@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 try {
     Write-Host ""
     Write-Host "  metal — Our Lady of the Miraculous Metal" -ForegroundColor Cyan
-    Write-Host "  v8 — 2026-03-20" -ForegroundColor DarkGray
+    Write-Host "  v9 — 2026-03-20" -ForegroundColor DarkGray
     Write-Host "  Bootstrap starting..." -ForegroundColor Cyan
     Write-Host ""
 
@@ -59,8 +59,19 @@ try {
         Write-Host "  ================================================" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "[2/4] Opening browser for GitHub login..." -ForegroundColor Yellow
-        gh auth login --hostname github.com --git-protocol https --web --clipboard
-        if ($LASTEXITCODE -ne 0) { throw "gh auth failed — run this script again to retry" }
+        $prevEAP2 = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        gh auth login --hostname github.com --git-protocol https --web --clipboard 2>&1
+        $ErrorActionPreference = $prevEAP2
+
+        # Verify auth actually worked (don't trust exit code — gh writes to stderr on success too)
+        $ErrorActionPreference = "Continue"
+        $null = gh auth status 2>&1
+        $loginOk = ($LASTEXITCODE -eq 0)
+        $ErrorActionPreference = $prevEAP2
+
+        if (-not $loginOk) { throw "gh auth failed — run this script again to retry" }
+        Write-Host "  Authenticated successfully." -ForegroundColor Green
     }
 
     # Step 3: Clone metal repo (skip if already cloned)
