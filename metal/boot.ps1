@@ -50,11 +50,9 @@ try {
     if ($authOk) {
         Write-Host "[2/4] Already authenticated with GitHub. Skipping." -ForegroundColor Green
     } else {
-        Write-Host "[2/4] Authenticate with GitHub..." -ForegroundColor Yellow
-        Write-Host "  Select: GitHub.com > HTTPS > Yes > Login with a web browser" -ForegroundColor Gray
-        Write-Host ""
-        gh auth login
-        if ($LASTEXITCODE -ne 0) { throw "gh auth failed" }
+        Write-Host "[2/4] Opening browser for GitHub login..." -ForegroundColor Yellow
+        gh auth login --hostname github.com --git-protocol https --web
+        if ($LASTEXITCODE -ne 0) { throw "gh auth failed — run this script again to retry" }
     }
 
     # Step 3: Clone metal repo (skip if already cloned)
