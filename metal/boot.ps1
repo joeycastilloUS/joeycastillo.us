@@ -12,7 +12,7 @@ try {
 
     # Step 1: Install GitHub CLI
     Write-Host "[1/4] Installing GitHub CLI..." -ForegroundColor Yellow
-    winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements
+    winget install --id GitHub.cli -e --source winget --accept-source-agreements --accept-package-agreements
 
     # Reload PATH from registry so we can find gh
     $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
