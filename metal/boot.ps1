@@ -45,7 +45,7 @@ try {
     } else {
         Write-Host "[2/4] Authenticate with GitHub..." -ForegroundColor Yellow
         Write-Host "  Opening GitHub login in your browser..." -ForegroundColor Gray
-        gh auth login --web --git-protocol https
+        gh auth login --hostname github.com --git-protocol https --web
         if ($LASTEXITCODE -ne 0) { throw "gh auth failed" }
     }
 
