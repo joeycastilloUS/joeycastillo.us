@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 try {
     Write-Host ""
     Write-Host "  metal — Our Lady of the Miraculous Metal" -ForegroundColor Cyan
-    Write-Host "  v11 — 2026-03-20" -ForegroundColor DarkGray
+    Write-Host "  v12 — 2026-03-20" -ForegroundColor DarkGray
     Write-Host "  Bootstrap starting..." -ForegroundColor Cyan
     Write-Host ""
 
@@ -110,11 +110,11 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "clone failed" }
     }
 
-    # Step 5: Launch (always runs latest go.bat)
+    # Step 5: Launch (always runs latest go-runtime.bat)
     Write-Host ""
     Write-Host "[5/5] Launching metal..." -ForegroundColor Yellow
     Set-Location C:\metal
-    & .\go.bat
+    & .\go-runtime.bat
 
 } catch {
     Write-Host ""
