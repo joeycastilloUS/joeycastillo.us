@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 try {
     Write-Host ""
     Write-Host "  metal — Our Lady of the Miraculous Metal" -ForegroundColor Cyan
-    Write-Host "  v7 — 2026-03-20" -ForegroundColor DarkGray
+    Write-Host "  v8 — 2026-03-20" -ForegroundColor DarkGray
     Write-Host "  Bootstrap starting..." -ForegroundColor Cyan
     Write-Host ""
 
@@ -51,8 +51,15 @@ try {
     if ($authOk) {
         Write-Host "[2/4] Already authenticated with GitHub. Skipping." -ForegroundColor Green
     } else {
+        Write-Host ""
+        Write-Host "  ================================================" -ForegroundColor Cyan
+        Write-Host "  GitHub will show a code below. It's also copied" -ForegroundColor Cyan
+        Write-Host "  to your clipboard. Paste it in the browser when" -ForegroundColor Cyan
+        Write-Host "  asked to authorize the app." -ForegroundColor Cyan
+        Write-Host "  ================================================" -ForegroundColor Cyan
+        Write-Host ""
         Write-Host "[2/4] Opening browser for GitHub login..." -ForegroundColor Yellow
-        gh auth login --hostname github.com --git-protocol https --web
+        gh auth login --hostname github.com --git-protocol https --web --clipboard
         if ($LASTEXITCODE -ne 0) { throw "gh auth failed — run this script again to retry" }
     }
 
