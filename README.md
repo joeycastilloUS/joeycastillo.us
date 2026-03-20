@@ -1,11 +1,6 @@
-# metal
+# joeycastillo.us
 
-*Dedicated to Our Lady of the Miraculous Metal.*
+Personal site. Hosted on Cloudflare Pages.
 
-Open PowerShell as Administrator. Paste this:
-
-```powershell
-irm https://joeycastillo.us/boot.ps1 | iex
-```
-
-That's it.
+- [joeycastillo.us](https://joeycastillo.us) — home
+- [joeycastillo.us/metal](https://joeycastillo.us/metal) — machine bootstrap
