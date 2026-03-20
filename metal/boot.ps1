@@ -7,16 +7,41 @@ $ErrorActionPreference = "Stop"
 try {
     Write-Host ""
     Write-Host "  metal — Our Lady of the Miraculous Metal" -ForegroundColor Cyan
-    Write-Host "  v9 — 2026-03-20" -ForegroundColor DarkGray
+    Write-Host "  v10 — 2026-03-20" -ForegroundColor DarkGray
     Write-Host "  Bootstrap starting..." -ForegroundColor Cyan
     Write-Host ""
 
-    # Step 1: Install GitHub CLI (skip if already installed)
+    # Step 1: Install Git (skip if already installed)
+    $gitPath = Get-Command git -ErrorAction SilentlyContinue
+    if ($gitPath) {
+        Write-Host "[1/5] Git already installed. Skipping." -ForegroundColor Green
+    } else {
+        Write-Host "[1/5] Installing Git..." -ForegroundColor Yellow
+        winget install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements
+
+        # Reload PATH from registry
+        $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+        $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+        $env:PATH = "$machinePath;$userPath"
+
+        # Fallback locations
+        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+            $env:PATH += ";C:\Program Files\Git\cmd"
+        }
+
+        $gitPath = Get-Command git -ErrorAction SilentlyContinue
+        if (-not $gitPath) {
+            throw "git not found after install. Close this window, open a NEW PowerShell as Admin, and try again."
+        }
+        Write-Host "  git found at $($gitPath.Source)" -ForegroundColor Green
+    }
+
+    # Step 2: Install GitHub CLI (skip if already installed)
     $ghPath = Get-Command gh -ErrorAction SilentlyContinue
     if ($ghPath) {
-        Write-Host "[1/4] GitHub CLI already installed. Skipping." -ForegroundColor Green
+        Write-Host "[2/5] GitHub CLI already installed. Skipping." -ForegroundColor Green
     } else {
-        Write-Host "[1/4] Installing GitHub CLI..." -ForegroundColor Yellow
+        Write-Host "[2/5] Installing GitHub CLI..." -ForegroundColor Yellow
         winget install --id GitHub.cli -e --source winget --accept-source-agreements --accept-package-agreements
 
         # Reload PATH from registry
@@ -39,7 +64,7 @@ try {
         Write-Host "  gh found at $($ghPath.Source)" -ForegroundColor Green
     }
 
-    # Step 2: Authenticate (skip if already logged in)
+    # Step 3: Authenticate (skip if already logged in)
     # Temporarily allow non-terminating errors — gh auth status writes to stderr when not logged in,
     # and $ErrorActionPreference = "Stop" would throw before we get to the login step.
     $prevEAP = $ErrorActionPreference
@@ -49,7 +74,7 @@ try {
     $ErrorActionPreference = $prevEAP
 
     if ($authOk) {
-        Write-Host "[2/4] Already authenticated with GitHub. Skipping." -ForegroundColor Green
+        Write-Host "[3/5] Already authenticated with GitHub. Skipping." -ForegroundColor Green
     } else {
         Write-Host ""
         Write-Host "  ================================================" -ForegroundColor Cyan
@@ -58,7 +83,7 @@ try {
         Write-Host "  asked to authorize the app." -ForegroundColor Cyan
         Write-Host "  ================================================" -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "[2/4] Opening browser for GitHub login..." -ForegroundColor Yellow
+        Write-Host "[3/5] Opening browser for GitHub login..." -ForegroundColor Yellow
         $prevEAP2 = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         gh auth login --hostname github.com --git-protocol https --web --clipboard 2>&1
@@ -74,20 +99,20 @@ try {
         Write-Host "  Authenticated successfully." -ForegroundColor Green
     }
 
-    # Step 3: Clone metal repo (skip if already cloned)
+    # Step 4: Clone metal repo (skip if already cloned)
     if (Test-Path "C:\metal\go.bat") {
-        Write-Host "[3/4] metal repo already cloned. Pulling latest..." -ForegroundColor Green
+        Write-Host "[4/5] metal repo already cloned. Pulling latest..." -ForegroundColor Green
         Set-Location C:\metal
         git pull
     } else {
-        Write-Host "[3/4] Cloning metal repo..." -ForegroundColor Yellow
+        Write-Host "[4/5] Cloning metal repo..." -ForegroundColor Yellow
         gh repo clone joeycastilloUS/metal C:\metal
         if ($LASTEXITCODE -ne 0) { throw "clone failed" }
     }
 
-    # Step 4: Launch
+    # Step 5: Launch
     Write-Host ""
-    Write-Host "[4/4] Launching metal..." -ForegroundColor Yellow
+    Write-Host "[5/5] Launching metal..." -ForegroundColor Yellow
     Set-Location C:\metal
     & .\go.bat
 
