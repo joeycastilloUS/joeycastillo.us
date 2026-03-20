@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 try {
     Write-Host ""
     Write-Host "  metal — Our Lady of the Miraculous Metal" -ForegroundColor Cyan
+    Write-Host "  v7 — 2026-03-20" -ForegroundColor DarkGray
     Write-Host "  Bootstrap starting..." -ForegroundColor Cyan
     Write-Host ""
 
