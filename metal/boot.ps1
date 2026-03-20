@@ -39,13 +39,21 @@ try {
     }
 
     # Step 2: Authenticate (skip if already logged in)
-    $authStatus = gh auth status 2>&1
-    if ($LASTEXITCODE -eq 0) {
+    # Temporarily allow non-terminating errors — gh auth status writes to stderr when not logged in,
+    # and $ErrorActionPreference = "Stop" would throw before we get to the login step.
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $null = gh auth status 2>&1
+    $authOk = ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = $prevEAP
+
+    if ($authOk) {
         Write-Host "[2/4] Already authenticated with GitHub. Skipping." -ForegroundColor Green
     } else {
         Write-Host "[2/4] Authenticate with GitHub..." -ForegroundColor Yellow
-        Write-Host "  Opening GitHub login in your browser..." -ForegroundColor Gray
-        gh auth login --hostname github.com --git-protocol https --web
+        Write-Host "  Select: GitHub.com > HTTPS > Yes > Login with a web browser" -ForegroundColor Gray
+        Write-Host ""
+        gh auth login
         if ($LASTEXITCODE -ne 0) { throw "gh auth failed" }
     }
 
