@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 try {
     Write-Host ""
     Write-Host "  metal — Our Lady of the Miraculous Metal" -ForegroundColor Cyan
-    Write-Host "  v10 — 2026-03-20" -ForegroundColor DarkGray
+    Write-Host "  v11 — 2026-03-20" -ForegroundColor DarkGray
     Write-Host "  Bootstrap starting..." -ForegroundColor Cyan
     Write-Host ""
 
@@ -99,18 +99,18 @@ try {
         Write-Host "  Authenticated successfully." -ForegroundColor Green
     }
 
-    # Step 4: Clone metal repo (skip if already cloned)
-    if (Test-Path "C:\metal\go.bat") {
-        Write-Host "[4/5] metal repo already cloned. Pulling latest..." -ForegroundColor Green
+    # Step 4: Clone or update metal repo (always pulls latest)
+    if (Test-Path "C:\metal\.git") {
+        Write-Host "[4/5] Pulling latest metal..." -ForegroundColor Yellow
         Set-Location C:\metal
-        git pull
+        git pull --ff-only
     } else {
         Write-Host "[4/5] Cloning metal repo..." -ForegroundColor Yellow
         gh repo clone joeycastilloUS/metal C:\metal
         if ($LASTEXITCODE -ne 0) { throw "clone failed" }
     }
 
-    # Step 5: Launch
+    # Step 5: Launch (always runs latest go.bat)
     Write-Host ""
     Write-Host "[5/5] Launching metal..." -ForegroundColor Yellow
     Set-Location C:\metal
