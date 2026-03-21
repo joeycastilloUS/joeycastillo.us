@@ -90,9 +90,4 @@ fi
 echo ""
 echo "[5/5] Launching metal..."
 cd "$METAL_DIR"
-if [[ -f "go-runtime.sh" ]]; then
-    bash go-runtime.sh
-else
-    echo "  metal cloned to $METAL_DIR"
-    echo "  Run: cd $METAL_DIR && ./go.sh setup"
-fi
+bash go-runtime.sh
