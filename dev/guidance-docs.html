@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADD — Architecture Driven Development — Claude Code Edition</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; color: #d4d4d4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; line-height: 1.7; }
+.top-nav { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: center; gap: 1.5rem; padding: 0.75rem 1rem; background: #0a0a0a; border-bottom: 1px solid #1a1a1a; z-index: 10; flex-wrap: wrap; }
+.top-nav a { color: #666; text-decoration: none; font-size: 0.8rem; transition: color 0.2s; }
+.top-nav a:hover { color: #4ec9b0; }
+.sidebar { position: fixed; top: 2.5rem; left: 0; width: 200px; height: calc(100vh - 2.5rem); background: #111; border-right: 1px solid #1a1a1a; padding: 1.5rem 1rem; overflow-y: auto; }
+.sidebar a { display: block; color: #666; text-decoration: none; font-size: 0.8rem; padding: 0.4rem 0.5rem; border-radius: 4px; transition: all 0.2s; font-family: monospace; }
+.sidebar a:hover { color: #4ec9b0; background: #1a1a1a; }
+.content { margin-left: 200px; margin-top: 2.5rem; max-width: 860px; padding: 2rem 3rem 4rem; }
+section { margin-bottom: 4rem; padding-top: 1rem; }
+.file-label { font-family: monospace; font-size: 0.75rem; color: #4ec9b0; background: #1a1a1a; display: inline-block; padding: 0.2rem 0.75rem; border-radius: 4px; margin-bottom: 1.5rem; border: 1px solid #333; }
+h1 { font-size: 2rem; font-weight: 300; color: #fff; margin: 1.5rem 0 1rem; border-bottom: 1px solid #222; padding-bottom: 0.5rem; }
+h2 { font-size: 1.4rem; font-weight: 400; color: #e0e0e0; margin: 2rem 0 0.75rem; border-bottom: 1px solid #1a1a1a; padding-bottom: 0.3rem; }
+h3 { font-size: 1.1rem; font-weight: 500; color: #ccc; margin: 1.5rem 0 0.5rem; }
+p { margin: 0.75rem 0; color: #bbb; }
+blockquote { border-left: 3px solid #4ec9b0; padding: 0.5rem 1rem; margin: 1rem 0; background: #111; border-radius: 0 4px 4px 0; }
+blockquote p { color: #999; font-size: 0.9rem; }
+ul, ol { margin: 0.75rem 0 0.75rem 1.5rem; color: #bbb; }
+li { margin: 0.3rem 0; }
+code { font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; font-size: 0.85em; background: #1a1a1a; padding: 0.15rem 0.4rem; border-radius: 3px; color: #4ec9b0; }
+pre { background: #141414; border: 1px solid #222; border-radius: 6px; padding: 1rem 1.25rem; overflow-x: auto; margin: 1rem 0; font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; font-size: 0.82rem; line-height: 1.5; color: #ccc; }
+pre code { background: none; padding: 0; color: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #222; padding: 0.5rem 0.75rem; text-align: left; font-size: 0.85rem; }
+th { background: #1a1a1a; color: #ccc; }
+td { color: #999; }
+strong { color: #e0e0e0; }
+em { color: #bbb; }
+a { color: #4ec9b0; text-decoration: none; }
+a:hover { text-decoration: underline; }
+@media (max-width: 768px) { .sidebar { display: none; } .content { margin-left: 0; padding: 1.5rem; } }
+</style>
+</head>
+<body>
+<nav class="top-nav">
+    <a href="https://joeycastillo.us">joeycastillo.us</a>
+    <a href="https://ai-pantheon.ai">ai-pantheon.ai</a>
+    <a href="https://kastil-systems.com">kastil-systems.com</a>
+    <a href="https://acmedev.com">acmedev.com</a>
+    <a href="https://meet.google.com/iop-ubmm-hqc">meet now</a>
+</nav>
+<div class="sidebar">
+    <div style="color:#888;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">a-d-d-guidance</div>
+    <a href="#PRIMER.md">PRIMER.md</a><a href="#GLOBAL.md">GLOBAL.md</a><a href="#CLAUDE.md">CLAUDE.md</a><a href="#README.md">README.md</a><a href="#NOTICE">NOTICE</a><a href="#.gitignore">.gitignore</a>
+    <div style="margin-top:1rem;color:#888;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Scripts</div>
+    <a href="#" style="color:#444;cursor:default;">go.bat</a>
+    <a href="#" style="color:#444;cursor:default;">go.sh</a>
+</div>
+<div class="content">
+    <section id="PRIMER.md"><div class="file-label">PRIMER.md</div><!-- CONFIDENTIAL - TRADE SECRET - Property of <OWNER> - All rights reserved -->
+
+<h1>ADD — Architecture Driven Development</h1>
+<p><strong>You design the architecture. The AI builds the code.</strong></p>
+<h2>The Idea</h2>
+<p>Software has two jobs: deciding what to build and building it. ADD splits
+them cleanly. The human owns the architecture — the what, the why, the
+constraints. The AI owns the implementation — the code, the tests, the
+deployment. Neither crosses the line without permission.</p>
+<h2>How It Works</h2>
+<div class="codehilite"><pre><span></span><code>Human: &quot;Here&#39;s what I want.&quot;
+  AI: &quot;Here&#39;s how I&#39;d build it. Approve?&quot;
+Human: &quot;Yes.&quot;
+  AI: builds, tests, deploys
+  AI: &quot;Done. I found an edge case — here&#39;s a spec update. Approve?&quot;
+Human: &quot;Yes.&quot;
+  AI: updates spec, updates tests, updates code
+</code></pre></div>
+
+<p>That's the whole loop. Everything flows through the architecture folder
+(<code>a-d-d/</code>), which is the single source of truth.</p>
+<h2>The Structure</h2>
+<p>Every project has an <code>a-d-d/</code> folder. Inside it:</p>
+<table>
+<thead>
+<tr>
+<th>Folder</th>
+<th>Contains</th>
+<th>Who Writes It</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;intent&gt;/</code></td>
+<td>WHY — the deployable goal</td>
+<td>Human approves, AI proposes</td>
+</tr>
+<tr>
+<td><code>&lt;intent&gt;/&lt;purpose&gt;/</code></td>
+<td>WHAT FOR — capabilities</td>
+<td>Human approves, AI proposes</td>
+</tr>
+<tr>
+<td><code>&lt;intent&gt;/&lt;purpose&gt;/skill/</code></td>
+<td>HOW — individual C libraries</td>
+<td>Human approves, AI proposes</td>
+</tr>
+<tr>
+<td><code>target/</code></td>
+<td>WHERE — hardware and deployment specs</td>
+<td>Human approves, AI proposes</td>
+</tr>
+<tr>
+<td><code>board/</code></td>
+<td>Kanban boards — work items as triples</td>
+<td>AI updates operationally</td>
+</tr>
+<tr>
+<td><code>user/</code></td>
+<td>Per-person preferences</td>
+<td>AI updates with approval</td>
+</tr>
+</tbody>
+</table>
+<p>The AI also has a code folder (<code>&lt;intent&gt;/</code>) where it writes the actual
+implementation. Architecture and code are separate trees.</p>
+<h2>The Cycle</h2>
+<ol>
+<li>
+<p><strong>Discovery</strong> — The AI interviews the human. What are you building? For
+   whom? On what hardware? What's your philosophy? No code. Just talking.</p>
+</li>
+<li>
+<p><strong>Shaping</strong> — The conversation becomes work items. Each sized at Fibonacci
+   3-5 (well below the AI's capability ceiling — reliability over ambition).
+   Ordered by dependency. Written to kanban boards.</p>
+</li>
+<li>
+<p><strong>Pull</strong> — The AI pulls the next ready item from the board. Locks it.
+   Writes tests that fail. Implements until they pass. Integrates. Moves to
+   done. Pulls next.</p>
+</li>
+<li>
+<p><strong>Deploy</strong> — Push to main. CI/CD fires. The AI verifies the deployment
+   is healthy.</p>
+</li>
+<li>
+<p><strong>Retrospective</strong> — What worked, what didn't, what changes. Feeds back
+   into the next cycle.</p>
+</li>
+</ol>
+<h2>The Board</h2>
+<p>Work items are triples — simple facts:</p>
+<div class="codehilite"><pre><span></span><code>{skill/hash, status, done}
+{skill/hash, description, hash table}
+{skill/hash, size, 3}
+
+{skill/store, status, ready}
+{skill/store, depends-on, skill/hash}
+</code></pre></div>
+
+<p>The board is a file in <code>a-d-d/board/</code>, checked into git. Coordination across
+terminals and workstations happens through GitHub — pull the latest board,
+lock your item (<code>in-progress</code>), commit and push. Other threads see the lock
+and skip it.</p>
+<h2>The Rules</h2>
+<ul>
+<li><strong>Pure C</strong> for production code. No external libraries. Roll your own.</li>
+<li><strong>Tests first.</strong> They must fail before implementation. If they pass, the
+  tests are wrong.</li>
+<li><strong>Architecture before code.</strong> Always flow up before down. If the code
+  reveals something, update <code>a-d-d/</code> first, then tests, then code.</li>
+<li><strong>The AI never writes to <code>a-d-d/</code> without human approval.</strong> Board state
+  is the one exception — it's operational, not architectural.</li>
+</ul>
+<h2>The Tooling</h2>
+<p>The AI owns the developer experience. Missing compiler? Install it. Broken
+PATH? Fix it. The "no dependencies" rule applies to production code, not
+dev tooling.</p>
+<h2>Getting Started</h2>
+<div class="codehilite"><pre><span></span><code><span class="n">go</span><span class="w"> </span><span class="n">setup</span><span class="w">     </span><span class="c1"># install the toolchain</span>
+<span class="n">go</span><span class="w"> </span><span class="n">init</span><span class="w">      </span><span class="c1"># create a workspace, start the discovery interview</span>
+<span class="n">go</span><span class="w">           </span><span class="c1"># launch the AI</span>
+</code></pre></div>
+
+<p>That's it. The AI takes it from there.</p>
+<h2>This Edition</h2>
+<p>This is the <strong>Claude Code Edition</strong>. The methodology is AI-agnostic — swap
+the engine, keep the architecture. <code>a-d-d-guidance/</code> is the template that
+seeds every new project's <code>a-d-d/</code> folder.</p></section>
+<section id="GLOBAL.md"><div class="file-label">GLOBAL.md</div><!-- CONFIDENTIAL - TRADE SECRET - Property of <OWNER> - All rights reserved -->
+
+<h1><PROJECT> — Global Rules</h1>
+<h2>Architecture Driven Development (ADD) — Claude Code Edition</h2>
+<blockquote>
+<p>ADD is a methodology for AI-driven development. The process is AI-agnostic —
+swap the engine, keep the architecture. This edition uses
+<a href="https://claude.ai/code">Claude Code</a>.</p>
+</blockquote>
+<p><strong><code>a-d-d-guidance/</code></strong> is the seed — the methodology template. When <code>go init</code>
+creates a new project, it copies the guidance into the project's <strong><code>a-d-d/</code></strong>
+folder. From that point on, <code>a-d-d/</code> is the living architecture for that
+project. Everything below describes what happens at runtime in <code>a-d-d/</code>.</p>
+<p>The <code>a-d-d/</code> folder is the single source of truth for architecture. It is a living
+document — constantly evolving, always human-approved. The AI is a steward of
+<code>a-d-d/</code>, never an owner.</p>
+<h3>Stewardship — The Core Rule</h3>
+<p><strong>The AI never writes to <code>a-d-d/</code> without explicit human approval.</strong> No exceptions.</p>
+<ul>
+<li>The AI may <strong>read</strong> <code>a-d-d/</code> at any time.</li>
+<li>The AI may <strong>propose</strong> changes to <code>a-d-d/</code> at any time — show the diff, explain
+  why, and wait.</li>
+<li>The AI may <strong>write</strong> to <code>a-d-d/</code> only after the human says yes.</li>
+<li>When implementation reveals something that changes the spec (edge case, new
+  dependency, interface change), the AI <strong>stops</strong>, presents the finding, proposes
+  the <code>a-d-d/</code> update, and waits. Only after approval: update <code>a-d-d/</code>, then
+  update related tests, then update code. Always in that order.</li>
+<li><strong>Board state</strong> (<code>a-d-d/board/</code>) is the one exception — The AI updates board
+  files as it pulls and completes work items, because board state is operational,
+  not architectural. The human can see every move in the git diff.</li>
+</ul>
+<p><strong>The flow is always up before down:</strong> discovery → a-d-d → tests → code.
+Even when insight comes from code, it flows back up to <code>a-d-d/</code> first.</p>
+<h3>On Startup — State Detection</h3>
+<p>Read ALL .md and skill.json files in <code>a-d-d/</code> and the workspace root. Also
+read the board files in <code>a-d-d/board/</code>. Check for state markers on the board
+and act accordingly:</p>
+<ul>
+<li><strong>(A) Discovery</strong> — no <code>{discovery, status, done}</code> marker on any board. Specs
+  are missing or empty stubs. Do not code. Follow <strong>First Session — Discovery</strong>.</li>
+<li><strong>(B) Architecture exists, no board</strong> — <code>{discovery, status, done}</code> exists but
+  no work items on the board yet. Follow <strong>Shaping</strong>.</li>
+<li><strong>(C) Board exists with work items</strong> — read the board. Check <code>a-d-d/</code> for
+  changes since last session. If specs changed, reshape. Otherwise pull the
+  next ready item and follow the <strong>Pull</strong> cycle.</li>
+<li><strong>(D) All done</strong> — every work item is <code>done</code>. Follow <strong>Retrospective</strong>.</li>
+</ul>
+<p><strong>State markers</strong> are triples on the board that track lifecycle:</p>
+<div class="codehilite"><pre><span></span><code>{discovery, status, in-progress}     ← currently interviewing
+{discovery, status, done}            ← architecture approved
+{shaping, status, in-progress}       ← decomposing work items
+{shaping, status, done}              ← board approved, ready to pull
+</code></pre></div>
+
+<p>The AI writes these as it transitions between phases. They survive session
+crashes — the next launch reads the board and picks up where it left off.</p>
+<h3>Hierarchy</h3>
+<div class="codehilite"><pre><span></span><code><span class="o">&lt;</span><span class="n">workspace</span><span class="o">&gt;/</span>
+<span class="w">  </span><span class="n">a</span><span class="o">-</span><span class="n">d</span><span class="o">-</span><span class="n">d</span><span class="o">/</span><span class="w">              </span><span class="err">←</span><span class="w"> </span><span class="n">architecture</span><span class="w"> </span><span class="n">repo</span><span class="w"> </span><span class="p">(</span><span class="n">human</span><span class="o">-</span><span class="n">approved</span><span class="p">,</span><span class="w"> </span><span class="n">AI</span><span class="o">-</span><span class="n">stewarded</span><span class="p">)</span>
+<span class="w">    </span><span class="o">&lt;</span><span class="n">intent</span><span class="o">&gt;/</span><span class="w">         </span><span class="err">←</span><span class="w"> </span><span class="n">WHY</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="n">deployable</span><span class="w"> </span><span class="n">goals</span>
+<span class="w">      </span><span class="o">&lt;</span><span class="n">purpose</span><span class="o">&gt;/</span><span class="w">      </span><span class="err">←</span><span class="w"> </span><span class="n">WHAT</span><span class="w"> </span><span class="n">FOR</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="n">capabilities</span>
+<span class="w">        </span><span class="n">skill</span><span class="o">/</span>
+<span class="w">          </span><span class="o">&lt;</span><span class="n">skill</span><span class="o">&gt;/</span><span class="w">    </span><span class="err">←</span><span class="w"> </span><span class="n">HOW</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="n">individual</span><span class="w"> </span><span class="n">skill</span>
+<span class="w">    </span><span class="n">target</span><span class="o">/</span><span class="w">           </span><span class="err">←</span><span class="w"> </span><span class="n">WHERE</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="n">specs</span><span class="w"> </span><span class="p">(</span><span class="n">hardware</span><span class="p">,</span><span class="w"> </span><span class="n">toolchain</span><span class="p">,</span><span class="w"> </span><span class="n">what</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">pull</span><span class="p">)</span>
+<span class="w">      </span><span class="o">&lt;</span><span class="n">target</span><span class="o">&gt;/</span>
+<span class="w">        </span><span class="n">CLAUDE</span><span class="o">.</span><span class="n">md</span>
+<span class="w">    </span><span class="n">site</span><span class="o">/</span><span class="w">             </span><span class="err">←</span><span class="w"> </span><span class="n">public</span><span class="w"> </span><span class="n">microsites</span><span class="w"> </span><span class="p">(</span><span class="n">Cloudflare</span><span class="w"> </span><span class="n">Pages</span><span class="w"> </span><span class="n">specs</span><span class="p">)</span>
+<span class="w">      </span><span class="o">&lt;</span><span class="n">site</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;/</span>
+<span class="w">        </span><span class="n">CLAUDE</span><span class="o">.</span><span class="n">md</span>
+<span class="w">    </span><span class="n">board</span><span class="o">/</span><span class="w">            </span><span class="err">←</span><span class="w"> </span><span class="n">kanban</span><span class="w"> </span><span class="n">boards</span><span class="w"> </span><span class="p">(</span><span class="n">one</span><span class="w"> </span><span class="n">per</span><span class="w"> </span><span class="n">workstream</span><span class="p">,</span><span class="w"> </span><span class="n">checked</span><span class="w"> </span><span class="ow">in</span><span class="p">)</span>
+<span class="w">      </span><span class="o">&lt;</span><span class="n">workstream</span><span class="o">&gt;.</span><span class="n">md</span>
+<span class="w">    </span><span class="n">user</span><span class="o">/</span><span class="w">             </span><span class="err">←</span><span class="w"> </span><span class="n">user</span><span class="w"> </span><span class="n">preferences</span><span class="w"> </span><span class="p">(</span><span class="n">one</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="n">per</span><span class="w"> </span><span class="n">person</span><span class="p">,</span><span class="w"> </span><span class="n">portable</span><span class="p">)</span>
+<span class="w">      </span><span class="o">&lt;</span><span class="n">name</span><span class="o">&gt;.</span><span class="n">md</span>
+<span class="w">  </span><span class="o">&lt;</span><span class="n">intent</span><span class="o">&gt;/</span><span class="w">           </span><span class="err">←</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="n">repo</span><span class="w"> </span><span class="p">(</span><span class="n">the</span><span class="w"> </span><span class="n">AI</span><span class="s1">&#39;s domain)</span>
+<span class="w">    </span><span class="o">.</span><span class="n">github</span><span class="o">/</span>
+<span class="w">      </span><span class="n">workflows</span><span class="o">/</span>
+<span class="w">        </span><span class="n">deploy</span><span class="o">.</span><span class="n">yml</span><span class="w">    </span><span class="err">←</span><span class="w"> </span><span class="n">GitHub</span><span class="w"> </span><span class="n">Action</span><span class="p">:</span><span class="w"> </span><span class="n">push</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">main</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Cloudflare</span><span class="w"> </span><span class="n">Pages</span><span class="w"> </span><span class="n">deploy</span>
+<span class="w">    </span><span class="o">&lt;</span><span class="n">purpose</span><span class="o">&gt;/</span>
+<span class="w">      </span><span class="n">skill</span><span class="o">/</span>
+<span class="w">        </span><span class="o">&lt;</span><span class="n">skill</span><span class="o">&gt;/</span>
+<span class="w">      </span><span class="n">tests</span><span class="o">/</span>
+<span class="w">      </span><span class="n">Makefile</span><span class="w">        </span><span class="err">←</span><span class="w"> </span><span class="n">dev</span><span class="o">/</span><span class="n">test</span><span class="w"> </span><span class="n">builds</span>
+<span class="w">    </span><span class="n">target</span><span class="o">/</span>
+<span class="w">      </span><span class="o">&lt;</span><span class="n">target</span><span class="o">&gt;/</span>
+<span class="w">        </span><span class="n">main</span><span class="o">.</span><span class="n">c</span><span class="w">        </span><span class="err">←</span><span class="w"> </span><span class="n">entry</span><span class="w"> </span><span class="n">point</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="n">wires</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="n">skills</span><span class="w"> </span><span class="n">together</span>
+<span class="w">        </span><span class="n">Makefile</span><span class="w">       </span><span class="err">←</span><span class="w"> </span><span class="n">flat</span><span class="w"> </span><span class="n">compile</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="n">hardware</span>
+<span class="w">    </span><span class="n">site</span><span class="o">/</span>
+<span class="w">      </span><span class="o">&lt;</span><span class="n">site</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;/</span>
+<span class="w">        </span><span class="n">index</span><span class="o">.</span><span class="n">html</span><span class="w">    </span><span class="err">←</span><span class="w"> </span><span class="n">public</span><span class="w"> </span><span class="n">microsite</span><span class="w"> </span><span class="p">(</span><span class="n">Cloudflare</span><span class="w"> </span><span class="n">Pages</span><span class="p">)</span>
+</code></pre></div>
+
+<h3>First Session — Discovery</h3>
+<p>When the AI launches into a fresh or empty workspace:</p>
+<ol>
+<li><strong>Interview</strong> — don't start coding. Start talking. These are starting points,
+   not a rigid checklist — follow the conversation wherever it goes.</li>
+<li>What are you building? What's the driving idea?</li>
+<li>Who is it for? What problem does it solve?</li>
+<li>What hardware will it run on? What are the constraints?</li>
+<li>Where does this run? Bare metal? Cloud? Edge? On-prem? Multiple?</li>
+<li>How does it get deployed? CI/CD on push to main is the default —
+     which platform? (Recommend GCP Cloud Build.) Any special requirements?</li>
+<li>What's your philosophy? What principles drive the design?</li>
+<li>What does success look like?</li>
+<li>Does this need a web presence? Who is your domain host? (Recommend
+     Cloudflare — free tier, Pages for static sites, DNS, SSL, all in one.)</li>
+<li>What do you want to call this project? <strong>(required — fills <code>&lt;PROJECT&gt;</code>)</strong></li>
+<li>Who owns this? Name or organization. <strong>(required — fills <code>&lt;OWNER&gt;</code>.
+     If <code>go init</code> already set this, confirm or update.)</strong></li>
+<li>
+<p>"I don't know yet" is a valid answer for anything except project name and
+     owner — those two are required before scaffolding. Everything else can be
+     backlog and revisited later.</p>
+</li>
+<li>
+<p><strong>Propose</strong> — from the conversation, draft architecture:</p>
+</li>
+<li>Project name and owner (replaces <code>&lt;PROJECT&gt;</code> and <code>&lt;OWNER&gt;</code> throughout <code>a-d-d/</code>)</li>
+<li>Intent names and descriptions (the WHY)</li>
+<li>Purpose breakdown (the WHAT FOR)</li>
+<li>Initial skill inventory (the HOW)</li>
+<li>
+<p>Target platforms (the WHERE)</p>
+</li>
+<li>
+<p><strong>Confirm</strong> — present the proposed architecture. <strong>Wait for approval.</strong></p>
+</li>
+<li>
+<p><strong>Scaffold</strong> — only after approval: replace <code>&lt;PROJECT&gt;</code> and <code>&lt;OWNER&gt;</code>
+   throughout <code>a-d-d/</code>. Write CLAUDE.md specs and skill.json manifests with
+   real substance from the conversation — interfaces, data structures,
+   algorithms, not just empty stubs. Create code repos. The AI commits to
+   <code>a-d-d/</code> after scaffolding.</p>
+</li>
+</ol>
+<h3>Shaping</h3>
+<p>Conversation between human and the AI generates ideas of varying complexity.
+The AI's job is to decompose that raw material into optimally-sized work items.</p>
+<p><strong>The free-climbing principle:</strong> size every work item 2 grades below the AI's
+capability ceiling. If the AI can handle a Fibonacci 8 on a good day, size to
+3-5 so it lands clean every time. Throughput comes from reliability, not
+ambition. Never fall.</p>
+<ul>
+<li><strong>Fibonacci 3-5</strong> is the safety margin, not a target. Small enough to always
+  succeed. Large enough to be meaningful.</li>
+<li>If something is bigger than 5, decompose it until every piece is 3-5.</li>
+<li>If something is a 1-2, bundle it with the next related item.</li>
+<li><strong>When the user asks for something big</strong> — explain it needs to be broken down.
+  Use the climbing analogy: we don't climb at our limit, we climb where we're
+  sure-footed. Help the user see the smaller pieces inside the big ask.</li>
+<li><strong>After explaining sizing</strong> — ask the user if they'd like you to skip the
+  explanation next time. If they say yes, note it in <code>a-d-d/user/&lt;name&gt;.md</code>.</li>
+</ul>
+<p>Items that aren't ready to be shaped — unclear scope, missing information,
+dependent on a decision not yet made — go to <strong>backlog</strong> on the board. They
+stay visible but don't block the flow. The AI revisits backlog items during
+shaping whenever new information surfaces.</p>
+<p>Once shaped, the AI orders the work items:</p>
+<ol>
+<li><strong>Dependency graph</strong> — follow skill.json deps bottom-up. Leaves first.</li>
+<li><strong>Unblocking</strong> — what enables the most downstream work goes first.</li>
+<li><strong>Group by purpose</strong> — so integration testing is possible earlier.</li>
+<li><strong>Stack into boards</strong> — one board per independent workstream. Independent
+   purposes = independent boards = parallel threads.</li>
+</ol>
+<p>Write the boards to <code>a-d-d/board/</code>. Get approval.</p>
+<h3>Board Format</h3>
+<p>Each board is a tripleset at <code>a-d-d/board/&lt;workstream&gt;.md</code>. Every fact about
+a work item is a triple: <code>{subject, predicate, object}</code>.</p>
+<p><strong>Parsing rule:</strong> subject is before the first comma. Predicate is between the
+first and second comma. Object is everything from after the second comma to the
+closing brace. This means objects can contain commas freely — no escaping needed.</p>
+<div class="codehilite"><pre><span></span><code>{skill/hash, status, done}
+{skill/hash, description, hash table}
+{skill/hash, size, 3}
+
+{skill/store, status, ready}
+{skill/store, description, key-value store}
+{skill/store, size, 5}
+{skill/store, depends-on, skill/hash}
+
+{skill/index, status, ready}
+{skill/index, description, triple index}
+{skill/index, size, 3}
+{skill/index, depends-on, skill/store}
+</code></pre></div>
+
+<p>Status values: <code>backlog</code>, <code>ready</code>, <code>in-progress</code>, <code>done</code>, <code>blocked</code>, <code>split</code>.</p>
+<ul>
+<li><code>backlog</code> — known but not yet shaped or sized. Revisit during shaping.</li>
+<li><code>ready</code> — shaped, sized, dependencies met. Can be pulled.</li>
+<li><code>in-progress</code> — actively being worked. <strong>This is the lock.</strong> If a thread
+  sees <code>in-progress</code>, it does not touch that item.</li>
+<li><code>done</code> — implemented, tested, integrated.</li>
+<li><code>blocked</code> — can't proceed. Add <code>{item, blocked-by, reason}</code> triple.</li>
+<li>
+<p><code>split</code> — item was too big. Original gets <code>split</code>, children get <code>ready</code>:
+  <code>{skill/foo, status, split}
+  {skill/foo, split-into, skill/foo-parse}
+  {skill/foo, split-into, skill/foo-emit}
+  {skill/foo-parse, status, ready}
+  {skill/foo-parse, size, 3}
+  {skill/foo-emit, status, ready}
+  {skill/foo-emit, size, 3}</code></p>
+</li>
+<li>
+<p>Every fact is a triple. Status, size, dependencies, descriptions — all triples.</p>
+</li>
+<li>The AI updates status triples as it pulls and completes work items.</li>
+<li>Board state is checked in and always respected — The AI reads the board on
+  startup and never skips or reorders items without approval.</li>
+<li>If a work item blows past its estimate mid-flight, the AI stops, explains
+  why it's bigger than expected, splits the item, updates the board, and gets
+  approval before continuing.</li>
+<li>Triples are queryable — The AI can reason over the board the same way it
+  reasons over any other knowledge.</li>
+<li><strong>Session recovery</strong> — if a session ends (budget, crash, user closes), run
+  <code>go -c</code> to continue or <code>go</code> to start fresh. The AI reads the board on startup
+  and picks up from the last in-progress or next ready item.</li>
+</ul>
+<h3>Pull</h3>
+<p>The execution cycle. The AI pulls the next ready item from the board:</p>
+<ol>
+<li><strong>Read a-d-d/</strong> — always read from <code>a-d-d/</code> directly (the source of truth),
+   never from the synced copies in code repos. If specs changed since the board
+   was written, stop and reshape.</li>
+<li><strong>Lock</strong> — set the item to <code>in-progress</code> and commit the board. This is
+   the lock — other threads will see it and skip.</li>
+<li><strong>Confirm spec</strong> — the skill's CLAUDE.md and skill.json match what you're
+   about to build. If not, stop and align with the user.</li>
+<li><strong>Test</strong> — write unit tests that prove the spec. Tests must FAIL. If they
+   pass before implementation, the tests are wrong.</li>
+<li><strong>Implement</strong> — write the <code>.c</code> + <code>.h</code> until all tests go green.</li>
+<li><strong>Integrate</strong> — build the purpose Makefile with all implemented skills so far.
+   Link. Run. If it links and the combined test passes, integration is good.</li>
+<li><strong>Reflect</strong> — if implementation revealed anything: <strong>stop</strong>. Present the
+   finding. Propose the <code>a-d-d/</code> update. Wait for approval. Then update
+   <code>a-d-d/</code> → tests → code. Always up before down.</li>
+<li><strong>Update board</strong> — move the item to done. Commit the work and the board.</li>
+<li><strong>Pull next</strong> — check the board, pull the next ready item. Repeat.</li>
+<li><strong>Target assembly</strong> — when all skills for a target are done, wire them up.
+    Flat-copy all skill <code>.c</code> and <code>.h</code> into the target build dir. Write <code>main.c</code>.
+    Compile with the target Makefile. If it builds, the assembly is good.</li>
+<li><strong>Deploy</strong> — push to main. CI/CD (Cloud Build) fires: builds, tests,
+    deploys. Verify the deployment is healthy. If deploy fails, treat it like
+    any other failure — stop, diagnose, fix the pipeline config or target spec.</li>
+<li><strong>Retrospective</strong> — after completing a workstream or major milestone, review
+    what worked, what didn't. Feed back into shaping.</li>
+</ol>
+<h3>Retrospective — When the Board Is Done</h3>
+<p>When every work item is <code>done</code>, the AI runs a retrospective:</p>
+<ol>
+<li><strong>What went well?</strong> — techniques, patterns, or decisions that worked.</li>
+<li><strong>What could be better?</strong> — friction points, surprises, things that took
+   longer than expected.</li>
+<li><strong>What do we commit to doing differently next iteration?</strong> — concrete
+   changes to process, architecture, or approach.</li>
+</ol>
+<p>Present the retro to the user. If it surfaces changes to the methodology or
+architecture, propose <code>a-d-d/</code> updates and wait for approval. The retro feeds
+directly into the next shaping cycle — or into the decision to ship.</p>
+<h3>Threading</h3>
+<p>Independent workstreams run in parallel. Open multiple terminals, run <code>go</code> in
+each. Every thread reads the same board and pulls the next ready item.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">terminal</span><span class="w"> </span><span class="mi">1</span><span class="err">:</span><span class="w">  </span><span class="k">go</span><span class="w">     </span><span class="err">→</span><span class="w"> </span><span class="n">pulls</span><span class="w"> </span><span class="k">next</span><span class="w"> </span><span class="n">ready</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">board</span>
+<span class="n">terminal</span><span class="w"> </span><span class="mi">2</span><span class="err">:</span><span class="w">  </span><span class="k">go</span><span class="w">     </span><span class="err">→</span><span class="w"> </span><span class="n">pulls</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="k">next</span><span class="w"> </span><span class="n">one</span><span class="w"> </span><span class="p">(</span><span class="n">different</span><span class="w"> </span><span class="n">item</span><span class="p">)</span>
+<span class="n">terminal</span><span class="w"> </span><span class="mi">3</span><span class="err">:</span><span class="w">  </span><span class="k">go</span><span class="w">     </span><span class="err">→</span><span class="w"> </span><span class="n">pulls</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="k">next</span><span class="w"> </span><span class="n">one</span>
+</code></pre></div>
+
+<p>The dependency graph determines what can parallelize. If purpose-a and purpose-b
+share no skill dependencies, their work items are independent and threads can
+work them concurrently. If purpose-c depends on a skill from purpose-a, its
+work items stay <code>ready</code> until the dependency is <code>done</code>.</p>
+<p><strong>Locking is simple:</strong> <code>in-progress</code> is the lock. Before starting work:</p>
+<ol>
+<li><code>git pull</code> — get the latest board from GitHub</li>
+<li>Set the item to <code>in-progress</code></li>
+<li><code>git commit &amp;&amp; git push</code> — that's the lock</li>
+</ol>
+<p>Other threads <code>git pull</code> before pulling their next item. They see the
+<code>in-progress</code> status and skip it. Git is the coordination layer. GitHub is
+the remote. No separate lock files, no claim triples — the board is the lock.</p>
+<p>WIP limit per thread = 1. One work item at a time, landed clean, then pull next.</p>
+<h3>User Preferences</h3>
+<p>Each user has a preferences file at <code>a-d-d/user/&lt;name&gt;.md</code>. The launcher
+(<code>go.bat</code> or <code>go.sh</code>) creates one on <code>go init</code> using the system username and
+syncs it to <code>.user.md</code> at the workspace root on every launch so the AI reads
+it automatically.</p>
+<p>Preferences are checked in, portable, and travel with the project inside the
+<code>a-d-d/</code> repo. When the AI learns something about how a user likes to work
+(skip explanations, communication style, workflow preferences), it updates
+that user's file (with approval, like any <code>a-d-d/</code> change).</p>
+<h3>Code repos</h3>
+<p>Each intent has its own git repo. The AI owns the code. Architecture files
+are synced from <code>a-d-d/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Intent</th>
+<th>Repo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><!-- filled in during discovery --></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2>Foundational Principles</h2>
+<h3>Bare Metal</h3>
+<p>Every line of <strong>production code</strong> targets specific hardware. No external libraries.
+No third-party dependencies. Every skill implements what it needs from scratch —
+purpose-built for the target metal.</p>
+<p>This applies to the code being built, not the dev tooling. Compilers, build tools,
+scp, curl, ssh — those are the workbench, not the product.</p>
+<h3>Target — Where It All Comes Together</h3>
+<p>Targets are where skills become a running binary. Every skill is a part. Every
+purpose groups parts. The target is the assembly — one flat copy of every skill,
+one <code>main.c</code>, one Makefile, one static binary for the specific hardware.</p>
+<p><strong>The target build is dead simple:</strong>
+1. Flat-copy every <code>.c</code> and <code>.h</code> from every pulled skill into the target build dir
+2. Write <code>main.c</code> — the entry point that initializes and wires skills together
+3. One Makefile compiles everything with target-specific flags
+4. Out comes one static binary. No intermediate libraries. No purpose-level linking
+   at deploy time. Skills go straight into the final product.</p>
+<p>Purpose-level Makefiles are for <strong>testing during development</strong>. The target
+Makefile is for <strong>building the deployable</strong>. Different jobs.</p>
+<div class="codehilite"><pre><span></span><code><span class="nx">a</span><span class="o">-</span><span class="nx">d</span><span class="o">-</span><span class="nx">d</span><span class="o">/</span><span class="nx">target</span><span class="o">/</span><span class="p">&lt;</span><span class="nx">name</span><span class="p">&gt;</span><span class="o">/</span><span class="nx">CLAUDE</span><span class="p">.</span><span class="nx">md</span><span class="w"> </span><span class="nx">defines</span><span class="p">:</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">Hardware</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nx">platform</span><span class="w"> </span><span class="p">(</span><span class="nx">CPU</span><span class="p">,</span><span class="w"> </span><span class="nx">memory</span><span class="p">,</span><span class="w"> </span><span class="k">or</span><span class="w"> </span><span class="nx">cloud</span><span class="w"> </span><span class="nx">instance</span><span class="w"> </span><span class="k">type</span><span class="p">)</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">Toolchain</span><span class="w"> </span><span class="p">(</span><span class="nx">cross</span><span class="o">-</span><span class="nx">compiler</span><span class="p">,</span><span class="w"> </span><span class="nx">flags</span><span class="p">,</span><span class="w"> </span><span class="nx">linker</span><span class="w"> </span><span class="nx">options</span><span class="p">)</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">Which</span><span class="w"> </span><span class="nx">purposes</span><span class="o">/</span><span class="nx">skills</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="nx">pull</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">Boot</span><span class="o">/</span><span class="nx">init</span><span class="w"> </span><span class="nx">requirements</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">Infrastructure</span><span class="w"> </span><span class="p">(</span><span class="nx">how</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="nx">provision</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="nx">cloud</span><span class="w"> </span><span class="nx">CLI</span><span class="p">,</span><span class="w"> </span><span class="nx">terraform</span><span class="p">,</span><span class="w"> </span><span class="nx">manual</span><span class="p">)</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">CI</span><span class="o">/</span><span class="nx">CD</span><span class="w"> </span><span class="nx">pipeline</span><span class="w"> </span><span class="p">(</span><span class="nx">how</span><span class="w"> </span><span class="nx">pushes</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="nx">main</span><span class="w"> </span><span class="nx">trigger</span><span class="w"> </span><span class="nx">build</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">deploy</span><span class="p">)</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">Monitoring</span><span class="w"> </span><span class="p">(</span><span class="nx">how</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="nx">know</span><span class="w"> </span><span class="nx">it</span><span class="err">&#39;</span><span class="nx">s</span><span class="w"> </span><span class="nx">healthy</span><span class="p">)</span>
+
+<span class="p">&lt;</span><span class="nx">intent</span><span class="p">&gt;</span><span class="o">/</span><span class="nx">target</span><span class="o">/</span><span class="p">&lt;</span><span class="nx">name</span><span class="p">&gt;</span><span class="o">/</span><span class="w"> </span><span class="nx">contains</span><span class="p">:</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">main</span><span class="p">.</span><span class="nx">c</span><span class="w">           </span><span class="err">—</span><span class="w"> </span><span class="nx">entry</span><span class="w"> </span><span class="nx">point</span><span class="p">,</span><span class="w"> </span><span class="nx">wires</span><span class="w"> </span><span class="nx">skills</span><span class="w"> </span><span class="nx">together</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">Makefile</span><span class="w">          </span><span class="err">—</span><span class="w"> </span><span class="nx">flat</span><span class="w"> </span><span class="nx">compile</span><span class="w"> </span><span class="nx">of</span><span class="w"> </span><span class="nx">all</span><span class="w"> </span><span class="nx">skills</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">this</span><span class="w"> </span><span class="nx">hardware</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">the</span><span class="w"> </span><span class="nx">binary</span><span class="w">        </span><span class="err">—</span><span class="w"> </span><span class="nx">output</span>
+
+<span class="p">&lt;</span><span class="nx">intent</span><span class="p">&gt;</span><span class="o">/</span><span class="w"> </span><span class="nx">repo</span><span class="w"> </span><span class="nx">root</span><span class="w"> </span><span class="nx">contains</span><span class="p">:</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="nx">cloudbuild</span><span class="p">.</span><span class="nx">yaml</span><span class="w">   </span><span class="err">—</span><span class="w"> </span><span class="nx">CI</span><span class="o">/</span><span class="nx">CD</span><span class="w"> </span><span class="nx">pipeline</span><span class="w"> </span><span class="p">(</span><span class="nx">recommended</span><span class="p">:</span><span class="w"> </span><span class="nx">GCP</span><span class="w"> </span><span class="nx">Cloud</span><span class="w"> </span><span class="nx">Build</span><span class="p">)</span>
+</code></pre></div>
+
+<p>There should be zero friction between "all skills are done" and "it runs on
+the target." If wiring skills together is hard, the architecture is wrong —
+the interfaces don't compose cleanly. Fix the architecture, not the wiring.</p>
+<h3>Deployment — CI/CD</h3>
+<p>Deployment is part of the cycle, not an afterthought. During Discovery, the AI
+asks where and how this runs. During Shaping, deployment tasks go on the board
+like any other work item. During Pull, the AI builds the CI/CD pipeline config.
+During Retrospective, deployment experience feeds back into the process.</p>
+<p><strong>Push to main deploys.</strong> The AI never ships directly to production. Instead:
+1. The AI writes the CI/CD pipeline config (<code>cloudbuild.yaml</code> recommended)
+2. The AI pushes code to main
+3. The CI/CD system (Cloud Build) fires automatically — builds, tests, deploys
+4. The AI verifies the deployment is healthy</p>
+<p><strong>Recommended default: GCP Cloud Build.</strong> The user can override with any CI/CD
+system (GitHub Actions, AWS CodePipeline, etc.), but Cloud Build is the default
+recommendation. The <code>cloudbuild.yaml</code> lives at the intent repo root.</p>
+<p><strong>The AI advises on platforms.</strong> Based on the project's needs — scale, cost,
+latency, complexity — The AI recommends deployment targets and explains the
+trade-offs. The user decides. Some rules of thumb:</p>
+<ul>
+<li><strong>Single static binary on a known machine</strong> — Cloud Build compiles, scps to
+  the machine, restarts the service. Simplest.</li>
+<li><strong>Single static binary on cloud</strong> — a VM (GCP Compute Engine, AWS EC2,
+  Azure VM). Cloud Build provisions (if first deploy), builds, ships. Cheap
+  for always-on services.</li>
+<li><strong>Stateless HTTP service</strong> — container platform (GCP Cloud Run, AWS Fargate).
+  Cloud Build wraps the binary in a minimal Dockerfile (FROM scratch), pushes
+  to registry, deploys. Scales to zero, pay per request.</li>
+<li><strong>Mobile (Android NDK)</strong> — production code in pure C, cross-compiled to ARM
+  via NDK. Thin Java/Kotlin JNI shim for Android API access only. Cloud Build
+  compiles the native library, wraps in APK, deploys. The C is the product,
+  Java is the bridge.</li>
+<li><strong>Mobile (bare metal)</strong> — remove the OS entirely. Custom bootloader, pure C
+  firmware on the SoC. Same as embedded — target spec defines the exact
+  hardware.</li>
+<li><strong>Embedded</strong> — cross-compile in Cloud Build for the target MCU/SBC
+  (ARM Cortex-M, RISC-V, ESP32, etc.). Push artifact to a bucket, registry,
+  or flash directly. Zero dependencies, zero OS overhead. Target spec defines
+  the hardware exactly.</li>
+<li><strong>Multiple regions / high availability</strong> — Cloud Build deploys to each
+  region. Target spec defines the topology.</li>
+</ul>
+<p>The CI/CD pipeline config is as much a deliverable as the binary itself. It
+defines the full lifecycle: build → test → deploy → verify.</p>
+<p>Infrastructure provisioning commands (<code>gcloud</code>, <code>aws</code>, <code>az</code>, <code>terraform</code>,
+<code>docker</code>) are dev tooling — The AI installs and uses them freely.</p>
+<!-- target hardware filled in during discovery -->
+
+<h3>Web Hosting</h3>
+<p>Two patterns, both lightweight, both free or near-free:</p>
+<p><strong>Pattern 1: C + HTML (local or server)</strong>
+A pure C HTTP server serving vanilla HTML/CSS/JS from a <code>wwwroot/</code> directory.
+No frameworks, no Node, no build step. The C server handles HTTP and WebSocket.
+The HTML is hand-written. The result is instant — sub-millisecond response times,
+tiny memory footprint, zero dependencies.</p>
+<div class="codehilite"><pre><span></span><code>&lt;purpose&gt;/
+  skill/
+    serve/
+      serve.c         ← HTTP + WebSocket server (Winsock/POSIX sockets)
+      serve.h
+      wwwroot/
+        index.html    ← vanilla HTML5
+        style.css     ← vanilla CSS
+        app.js        ← vanilla JS (no frameworks)
+</code></pre></div>
+
+<p>Use this for: desktop interfaces, local tools, admin panels, anything that
+runs on the user's machine or on a server you control. The C server is the
+product — it ships with the target binary.</p>
+<p><strong>Pattern 2: Cloudflare Pages (public microsites)</strong>
+Static HTML/CSS/JS deployed to Cloudflare Pages for free. No server needed.
+The AI handles the entire deployment — <code>wrangler</code> CLI, project creation, DNS
+configuration. The result is a public website at <code>&lt;project&gt;.pages.dev</code> or a
+custom domain, served from Cloudflare's edge network worldwide.</p>
+<div class="codehilite"><pre><span></span><code>&lt;intent&gt;/
+  .github/
+    workflows/
+      deploy.yml        ← GitHub Action: push to main → wrangler pages deploy
+  site/
+    &lt;site-name&gt;/
+      index.html        ← static site
+      style.css
+</code></pre></div>
+
+<p>Use this for: landing pages, documentation sites, project homepages, anything
+public-facing that doesn't need a backend. Cloudflare Pages is free, fast, and
+deployment is automatic — push to main triggers a GitHub Action that runs
+<code>wrangler pages deploy</code>. Setup requires two repo secrets (<code>CLOUDFLARE_API_TOKEN</code>,
+<code>CLOUDFLARE_ACCOUNT_ID</code>) and one repo variable (<code>PAGES_PROJECT_NAME</code>). The AI
+sets these up via <code>gh secret set</code> and <code>gh variable set</code>.</p>
+<p><strong>Recommend Cloudflare</strong> for domain hosting. Free tier covers: DNS, SSL, Pages
+(static hosting), basic DDoS protection. One account, one dashboard, everything
+the project needs for a web presence.</p>
+<h3>Roll Your Own</h3>
+<p>Never reuse someone else's code. If you need it, write it. The code is shaped to
+the hardware it runs on, not to abstractions. No portability layers. No compatibility
+shims. Built for exactly what it is.</p>
+<h3>Shared Memory</h3>
+<p>Purposes within the same intent share the same memory space directly. No APIs
+between purposes. No IPC. No RPC. One process, one address space, direct memory
+access.</p>
+<h3>Optimize At Every Roll-Up</h3>
+<p>Optimization happens at every composition boundary:
+- Skills roll up into a purpose — optimize at the purpose level
+- Purposes roll up into an intent — optimize at the intent level</p>
+<p>If rolling up creates walls, indirection, or long paths to join forces —
+the architecture is wrong. Every roll-up must be clear, precise, straight
+to it. No reusability tax. No abstraction overhead.</p>
+<h2>Trade Secret Notices</h2>
+<p>All repositories contain trade secrets. Every file must be marked.</p>
+<h3>File headers</h3>
+<p>Every new or modified source file gets a one-line confidentiality header as the <strong>first line</strong> (or line 2 after a shebang):</p>
+<table>
+<thead>
+<tr>
+<th>Extensions</th>
+<th>Header</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.c</code> <code>.h</code> <code>.js</code> <code>.ts</code> <code>.tsx</code> <code>.jsx</code> <code>.css</code> <code>.go</code> <code>.java</code> <code>.rs</code> <code>.swift</code> <code>.scss</code> <code>.less</code></td>
+<td><code>/* CONFIDENTIAL - TRADE SECRET - Property of &lt;OWNER&gt; - All rights reserved */</code></td>
+</tr>
+<tr>
+<td><code>.py</code> <code>.sh</code> <code>.bash</code> <code>.rb</code> <code>.yml</code> <code>.yaml</code> <code>.toml</code> <code>.pl</code> <code>.r</code> <code>.env</code> <code>.gitignore</code> <code>.gitattributes</code> <code>.dockerignore</code> <code>Makefile</code> <code>Dockerfile</code></td>
+<td><code># CONFIDENTIAL - TRADE SECRET - Property of &lt;OWNER&gt; - All rights reserved</code></td>
+</tr>
+<tr>
+<td><code>.html</code> <code>.xml</code> <code>.svg</code> <code>.md</code></td>
+<td><code>&lt;!-- CONFIDENTIAL - TRADE SECRET - Property of &lt;OWNER&gt; - All rights reserved --&gt;</code></td>
+</tr>
+<tr>
+<td><code>.json</code> binaries (<code>.png</code> <code>.jpg</code> <code>.bin</code> etc.)</td>
+<td>SKIP — no comment syntax</td>
+</tr>
+</tbody>
+</table>
+<h3>NOTICE file</h3>
+<p>Every repo root must have a <code>NOTICE</code> file.</p>
+<h2>Tooling</h2>
+<p>The AI is aggressive and optimistic about tooling. When a tool is missing,
+broken, or misconfigured — fix it. Don't ask permission, don't hedge, don't
+suggest the user do it themselves. Install it, configure it, verify it works.</p>
+<ul>
+<li><strong>Missing compiler?</strong> Install it.</li>
+<li><strong>Wrong version?</strong> Upgrade it.</li>
+<li><strong>Build tool not configured?</strong> Configure it.</li>
+<li><strong>Environment variable not set?</strong> Set it.</li>
+<li><strong>PATH not right?</strong> Fix it.</li>
+<li><strong>Need npm for wrangler? pip for a script? cargo for a build tool?</strong> Install
+  it. The "no dependencies" rule applies to production code, not dev tooling.
+  Use whatever tools get the job done — npm, pip, brew, apt, chocolatey, cargo.</li>
+</ul>
+<p>The user is here to build, not to debug their toolchain. The AI owns the
+developer experience end to end. If something is blocking the build, the AI
+unblocks it. Every tool installation and configuration change should be
+explained as it happens so the user knows what changed on their system.</p>
+<h3>Improving the Guidance</h3>
+<p>When the AI encounters a tooling gap, a missing pattern, or a better way to
+do something — it doesn't just fix the immediate problem. It proposes an
+update to <code>a-d-d-guidance/</code> so the fix becomes part of the methodology for
+all future projects. The improvement flows up: fix the problem → propose the
+guidance update → wait for approval → update <code>a-d-d-guidance/</code>.</p>
+<p>The guidance is a living document. Every project that uses it makes it better.</p>
+<h2>Rules</h2>
+<ul>
+<li><strong>Never</strong> add <code>Co-Authored-By</code> lines to commits.</li>
+<li><strong>Pure C</strong> for all production code. <code>-std=c11</code>.</li>
+<li>HTML for website front ends where applicable.</li>
+<li>Python/scripts are fine for dev tooling only.</li>
+<li>When syncing from <code>a-d-d/</code>, always overwrite code-tree copies — <code>a-d-d/</code> wins.</li>
+<li><strong>Always read from <code>a-d-d/</code> directly</strong> — never trust the synced copies in code
+  repos for spec decisions. The sync is for Claude Code's CLAUDE.md auto-discovery
+  on startup. After that, go to the source.</li>
+<li><strong>Build from a-d-d, never from context.</strong> The AI implements exactly what the architecture specifies — function names, interfaces, dependencies, structure. If it's not in a-d-d, it doesn't get built. No inventing APIs. No adding functions. No "enhancing" the spec. If the spec is missing something, stop and tell the human. The human updates a-d-d, then the AI implements.</li>
+</ul></section>
+<section id="CLAUDE.md"><div class="file-label">CLAUDE.md</div><!-- CONFIDENTIAL - TRADE SECRET - Property of <OWNER> - All rights reserved -->
+
+<h1><PROJECT> — Code Organization Rules</h1>
+<h2>Skill-Based Structure</h2>
+<p>Each purpose contains <strong>skills</strong> — small, focused C libraries that compile into
+a single binary with zero fat.</p>
+<h3>Purpose Layout</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">&lt;</span><span class="nx">purpose</span><span class="p">&gt;</span><span class="o">/</span>
+<span class="w">  </span><span class="nx">skill</span><span class="o">/</span>
+<span class="w">    </span><span class="p">&lt;</span><span class="nx">skill</span><span class="o">-</span><span class="nx">name</span><span class="p">&gt;</span><span class="o">/</span>
+<span class="w">      </span><span class="nx">skill</span><span class="p">.</span><span class="nx">json</span><span class="w">      </span><span class="err">#</span><span class="w"> </span><span class="nx">manifest</span><span class="p">:</span><span class="w"> </span><span class="nx">name</span><span class="p">,</span><span class="w"> </span><span class="nx">deps</span><span class="p">,</span><span class="w"> </span><span class="nx">sources</span><span class="p">,</span><span class="w"> </span><span class="nx">headers</span>
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">skill</span><span class="o">-</span><span class="nx">name</span><span class="p">&gt;.</span><span class="nx">h</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="nx">public</span><span class="w"> </span><span class="nx">header</span>
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">skill</span><span class="o">-</span><span class="nx">name</span><span class="p">&gt;.</span><span class="nx">c</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="nx">implementation</span>
+<span class="w">  </span><span class="nx">tests</span><span class="o">/</span>
+<span class="w">    </span><span class="nx">test</span><span class="p">.</span><span class="nx">c</span><span class="w">            </span><span class="err">#</span><span class="w"> </span><span class="nx">test</span><span class="w"> </span><span class="nx">suite</span>
+<span class="w">  </span><span class="nx">Makefile</span><span class="w">            </span><span class="err">#</span><span class="w"> </span><span class="nx">builds</span><span class="w"> </span><span class="nx">all</span><span class="w"> </span><span class="nx">skills</span><span class="w"> </span><span class="nx">into</span><span class="w"> </span><span class="nx">one</span><span class="w"> </span><span class="nx">binary</span>
+</code></pre></div>
+
+<h3>Target Layout</h3>
+<p>Architecture side (<code>a-d-d/</code>):</p>
+<div class="codehilite"><pre><span></span><code><span class="n">a</span><span class="o">-</span><span class="n">d</span><span class="o">-</span><span class="n">d</span><span class="o">/</span><span class="n">target</span><span class="o">/</span>
+<span class="w">  </span><span class="o">&lt;</span><span class="n">target</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;/</span>
+<span class="w">    </span><span class="n">CLAUDE</span><span class="o">.</span><span class="n">md</span><span class="w">           </span><span class="c1"># hardware, toolchain, skills to pull, deploy method</span>
+</code></pre></div>
+
+<p>Code side (<code>&lt;intent&gt;/</code>):</p>
+<div class="codehilite"><pre><span></span><code><span class="o">&lt;</span><span class="n">intent</span><span class="o">&gt;/</span>
+<span class="w">  </span><span class="n">cloudbuild</span><span class="p">.</span><span class="n">yaml</span><span class="w">         </span><span class="p">#</span><span class="w"> </span><span class="n">CI</span><span class="o">/</span><span class="n">CD</span><span class="w"> </span><span class="n">pipeline</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="n">builds</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">deploys</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">push</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">main</span>
+<span class="w">  </span><span class="n">target</span><span class="o">/</span>
+<span class="w">    </span><span class="o">&lt;</span><span class="n">target</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;/</span>
+<span class="w">      </span><span class="n">main</span><span class="p">.</span><span class="n">c</span><span class="w">              </span><span class="p">#</span><span class="w"> </span><span class="n">entry</span><span class="w"> </span><span class="n">point</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="n">initializes</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="n">wires</span><span class="w"> </span><span class="n">skills</span>
+<span class="w">      </span><span class="n">Makefile</span><span class="w">             </span><span class="p">#</span><span class="w"> </span><span class="n">flat</span><span class="w"> </span><span class="n">compile</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="n">pulled</span><span class="w"> </span><span class="n">skills</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">hardware</span>
+</code></pre></div>
+
+<p>Targets are where skills become a running binary. The target Makefile flat-copies
+every <code>.c</code> and <code>.h</code> from every pulled skill, compiles with target-specific flags,
+and produces one static binary. No intermediate libraries. No purpose-level
+linking at deploy time. Skills go straight into the final product.</p>
+<p>If wiring skills into <code>main.c</code> is hard, the architecture is wrong — fix the
+skill interfaces, not the wiring.</p>
+<h3>Target Build Process</h3>
+<ol>
+<li>Read <code>a-d-d/target/&lt;name&gt;/CLAUDE.md</code> — know the platform, toolchain, and
+   which skills to pull.</li>
+<li>Flat-copy all <code>.c</code> and <code>.h</code> from pulled skills into the target build dir.</li>
+<li>Write <code>main.c</code> — initialize skills in dependency order, wire them together.</li>
+<li>Makefile compiles everything with target-specific flags (<code>-march</code>, <code>-mfpu</code>,
+   cross-compiler prefix, etc.) into one static binary.</li>
+<li>Write <code>cloudbuild.yaml</code> at the intent repo root — CI/CD pipeline that
+   builds, tests, and deploys on push to main. Recommended: GCP Cloud Build.</li>
+<li>Push to main. Cloud Build fires, builds the target, deploys it. The AI
+   verifies the deployment is healthy.</li>
+</ol>
+<p>Purpose-level Makefiles are for testing during development. The target Makefile
+is for building the deployable. <code>cloudbuild.yaml</code> is for shipping it. Three
+different jobs.</p>
+<h3>Web Hosting Layout</h3>
+<p>For C + HTML interfaces (local or server-side):</p>
+<div class="codehilite"><pre><span></span><code>&lt;purpose&gt;/
+  skill/
+    serve/
+      serve.c           # pure C HTTP + WebSocket server
+      serve.h
+      wwwroot/
+        index.html      # vanilla HTML5 — no frameworks
+        style.css       # vanilla CSS
+        app.js          # vanilla JS
+</code></pre></div>
+
+<p>For Cloudflare Pages (public static microsites):</p>
+<div class="codehilite"><pre><span></span><code>&lt;intent&gt;/
+  .github/
+    workflows/
+      deploy.yml          # GitHub Action — auto-deploys to Cloudflare Pages on push
+  site/
+    &lt;site-name&gt;/
+      index.html          # static site
+      style.css
+</code></pre></div>
+
+<p>The GitHub Action handles deployment automatically — push to main triggers
+<code>wrangler pages deploy</code>. Requires two repo secrets (<code>CLOUDFLARE_API_TOKEN</code>,
+<code>CLOUDFLARE_ACCOUNT_ID</code>) and one variable (<code>PAGES_PROJECT_NAME</code>).</p>
+<p>C + HTML is for anything that ships with the binary. Cloudflare Pages is for
+anything public-facing that doesn't need a backend. Both use vanilla HTML/CSS/JS
+— no frameworks, no build tools, no npm.</p>
+<h3>skill.json Format</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;skill-name&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;deps&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;other-skill&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;sources&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;skill-name.c&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;skill-name.h&quot;</span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3>Development Order</h3>
+<p>Every skill follows the same cycle:</p>
+<ol>
+<li><strong>Spec</strong> — CLAUDE.md + skill.json in <code>a-d-d/</code> define the interface and intent.</li>
+<li><strong>Tests first</strong> — write <code>tests/test.c</code> with unit and integration tests derived
+   from the spec. Tests MUST fail (red). If they pass before implementation, the
+   tests are wrong.</li>
+<li><strong>Implement</strong> — write the <code>.c</code> + <code>.h</code> until all tests go green.</li>
+<li><strong>Retrospective</strong> — review what worked, what didn't, feed improvements back
+   into the spec.</li>
+</ol>
+<h3>Rules</h3>
+<ol>
+<li><strong>One skill per directory</strong> under <code>skill/</code>. Each skill is a <code>.c</code> + <code>.h</code> pair with a <code>skill.json</code> manifest.</li>
+<li><strong>Dependencies are explicit</strong> in <code>skill.json</code>. A skill includes its deps via relative paths.</li>
+<li><strong>No dynamic linking.</strong> Everything compiles statically into one binary.</li>
+<li><strong>No fat.</strong> Only pull in what you need. No frameworks, no runtime deps.</li>
+<li><strong>Pure C.</strong> Use <code>-std=c11</code>. Platform differences go in platform skills.</li>
+<li><strong>Skills are reusable.</strong> Design each skill so other skills can depend on it. Keep interfaces minimal.</li>
+<li><strong>Naming matches the directory.</strong> Skill named "hash" lives in <code>skill/hash/</code> with <code>hash.h</code> and <code>hash.c</code>.</li>
+<li><strong>Tests go in <code>tests/</code>.</strong> One test binary that exercises all skills. Tests are written BEFORE implementation.</li>
+<li><strong>The Makefile builds everything.</strong> Compiles all skill sources, links into a single static library + test binary.</li>
+</ol></section>
+<section id="README.md"><div class="file-label">README.md</div><!-- CONFIDENTIAL - TRADE SECRET - Property of <OWNER> - All rights reserved -->
+
+<h1>ADD — Architecture Driven Development</h1>
+<p>You design the architecture. The AI builds the code.</p>
+<p>ADD is a development methodology where humans own the architecture and
+AI owns the implementation. The architecture repository (<code>a-d-d/</code>) is the
+single source of truth.</p>
+<p>No frameworks. No libraries. No dependencies. Pure C, built for the metal
+it runs on.</p>
+<h2>Install</h2>
+<h3>Windows</h3>
+<ol>
+<li>Get the <code>a-d-d</code> folder onto your machine (clone, copy, or download)</li>
+<li>Open a terminal in the <code>a-d-d</code> folder</li>
+<li>Run:</li>
+</ol>
+<div class="codehilite"><pre><span></span><code><span class="k">go</span><span class="w"> </span><span class="n">setup</span>
+<span class="k">go</span><span class="w"> </span><span class="n">init</span>
+</code></pre></div>
+
+<p><code>setup</code> installs GCC (via winget), Node.js, and Claude Code CLI.
+<code>init</code> creates your workspace and launches the discovery interview.</p>
+<h3>Mac</h3>
+<ol>
+<li>Get the <code>a-d-d</code> folder onto your machine</li>
+<li>Open Terminal in the <code>a-d-d</code> folder</li>
+<li>Run:</li>
+</ol>
+<div class="codehilite"><pre><span></span><code><span class="n">chmod</span><span class="w"> </span><span class="o">+</span><span class="n">x</span><span class="w"> </span><span class="k">go</span><span class="p">.</span><span class="n">sh</span>
+<span class="p">.</span><span class="o">/</span><span class="k">go</span><span class="p">.</span><span class="n">sh</span><span class="w"> </span><span class="n">setup</span>
+<span class="p">.</span><span class="o">/</span><span class="k">go</span><span class="p">.</span><span class="n">sh</span><span class="w"> </span><span class="n">init</span>
+</code></pre></div>
+
+<p><code>setup</code> installs Xcode Command Line Tools (compiler, make, git), Node.js
+(via Homebrew), and Claude Code CLI. If Homebrew isn't installed, it tells
+you the one-liner to get it.</p>
+<p><strong>Note:</strong> Xcode CLI Tools installation opens a system dialog. Click Install,
+wait for it to finish, then re-run <code>./go.sh setup</code> to continue.</p>
+<h3>Linux</h3>
+<p>Same as Mac but <code>setup</code> uses your package manager (apt, dnf, or pacman)
+to install gcc and Node.js.</p>
+<h2>Quick Start</h2>
+<p>After setup, just run:</p>
+<p><strong>Windows:</strong> <code>go init</code>
+<strong>Mac / Linux:</strong> <code>./go.sh init</code></p>
+<p>It asks for your project folder and name, creates the workspace,
+launches the AI, and starts the discovery interview.</p>
+<h2>What Happens</h2>
+<ol>
+<li><strong>Discovery</strong> — The AI interviews you about your idea, goals, hardware, philosophy</li>
+<li><strong>Architecture</strong> — The AI proposes intents, purposes, skills, targets</li>
+<li><strong>Shaping</strong> — conversation → decompose → size (fib 3-5) → order → kanban boards</li>
+<li><strong>Pull</strong> — The AI pulls work items from the board: test → implement → integrate → next</li>
+<li><strong>Threading</strong> — independent workstreams run in parallel across terminals</li>
+</ol>
+<h2>The Hierarchy</h2>
+<div class="codehilite"><pre><span></span><code><span class="nx">intent</span><span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="nx">WHY</span><span class="w">        </span><span class="err">→</span><span class="w"> </span><span class="nx">the</span><span class="w"> </span><span class="nx">deployable</span><span class="w"> </span><span class="nx">goal</span>
+<span class="nx">purpose</span><span class="w">  </span><span class="err">→</span><span class="w"> </span><span class="nx">WHAT</span><span class="w"> </span><span class="nx">FOR</span><span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="nx">a</span><span class="w"> </span><span class="nx">capability</span><span class="w"> </span><span class="nx">serving</span><span class="w"> </span><span class="nx">that</span><span class="w"> </span><span class="nx">goal</span>
+<span class="nx">skill</span><span class="w">    </span><span class="err">→</span><span class="w"> </span><span class="nx">HOW</span><span class="w">        </span><span class="err">→</span><span class="w"> </span><span class="nx">a</span><span class="w"> </span><span class="nx">focused</span><span class="w"> </span><span class="nx">C</span><span class="w"> </span><span class="kn">library</span><span class="w"> </span><span class="p">(.</span><span class="nx">c</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">.</span><span class="nx">h</span><span class="w"> </span><span class="nx">pair</span><span class="p">)</span>
+<span class="nx">target</span><span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="nx">WHERE</span><span class="w">      </span><span class="err">→</span><span class="w"> </span><span class="nx">deployment</span><span class="w"> </span><span class="nx">config</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">specific</span><span class="w"> </span><span class="nx">hardware</span>
+</code></pre></div>
+
+<h2>Layout</h2>
+<div class="codehilite"><pre><span></span><code><span class="p">&lt;</span><span class="nx">workspace</span><span class="p">&gt;</span>\
+<span class="w">  </span><span class="nx">a</span><span class="o">-</span><span class="nx">d</span><span class="o">-</span><span class="nx">d</span><span class="err">\</span><span class="w">                          </span><span class="nx">YOUR</span><span class="w"> </span><span class="nx">DOMAIN</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="nx">architecture</span>
+<span class="w">    </span><span class="p">&lt;</span><span class="nx">intent</span><span class="p">&gt;</span>\
+<span class="w">      </span><span class="nx">CLAUDE</span><span class="p">.</span><span class="nx">md</span><span class="w">                   </span><span class="nx">intent</span><span class="w"> </span><span class="nx">spec</span><span class="w"> </span><span class="p">(</span><span class="nx">WHY</span><span class="p">)</span>
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">purpose</span><span class="p">&gt;</span>\
+<span class="w">        </span><span class="nx">CLAUDE</span><span class="p">.</span><span class="nx">md</span><span class="w">                 </span><span class="nx">purpose</span><span class="w"> </span><span class="nx">spec</span><span class="w"> </span><span class="p">(</span><span class="nx">WHAT</span><span class="w"> </span><span class="nx">FOR</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">skill</span>\
+<span class="w">          </span><span class="p">&lt;</span><span class="nx">skill</span><span class="p">&gt;</span>\
+<span class="w">            </span><span class="nx">CLAUDE</span><span class="p">.</span><span class="nx">md</span><span class="w">             </span><span class="nx">skill</span><span class="w"> </span><span class="nx">spec</span><span class="w"> </span><span class="p">(</span><span class="nx">HOW</span><span class="p">)</span>
+<span class="w">            </span><span class="nx">skill</span><span class="p">.</span><span class="nx">json</span><span class="w">            </span><span class="nx">manifest</span>
+<span class="w">    </span><span class="nx">target</span>\
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">target</span><span class="p">&gt;</span>\
+<span class="w">        </span><span class="nx">CLAUDE</span><span class="p">.</span><span class="nx">md</span><span class="w">                 </span><span class="nx">target</span><span class="w"> </span><span class="nx">spec</span><span class="w"> </span><span class="p">(</span><span class="nx">WHERE</span><span class="p">)</span>
+<span class="w">    </span><span class="nx">site</span>\
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">site</span><span class="o">-</span><span class="nx">name</span><span class="p">&gt;</span>\
+<span class="w">        </span><span class="nx">CLAUDE</span><span class="p">.</span><span class="nx">md</span><span class="w">                 </span><span class="nx">site</span><span class="w"> </span><span class="nx">spec</span><span class="w"> </span><span class="p">(</span><span class="nx">purpose</span><span class="p">,</span><span class="w"> </span><span class="nx">domain</span><span class="p">,</span><span class="w"> </span><span class="nx">content</span><span class="p">,</span><span class="w"> </span><span class="nx">design</span><span class="p">)</span>
+<span class="w">    </span><span class="nx">board</span>\
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">workstream</span><span class="p">&gt;.</span><span class="nx">md</span><span class="w">             </span><span class="nx">kanban</span><span class="w"> </span><span class="nx">board</span><span class="w"> </span><span class="p">(</span><span class="nx">tripleset</span><span class="p">)</span>
+<span class="w">    </span><span class="nx">user</span>\
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">name</span><span class="p">&gt;.</span><span class="nx">md</span><span class="w">                   </span><span class="nx">user</span><span class="w"> </span><span class="nx">preferences</span><span class="w"> </span><span class="p">(</span><span class="nx">per</span><span class="w"> </span><span class="nx">person</span><span class="p">)</span>
+
+<span class="w">  </span><span class="p">&lt;</span><span class="nx">intent</span><span class="p">&gt;</span><span class="err">\</span><span class="w">                       </span><span class="nx">CLAUDE</span><span class="err">&#39;</span><span class="nx">S</span><span class="w"> </span><span class="nx">DOMAIN</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="nx">code</span>
+<span class="w">    </span><span class="p">&lt;</span><span class="nx">purpose</span><span class="p">&gt;</span>\
+<span class="w">      </span><span class="nx">skill</span>\
+<span class="w">        </span><span class="p">&lt;</span><span class="nx">skill</span><span class="p">&gt;</span>\
+<span class="w">          </span><span class="p">&lt;</span><span class="nx">skill</span><span class="p">&gt;.</span><span class="nx">h</span><span class="w">               </span><span class="nx">public</span><span class="w"> </span><span class="kd">interface</span>
+<span class="w">          </span><span class="p">&lt;</span><span class="nx">skill</span><span class="p">&gt;.</span><span class="nx">c</span><span class="w">               </span><span class="nx">implementation</span>
+<span class="w">      </span><span class="nx">tests</span>\
+<span class="w">        </span><span class="nx">test</span><span class="p">.</span><span class="nx">c</span><span class="w">                    </span><span class="nx">test</span><span class="w"> </span><span class="nx">suite</span>
+<span class="w">      </span><span class="nx">Makefile</span><span class="w">                    </span><span class="nx">dev</span><span class="o">/</span><span class="nx">test</span><span class="w"> </span><span class="nx">builds</span>
+<span class="w">    </span><span class="nx">target</span>\
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">target</span><span class="p">&gt;</span>\
+<span class="w">        </span><span class="nx">main</span><span class="p">.</span><span class="nx">c</span><span class="w">                    </span><span class="nx">entry</span><span class="w"> </span><span class="nx">point</span><span class="w"> </span><span class="err">—</span><span class="w"> </span><span class="nx">wires</span><span class="w"> </span><span class="nx">skills</span><span class="w"> </span><span class="nx">together</span>
+<span class="w">        </span><span class="nx">Makefile</span><span class="w">                  </span><span class="nx">flat</span><span class="w"> </span><span class="nx">compile</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">target</span><span class="w"> </span><span class="nx">hardware</span>
+<span class="w">    </span><span class="nx">site</span>\
+<span class="w">      </span><span class="p">&lt;</span><span class="nx">site</span><span class="o">-</span><span class="nx">name</span><span class="p">&gt;</span>\
+<span class="w">        </span><span class="nx">index</span><span class="p">.</span><span class="nx">html</span><span class="w">                </span><span class="nx">public</span><span class="w"> </span><span class="nx">microsite</span><span class="w"> </span><span class="p">(</span><span class="nx">Cloudflare</span><span class="w"> </span><span class="nx">Pages</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">wrangler</span><span class="p">.</span><span class="nx">toml</span>
+</code></pre></div>
+
+<p>Skills are parts. Target is the assembly. All skill <code>.c</code> and <code>.h</code> files get
+flat-copied into the target, wired through <code>main.c</code>, and compiled into one
+static binary. Zero friction.</p>
+<h2>Commands</h2>
+<p>Windows uses <code>go</code> and backslashes. Mac/Linux uses <code>./go.sh</code> and forward slashes.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">go</span><span class="w"> </span><span class="n">setup</span><span class="w">                             </span><span class="n">Install</span><span class="w"> </span><span class="n">prerequisites</span>
+<span class="k">go</span><span class="w"> </span><span class="n">init</span><span class="w">                              </span><span class="k">Create</span><span class="w"> </span><span class="n">workspace</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="k">start</span><span class="w"> </span><span class="n">discovery</span>
+<span class="k">go</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="o">&lt;</span><span class="n">intent</span><span class="o">&gt;</span><span class="w">                      </span><span class="n">Scaffold</span><span class="w"> </span><span class="n">intent</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="n">repo</span>
+<span class="k">go</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="o">&lt;</span><span class="n">intent</span><span class="o">&gt;/&lt;</span><span class="n">purpose</span><span class="o">&gt;</span><span class="w">            </span><span class="n">Scaffold</span><span class="w"> </span><span class="n">purpose</span>
+<span class="k">go</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="o">&lt;</span><span class="n">intent</span><span class="o">&gt;/&lt;</span><span class="n">purpose</span><span class="o">&gt;/</span><span class="n">skill</span><span class="o">/&lt;</span><span class="n">s</span><span class="o">&gt;</span><span class="w">  </span><span class="n">Scaffold</span><span class="w"> </span><span class="n">skill</span><span class="w"> </span><span class="p">(.</span><span class="n">c</span><span class="w"> </span><span class="p">.</span><span class="n">h</span><span class="w"> </span><span class="n">skill</span><span class="p">.</span><span class="n">json</span><span class="p">)</span>
+<span class="k">go</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">target</span><span class="o">/&lt;</span><span class="n">name</span><span class="o">&gt;</span><span class="w">                 </span><span class="n">Scaffold</span><span class="w"> </span><span class="n">deployment</span><span class="w"> </span><span class="n">target</span>
+<span class="k">go</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">site</span><span class="o">/&lt;</span><span class="n">name</span><span class="o">&gt;</span><span class="w">                   </span><span class="n">Scaffold</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">microsite</span>
+<span class="k">go</span><span class="w">                                   </span><span class="n">Launch</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">AI</span>
+<span class="k">go</span><span class="w"> </span><span class="o">-</span><span class="n">c</span><span class="w">                                </span><span class="k">Continue</span><span class="w"> </span><span class="k">last</span><span class="w"> </span><span class="k">session</span>
+<span class="k">go</span><span class="w"> </span><span class="n">help</span><span class="w">                              </span><span class="n">Show</span><span class="w"> </span><span class="k">usage</span>
+</code></pre></div>
+
+<h2>skill.json</h2>
+<p>Every skill has a manifest:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hash&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;deps&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;store&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;sources&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;hash.c&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;hash.h&quot;</span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<ul>
+<li><code>deps</code> — other skills this one depends on (by name, not path)</li>
+<li><code>sources</code> — C files to compile</li>
+<li><code>headers</code> — public interface</li>
+</ul>
+<h2>CLAUDE.md Files</h2>
+<p>Specs at every level, inherited top-down:</p>
+<ul>
+<li><strong>Intent</strong> <code>CLAUDE.md</code> — vision, mission, constraints</li>
+<li><strong>Purpose</strong> <code>CLAUDE.md</code> — capabilities, skill inventory, interfaces</li>
+<li><strong>Skill</strong> <code>CLAUDE.md</code> — implementation intent, algorithms, function signatures</li>
+<li><strong>Target</strong> <code>CLAUDE.md</code> — hardware, constraints, deployment configuration</li>
+</ul>
+<p>The AI reads these on startup. On first launch it interviews you and writes
+the specs. After that, it writes tests first (they must fail), then implements
+until green. If something is missing from the spec, the AI stops and asks —
+it never invents.</p>
+<h2>Rules</h2>
+<ul>
+<li>Pure C. <code>-std=c11</code>. No exceptions for production code.</li>
+<li>No external libraries. Roll your own. Every skill builds what it needs.</li>
+<li>No dynamic linking. Static binaries only.</li>
+<li>Purposes share memory. No IPC. No RPC. One process, one address space.</li>
+<li><code>a-d-d/</code> wins. Architecture files always overwrite code-tree copies on sync.</li>
+<li>Build from spec. If it's not in <code>a-d-d/</code>, it doesn't get built.</li>
+<li>Python/scripts are fine for dev tooling only.</li>
+</ul>
+<h2>Trade Secrets</h2>
+<p>Every source file gets a one-line header:</p>
+<div class="codehilite"><pre><span></span><code><span class="cm">/* CONFIDENTIAL - TRADE SECRET - Property of Your Name - All rights reserved */</span>
+</code></pre></div>
+
+<p>Every repo root gets a <code>NOTICE</code> file. <code>go init</code> handles this automatically.</p>
+<h2>Requirements</h2>
+<p>All installed automatically by <code>go setup</code> / <code>./go.sh setup</code>:</p>
+<ul>
+<li><strong>C compiler</strong> — GCC (Windows via winget), clang (macOS via Xcode CLI Tools),
+  or gcc (Linux via package manager)</li>
+<li><strong>Node.js</strong> — needed for Claude Code CLI</li>
+<li><strong><a href="https://claude.ai/code">Claude Code</a></strong> — CLI installed via npm</li>
+<li><strong>git</strong> and <strong>make</strong> — included with Xcode CLI Tools on Mac, build-essential
+  on Linux, and WinLibs on Windows</li>
+</ul>
+<p>Note: Both launchers run the AI with <code>--permission-mode bypassPermissions</code>.
+The AI owns the developer experience end to end.</p>
+<h2>License</h2>
+<p>Proprietary. All rights reserved.</p></section>
+<section id="NOTICE"><div class="file-label">NOTICE</div><pre>CONFIDENTIAL — TRADE SECRET
+
+This repository and all its contents are the confidential and proprietary
+property of <OWNER>. All rights reserved.
+
+Unauthorized copying, modification, distribution, or disclosure of this
+material is strictly prohibited without prior written consent.
+</pre></section>
+<section id=".gitignore"><div class="file-label">.gitignore</div><pre># CONFIDENTIAL - TRADE SECRET - Property of <OWNER> - All rights reserved
+
+# Build artifacts
+*.o
+*.obj
+*.exe
+*.out
+*.a
+*.lib
+*.so
+*.dylib
+
+# Debug
+.claude-debug.log
+
+# Synced copies (generated by launcher, not source of truth)
+.user.md
+</pre></section>
+</div>
+</body>
+</html>
