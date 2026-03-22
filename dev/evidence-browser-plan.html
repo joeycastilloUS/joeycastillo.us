@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evidence Browser Redesign — Water of Life</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon-jc.svg">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #111111;
+      --bg-raised: #1A1A1A;
+      --bg-sunken: #0A0A0A;
+      --gold: #6FC3DF;
+      --gold-light: #9DD9EE;
+      --white: #E8E8E8;
+      --text: #E8E8E8;
+      --text-light: #888888;
+      --danger: #C0392B;
+      --green: #4CAF50;
+      --purple: #CE93D8;
+      --max-width: 800px;
+    }
+    html { font-size: 18px; scroll-behavior: smooth; }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    nav {
+      background: #000;
+      padding: 0.8rem 1.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 3px solid var(--gold);
+    }
+    nav .nav-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    nav .brand {
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: var(--gold);
+      text-decoration: none;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    nav .links { display: flex; gap: 1.2rem; flex-wrap: wrap; }
+    nav .links a {
+      font-size: 0.8rem;
+      color: var(--white);
+      text-decoration: none;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+    nav .links a:hover { opacity: 1; }
+
+    .content {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .status-banner {
+      background: var(--gold);
+      color: #000;
+      padding: 0.5rem 1rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-align: center;
+      font-size: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+    .subtitle {
+      color: var(--gold);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 2px solid var(--gold);
+    }
+    h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--gold);
+      margin: 1.5rem 0 0.5rem;
+    }
+
+    p, li { font-size: 0.9rem; margin-bottom: 0.5rem; }
+    ul { padding-left: 1.2rem; }
+    ul li { padding: 0.15rem 0; }
+
+    .problem {
+      background: rgba(192,57,43,0.08);
+      border-left: 3px solid var(--danger);
+      padding: 1rem 1.2rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+    }
+    .problem strong { color: var(--danger); }
+
+    .solution {
+      background: rgba(76,175,80,0.08);
+      border-left: 3px solid var(--green);
+      padding: 1rem 1.2rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+    }
+    .solution strong { color: var(--green); }
+
+    /* MOCKUP STYLES */
+    .mockup {
+      background: var(--bg-sunken);
+      border: 1px solid #333;
+      border-radius: 6px;
+      margin: 1.5rem 0;
+      overflow: hidden;
+    }
+    .mockup-title {
+      background: #222;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-light);
+      border-bottom: 1px solid #333;
+    }
+    .mockup-body {
+      padding: 1rem;
+    }
+
+    /* Breadcrumb mockup */
+    .mock-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+      padding: 0.5rem 0.8rem;
+      background: #1a1a1a;
+      border-bottom: 1px solid #222;
+      flex-wrap: wrap;
+    }
+    .mock-crumb {
+      color: var(--gold);
+      cursor: default;
+    }
+    .mock-crumb-sep {
+      color: #444;
+      font-size: 0.6rem;
+    }
+    .mock-crumb-current {
+      color: var(--white);
+      font-weight: 700;
+    }
+
+    /* Search mockup */
+    .mock-search {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      padding: 0.5rem 0.8rem;
+      color: var(--text-light);
+      font-family: inherit;
+      font-size: 0.8rem;
+      width: 100%;
+      margin-bottom: 0.8rem;
+      outline: none;
+    }
+    .mock-search::placeholder { color: #444; }
+    .mock-search:focus { border-color: var(--gold); }
+
+    /* Category cards mockup */
+    .mock-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+      margin-bottom: 0.8rem;
+    }
+    .mock-card {
+      background: var(--bg-raised);
+      border: 1px solid #222;
+      border-left: 3px solid var(--gold);
+      padding: 0.8rem;
+      cursor: default;
+      transition: border-left-color 0.2s;
+    }
+    .mock-card:hover { border-left-color: var(--gold-light); }
+    .mock-card-title {
+      font-weight: 900;
+      font-size: 0.8rem;
+      color: var(--white);
+    }
+    .mock-card-count {
+      font-size: 0.65rem;
+      color: var(--text-light);
+      margin-top: 0.15rem;
+    }
+    .mock-card.sacred { border-left-color: var(--purple); }
+    .mock-card.proof { border-left-color: var(--green); }
+    .mock-card.nobel { border-left-color: #FFD54F; }
+
+    /* Sub-category cards */
+    .mock-subcards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.8rem;
+    }
+    .mock-subcard {
+      background: var(--bg-raised);
+      border: 1px solid #222;
+      padding: 0.6rem 0.8rem;
+      cursor: default;
+    }
+    .mock-subcard-title {
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: var(--white);
+    }
+    .mock-subcard-count {
+      font-size: 0.6rem;
+      color: var(--text-light);
+    }
+
+    /* Entry mockup */
+    .mock-entry {
+      background: var(--bg-raised);
+      border: 1px solid #222;
+      border-left: 3px solid var(--purple);
+      padding: 0.7rem 0.9rem;
+      margin-bottom: 0.4rem;
+    }
+    .mock-entry-date { font-size: 0.6rem; color: var(--gold); font-weight: 900; }
+    .mock-entry-title { font-weight: 900; font-size: 0.8rem; color: var(--white); }
+    .mock-entry-body { font-size: 0.75rem; color: rgba(232,232,232,0.6); margin-top: 0.2rem; }
+
+    /* Filter tags */
+    .mock-filters {
+      display: flex;
+      gap: 0.3rem;
+      margin-bottom: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .mock-filter {
+      font-size: 0.6rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.25rem 0.6rem;
+      border: 1px solid #333;
+      color: rgba(232,232,232,0.5);
+      cursor: default;
+    }
+    .mock-filter.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: rgba(111,195,223,0.08);
+    }
+    .mock-filter.active-green {
+      border-color: var(--green);
+      color: var(--green);
+      background: rgba(76,175,80,0.08);
+    }
+
+    /* Search result highlight */
+    .mock-highlight {
+      background: rgba(111,195,223,0.2);
+      padding: 0 0.1rem;
+    }
+
+    /* Architecture diagram */
+    .arch {
+      background: var(--bg-sunken);
+      border: 1px solid #333;
+      padding: 1rem;
+      margin: 1rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      line-height: 1.8;
+      color: var(--text-light);
+      overflow-x: auto;
+    }
+    .arch .gold { color: var(--gold); }
+    .arch .green { color: var(--green); }
+    .arch .purple { color: var(--purple); }
+    .arch .white { color: var(--white); font-weight: 700; }
+
+    /* Phase cards */
+    .phases {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .phase {
+      background: var(--bg-raised);
+      border-left: 3px solid var(--gold);
+      padding: 0.8rem 1rem;
+    }
+    .phase-num {
+      font-size: 0.6rem;
+      font-weight: 900;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .phase-title {
+      font-weight: 900;
+      font-size: 0.85rem;
+      color: var(--white);
+      margin: 0.1rem 0 0.3rem;
+    }
+    .phase ul { margin: 0; padding-left: 1rem; }
+    .phase li { font-size: 0.8rem; color: var(--text-light); padding: 0.1rem 0; }
+
+    .constraints {
+      background: var(--bg-raised);
+      border: 1px solid #222;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+    }
+    .constraints li {
+      font-size: 0.8rem;
+      color: var(--text-light);
+    }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid #222;
+      font-size: 0.7rem;
+      color: #444;
+      text-align: center;
+    }
+    footer a { color: #555; font-size: 0.7rem; text-decoration: none; }
+    footer a:hover { color: var(--gold); }
+
+    @media (max-width: 600px) {
+      .mock-cards { grid-template-columns: 1fr; }
+      .mock-subcards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="status-banner">Plan &mdash; Awaiting Approval</div>
+
+<nav>
+  <div class="nav-inner">
+    <a href="https://wateroflife.supply" class="brand">Water of Life</a>
+    <div class="links">
+      <a href="https://wateroflife.supply">Home</a>
+      <a href="/dev">Dev Artifacts</a>
+      <a href="https://joeycastillo.us">joeycastillo.us</a>
+    </div>
+  </div>
+</nav>
+
+<div class="content">
+
+  <h1>Evidence Browser Redesign</h1>
+  <div class="subtitle">From confusing tabs to drill-in/drill-out with search</div>
+
+  <!-- PROBLEM -->
+  <h2>The Problem</h2>
+
+  <div class="problem"><strong>Confusing navigation.</strong> Three tabs (Sacred Texts, The Proof, Nobel Prizes) with a sub-nav underneath. Users don't know where they are or how to get back.</div>
+  <div class="problem"><strong>No search.</strong> 80+ entries and no way to find what you're looking for without scrolling through everything.</div>
+  <div class="problem"><strong>Flat structure.</strong> Sacred Texts dumps 20+ traditions into one scroll. No way to drill into Hinduism vs. Judaism vs. Islam without hunting.</div>
+  <div class="problem"><strong>No breadcrumbs.</strong> Once you click a sub-nav item, you lose context of where you are in the hierarchy.</div>
+
+  <!-- SOLUTION -->
+  <h2>The Solution</h2>
+
+  <div class="solution"><strong>Drill-in / drill-out hierarchy</strong> with breadcrumbs at every level. Click a category to see sub-categories. Click a sub-category to see entries. Breadcrumb lets you jump back to any level instantly.</div>
+  <div class="solution"><strong>Live search bar</strong> that auto-filters as you type. Matches title and description. Flattens the hierarchy into a filtered result list. Clear to snap back.</div>
+  <div class="solution"><strong>Mineral tag filters</strong> (sodium, potassium, magnesium, water) that combine with search and hierarchy. Active at every level.</div>
+
+  <!-- MOCKUP: LEVEL 0 -->
+  <h2>Mockup: Level 0 &mdash; Overview</h2>
+  <p>User lands here. Three category cards with counts. Search bar at top.</p>
+
+  <div class="mockup">
+    <div class="mockup-title">Evidence Browser &mdash; Level 0: Overview</div>
+    <div class="mockup-body">
+      <div class="mock-breadcrumb">
+        <span class="mock-crumb-current">Evidence</span>
+      </div>
+      <div style="padding: 0.8rem;">
+        <input type="text" class="mock-search" placeholder="Search all evidence... (title, description, source)" disabled>
+        <div class="mock-filters">
+          <span class="mock-filter active">All</span>
+          <span class="mock-filter">Sodium</span>
+          <span class="mock-filter">Potassium</span>
+          <span class="mock-filter">Magnesium</span>
+          <span class="mock-filter">Water</span>
+        </div>
+        <div class="mock-cards">
+          <div class="mock-card sacred">
+            <div class="mock-card-title">Sacred Texts</div>
+            <div class="mock-card-count">56 entries &middot; 20+ traditions</div>
+          </div>
+          <div class="mock-card proof">
+            <div class="mock-card-title">The Proof</div>
+            <div class="mock-card-count">24 entries &middot; 2800 BCE &ndash; 2024</div>
+          </div>
+          <div class="mock-card nobel">
+            <div class="mock-card-title">Nobel Prizes</div>
+            <div class="mock-card-count">5 entries &middot; 1901 &ndash; 2016</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOCKUP: LEVEL 1 -->
+  <h2>Mockup: Level 1 &mdash; Category (Sacred Texts)</h2>
+  <p>User clicked "Sacred Texts." Sub-categories appear as cards. Breadcrumb shows path.</p>
+
+  <div class="mockup">
+    <div class="mockup-title">Evidence Browser &mdash; Level 1: Sacred Texts</div>
+    <div class="mockup-body">
+      <div class="mock-breadcrumb">
+        <span class="mock-crumb">Evidence</span>
+        <span class="mock-crumb-sep">&#x25B8;</span>
+        <span class="mock-crumb-current">Sacred Texts</span>
+      </div>
+      <div style="padding: 0.8rem;">
+        <input type="text" class="mock-search" placeholder="Search sacred texts..." disabled>
+        <div class="mock-filters">
+          <span class="mock-filter active">All</span>
+          <span class="mock-filter">Sodium</span>
+          <span class="mock-filter">Potassium</span>
+          <span class="mock-filter">Magnesium</span>
+          <span class="mock-filter">Water</span>
+        </div>
+        <div class="mock-subcards">
+          <div class="mock-subcard"><div class="mock-subcard-title">Mesopotamia</div><div class="mock-subcard-count">6 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Egypt</div><div class="mock-subcard-count">5 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Judaism</div><div class="mock-subcard-count">8 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Christianity</div><div class="mock-subcard-count">5 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Islam</div><div class="mock-subcard-count">5 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Hinduism</div><div class="mock-subcard-count">5 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Buddhism</div><div class="mock-subcard-count">4 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Taoism</div><div class="mock-subcard-count">3 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Shinto</div><div class="mock-subcard-count">3 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Sikhism</div><div class="mock-subcard-count">1 entry</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Greek &amp; Roman</div><div class="mock-subcard-count">5 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Norse &amp; Celtic</div><div class="mock-subcard-count">3 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Persian</div><div class="mock-subcard-count">3 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Mesoamerican</div><div class="mock-subcard-count">3 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Indigenous</div><div class="mock-subcard-count">3 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Pacific &amp; African</div><div class="mock-subcard-count">4 entries</div></div>
+          <div class="mock-subcard"><div class="mock-subcard-title">Fasting Traditions</div><div class="mock-subcard-count">10 entries</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOCKUP: LEVEL 2 -->
+  <h2>Mockup: Level 2 &mdash; Sub-Category (Judaism)</h2>
+  <p>User drilled into "Judaism." All entries in that tradition are shown. Breadcrumb has full path.</p>
+
+  <div class="mockup">
+    <div class="mockup-title">Evidence Browser &mdash; Level 2: Judaism</div>
+    <div class="mockup-body">
+      <div class="mock-breadcrumb">
+        <span class="mock-crumb">Evidence</span>
+        <span class="mock-crumb-sep">&#x25B8;</span>
+        <span class="mock-crumb">Sacred Texts</span>
+        <span class="mock-crumb-sep">&#x25B8;</span>
+        <span class="mock-crumb-current">Judaism</span>
+      </div>
+      <div style="padding: 0.8rem;">
+        <input type="text" class="mock-search" placeholder="Search Judaism..." disabled>
+        <div class="mock-filters">
+          <span class="mock-filter active">All</span>
+          <span class="mock-filter">Sodium</span>
+          <span class="mock-filter">Potassium</span>
+          <span class="mock-filter">Magnesium</span>
+          <span class="mock-filter">Water</span>
+        </div>
+        <div class="mock-entry">
+          <div class="mock-entry-date">~1,400 BCE</div>
+          <div class="mock-entry-title">The Salt Covenant &mdash; God's Unbreakable Promise</div>
+          <div class="mock-entry-body">Berit melach &mdash; the covenant of salt. The highest form of binding agreement between God and humanity.</div>
+        </div>
+        <div class="mock-entry">
+          <div class="mock-entry-date">~1,000 BCE</div>
+          <div class="mock-entry-title">Solomon's Temple &mdash; The Bronze Sea</div>
+          <div class="mock-entry-body">Yam mutzak &mdash; cast metal sea holding 44,000 liters of water. The largest ritual water vessel in ancient history.</div>
+        </div>
+        <div class="mock-entry">
+          <div class="mock-entry-date">~600 BCE</div>
+          <div class="mock-entry-title">Jeremiah &mdash; The Fountain of Living Waters</div>
+          <div class="mock-entry-body">Makor mayim chayyim. God calls Himself the source of living water &mdash; and condemns those who dig broken cisterns.</div>
+        </div>
+        <div style="font-size:0.7rem; color:#555; text-align:center; margin-top:0.5rem;">+ 5 more entries</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOCKUP: SEARCH -->
+  <h2>Mockup: Search Active</h2>
+  <p>User typed "autophagy" &mdash; hierarchy flattens to matching results with breadcrumb context.</p>
+
+  <div class="mockup">
+    <div class="mockup-title">Evidence Browser &mdash; Search Results</div>
+    <div class="mockup-body">
+      <div class="mock-breadcrumb">
+        <span class="mock-crumb">Evidence</span>
+        <span class="mock-crumb-sep">&#x25B8;</span>
+        <span class="mock-crumb-current">Search: "autophagy"</span>
+      </div>
+      <div style="padding: 0.8rem;">
+        <input type="text" class="mock-search" value="autophagy" disabled style="border-color: var(--gold); color: var(--white);">
+        <div style="font-size:0.7rem; color:var(--text-light); margin-bottom:0.6rem;">3 results</div>
+        <div class="mock-entry" style="border-left-color: var(--purple);">
+          <div style="font-size:0.55rem; color:#555; margin-bottom:0.2rem;">Sacred Texts &rsaquo; Fasting Traditions</div>
+          <div class="mock-entry-date">Cross-Cultural</div>
+          <div class="mock-entry-title">The Universal Pattern &mdash; Every Tradition Knows</div>
+          <div class="mock-entry-body">Fasting activates <span class="mock-highlight">autophagy</span>. Every major tradition independently discovered that not eating heals.</div>
+        </div>
+        <div class="mock-entry" style="border-left-color: var(--green);">
+          <div style="font-size:0.55rem; color:#555; margin-bottom:0.2rem;">The Proof &rsaquo; Modern Research</div>
+          <div class="mock-entry-date">2019</div>
+          <div class="mock-entry-title">1,422-Person Fasting Study</div>
+          <div class="mock-entry-body">Wilhelmi de Toledo et al. confirmed <span class="mock-highlight">autophagy</span> activation, metabolic benefits in PLOS ONE.</div>
+        </div>
+        <div class="mock-entry" style="border-left-color: #FFD54F;">
+          <div style="font-size:0.55rem; color:#555; margin-bottom:0.2rem;">Nobel Prizes</div>
+          <div class="mock-entry-date">2016</div>
+          <div class="mock-entry-title">Yoshinori Ohsumi &mdash; Mechanisms of Autophagy</div>
+          <div class="mock-entry-body">Nobel Prize in Medicine for discovering the mechanisms of <span class="mock-highlight">autophagy</span>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOCKUP: FILTER + SEARCH -->
+  <h2>Mockup: Mineral Filter + Search Combined</h2>
+  <p>User selected "Magnesium" filter and typed "eclampsia" &mdash; both active simultaneously.</p>
+
+  <div class="mockup">
+    <div class="mockup-title">Evidence Browser &mdash; Filtered + Search</div>
+    <div class="mockup-body">
+      <div class="mock-breadcrumb">
+        <span class="mock-crumb">Evidence</span>
+        <span class="mock-crumb-sep">&#x25B8;</span>
+        <span class="mock-crumb-current">Magnesium + "eclampsia"</span>
+      </div>
+      <div style="padding: 0.8rem;">
+        <input type="text" class="mock-search" value="eclampsia" disabled style="border-color: var(--gold); color: var(--white);">
+        <div class="mock-filters">
+          <span class="mock-filter">All</span>
+          <span class="mock-filter">Sodium</span>
+          <span class="mock-filter">Potassium</span>
+          <span class="mock-filter active-green">Magnesium</span>
+          <span class="mock-filter">Water</span>
+        </div>
+        <div style="font-size:0.7rem; color:var(--text-light); margin-bottom:0.6rem;">2 results</div>
+        <div class="mock-entry" style="border-left-color: var(--green);">
+          <div style="font-size:0.55rem; color:#555; margin-bottom:0.2rem;">The Proof &rsaquo; Clinical Evidence</div>
+          <div class="mock-entry-date">1992</div>
+          <div class="mock-entry-title">LIMIT-2 &mdash; Magnesium for Heart Attacks</div>
+          <div class="mock-entry-body">IV magnesium reduced mortality 24% in acute MI. Pre-<span class="mock-highlight">eclampsia</span> research parallels.</div>
+        </div>
+        <div class="mock-entry" style="border-left-color: var(--green);">
+          <div style="font-size:0.55rem; color:#555; margin-bottom:0.2rem;">The Proof &rsaquo; Clinical Evidence</div>
+          <div class="mock-entry-date">2002</div>
+          <div class="mock-entry-title">Magpie Trial &mdash; 10,141 Women</div>
+          <div class="mock-entry-body">Magnesium sulfate: 58% lower <span class="mock-highlight">eclampsia</span> risk, 45% lower maternal mortality.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA ARCHITECTURE -->
+  <h2>Data Architecture</h2>
+  <p>Each entry gets tagged with category, sub-category, and minerals as data attributes. The JS reads these to build the hierarchy dynamically.</p>
+
+  <div class="arch">
+<span class="white">&lt;div class="entry"</span>
+     <span class="gold">data-category="sacred"</span>
+     <span class="purple">data-subcategory="judaism"</span>
+     <span class="green">data-minerals="sodium"</span><span class="white">&gt;</span>
+  &lt;div class="entry-date"&gt;~1,400 BCE&lt;/div&gt;
+  &lt;div class="entry-title"&gt;The Salt Covenant&lt;/div&gt;
+  &lt;div class="entry-body"&gt;...&lt;/div&gt;
+  &lt;div class="entry-source"&gt;...&lt;/div&gt;
+<span class="white">&lt;/div&gt;</span>
+
+<span class="gold">// JS builds hierarchy from data attributes:</span>
+<span class="green">categories</span> = unique <span class="gold">data-category</span> values &rarr; Level 0 cards
+<span class="green">subcategories</span> = unique <span class="purple">data-subcategory</span> within category &rarr; Level 1 cards
+<span class="green">entries</span> = all entries in subcategory &rarr; Level 2 list
+<span class="green">search</span> = fuzzy match on <span class="white">title + body + source</span> &rarr; flat list
+  </div>
+
+  <!-- IMPLEMENTATION PHASES -->
+  <h2>Implementation</h2>
+
+  <div class="phases">
+    <div class="phase">
+      <div class="phase-num">Phase 1</div>
+      <div class="phase-title">Tag Existing Entries</div>
+      <ul>
+        <li>Add data-category, data-subcategory, data-minerals attributes to all 80+ entries</li>
+        <li>No visible changes yet &mdash; just data preparation</li>
+        <li>Verify every entry is tagged correctly</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <div class="phase-num">Phase 2</div>
+      <div class="phase-title">Breadcrumb + Drill-In/Out</div>
+      <ul>
+        <li>Replace tab/sub-nav system with hierarchical navigation</li>
+        <li>Breadcrumb bar always visible below search</li>
+        <li>Category cards (Level 0) &rarr; Sub-category cards (Level 1) &rarr; Entry list (Level 2)</li>
+        <li>Click breadcrumb to jump back to any level</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <div class="phase-num">Phase 3</div>
+      <div class="phase-title">Live Search</div>
+      <ul>
+        <li>Search bar at top, always visible</li>
+        <li>Filters as you type &mdash; no submit button needed</li>
+        <li>Matches against entry-title and entry-body text</li>
+        <li>When search is active: hierarchy flattens, results show with breadcrumb context</li>
+        <li>Highlight matching text in results</li>
+        <li>Clear search to snap back to current hierarchy position</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <div class="phase-num">Phase 4</div>
+      <div class="phase-title">Mineral Filters</div>
+      <ul>
+        <li>Keep existing sodium/potassium/magnesium/water buttons</li>
+        <li>Combinable with search and hierarchy position</li>
+        <li>Active filter persists across drill-in/out</li>
+        <li>Result count updates live</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- CONSTRAINTS -->
+  <h2>Constraints</h2>
+  <div class="constraints">
+    <ul>
+      <li>Vanilla JS &mdash; no frameworks, no build tools, no npm</li>
+      <li>Single file &mdash; all JS inline in the-evidence.html</li>
+      <li>Works on cheap phones &mdash; no heavy DOM manipulation</li>
+      <li>Dark theme &mdash; matches existing site design system</li>
+      <li>Keyboard accessible &mdash; search focuses on page load, breadcrumbs tabbable</li>
+      <li>URL hash state &mdash; #sacred/judaism deep-links work, back button navigates hierarchy</li>
+    </ul>
+  </div>
+
+  <footer>
+    <a href="/dev">&larr; Dev Artifacts</a> &nbsp;&middot;&nbsp; Water of Life &nbsp;&middot;&nbsp; 2026
+  </footer>
+
+</div>
+</body>
+</html>
