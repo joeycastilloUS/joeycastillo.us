@@ -42,28 +42,68 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
     echo "  Done."
 
-    # ── 4/8: Keyboard — fast repeat ──
-    echo "[4/8] Keyboard — max repeat rate..."
+    # ── 4/9: Keyboard — fast repeat ──
+    echo "[4/9] Keyboard — max repeat rate..."
     defaults write NSGlobalDomain KeyRepeat -int 2
     defaults write NSGlobalDomain InitialKeyRepeat -int 15
     defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
     echo "  Done."
 
-    # ── 5/8: Trackpad — tap to click ──
-    echo "[5/8] Trackpad..."
+    # ── 5/9: Windows keyboard remap — Ctrl acts as Cmd ──
+    echo "[5/9] Windows keyboard remap (Ctrl → Cmd)..."
+    # Remap Left Ctrl → Left Cmd, Right Ctrl → Right Cmd
+    # So Ctrl+C/V/X/Z/A/S/F/T/W/N all work like Windows
+    hidutil property --set '{"UserKeyMapping":[
+        {"HIDKeyboardModifierMappingSrc":0x700000E0,"HIDKeyboardModifierMappingDst":0x700000E3},
+        {"HIDKeyboardModifierMappingSrc":0x700000E3,"HIDKeyboardModifierMappingDst":0x700000E0},
+        {"HIDKeyboardModifierMappingSrc":0x700000E4,"HIDKeyboardModifierMappingDst":0x700000E7},
+        {"HIDKeyboardModifierMappingSrc":0x700000E7,"HIDKeyboardModifierMappingDst":0x700000E4}
+    ]}' >/dev/null 2>&1 || true
+
+    # Persist across reboots via LaunchAgent
+    PLIST_DIR="$HOME/Library/LaunchAgents"
+    PLIST_PATH="$PLIST_DIR/local.metalKeyRemap.plist"
+    mkdir -p "$PLIST_DIR"
+    cat > "$PLIST_PATH" << 'PLISTEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.metalKeyRemap</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/hidutil</string>
+    <string>property</string>
+    <string>--set</string>
+    <string>{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000E0,"HIDKeyboardModifierMappingDst":0x700000E3},{"HIDKeyboardModifierMappingSrc":0x700000E3,"HIDKeyboardModifierMappingDst":0x700000E0},{"HIDKeyboardModifierMappingSrc":0x700000E4,"HIDKeyboardModifierMappingDst":0x700000E7},{"HIDKeyboardModifierMappingSrc":0x700000E7,"HIDKeyboardModifierMappingDst":0x700000E4}]}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
+PLISTEOF
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    launchctl load "$PLIST_PATH" 2>/dev/null || true
+    echo "  Ctrl and Cmd swapped. Ctrl+C/V/X/Z now work like Windows."
+    echo "  Persists across reboots."
+    echo "  Done."
+
+    # ── 6/9: Trackpad — tap to click ──
+    echo "[6/9] Trackpad..."
     defaults write com.apple.AppleMultitouchTrackpad Clicking -bool true
     defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true
     defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
     echo "  Done."
 
-    # ── 6/8: Screenshots — no shadow, PNG, to Desktop ──
-    echo "[6/8] Screenshots..."
+    # ── 7/9: Screenshots — no shadow, PNG, to Desktop ──
+    echo "[7/9] Screenshots..."
     defaults write com.apple.screencapture disable-shadow -bool true
     defaults write com.apple.screencapture type -string "png"
     echo "  Done."
 
-    # ── 7/8: Privacy — minimal analytics ──
-    echo "[7/8] Privacy..."
+    # ── 8/9: Privacy — minimal analytics ──
+    echo "[8/9] Privacy..."
     defaults write com.apple.SoftwareUpdate AutomaticCheckEnabled -bool true
     defaults write com.apple.SoftwareUpdate AutomaticDownload -bool true
     defaults write com.apple.commerce AutoUpdate -bool true
@@ -72,8 +112,8 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     launchctl disable "user/$(id -u)/com.apple.Siri.agent" 2>/dev/null || true
     echo "  Done."
 
-    # ── 8/8: Power — prevent sleep on AC ──
-    echo "[8/8] Power..."
+    # ── 9/9: Power — prevent sleep on AC ──
+    echo "[9/9] Power..."
     sudo pmset -c displaysleep 30 2>/dev/null || true
     sudo pmset -c sleep 0 2>/dev/null || true
     sudo pmset -b displaysleep 5 2>/dev/null || true
