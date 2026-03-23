@@ -97,7 +97,7 @@ if exist "C:\metal\.git" (
     echo [4/5] Cloning metal...
     gh repo clone joeycastilloUS/metal C:\metal
 )
-if not exist "C:\metal\Go.Fe.2.bat" (
+if not exist "C:\metal\Go.Fe.bat" (
     echo.
     echo   ERROR: metal repo not found at C:\metal
     echo   Clone may have failed. Try manually:
@@ -108,7 +108,7 @@ if not exist "C:\metal\Go.Fe.2.bat" (
 rem === Step 5: Run full toolchain ===
 echo.
 echo [5/5] Launching metal.Fe...
-call "C:\metal\Go.Fe.2.bat"
+call "C:\metal\Go.Fe.bat"
 
 goto :end
 

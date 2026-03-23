@@ -108,7 +108,7 @@ else
     METAL_DIR="$HOME/metal"
 fi
 
-if [ ! -f "$METAL_DIR/Go.Fe.2.sh" ]; then
+if [ ! -f "$METAL_DIR/Go.Fe.sh" ]; then
     echo ""
     echo "  ERROR: metal repo not found at $METAL_DIR"
     echo "  Clone may have failed. Try manually:"
@@ -119,4 +119,4 @@ fi
 # === Step 5: Run full toolchain ===
 echo ""
 echo "[5/5] Launching metal.Fe..."
-bash "$METAL_DIR/Go.Fe.2.sh" < /dev/tty
+bash "$METAL_DIR/Go.Fe.sh" < /dev/tty
