@@ -1,6 +1,6 @@
 @echo off
 rem metal.Fe — Iron. The foundation.
-rem v1.8 — 2026-03-23
+rem v1.8.1 — 2026-03-23
 rem curl -fsSL https://joeycastillo.us/metal/Go.Fe.bat -o %TEMP%\Go.Fe.bat && %TEMP%\Go.Fe.bat
 rem Installs git, gh, clones metal, runs full toolchain + identity + auth.
 rem Idempotent — safe to run again.
@@ -9,7 +9,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo   metal.Fe — Iron. The foundation.
-echo   v1.8 — 2026-03-23
+echo   v1.8.1 — 2026-03-23
 echo   Full dev toolchain. One command.
 echo.
 

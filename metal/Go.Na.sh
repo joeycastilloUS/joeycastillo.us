@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # metal.Na — Sodium. The reset.
-# v1.8 — 2026-03-23
+# v1.8.1 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Na.sh | bash
 # Removes metal repos so you can test a fresh install.
 # Leaves tools and OS changes in place.
 
 echo ""
 echo "  metal.Na — Sodium. The reset."
-echo "  v1.8 — 2026-03-23"
+echo "  v1.8.1 — 2026-03-23"
 echo "  Explodes on contact. Clean slate."
 echo ""
 echo "  This will remove:"
