@@ -88,4 +88,4 @@ fi
 echo ""
 echo "[5/5] Launching metal.Fe..."
 cd "$METAL_DIR"
-bash go-runtime.sh
+bash go-runtime.sh < /dev/tty
