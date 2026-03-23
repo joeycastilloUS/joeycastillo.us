@@ -18,19 +18,16 @@ if !errorlevel! equ 0 (
 ) else (
     echo [1/5] Installing Git...
     winget install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements
-    if !errorlevel! neq 0 (
-        echo ERROR: Git installation failed.
-        goto :error
-    )
+    rem winget returns non-zero if already installed — not a real error
     call :refresh_path
     where git >nul 2>&1
     if !errorlevel! neq 0 set "PATH=!PATH!;C:\Program Files\Git\cmd"
     where git >nul 2>&1
     if !errorlevel! neq 0 (
-        echo ERROR: git not found. Open a NEW Admin Command Prompt and try again.
+        echo ERROR: git not found after install. Open a NEW Admin Command Prompt and try again.
         goto :error
     )
-    echo   git installed.
+    echo   git ready.
 )
 
 rem === Step 2: Install GitHub CLI ===
@@ -40,10 +37,7 @@ if !errorlevel! equ 0 (
 ) else (
     echo [2/5] Installing GitHub CLI...
     winget install --id GitHub.cli -e --source winget --accept-source-agreements --accept-package-agreements
-    if !errorlevel! neq 0 (
-        echo ERROR: GitHub CLI installation failed.
-        goto :error
-    )
+    rem winget returns non-zero if already installed — not a real error
     call :refresh_path
     where gh >nul 2>&1
     if !errorlevel! neq 0 set "PATH=!PATH!;C:\Program Files\GitHub CLI"
@@ -51,10 +45,10 @@ if !errorlevel! equ 0 (
     if !errorlevel! neq 0 set "PATH=!PATH!;%LOCALAPPDATA%\Programs\GitHub CLI"
     where gh >nul 2>&1
     if !errorlevel! neq 0 (
-        echo ERROR: gh not found. Open a NEW Admin Command Prompt and try again.
+        echo ERROR: gh not found after install. Open a NEW Admin Command Prompt and try again.
         goto :error
     )
-    echo   gh installed.
+    echo   gh ready.
 )
 
 rem === Step 3: Authenticate ===
