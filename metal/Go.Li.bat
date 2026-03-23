@@ -14,14 +14,6 @@ echo   v1.8.3 — 2026-03-23
 echo   Strip the fat. Dark mode. Full power.
 echo.
 
-rem ── Check admin ──
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] Run this as Administrator.
-    echo Right-click Command Prompt ^> Run as administrator
-    pause
-    exit /b 1
-)
 
 echo   12 steps:
 echo.
