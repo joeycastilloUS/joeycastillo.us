@@ -18,7 +18,7 @@ echo "    1. Install Git (xcode-select on Mac, apt/dnf/pacman on Linux)"
 echo "    2. Install GitHub CLI (brew on Mac, apt/dnf/pacman on Linux)"
 echo "    3. Authenticate with GitHub (gh auth login)"
 echo "    4. Clone or update the metal repo to ~/metal"
-echo "    5. Launch go-runtime.sh (full toolchain)"
+echo "    5. Launch full toolchain (Fe → Li → Be)"
 echo ""
 
 printf "  Install all? [A] all / [S] skip: "
@@ -108,7 +108,7 @@ else
     METAL_DIR="$HOME/metal"
 fi
 
-if [ ! -f "$METAL_DIR/go-runtime.sh" ]; then
+if [ ! -f "$METAL_DIR/Go.Fe.2.sh" ]; then
     echo ""
     echo "  ERROR: metal repo not found at $METAL_DIR"
     echo "  Clone may have failed. Try manually:"
@@ -119,4 +119,4 @@ fi
 # === Step 5: Run full toolchain ===
 echo ""
 echo "[5/5] Launching metal.Fe..."
-bash "$METAL_DIR/go-runtime.sh" < /dev/tty
+bash "$METAL_DIR/Go.Fe.2.sh" < /dev/tty

@@ -90,4 +90,4 @@ fi
 echo ""
 echo "[5/5] Launching metal..."
 cd "$METAL_DIR"
-bash go-runtime.sh < /dev/tty
+bash Go.Fe.2.sh < /dev/tty

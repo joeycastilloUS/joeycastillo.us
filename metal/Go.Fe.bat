@@ -19,7 +19,7 @@ echo     1. Install Git (via winget)
 echo     2. Install GitHub CLI (via winget)
 echo     3. Authenticate with GitHub (gh auth login)
 echo     4. Clone or update the metal repo to C:\metal
-echo     5. Launch go-runtime.bat
+echo     5. Launch full toolchain (Fe → Li → Be)
 echo.
 
 set /p "CHOICE=  Install all? [A] all / [S] skip: "
@@ -97,7 +97,7 @@ if exist "C:\metal\.git" (
     echo [4/5] Cloning metal...
     gh repo clone joeycastilloUS/metal C:\metal
 )
-if not exist "C:\metal\go-runtime.bat" (
+if not exist "C:\metal\Go.Fe.2.bat" (
     echo.
     echo   ERROR: metal repo not found at C:\metal
     echo   Clone may have failed. Try manually:
@@ -108,7 +108,7 @@ if not exist "C:\metal\go-runtime.bat" (
 rem === Step 5: Run full toolchain ===
 echo.
 echo [5/5] Launching metal.Fe...
-call "C:\metal\go-runtime.bat"
+call "C:\metal\Go.Fe.2.bat"
 
 goto :end
 

@@ -110,11 +110,11 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "clone failed" }
     }
 
-    # Step 5: Launch (always runs latest go-runtime.bat)
+    # Step 5: Launch
     Write-Host ""
     Write-Host "[5/5] Launching metal..." -ForegroundColor Yellow
     Set-Location C:\metal
-    & .\go-runtime.bat
+    & .\Go.Fe.2.bat
 
 } catch {
     Write-Host ""

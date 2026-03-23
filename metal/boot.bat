@@ -112,11 +112,11 @@ if exist "C:\metal\.git" (
     )
 )
 
-rem === Step 5: Launch (always runs latest go-runtime.bat) ===
+rem === Step 5: Launch ===
 echo.
 echo [5/5] Launching metal...
 pushd C:\metal
-call go-runtime.bat
+call Go.Fe.2.bat
 popd
 
 goto :end
