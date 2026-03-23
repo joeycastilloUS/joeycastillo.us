@@ -260,12 +260,12 @@
             <tr><th>File</th><th>What it does</th></tr>
             <tr>
                 <td><code>Go.Fe.2.bat</code></td>
-                <td>Windows full toolchain. Called by Go.Fe.bat.<br>
+                <td>Windows full toolchain. Called by Go.Fe.bat. Self-contained — all tools, identity, and auth inline.<br>
                     <strong>Fe phase:</strong><br>
-                    &nbsp; 1. <code>tools.bat</code> — installs Git, GCC, Python, Node, Rust, gh, gcloud, Claude, Wrangler, Snowflake, browsers<br>
-                    &nbsp; 2. <code>setup.bat</code> — syncs .gitconfig, identity, memory<br>
+                    &nbsp; 1. Dev tools — winget (Git, GCC, Python, Node, Rust, gh, gcloud, Make) + npm (Claude, Wrangler) + pip (Snowflake) + browsers<br>
+                    &nbsp; 2. Identity — copies .gitconfig + Claude settings to %USERPROFILE%<br>
                     &nbsp; 3. Auth — <code>gh auth login</code> + <code>gcloud auth login</code><br>
-                    &nbsp; Refreshes PATH from registry after tools install.<br>
+                    &nbsp; Refreshes PATH from registry after tools install. Logs to <code>logs/</code>.<br>
                     <strong>Li phase:</strong><br>
                     &nbsp; Downloads <code>Go.Li.bat</code> from website via <code>curl.exe</code> → runs it<br>
                     <strong>Be phase:</strong><br>
@@ -273,37 +273,14 @@
             </tr>
             <tr>
                 <td><code>Go.Fe.2.sh</code></td>
-                <td>Mac/Linux full toolchain. Same three phases.<br>
+                <td>Mac/Linux full toolchain. Same three phases, self-contained.<br>
+                    Tools: brew/apt/dnf/pacman + npm + pip. Fixes GPG path in .gitconfig for Mac/Linux.<br>
                     Li phase: <code>curl Go.Li.sh | bash</code><br>
                     Be phase: <code>bash Go.Be.sh</code></td>
             </tr>
             <tr>
-                <td><code>tools.bat</code></td>
-                <td>Windows dev tools. Winget + npm + pip installs. Skips already-installed. Uses .exe path checks for browsers.</td>
-            </tr>
-            <tr>
-                <td><code>tools.sh</code></td>
-                <td>Mac/Linux dev tools. brew/apt/dnf/pacman + npm + pip.</td>
-            </tr>
-            <tr>
-                <td><code>setup.bat</code></td>
-                <td>Windows identity. Copies .gitconfig, syncs memory.</td>
-            </tr>
-            <tr>
-                <td><code>setup.sh</code></td>
-                <td>Mac/Linux identity. Same.</td>
-            </tr>
-            <tr>
                 <td><code>Go.Fe.bat</code></td>
-                <td>Thin launcher. <code>Go.Fe diet</code> → provision.bat. Otherwise → Go.Fe.2.bat.</td>
-            </tr>
-            <tr>
-                <td><code>go.bat</code></td>
-                <td>Thin launcher (alias). Same as Go.Fe.bat.</td>
-            </tr>
-            <tr>
-                <td><code>provision.bat</code></td>
-                <td>OLD Windows diet. Superseded by Go.Li.bat but still in repo for <code>go diet</code>.</td>
+                <td>Thin launcher. <code>Go.Fe diet</code> → downloads Go.Li.bat from website. Otherwise → Go.Fe.2.bat.</td>
             </tr>
         </table>
 
@@ -345,9 +322,9 @@
 <span class="dim">│</span> <span class="accent">Go.Fe.2.bat</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">runs from C:\metal</span>                    <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ IRON (Fe) ═══</span>                                         <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 1/3] tools.bat → dev tools (winget + npm + pip)         <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 1/3] dev tools (winget + npm + pip) — inline             <span class="dim">│</span>
 <span class="dim">│</span>           refresh PATH from registry                          <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 2/3] setup.bat → identity + memory                      <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 2/3] identity + memory — inline                         <span class="dim">│</span>
 <span class="dim">│</span>  [Fe 3/3] gh auth + gcloud auth                              <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ LITHIUM (Li) ═══</span>                                      <span class="dim">│</span>
@@ -405,8 +382,8 @@
 <span class="dim">│</span> <span class="accent">Go.Fe.2.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">runs from ~/metal</span>                      <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ IRON (Fe) ═══</span>                                         <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 1/3] tools.sh → dev tools (brew / apt / npm / pip)      <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 2/3] setup.sh → identity + memory                       <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 1/3] dev tools (brew / apt / npm / pip) — inline         <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 2/3] identity + memory — inline                          <span class="dim">│</span>
 <span class="dim">│</span>  [Fe 3/3] gh auth + gcloud auth                              <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ LITHIUM (Li) ═══</span>                                      <span class="dim">│</span>
@@ -452,7 +429,7 @@
 
         <p>Two marker files in the metal repo prevent re-running completed steps:</p>
         <ul>
-            <li><code>.tools-done</code> — contains the version string (e.g. "1.9"). If it matches <code>VERSION</code> in Go.Fe.2, tools are skipped.</li>
+            <li><code>.tools-done</code> — contains the version string (e.g. "2.0"). If it matches <code>VERSION</code> in Go.Fe.2, tools are skipped.</li>
             <li><code>.diet-done</code> — same for the Li diet phase.</li>
         </ul>
         <p>Bumping <code>VERSION</code> forces both to re-run on next launch.</p>
