@@ -1,6 +1,6 @@
 @echo off
 rem metal.Li — Lithium. OS diet.
-rem v1.7.1 — 2026-03-23
+rem v1.8 — 2026-03-23
 rem curl -fsSL https://joeycastillo.us/metal/Go.Li.bat -o %TEMP%\Go.Li.bat && %TEMP%\Go.Li.bat
 rem Zero dependencies. Just run as Administrator.
 rem Apply all at once or choose step by step.
@@ -10,7 +10,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo   metal.Li — Lithium. OS diet.
-echo   v1.6 — 2026-03-23
+echo   v1.8 — 2026-03-23
 echo   Strip the fat. Dark mode. Full power.
 echo.
 
@@ -38,8 +38,13 @@ echo   10. Start menu              (kill recommendations, recent/frequent)
 echo   11. Secondary clock         (US West / Pacific)
 echo   12. Disable OneDrive        (remove from startup)
 echo.
-set /p "MODE=  Apply all? [Y] yes all / [N] pick one by one: "
-if /i "!MODE!"=="n" (
+set /p "MODE=  Apply all? [A] all / [P] pick one by one / [S] skip: "
+if /i "!MODE!"=="s" (
+    echo.
+    echo   Skipped.
+    goto :end
+)
+if /i "!MODE!"=="p" (
     set "PICK=1"
 ) else (
     set "PICK=0"
@@ -250,6 +255,7 @@ if "!APPLIED!"=="1" (
     start explorer.exe
 )
 
+:end
 echo.
 echo ============================================
 echo   metal.Li — diet complete.

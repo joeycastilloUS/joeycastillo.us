@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # metal.Li — Lithium. OS diet.
-# v1.7.1 — 2026-03-23
+# v1.8 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Li.sh | bash
 # Apply all at once or choose step by step.
 # Mac and Linux. Idempotent — safe to run again.
 
 echo ""
 echo "  metal.Li — Lithium. OS diet."
-echo "  v1.6 — 2026-03-23"
+echo "  v1.8 — 2026-03-23"
 echo "  Strip the fat. Dark mode. Full power."
 echo ""
 
@@ -41,12 +41,18 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     echo "   8. Privacy            (kill Siri, auto-update on)"
     echo "   9. Power              (never sleep on AC)"
     echo ""
-    printf "  Apply all? [Y] yes all / [N] pick one by one: " >/dev/tty
-    read -r MODE < /dev/tty 2>/dev/null || MODE="y"
+    printf "  Apply all? [A] all / [P] pick one by one / [S] skip: " >/dev/tty
+    read -r MODE < /dev/tty 2>/dev/null || MODE="a"
     case "$MODE" in
-    [nN]) PICK=1 ;;
+    [pP]) PICK=1 ;;
+    [sS])
+        echo ""
+        echo "  Skipped."
+        APPLIED=0
+        ;;
     esac
-    echo ""
+
+    if [ "$MODE" != "s" ] && [ "$MODE" != "S" ]; then
 
     # ── 1/9: Dark mode ──
     echo "[1/9] Dark mode"
@@ -210,6 +216,8 @@ PLISTEOF
         echo "       Skipped."
     fi
 
+    fi  # end of "not skip" guard
+
     if [ "$APPLIED" = "1" ]; then
         echo ""
         echo "  Restarting Finder and Dock..."
@@ -229,12 +237,17 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         echo "   3. File manager    (show hidden)"
         echo "   4. Power           (never sleep on AC)"
         echo ""
-        printf "  Apply all? [Y] yes all / [N] pick one by one: " >/dev/tty
-        read -r MODE < /dev/tty 2>/dev/null || MODE="y"
+        printf "  Apply all? [A] all / [P] pick one by one / [S] skip: " >/dev/tty
+        read -r MODE < /dev/tty 2>/dev/null || MODE="a"
         case "$MODE" in
-        [nN]) PICK=1 ;;
+        [pP]) PICK=1 ;;
+        [sS])
+            echo ""
+            echo "  Skipped."
+            ;;
         esac
-        echo ""
+
+        if [ "$MODE" != "s" ] && [ "$MODE" != "S" ]; then
 
         echo "[1/4] Dark mode"
         echo "       GNOME dark theme."
@@ -277,6 +290,8 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         else
             echo "       Skipped."
         fi
+
+        fi  # end of "not skip" guard
     else
         echo "  No GNOME detected. Skipping desktop preferences."
         echo "  (KDE/XFCE/i3 users: configure manually)"

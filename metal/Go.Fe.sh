@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # metal.Fe — Iron. The foundation.
-# v1.7.1 — 2026-03-23
+# v1.8 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Fe.sh | bash
 # Installs git, gh, clones metal, runs full toolchain + identity + auth.
 # Idempotent — safe to run again.
@@ -9,9 +9,27 @@ set -e
 
 echo ""
 echo "  metal.Fe — Iron. The foundation."
-echo "  v1.6 — 2026-03-23"
+echo "  v1.8 — 2026-03-23"
 echo "  Full dev toolchain. One command."
 echo ""
+echo "  This script will:"
+echo ""
+echo "    1. Install Git (xcode-select on Mac, apt/dnf/pacman on Linux)"
+echo "    2. Install GitHub CLI (brew on Mac, apt/dnf/pacman on Linux)"
+echo "    3. Authenticate with GitHub (gh auth login)"
+echo "    4. Clone or update the metal repo to ~/metal"
+echo "    5. Launch go-runtime.sh (full toolchain)"
+echo ""
+
+printf "  Install all? [A] all / [S] skip: "
+read -r CHOICE < /dev/tty
+
+case "$CHOICE" in
+    s|S)
+        echo "  Skipped."
+        exit 0
+        ;;
+esac
 
 # === Step 1: Install Git ===
 if command -v git &>/dev/null; then
