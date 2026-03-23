@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # metal.Li — Lithium. OS diet.
-# v1.5.3 — 2026-03-23
+# v1.6 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Li.sh | bash
-# Each step is optional — you choose what to apply.
+# Apply all at once or choose step by step.
 # Mac and Linux. Idempotent — safe to run again.
 
 echo ""
 echo "  metal.Li — Lithium. OS diet."
-echo "  v1.5.3 — 2026-03-23"
+echo "  v1.6 — 2026-03-23"
 echo "  Strip the fat. Dark mode. Full power."
-echo "  Each step is optional. Safe to run on any machine."
 echo ""
 
+PICK=0
+
 ask() {
-    local prompt="$1"
+    if [ "$PICK" = "0" ]; then return 0; fi
     local answer
     printf "       Apply? [Y/n]: " >/dev/tty
     read -r answer < /dev/tty 2>/dev/null || answer="y"
@@ -27,6 +28,24 @@ APPLIED=0
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
     echo "  macOS detected."
+    echo ""
+    echo "  9 steps:"
+    echo ""
+    echo "   1. Dark mode          (system-wide)"
+    echo "   2. Dock               (auto-hide, small, left, no recents)"
+    echo "   3. Finder             (show hidden, extensions, path bar)"
+    echo "   4. Keyboard           (max repeat, no press-and-hold)"
+    echo "   5. Keyboard remap     (Win→Ctrl, Alt→Cmd for Windows keyboards)"
+    echo "   6. Trackpad           (tap to click)"
+    echo "   7. Screenshots        (no shadow, PNG)"
+    echo "   8. Privacy            (kill Siri, auto-update on)"
+    echo "   9. Power              (never sleep on AC)"
+    echo ""
+    printf "  Apply all? [Y] yes all / [N] pick one by one: " >/dev/tty
+    read -r MODE < /dev/tty 2>/dev/null || MODE="y"
+    case "$MODE" in
+    [nN]) PICK=1 ;;
+    esac
     echo ""
 
     # ── 1/9: Dark mode ──
@@ -203,6 +222,20 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     echo ""
 
     if command -v gsettings &>/dev/null; then
+        echo "  4 steps:"
+        echo ""
+        echo "   1. Dark mode       (GNOME dark theme)"
+        echo "   2. Keyboard        (fast repeat)"
+        echo "   3. File manager    (show hidden)"
+        echo "   4. Power           (never sleep on AC)"
+        echo ""
+        printf "  Apply all? [Y] yes all / [N] pick one by one: " >/dev/tty
+        read -r MODE < /dev/tty 2>/dev/null || MODE="y"
+        case "$MODE" in
+        [nN]) PICK=1 ;;
+        esac
+        echo ""
+
         echo "[1/4] Dark mode"
         echo "       GNOME dark theme."
         if ask; then
