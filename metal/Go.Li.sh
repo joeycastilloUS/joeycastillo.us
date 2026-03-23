@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # metal.Li — Lithium. OS diet.
-# v1.5.1 — 2026-03-23
+# v1.5.2 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Li.sh | bash
 # Each step is optional — you choose what to apply.
 # Mac and Linux. Idempotent — safe to run again.
 
 echo ""
 echo "  metal.Li — Lithium. OS diet."
-echo "  v1.5.1 — 2026-03-23"
+echo "  v1.5.2 — 2026-03-23"
 echo "  Strip the fat. Dark mode. Full power."
 echo "  Each step is optional. Safe to run on any machine."
 echo ""
