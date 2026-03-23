@@ -49,15 +49,17 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
     echo "  Done."
 
-    # ── 5/9: Windows keyboard remap — Ctrl acts as Cmd ──
-    echo "[5/9] Windows keyboard remap (Ctrl → Cmd)..."
-    # Remap Left Ctrl → Left Cmd, Right Ctrl → Right Cmd
-    # So Ctrl+C/V/X/Z/A/S/F/T/W/N all work like Windows
+    # ── 5/9: Windows keyboard remap for Mac ──
+    echo "[5/9] Windows keyboard remap..."
+    # Physical Ctrl → stays Control (Ctrl+C interrupts in terminal/Claude)
+    # Physical Win  → Control      (no more "start button", acts as Ctrl)
+    # Physical Alt  → Command      (Alt+C=copy, Alt+V=paste, Alt+Tab=switch)
+    # Result: Ctrl works in terminal. Alt does Mac GUI shortcuts. Win = bonus Ctrl.
     hidutil property --set '{"UserKeyMapping":[
-        {"HIDKeyboardModifierMappingSrc":0x700000E0,"HIDKeyboardModifierMappingDst":0x700000E3},
         {"HIDKeyboardModifierMappingSrc":0x700000E3,"HIDKeyboardModifierMappingDst":0x700000E0},
-        {"HIDKeyboardModifierMappingSrc":0x700000E4,"HIDKeyboardModifierMappingDst":0x700000E7},
-        {"HIDKeyboardModifierMappingSrc":0x700000E7,"HIDKeyboardModifierMappingDst":0x700000E4}
+        {"HIDKeyboardModifierMappingSrc":0x700000E2,"HIDKeyboardModifierMappingDst":0x700000E3},
+        {"HIDKeyboardModifierMappingSrc":0x700000E7,"HIDKeyboardModifierMappingDst":0x700000E4},
+        {"HIDKeyboardModifierMappingSrc":0x700000E6,"HIDKeyboardModifierMappingDst":0x700000E7}
     ]}' >/dev/null 2>&1 || true
 
     # Persist across reboots via LaunchAgent
@@ -76,7 +78,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     <string>/usr/bin/hidutil</string>
     <string>property</string>
     <string>--set</string>
-    <string>{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000E0,"HIDKeyboardModifierMappingDst":0x700000E3},{"HIDKeyboardModifierMappingSrc":0x700000E3,"HIDKeyboardModifierMappingDst":0x700000E0},{"HIDKeyboardModifierMappingSrc":0x700000E4,"HIDKeyboardModifierMappingDst":0x700000E7},{"HIDKeyboardModifierMappingSrc":0x700000E7,"HIDKeyboardModifierMappingDst":0x700000E4}]}</string>
+    <string>{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000E3,"HIDKeyboardModifierMappingDst":0x700000E0},{"HIDKeyboardModifierMappingSrc":0x700000E2,"HIDKeyboardModifierMappingDst":0x700000E3},{"HIDKeyboardModifierMappingSrc":0x700000E7,"HIDKeyboardModifierMappingDst":0x700000E4},{"HIDKeyboardModifierMappingSrc":0x700000E6,"HIDKeyboardModifierMappingDst":0x700000E7}]}</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -85,7 +87,8 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 PLISTEOF
     launchctl unload "$PLIST_PATH" 2>/dev/null || true
     launchctl load "$PLIST_PATH" 2>/dev/null || true
-    echo "  Ctrl and Cmd swapped. Ctrl+C/V/X/Z now work like Windows."
+    echo "  Win → Ctrl, Alt → Cmd. Ctrl stays Ctrl."
+    echo "  Ctrl+C works in Claude. Alt+C/V copies/pastes. Alt+Tab switches apps."
     echo "  Persists across reboots."
     echo "  Done."
 
