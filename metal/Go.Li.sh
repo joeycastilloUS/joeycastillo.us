@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # metal.Li — Lithium. OS diet.
-# v1.5.2 — 2026-03-23
+# v1.5.3 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Li.sh | bash
 # Each step is optional — you choose what to apply.
 # Mac and Linux. Idempotent — safe to run again.
 
 echo ""
 echo "  metal.Li — Lithium. OS diet."
-echo "  v1.5.2 — 2026-03-23"
+echo "  v1.5.3 — 2026-03-23"
 echo "  Strip the fat. Dark mode. Full power."
 echo "  Each step is optional. Safe to run on any machine."
 echo ""
@@ -259,3 +259,33 @@ echo "  metal.Li — diet complete."
 echo "  Log out and back in for all changes."
 echo "  ============================================"
 echo ""
+
+# ── Launch metal.Be? ──
+echo "  Launch metal.Be (Claude Code with tilde commands)?"
+printf "  [Y/n]: " >/dev/tty
+read -r LAUNCH < /dev/tty 2>/dev/null || LAUNCH="y"
+case "$LAUNCH" in
+[nN])
+    echo "  See you next time."
+    ;;
+*)
+    METAL_BE="$HOME/metal.Be"
+    [ ! -d "$METAL_BE" ] && [ -d "/metal.Be" ] && METAL_BE="/metal.Be"
+
+    if [ ! -d "$METAL_BE" ]; then
+        echo "  Cloning metal.Be..."
+        if command -v gh &>/dev/null; then
+            gh repo clone joeycastilloUS/metal.Be "$HOME/metal.Be"
+        else
+            git clone https://github.com/joeycastilloUS/metal.Be.git "$HOME/metal.Be"
+        fi
+        METAL_BE="$HOME/metal.Be"
+    fi
+
+    if [ -f "$METAL_BE/Go.Be.sh" ]; then
+        exec bash "$METAL_BE/Go.Be.sh"
+    else
+        echo "  [ERROR] Go.Be.sh not found at $METAL_BE"
+    fi
+    ;;
+esac
