@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # metal.Li — Lithium. OS diet.
-# v1.7 — 2026-03-23
+# v1.7.1 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Li.sh | bash
 # Apply all at once or choose step by step.
 # Mac and Linux. Idempotent — safe to run again.

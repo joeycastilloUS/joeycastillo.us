@@ -1,6 +1,6 @@
 @echo off
 rem metal.Na — Sodium. The reset.
-rem v1.7 — 2026-03-23
+rem v1.7.1 — 2026-03-23
 rem Removes metal repos so you can test a fresh install.
 rem Leaves tools and OS changes in place.
 
