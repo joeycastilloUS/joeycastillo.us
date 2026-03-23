@@ -1,6 +1,6 @@
 @echo off
 rem metal.Li — Lithium. OS diet.
-rem v1.5 — 2026-03-23
+rem v1.5.1 — 2026-03-23
 rem curl -fsSL https://joeycastillo.us/metal/Go.Li.bat -o %TEMP%\Go.Li.bat && %TEMP%\Go.Li.bat
 rem Zero dependencies. Just run as Administrator.
 rem Each step is optional — you choose what to apply.
@@ -10,7 +10,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo   metal.Li — Lithium. OS diet.
-echo   v1.5 — 2026-03-23
+echo   v1.5.1 — 2026-03-23
 echo   Strip the fat. Dark mode. Full power.
 echo   Each step is optional. Safe to run on any machine.
 echo.
