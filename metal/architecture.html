@@ -221,8 +221,10 @@ architecture.html  This document — system schematic, script detail, flow diagr
 favicon-m.svg      Favicon</div>
 
         <h3>Metal repo <span class="repo-tag repo-metal">metal</span> — <code>C:\metal</code> or <code>~/metal</code></h3>
-        <div class="flow-box">Go.Fe.bat          Iron (Fe) — Windows full toolchain. Tools + identity + auth, then calls Li + Be. "diet" subcommand runs Li only.
-Go.Fe.sh           Iron (Fe) — Mac/Linux full toolchain. Same phases, brew/apt/dnf/pacman.
+        <div class="flow-box">Go.K.bat           Potassium (K) — Windows orchestrator. Calls Fe → Li → Be, reboot check.
+Go.K.sh            Potassium (K) — Mac/Linux orchestrator. Same flow.
+Go.Fe.bat          Iron (Fe) — Windows dev tools + identity + auth. Nothing else.
+Go.Fe.sh           Iron (Fe) — Mac/Linux dev tools + identity + auth. brew/apt/dnf/pacman.
 Go.Li.bat          Lithium (Li) — Windows diet. Version-gates, downloads Go.Li.bat from website, runs it.
 Go.Li.sh           Lithium (Li) — Mac/Linux diet. Version-gates, downloads Go.Li.sh from website, runs it.
 .gitconfig         Git identity — name, email, GPG signing key, aliases.
@@ -251,28 +253,28 @@ Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt
                     3. Install GitHub CLI via winget<br>
                     4. <code>gh auth login</code><br>
                     5. <code>gh repo clone</code> metal → <code>C:\metal</code><br>
-                    6. <code>call "C:\metal\Go.Fe.bat"</code></td>
+                    6. <code>call "C:\metal\Go.K.bat"</code> — launches the orchestrator</td>
             </tr>
             <tr>
                 <td><code>Go.Fe.sh</code></td>
                 <td><strong>Iron (Fe) — Mac/Linux bootstrap.</strong> Piped to bash.<br>
                     Same 5 steps but uses xcode-select/brew/apt/dnf/pacman.<br>
-                    Ends with <code>bash ~/metal/Go.Fe.sh &lt; /dev/tty</code></td>
+                    Ends with <code>bash ~/metal/Go.K.sh &lt; /dev/tty</code></td>
             </tr>
             <tr>
                 <td><code>Go.Li.bat</code></td>
-                <td>Windows diet. Self-contained, zero deps.<br>
+                <td><strong>Lithium (Li) — Windows diet.</strong> Self-contained, zero deps.<br>
                     Shows 12 steps → [A] all / [P] pick / [S] skip.<br>
                     Registry tweaks, PowerShell bloatware removal.<br>
-                    <strong>Also downloaded and run by Go.Fe.bat during the Li phase.</strong></td>
+                    <strong>Also downloaded and run by Go.Li.bat in the metal repo.</strong></td>
             </tr>
             <tr>
                 <td><code>Go.Li.sh</code></td>
-                <td>Mac/Linux diet.<br>
+                <td><strong>Lithium (Li) — Mac/Linux diet.</strong><br>
                     Mac: 9 steps (dark mode, dock, finder, keyboard, remap, trackpad, screenshots, privacy, power).<br>
                     Linux: 4 steps (dark mode, keyboard, file manager, power).<br>
-                    Same [A] / [P] / [S] menu. Offers to launch Be at end.<br>
-                    <strong>Also downloaded and run by Go.Fe.sh during the Li phase.</strong></td>
+                    Same [A] / [P] / [S] menu.<br>
+                    <strong>Also downloaded and run by Go.Li.sh in the metal repo.</strong></td>
             </tr>
             <tr>
                 <td><code>Go.Na.bat</code></td>
@@ -284,11 +286,39 @@ Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt
             </tr>
         </table>
 
-        <h3>Iron (Fe) — Go.Fe.bat <span class="repo-tag repo-metal">metal</span></h3>
-        <p>Windows full toolchain. Self-contained — everything is inline. Called by Go.Fe.bat after the repo is cloned.</p>
+        <h3>Potassium (K) — Go.K.bat / Go.K.sh <span class="repo-tag repo-metal">metal</span></h3>
+        <p>The orchestrator. Calls each element in order, handles reboot and Be launch.</p>
 
         <table>
-            <tr><th>Phase</th><th>Step</th><th>What happens</th></tr>
+            <tr><th>Phase</th><th>What happens</th></tr>
+            <tr>
+                <td><strong>Fe — Iron</strong></td>
+                <td><code>call Go.Fe.bat</code> (Windows) / <code>bash Go.Fe.sh</code> (Mac/Linux).<br>
+                    Checks <code>.tools-done</code> after return to detect if changes were made.</td>
+            </tr>
+            <tr>
+                <td><strong>Li — Lithium</strong></td>
+                <td><code>call Go.Li.bat</code> (Windows) / <code>bash Go.Li.sh</code> (Mac/Linux).<br>
+                    Checks <code>.diet-done</code> after return to detect if changes were made.</td>
+            </tr>
+            <tr>
+                <td><strong>Reboot check</strong></td>
+                <td>If any changes: Windows asks <code>Reboot now? [Y/n]</code> → <code>shutdown /r /t 5</code>.<br>
+                    Mac/Linux asks <code>Launch metal.Be now? [Y/n]</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>Be — Beryllium</strong></td>
+                <td><code>gh repo clone metal.Be</code> (if not present).<br>
+                    Windows: <code>where claude</code> → refresh PATH if needed → <code>call Go.Be.bat</code>.<br>
+                    Mac/Linux: <code>bash Go.Be.sh</code>.</td>
+            </tr>
+        </table>
+
+        <h3>Iron (Fe) — Go.Fe.bat / Go.Fe.sh <span class="repo-tag repo-metal">metal</span></h3>
+        <p>Dev tools + identity + auth. Called by Go.K. Does its job and returns.</p>
+
+        <table>
+            <tr><th>Step</th><th>Detail</th><th>What happens</th></tr>
             <tr>
                 <td rowspan="3"><strong>Fe 1/3<br>Dev tools</strong></td>
                 <td>Version gate</td>
@@ -323,24 +353,6 @@ Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt
                 <td><code>gh auth status</code> → skip or <code>gh auth login</code><br>
                     <code>gcloud auth print-access-token</code> → skip or <code>gcloud auth login</code></td>
             </tr>
-            <tr>
-                <td><strong>Li<br>Diet</strong></td>
-                <td>Delegate</td>
-                <td><code>call Go.Li.bat</code> — separate file handles version gate + download + run.<br>
-                    Checks <code>.diet-done</code> after return to detect if changes were made.</td>
-            </tr>
-            <tr>
-                <td rowspan="2"><strong>Be<br>Launch</strong></td>
-                <td>Reboot check</td>
-                <td>If changes were made: asks <code>Reboot now? [Y/n]</code><br>
-                    Y → <code>shutdown /r /t 5</code>. N → continue.</td>
-            </tr>
-            <tr>
-                <td>Launch</td>
-                <td><code>gh repo clone metal.Be C:\metal.Be</code> (if not present).<br>
-                    <code>where claude</code> → if not found, refresh PATH, check <code>%APPDATA%\npm</code>.<br>
-                    <code>call "C:\metal.Be\Go.Be.bat"</code></td>
-            </tr>
         </table>
 
         <h3>Subroutines in Go.Fe.bat</h3>
@@ -368,11 +380,11 @@ Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt
             </tr>
         </table>
 
-        <h3>Iron (Fe) — Go.Fe.sh <span class="repo-tag repo-metal">metal</span></h3>
-        <p>Mac/Linux full toolchain. Same three phases, self-contained.</p>
+        <h3>Iron (Fe) — Go.Fe.sh details <span class="repo-tag repo-metal">metal</span></h3>
+        <p>Mac/Linux version. Same three steps as .bat, different package managers.</p>
 
         <table>
-            <tr><th>Phase</th><th>Step</th><th>What happens</th></tr>
+            <tr><th>Step</th><th>Detail</th><th>What happens</th></tr>
             <tr>
                 <td rowspan="3"><strong>Fe 1/3<br>Dev tools</strong></td>
                 <td>Version gate</td>
@@ -407,23 +419,6 @@ Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt
                 <td>Inline</td>
                 <td><code>gh auth status</code> → skip or <code>gh auth login &lt; /dev/tty</code><br>
                     <code>gcloud auth print-access-token</code> → skip or <code>gcloud auth login &lt; /dev/tty</code></td>
-            </tr>
-            <tr>
-                <td><strong>Li<br>Diet</strong></td>
-                <td>Delegate</td>
-                <td><code>bash Go.Li.sh</code> — separate file handles version gate + download + run.<br>
-                    Checks <code>.diet-done</code> after return to detect if changes were made.</td>
-            </tr>
-            <tr>
-                <td rowspan="2"><strong>Be<br>Launch</strong></td>
-                <td>Check</td>
-                <td>If changes: asks <code>Launch metal.Be now? [Y/n]</code><br>
-                    Checks multiple paths: <code>~/metal.Be</code>, <code>/metal.Be</code>, <code>C:/metal.Be</code></td>
-            </tr>
-            <tr>
-                <td>Launch</td>
-                <td><code>gh repo clone metal.Be ~/metal.Be</code> (if not present).<br>
-                    <code>bash Go.Be.sh</code></td>
             </tr>
         </table>
 
@@ -491,57 +486,47 @@ Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt
 <span class="dim">│</span>  [2/5] Install GitHub CLI (winget)                           <span class="dim">│</span>
 <span class="dim">│</span>  [3/5] gh auth login (browser OAuth)                         <span class="dim">│</span>
 <span class="dim">│</span>  [4/5] gh repo clone metal → C:\metal                        <span class="dim">│</span>
-<span class="dim">│</span>  [5/5] call "C:\metal\Go.Fe.bat"                           <span class="dim">│</span>
+<span class="dim">│</span>  [5/5] call "C:\metal\Go.K.bat"                            <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">└─────────┼────────────────────────────────────────────────────┘</span>
           <span class="dim">│</span>
           <span class="dim">▼</span>
 <span class="dim">┌──────────────────────────────────────────────────────────────┐</span>
-<span class="dim">│</span> <span class="accent">Go.Fe.bat</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">runs from C:\metal</span>                    <span class="dim">│</span>
+<span class="dim">│</span> <span class="accent">Go.K.bat</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">Potassium — orchestrator</span>              <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  <span class="warn">═══ IRON (Fe) ═══</span>                                         <span class="dim">│</span>
-<span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 1/3] Dev tools (all inline)                             <span class="dim">│</span>
-<span class="dim">│</span>    check .tools-done → skip if version matches               <span class="dim">│</span>
-<span class="dim">│</span>    ask [Y/n]                                                 <span class="dim">│</span>
-<span class="dim">│</span>    create log file in logs/                                  <span class="dim">│</span>
-<span class="dim">│</span>    [1/3] winget: Git, GCC, gh, Python, Node, gcloud,         <span class="dim">│</span>
-<span class="dim">│</span>                  Rust, Make                                   <span class="dim">│</span>
-<span class="dim">│</span>    [2/3] npm: Claude Code, Wrangler                          <span class="dim">│</span>
-<span class="dim">│</span>           pip: Snowflake CLI                                 <span class="dim">│</span>
-<span class="dim">│</span>    [3/3] browsers: Chrome, Firefox, Brave, Opera              <span class="dim">│</span>
-<span class="dim">│</span>    :refresh_path from registry                               <span class="dim">│</span>
-<span class="dim">│</span>    write .tools-done                                         <span class="dim">│</span>
-<span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 2/3] Identity (inline)                                  <span class="dim">│</span>
-<span class="dim">│</span>    copy .gitconfig → %USERPROFILE%                            <span class="dim">│</span>
-<span class="dim">│</span>    copy claude settings → %USERPROFILE%\.claude               <span class="dim">│</span>
-<span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 3/3] Auth                                               <span class="dim">│</span>
-<span class="dim">│</span>    gh auth login (skip if already authed)                     <span class="dim">│</span>
-<span class="dim">│</span>    gcloud auth login (skip if already authed)                 <span class="dim">│</span>
-<span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  <span class="warn">═══ LITHIUM (Li) ═══</span>                                      <span class="dim">│</span>
-<span class="dim">│</span>    call Go.Li.bat                                          <span class="dim">│</span>
-<span class="dim">│</span>      → check .diet-done → skip if version matches            <span class="dim">│</span>
-<span class="dim">│</span>      → curl Go.Li.bat → %TEMP% → call it                    <span class="dim">│</span>
-<span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
-<span class="dim">│</span>         <span class="dim">▼</span>                                                     <span class="dim">│</span>
+<span class="dim">│</span>  <span class="warn">═══ call Go.Fe.bat ═══</span>  Iron                                <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">┌────────────────────────────────────────────────────┐</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span> <span class="accent">Go.Li.bat</span>  <span class="repo-tag repo-web" style="font-size:0.65rem">web</span>  <span class="dim">runs from %TEMP%</span>              <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>                                                    <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>  12 steps → [A] all / [P] pick / [S] skip          <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>  Bloatware, Cortana, taskbar, dark mode,           <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>  explorer, power, privacy, notifications,           <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>  keyboard, start menu, clock, OneDrive              <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span> <span class="accent">Go.Fe.bat</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>                                <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  [Fe 1/3] Dev tools                                <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    check .tools-done → skip if version matches     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    [1/3] winget: Git, GCC, gh, Python, Node,       <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>                  gcloud, Rust, Make                <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    [2/3] npm: Claude, Wrangler; pip: Snowflake      <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    [3/3] browsers: Chrome, Firefox, Brave, Opera    <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    write .tools-done                                <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  [Fe 2/3] Identity — .gitconfig + claude settings   <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  [Fe 3/3] Auth — gh + gcloud                        <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">└────────────────────────────────────────────────────┘</span>    <span class="dim">│</span>
-<span class="dim">│</span>    write .diet-done                                          <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  <span class="warn">═══ call Go.Li.bat ═══</span>  Lithium                              <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">┌────────────────────────────────────────────────────┐</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span> <span class="accent">Go.Li.bat</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>                                <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  check .diet-done → skip if version matches        <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  curl Go.Li.bat from website → %TEMP% → call       <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    ┌──────────────────────────────────────────┐     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    <span class="dim">│</span> <span class="accent">Go.Li.bat</span>  <span class="repo-tag repo-web" style="font-size:0.65rem">web</span>  <span class="dim">from %TEMP%</span>          <span class="dim">│</span>     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    <span class="dim">│</span>  12 steps: bloatware, Cortana, taskbar, <span class="dim">│</span>     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    <span class="dim">│</span>  dark mode, explorer, power, privacy,   <span class="dim">│</span>     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    <span class="dim">│</span>  notifications, keyboard, start, clock, <span class="dim">│</span>     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    <span class="dim">│</span>  OneDrive                               <span class="dim">│</span>     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    └──────────────────────────────────────────┘     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  write .diet-done                                  <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">└────────────────────────────────────────────────────┘</span>    <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ BERYLLIUM (Be) ═══</span>                                    <span class="dim">│</span>
 <span class="dim">│</span>    If changes → "Reboot now? [Y/n]"                          <span class="dim">│</span>
 <span class="dim">│</span>    gh repo clone metal.Be → C:\metal.Be                      <span class="dim">│</span>
 <span class="dim">│</span>    where claude → refresh PATH if needed                      <span class="dim">│</span>
-<span class="dim">│</span>    fallback: check %APPDATA%\npm\claude.cmd                  <span class="dim">│</span>
 <span class="dim">│</span>    call "C:\metal.Be\Go.Be.bat"                              <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">└─────────┼────────────────────────────────────────────────────┘</span>
@@ -571,51 +556,40 @@ Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt
 <span class="dim">│</span>  [2/5] Install GitHub CLI (brew / apt / dnf / pacman)        <span class="dim">│</span>
 <span class="dim">│</span>  [3/5] gh auth login (browser OAuth)                         <span class="dim">│</span>
 <span class="dim">│</span>  [4/5] gh repo clone metal → ~/metal                         <span class="dim">│</span>
-<span class="dim">│</span>  [5/5] bash ~/metal/Go.Fe.sh &lt; /dev/tty                    <span class="dim">│</span>
+<span class="dim">│</span>  [5/5] bash ~/metal/Go.K.sh &lt; /dev/tty                     <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">└─────────┼────────────────────────────────────────────────────┘</span>
           <span class="dim">│</span>
           <span class="dim">▼</span>
 <span class="dim">┌──────────────────────────────────────────────────────────────┐</span>
-<span class="dim">│</span> <span class="accent">Go.Fe.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">runs from ~/metal</span>                      <span class="dim">│</span>
+<span class="dim">│</span> <span class="accent">Go.K.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">Potassium — orchestrator</span>               <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  <span class="warn">═══ IRON (Fe) ═══</span>                                         <span class="dim">│</span>
-<span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 1/3] Dev tools (all inline)                             <span class="dim">│</span>
-<span class="dim">│</span>    check .tools-done → skip if version matches               <span class="dim">│</span>
-<span class="dim">│</span>    ask [Y/n] &lt; /dev/tty                                     <span class="dim">│</span>
-<span class="dim">│</span>    Mac: xcode-select → Homebrew → brew install               <span class="dim">│</span>
-<span class="dim">│</span>    Linux: apt / dnf / pacman (auto-detected)                 <span class="dim">│</span>
-<span class="dim">│</span>    git, gh, python3, node, make, Rust (rustup), gcloud       <span class="dim">│</span>
-<span class="dim">│</span>    npm: Claude Code, Wrangler                                <span class="dim">│</span>
-<span class="dim">│</span>    pip: Snowflake CLI                                        <span class="dim">│</span>
-<span class="dim">│</span>    Mac browsers: Chrome, Firefox, Brave, Opera (brew cask)   <span class="dim">│</span>
-<span class="dim">│</span>    Linux: Firefox only                                       <span class="dim">│</span>
-<span class="dim">│</span>    write .tools-done                                         <span class="dim">│</span>
-<span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 2/3] Identity (inline)                                  <span class="dim">│</span>
-<span class="dim">│</span>    cp .gitconfig → ~/.gitconfig                              <span class="dim">│</span>
-<span class="dim">│</span>    sed: fix GPG path for Mac or Linux                        <span class="dim">│</span>
-<span class="dim">│</span>    cp Claude settings → ~/.claude/                            <span class="dim">│</span>
-<span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 3/3] Auth                                               <span class="dim">│</span>
-<span class="dim">│</span>    gh auth login &lt; /dev/tty (skip if authed)                 <span class="dim">│</span>
-<span class="dim">│</span>    gcloud auth login &lt; /dev/tty (skip if authed)             <span class="dim">│</span>
-<span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  <span class="warn">═══ LITHIUM (Li) ═══</span>                                      <span class="dim">│</span>
-<span class="dim">│</span>    bash Go.Li.sh                                           <span class="dim">│</span>
-<span class="dim">│</span>      → check .diet-done → skip if version matches            <span class="dim">│</span>
-<span class="dim">│</span>      → curl -fsSL Go.Li.sh | bash                           <span class="dim">│</span>
-<span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
-<span class="dim">│</span>         <span class="dim">▼</span>                                                     <span class="dim">│</span>
+<span class="dim">│</span>  <span class="warn">═══ bash Go.Fe.sh ═══</span>  Iron                                 <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">┌────────────────────────────────────────────────────┐</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span> <span class="accent">Go.Li.sh</span>  <span class="repo-tag repo-web" style="font-size:0.65rem">web</span>  <span class="dim">piped to bash</span>                   <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>                                                    <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>  Mac: 9 steps / Linux: 4 steps                   <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>  [A] all / [P] pick / [S] skip                    <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>  Offers to launch metal.Be at end                 <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span> <span class="accent">Go.Fe.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>                                 <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  [Fe 1/3] Dev tools                                <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    Mac: xcode-select → Homebrew → brew              <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    Linux: apt / dnf / pacman (auto-detected)       <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    git, gh, python3, node, make, Rust, gcloud      <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    npm: Claude, Wrangler; pip: Snowflake            <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    Mac browsers: brew cask / Linux: Firefox         <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    write .tools-done                                <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  [Fe 2/3] Identity — .gitconfig + sed GPG + claude  <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  [Fe 3/3] Auth — gh + gcloud &lt; /dev/tty             <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">└────────────────────────────────────────────────────┘</span>    <span class="dim">│</span>
-<span class="dim">│</span>    write .diet-done                                          <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  <span class="warn">═══ bash Go.Li.sh ═══</span>  Lithium                              <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">┌────────────────────────────────────────────────────┐</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span> <span class="accent">Go.Li.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>                                 <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  check .diet-done → skip if version matches        <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  curl Go.Li.sh from website | bash                 <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    ┌──────────────────────────────────────────┐     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    <span class="dim">│</span> <span class="accent">Go.Li.sh</span>  <span class="repo-tag repo-web" style="font-size:0.65rem">web</span>  <span class="dim">piped to bash</span>       <span class="dim">│</span>     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    <span class="dim">│</span>  Mac: 9 steps / Linux: 4 steps          <span class="dim">│</span>     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    <span class="dim">│</span>  [A] all / [P] pick / [S] skip          <span class="dim">│</span>     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>    └──────────────────────────────────────────┘     <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  write .diet-done                                  <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">└────────────────────────────────────────────────────┘</span>    <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ BERYLLIUM (Be) ═══</span>                                    <span class="dim">│</span>
 <span class="dim">│</span>    If changes → "Launch Be now? [Y/n]"                       <span class="dim">│</span>
@@ -669,6 +643,8 @@ Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt
             <tr><td><span class="repo-tag repo-web">web</span></td><td><code>Go.Na.sh</code></td><td>comment + echo</td></tr>
             <tr><td><span class="repo-tag repo-web">web</span></td><td><code>index.html</code></td><td>version display</td></tr>
             <tr><td><span class="repo-tag repo-web">web</span></td><td><code>history.html</code></td><td>new entry</td></tr>
+            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.K.bat</code></td><td><code>set "VERSION=..."</code></td></tr>
+            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.K.sh</code></td><td><code>VERSION="..."</code></td></tr>
             <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Fe.bat</code></td><td><code>set "VERSION=..."</code></td></tr>
             <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Fe.sh</code></td><td><code>VERSION="..."</code></td></tr>
             <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Li.bat</code></td><td><code>set "VERSION=..."</code></td></tr>

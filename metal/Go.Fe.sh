@@ -108,7 +108,7 @@ else
     METAL_DIR="$HOME/metal"
 fi
 
-if [ ! -f "$METAL_DIR/Go.Fe.sh" ]; then
+if [ ! -f "$METAL_DIR/Go.K.sh" ]; then
     echo ""
     echo "  ERROR: metal repo not found at $METAL_DIR"
     echo "  Clone may have failed. Try manually:"
@@ -116,7 +116,7 @@ if [ ! -f "$METAL_DIR/Go.Fe.sh" ]; then
     exit 1
 fi
 
-# === Step 5: Run full toolchain ===
+# === Step 5: Launch Potassium (orchestrator) ===
 echo ""
-echo "[5/5] Launching metal.Fe..."
-bash "$METAL_DIR/Go.Fe.sh" < /dev/tty
+echo "[5/5] Launching metal.K..."
+bash "$METAL_DIR/Go.K.sh" < /dev/tty
