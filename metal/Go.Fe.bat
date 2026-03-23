@@ -1,6 +1,6 @@
 @echo off
 rem metal.Fe — Iron. The foundation.
-rem v1.6.1 — 2026-03-23
+rem v1.7 — 2026-03-23
 rem curl -fsSL https://joeycastillo.us/metal/Go.Fe.bat -o %TEMP%\Go.Fe.bat && %TEMP%\Go.Fe.bat
 rem Installs git, gh, clones metal, runs full toolchain + identity + auth.
 rem Idempotent — safe to run again.
