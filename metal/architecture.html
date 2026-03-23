@@ -209,42 +209,44 @@
         <h2>File structure</h2>
 
         <h3>Website repo <span class="repo-tag repo-web">web</span> — <code>joeycastillo.us/metal/</code></h3>
-        <div class="flow-box">Go.Fe.bat          Windows bootstrap (downloaded to %TEMP%)
-Go.Fe.sh           Mac/Linux bootstrap (piped to bash)
-Go.Li.bat          Windows diet — self-contained, 12 steps
-Go.Li.sh           Mac/Linux diet — Mac 9 steps, Linux 4 steps
-Go.Na.bat          Windows reset
-Go.Na.sh           Mac/Linux reset
-index.html         Main page with install commands
-history.html       Full version changelog
-architecture.html  This document
+        <div class="flow-box">Go.Fe.bat          Iron (Fe) — Windows bootstrap. Installs git + gh, clones metal, launches Fe 2.
+Go.Fe.sh           Iron (Fe) — Mac/Linux bootstrap. Same flow, piped to bash.
+Go.Li.bat          Lithium (Li) — Windows OS diet. Self-contained, 12 steps, zero deps.
+Go.Li.sh           Lithium (Li) — Mac/Linux OS diet. Mac 9 steps, Linux 4 steps.
+Go.Na.bat          Sodium (Na) — Windows reset. Removes metal repos, leaves tools + OS.
+Go.Na.sh           Sodium (Na) — Mac/Linux reset. Same cleanup.
+index.html         Main page — install commands, platform tabs, What's New.
+history.html       Full version changelog — every release since v1.0.
+architecture.html  This document — system schematic, script detail, flow diagrams.
 favicon-m.svg      Favicon</div>
 
         <h3>Metal repo <span class="repo-tag repo-metal">metal</span> — <code>C:\metal</code> or <code>~/metal</code></h3>
-        <div class="flow-box">Go.Fe.bat          Thin launcher → Go.Fe.2.bat (or downloads Go.Li.bat for "diet")
-Go.Fe.2.bat        Windows full toolchain — tools + identity + auth + Li + Be
-Go.Fe.2.sh         Mac/Linux full toolchain — same
-.gitconfig         Git identity, GPG signing
-claude/            Claude Code settings (settings.json, settings.local.json)
-a-d-d/             ADD methodology template (CLAUDE.md, board/, user/)
-logs/              Tool install logs (created at runtime)
-.tools-done        Version marker — skip tools if current
-.diet-done         Version marker — skip diet if current</div>
+        <div class="flow-box">Go.Fe.bat          Iron (Fe) — Thin launcher. Default → Go.Fe.2.bat. "diet" → downloads Go.Li.bat.
+Go.Fe.2.bat        Iron (Fe) — Windows full toolchain. Tools + identity + auth, then calls Li + Be.
+Go.Fe.2.sh         Iron (Fe) — Mac/Linux full toolchain. Same phases, brew/apt/dnf/pacman.
+Go.Li.2.bat        Lithium (Li) — Windows diet wrapper. Version-gates, downloads Go.Li.bat, runs it.
+Go.Li.2.sh         Lithium (Li) — Mac/Linux diet wrapper. Version-gates, downloads Go.Li.sh, runs it.
+.gitconfig         Git identity — name, email, GPG signing key, aliases.
+claude/            Claude Code settings — settings.json, settings.local.json.
+a-d-d/             ADD methodology — architecture (CLAUDE.md), board, user prefs.
+logs/              Tool install logs — one file per install, created at runtime.
+.tools-done        Version marker — skip Fe tools phase if version matches.
+.diet-done         Version marker — skip Li diet phase if version matches.</div>
 
-        <h3>Be repo <span class="repo-tag repo-be">Be</span> — <code>C:\metal.Be</code> or <code>~/metal.Be</code></h3>
-        <div class="flow-box">Go.Be.bat          Launches claude (Windows)
-Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div>
+        <h3>Beryllium repo <span class="repo-tag repo-be">Be</span> — <code>C:\metal.Be</code> or <code>~/metal.Be</code></h3>
+        <div class="flow-box">Go.Be.bat          Beryllium (Be) — Launches Claude Code (Windows).
+Go.Be.sh           Beryllium (Be) — Launches Claude Code (Mac/Linux). exec &lt; /dev/tty first.</div>
 
         <!-- ═══════════════════════════════════════════ -->
         <h2>Every script, what it does</h2>
 
-        <h3>Website bootstrap <span class="repo-tag repo-web">web</span></h3>
+        <h3>Website bootstrap — Iron (Fe) + Lithium (Li) + Sodium (Na) <span class="repo-tag repo-web">web</span></h3>
 
         <table>
             <tr><th>File</th><th>What it does</th></tr>
             <tr>
                 <td><code>Go.Fe.bat</code></td>
-                <td>Windows bootstrap. Downloaded to <code>%TEMP%</code> and run.<br>
+                <td><strong>Iron (Fe) — Windows bootstrap.</strong> Downloaded to <code>%TEMP%</code> and run.<br>
                     1. Show 5 steps → [A] all / [S] skip<br>
                     2. Install Git via winget<br>
                     3. Install GitHub CLI via winget<br>
@@ -254,7 +256,7 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
             </tr>
             <tr>
                 <td><code>Go.Fe.sh</code></td>
-                <td>Mac/Linux bootstrap. Piped to bash.<br>
+                <td><strong>Iron (Fe) — Mac/Linux bootstrap.</strong> Piped to bash.<br>
                     Same 5 steps but uses xcode-select/brew/apt/dnf/pacman.<br>
                     Ends with <code>bash ~/metal/Go.Fe.2.sh &lt; /dev/tty</code></td>
             </tr>
@@ -283,7 +285,7 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
             </tr>
         </table>
 
-        <h3>Metal repo — Go.Fe.2.bat <span class="repo-tag repo-metal">metal</span></h3>
+        <h3>Iron (Fe) — Go.Fe.2.bat <span class="repo-tag repo-metal">metal</span></h3>
         <p>Windows full toolchain. Self-contained — everything is inline. Called by Go.Fe.bat after the repo is cloned.</p>
 
         <table>
@@ -324,10 +326,9 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
             </tr>
             <tr>
                 <td><strong>Li<br>Diet</strong></td>
-                <td>Version gate</td>
-                <td>Reads <code>.diet-done</code>. If version matches, skips.<br>
-                    Otherwise: <code>%SystemRoot%\System32\curl.exe</code> downloads Go.Li.bat from website → <code>%TEMP%</code> → <code>call</code> it.<br>
-                    Writes version to <code>.diet-done</code>.</td>
+                <td>Delegate</td>
+                <td><code>call Go.Li.2.bat</code> — separate file handles version gate + download + run.<br>
+                    Checks <code>.diet-done</code> after return to detect if changes were made.</td>
             </tr>
             <tr>
                 <td rowspan="2"><strong>Be<br>Launch</strong></td>
@@ -368,7 +369,7 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
             </tr>
         </table>
 
-        <h3>Metal repo — Go.Fe.2.sh <span class="repo-tag repo-metal">metal</span></h3>
+        <h3>Iron (Fe) — Go.Fe.2.sh <span class="repo-tag repo-metal">metal</span></h3>
         <p>Mac/Linux full toolchain. Same three phases, self-contained.</p>
 
         <table>
@@ -410,10 +411,9 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
             </tr>
             <tr>
                 <td><strong>Li<br>Diet</strong></td>
-                <td>Version gate</td>
-                <td>Reads <code>.diet-done</code>. If matches, skips.<br>
-                    Otherwise: <code>curl -fsSL joeycastillo.us/metal/Go.Li.sh | bash</code><br>
-                    Writes version to <code>.diet-done</code>.</td>
+                <td>Delegate</td>
+                <td><code>bash Go.Li.2.sh</code> — separate file handles version gate + download + run.<br>
+                    Checks <code>.diet-done</code> after return to detect if changes were made.</td>
             </tr>
             <tr>
                 <td rowspan="2"><strong>Be<br>Launch</strong></td>
@@ -446,8 +446,8 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
             </tr>
         </table>
 
-        <h3>Metal repo — Go.Fe.bat <span class="repo-tag repo-metal">metal</span></h3>
-        <p>Thin launcher. Two modes:</p>
+        <h3>Iron (Fe) — Go.Fe.bat launcher <span class="repo-tag repo-metal">metal</span></h3>
+        <p>Thin launcher in the metal repo. Two modes:</p>
         <table>
             <tr><th>Command</th><th>What happens</th></tr>
             <tr>
@@ -460,7 +460,26 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
             </tr>
         </table>
 
-        <h3>Be repo <span class="repo-tag repo-be">Be</span></h3>
+        <h3>Lithium (Li) — Go.Li.2.bat / Go.Li.2.sh <span class="repo-tag repo-metal">metal</span></h3>
+        <p>Diet wrappers in the metal repo. Called by Go.Fe.2. Handle version gate + download + run.</p>
+        <table>
+            <tr><th>File</th><th>What it does</th></tr>
+            <tr>
+                <td><code>Go.Li.2.bat</code></td>
+                <td>Reads <code>.diet-done</code> — skip if version matches.<br>
+                    Downloads <code>Go.Li.bat</code> from website via <code>%SystemRoot%\System32\curl.exe</code> → <code>%TEMP%</code>.<br>
+                    <code>call "%TEMP%\Go.Li.bat"</code> — runs the 12-step Windows diet.<br>
+                    Writes version to <code>.diet-done</code>.</td>
+            </tr>
+            <tr>
+                <td><code>Go.Li.2.sh</code></td>
+                <td>Reads <code>.diet-done</code> — skip if version matches.<br>
+                    <code>curl -fsSL joeycastillo.us/metal/Go.Li.sh | bash</code> — runs Mac/Linux diet.<br>
+                    Writes version to <code>.diet-done</code>.</td>
+            </tr>
+        </table>
+
+        <h3>Beryllium (Be) — Go.Be.bat / Go.Be.sh <span class="repo-tag repo-be">Be</span></h3>
         <table>
             <tr><th>File</th><th>What it does</th></tr>
             <tr>
@@ -518,9 +537,9 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
 <span class="dim">│</span>    gcloud auth login (skip if already authed)                 <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ LITHIUM (Li) ═══</span>                                      <span class="dim">│</span>
-<span class="dim">│</span>    check .diet-done → skip if version matches                <span class="dim">│</span>
-<span class="dim">│</span>    %SystemRoot%\System32\curl.exe Go.Li.bat → %TEMP%         <span class="dim">│</span>
-<span class="dim">│</span>    call "%TEMP%\Go.Li.bat"                                   <span class="dim">│</span>
+<span class="dim">│</span>    call Go.Li.2.bat                                          <span class="dim">│</span>
+<span class="dim">│</span>      → check .diet-done → skip if version matches            <span class="dim">│</span>
+<span class="dim">│</span>      → curl Go.Li.bat → %TEMP% → call it                    <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">▼</span>                                                     <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">┌────────────────────────────────────────────────────┐</span>    <span class="dim">│</span>
@@ -599,8 +618,9 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
 <span class="dim">│</span>    gcloud auth login &lt; /dev/tty (skip if authed)             <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ LITHIUM (Li) ═══</span>                                      <span class="dim">│</span>
-<span class="dim">│</span>    check .diet-done → skip if version matches                <span class="dim">│</span>
-<span class="dim">│</span>    curl -fsSL Go.Li.sh | bash                                <span class="dim">│</span>
+<span class="dim">│</span>    bash Go.Li.2.sh                                           <span class="dim">│</span>
+<span class="dim">│</span>      → check .diet-done → skip if version matches            <span class="dim">│</span>
+<span class="dim">│</span>      → curl -fsSL Go.Li.sh | bash                           <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">▼</span>                                                     <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">┌────────────────────────────────────────────────────┐</span>    <span class="dim">│</span>
@@ -666,6 +686,8 @@ Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div
             <tr><td><span class="repo-tag repo-web">web</span></td><td><code>history.html</code></td><td>new entry</td></tr>
             <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Fe.2.bat</code></td><td><code>set "VERSION=..."</code></td></tr>
             <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Fe.2.sh</code></td><td><code>VERSION="..."</code></td></tr>
+            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Li.2.bat</code></td><td><code>set "VERSION=..."</code></td></tr>
+            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Li.2.sh</code></td><td><code>VERSION="..."</code></td></tr>
         </table>
 
         <!-- ═══════════════════════════════════════════ -->
