@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # metal.Fe — Iron. The foundation.
-# v1.8.4 — 2026-03-23
+# v1.9 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Fe.sh | bash
 # Installs git, gh, clones metal, runs full toolchain + identity + auth.
 # Idempotent — safe to run again.
@@ -9,7 +9,7 @@ set -e
 
 echo ""
 echo "  metal.Fe — Iron. The foundation."
-echo "  v1.8.4 — 2026-03-23"
+echo "  v1.9 — 2026-03-23"
 echo "  Full dev toolchain. One command."
 echo ""
 echo "  This script will:"

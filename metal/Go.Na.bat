@@ -1,6 +1,6 @@
 @echo off
 rem metal.Na — Sodium. The reset.
-rem v1.8.4 — 2026-03-23
+rem v1.9 — 2026-03-23
 rem Removes metal repos so you can test a fresh install.
 rem Leaves tools and OS changes in place.
 
@@ -8,7 +8,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo   metal.Na — Sodium. The reset.
-echo   v1.8.4 — 2026-03-23
+echo   v1.9 — 2026-03-23
 echo   Explodes on contact. Clean slate.
 echo.
 echo   This will remove:
