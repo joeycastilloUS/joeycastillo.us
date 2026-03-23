@@ -159,6 +159,7 @@
             color: #999;
         }
         .note strong { color: #ccc; }
+        .note.warn { border-left-color: #c9a96f; }
     </style>
 </head>
 <body>
@@ -172,7 +173,7 @@
 
     <div class="container">
         <h1>metal — architecture</h1>
-        <div class="subtitle"><a href="/metal/">← back to metal</a></div>
+        <div class="subtitle"><a href="/metal/">← back to metal</a> · v2.0 — 2026-03-23</div>
 
         <!-- ═══════════════════════════════════════════ -->
         <h2>Three repos</h2>
@@ -191,7 +192,7 @@
             <tr>
                 <td><code>joeycastilloUS/metal</code> <span class="repo-tag repo-metal">metal</span></td>
                 <td><code>C:\metal</code> or <code>~/metal</code></td>
-                <td>Full toolchain. Tools, identity, auth, version markers.</td>
+                <td>Full toolchain. Everything inline in Go.Fe.2.</td>
             </tr>
             <tr>
                 <td><code>joeycastilloUS/metal.Be</code> <span class="repo-tag repo-be">Be</span></td>
@@ -205,10 +206,39 @@
         </div>
 
         <!-- ═══════════════════════════════════════════ -->
-        <h2>Every script, line by line</h2>
+        <h2>File structure</h2>
 
-        <h3>Scripts on the website <span class="repo-tag repo-web">web</span></h3>
-        <p>These are downloaded and run. They live in <code>joeycastillo.us/metal/</code>.</p>
+        <h3>Website repo <span class="repo-tag repo-web">web</span> — <code>joeycastillo.us/metal/</code></h3>
+        <div class="flow-box">Go.Fe.bat          Windows bootstrap (downloaded to %TEMP%)
+Go.Fe.sh           Mac/Linux bootstrap (piped to bash)
+Go.Li.bat          Windows diet — self-contained, 12 steps
+Go.Li.sh           Mac/Linux diet — Mac 9 steps, Linux 4 steps
+Go.Na.bat          Windows reset
+Go.Na.sh           Mac/Linux reset
+index.html         Main page with install commands
+history.html       Full version changelog
+architecture.html  This document
+favicon-m.svg      Favicon</div>
+
+        <h3>Metal repo <span class="repo-tag repo-metal">metal</span> — <code>C:\metal</code> or <code>~/metal</code></h3>
+        <div class="flow-box">Go.Fe.bat          Thin launcher → Go.Fe.2.bat (or downloads Go.Li.bat for "diet")
+Go.Fe.2.bat        Windows full toolchain — tools + identity + auth + Li + Be
+Go.Fe.2.sh         Mac/Linux full toolchain — same
+.gitconfig         Git identity, GPG signing
+claude/            Claude Code settings (settings.json, settings.local.json)
+a-d-d/             ADD methodology template (CLAUDE.md, board/, user/)
+logs/              Tool install logs (created at runtime)
+.tools-done        Version marker — skip tools if current
+.diet-done         Version marker — skip diet if current</div>
+
+        <h3>Be repo <span class="repo-tag repo-be">Be</span> — <code>C:\metal.Be</code> or <code>~/metal.Be</code></h3>
+        <div class="flow-box">Go.Be.bat          Launches claude (Windows)
+Go.Be.sh           Launches claude (Mac/Linux) — exec &lt; /dev/tty first</div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Every script, what it does</h2>
+
+        <h3>Website bootstrap <span class="repo-tag repo-web">web</span></h3>
 
         <table>
             <tr><th>File</th><th>What it does</th></tr>
@@ -245,64 +275,208 @@
             </tr>
             <tr>
                 <td><code>Go.Na.bat</code></td>
-                <td>Windows reset. Confirms, then <code>rmdir /s /q C:\metal</code> and <code>C:\metal.Be</code>.</td>
+                <td>Windows reset. Confirms [y/N], then <code>rmdir /s /q C:\metal</code> and <code>C:\metal.Be</code>.</td>
             </tr>
             <tr>
                 <td><code>Go.Na.sh</code></td>
-                <td>Mac/Linux reset. Confirms, then <code>rm -rf ~/metal</code> and <code>~/metal.Be</code>.</td>
+                <td>Mac/Linux reset. Confirms [y/N], then <code>rm -rf ~/metal</code> and <code>~/metal.Be</code>.</td>
             </tr>
         </table>
 
-        <h3>Scripts in the metal repo <span class="repo-tag repo-metal">metal</span></h3>
-        <p>These run from <code>C:\metal</code> or <code>~/metal</code> after the repo is cloned.</p>
+        <h3>Metal repo — Go.Fe.2.bat <span class="repo-tag repo-metal">metal</span></h3>
+        <p>Windows full toolchain. Self-contained — everything is inline. Called by Go.Fe.bat after the repo is cloned.</p>
 
         <table>
-            <tr><th>File</th><th>What it does</th></tr>
+            <tr><th>Phase</th><th>Step</th><th>What happens</th></tr>
             <tr>
-                <td><code>Go.Fe.2.bat</code></td>
-                <td>Windows full toolchain. Called by Go.Fe.bat. Self-contained — all tools, identity, and auth inline.<br>
-                    <strong>Fe phase:</strong><br>
-                    &nbsp; 1. Dev tools — winget (Git, GCC, Python, Node, Rust, gh, gcloud, Make) + npm (Claude, Wrangler) + pip (Snowflake) + browsers<br>
-                    &nbsp; 2. Identity — copies .gitconfig + Claude settings to %USERPROFILE%<br>
-                    &nbsp; 3. Auth — <code>gh auth login</code> + <code>gcloud auth login</code><br>
-                    &nbsp; Refreshes PATH from registry after tools install. Logs to <code>logs/</code>.<br>
-                    <strong>Li phase:</strong><br>
-                    &nbsp; Downloads <code>Go.Li.bat</code> from website via <code>curl.exe</code> → runs it<br>
-                    <strong>Be phase:</strong><br>
-                    &nbsp; Clones metal.Be → checks claude on PATH → <code>call Go.Be.bat</code></td>
+                <td rowspan="3"><strong>Fe 1/3<br>Dev tools</strong></td>
+                <td>Version gate</td>
+                <td>Reads <code>.tools-done</code>. If version matches <code>VERSION</code>, skips entire step.<br>
+                    Otherwise asks <code>[Y/n]</code> to install.</td>
             </tr>
             <tr>
-                <td><code>Go.Fe.2.sh</code></td>
-                <td>Mac/Linux full toolchain. Same three phases, self-contained.<br>
-                    Tools: brew/apt/dnf/pacman + npm + pip. Fixes GPG path in .gitconfig for Mac/Linux.<br>
-                    Li phase: <code>curl Go.Li.sh | bash</code><br>
-                    Be phase: <code>bash Go.Be.sh</code></td>
+                <td>Winget phase</td>
+                <td>Creates <code>logs/tools_YYYYMMDD_HHMM.log</code>.<br>
+                    Each tool: <code>where X</code> → skip if found, else <code>:run_install</code>.<br>
+                    <code>:run_install</code> writes a temp .cmd, wraps it in PowerShell with 300s timeout.<br>
+                    Installs: <strong>Git, GCC (MinGW-w64), GitHub CLI, Python 3.12, Node.js LTS, Google Cloud CLI, Rust, Make</strong></td>
             </tr>
             <tr>
-                <td><code>Go.Fe.bat</code></td>
-                <td>Thin launcher. <code>Go.Fe diet</code> → downloads Go.Li.bat from website. Otherwise → Go.Fe.2.bat.</td>
+                <td>npm + pip phase</td>
+                <td>Extends PATH with <code>%APPDATA%\npm</code> and Python dirs.<br>
+                    Upgrades pip. Installs: <strong>Claude Code, Wrangler, Snowflake CLI</strong><br>
+                    Then browsers: <strong>Chrome, Firefox, Brave, Opera</strong> (checks .exe paths, not winget list).<br>
+                    Refreshes PATH from registry via <code>:refresh_path</code>.<br>
+                    Writes version to <code>.tools-done</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>Fe 2/3<br>Identity</strong></td>
+                <td>Inline</td>
+                <td><code>copy .gitconfig → %USERPROFILE%\.gitconfig</code><br>
+                    <code>copy claude\settings.json → %USERPROFILE%\.claude\settings.json</code><br>
+                    <code>copy claude\settings.local.json → %USERPROFILE%\.claude\settings.local.json</code></td>
+            </tr>
+            <tr>
+                <td><strong>Fe 3/3<br>Auth</strong></td>
+                <td>Inline</td>
+                <td><code>gh auth status</code> → skip or <code>gh auth login</code><br>
+                    <code>gcloud auth print-access-token</code> → skip or <code>gcloud auth login</code></td>
+            </tr>
+            <tr>
+                <td><strong>Li<br>Diet</strong></td>
+                <td>Version gate</td>
+                <td>Reads <code>.diet-done</code>. If version matches, skips.<br>
+                    Otherwise: <code>%SystemRoot%\System32\curl.exe</code> downloads Go.Li.bat from website → <code>%TEMP%</code> → <code>call</code> it.<br>
+                    Writes version to <code>.diet-done</code>.</td>
+            </tr>
+            <tr>
+                <td rowspan="2"><strong>Be<br>Launch</strong></td>
+                <td>Reboot check</td>
+                <td>If changes were made: asks <code>Reboot now? [Y/n]</code><br>
+                    Y → <code>shutdown /r /t 5</code>. N → continue.</td>
+            </tr>
+            <tr>
+                <td>Launch</td>
+                <td><code>gh repo clone metal.Be C:\metal.Be</code> (if not present).<br>
+                    <code>where claude</code> → if not found, refresh PATH, check <code>%APPDATA%\npm</code>.<br>
+                    <code>call "C:\metal.Be\Go.Be.bat"</code></td>
             </tr>
         </table>
 
-        <h3>Scripts in the Be repo <span class="repo-tag repo-be">Be</span></h3>
-        <p>These run from <code>C:\metal.Be</code> or <code>~/metal.Be</code>.</p>
+        <h3>Subroutines in Go.Fe.2.bat</h3>
+        <table>
+            <tr><th>Label</th><th>What it does</th></tr>
+            <tr>
+                <td><code>:refresh_path</code></td>
+                <td>Reads PATH from <code>HKLM\...\Environment</code> and <code>HKCU\Environment</code> registry keys.<br>
+                    Rebuilds the PATH variable from scratch. <strong>Warning:</strong> can drop System32.</td>
+            </tr>
+            <tr>
+                <td><code>:log</code></td>
+                <td>Appends timestamped line to <code>LOGFILE</code>. No-op if LOGFILE not set.</td>
+            </tr>
+            <tr>
+                <td><code>:skip</code></td>
+                <td>Logs skip, prints "already installed", increments <code>SKIP_COUNT</code>.</td>
+            </tr>
+            <tr>
+                <td><code>:run_install</code></td>
+                <td>Writes command to <code>%TEMP%\metal_run.cmd</code>.<br>
+                    Wraps in PowerShell <code>Start-Process</code> with <code>WaitForExit(300000)</code>.<br>
+                    Captures stdout/stderr to temp files, appends to log.<br>
+                    Exit 258 = timeout. Nonzero = fail. Zero = OK.</td>
+            </tr>
+        </table>
 
+        <h3>Metal repo — Go.Fe.2.sh <span class="repo-tag repo-metal">metal</span></h3>
+        <p>Mac/Linux full toolchain. Same three phases, self-contained.</p>
+
+        <table>
+            <tr><th>Phase</th><th>Step</th><th>What happens</th></tr>
+            <tr>
+                <td rowspan="3"><strong>Fe 1/3<br>Dev tools</strong></td>
+                <td>Version gate</td>
+                <td>Reads <code>.tools-done</code>, strips whitespace. If matches <code>VERSION</code>, skips.<br>
+                    Otherwise asks <code>[Y/n]</code>.</td>
+            </tr>
+            <tr>
+                <td>Core tools</td>
+                <td>Mac: xcode-select → Homebrew → brew install.<br>
+                    Linux: apt/dnf/pacman auto-detected for each tool.<br>
+                    <code>install_pkg()</code> helper checks <code>command -v</code> before install.<br>
+                    Installs: <strong>git, gh, python3, node, make, Rust (rustup), gcloud</strong><br>
+                    Each wrapped in <code>run_install()</code> with timeout via <code>timeout</code>/<code>gtimeout</code>.</td>
+            </tr>
+            <tr>
+                <td>npm + pip + browsers</td>
+                <td><strong>Claude Code, Wrangler, Snowflake CLI</strong> via npm/pip.<br>
+                    Mac browsers: <strong>Chrome, Firefox, Brave, Opera</strong> via <code>brew --cask</code>.<br>
+                    Linux: Firefox only (others vary by distro).<br>
+                    Writes version to <code>.tools-done</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>Fe 2/3<br>Identity</strong></td>
+                <td>Inline</td>
+                <td><code>cp .gitconfig → ~/.gitconfig</code><br>
+                    Mac: <code>sed</code> fixes GPG path to <code>/usr/local/bin/gpg</code><br>
+                    Linux: <code>sed</code> fixes GPG path to <code>/usr/bin/gpg</code><br>
+                    Copies Claude settings to <code>~/.claude/</code></td>
+            </tr>
+            <tr>
+                <td><strong>Fe 3/3<br>Auth</strong></td>
+                <td>Inline</td>
+                <td><code>gh auth status</code> → skip or <code>gh auth login &lt; /dev/tty</code><br>
+                    <code>gcloud auth print-access-token</code> → skip or <code>gcloud auth login &lt; /dev/tty</code></td>
+            </tr>
+            <tr>
+                <td><strong>Li<br>Diet</strong></td>
+                <td>Version gate</td>
+                <td>Reads <code>.diet-done</code>. If matches, skips.<br>
+                    Otherwise: <code>curl -fsSL joeycastillo.us/metal/Go.Li.sh | bash</code><br>
+                    Writes version to <code>.diet-done</code>.</td>
+            </tr>
+            <tr>
+                <td rowspan="2"><strong>Be<br>Launch</strong></td>
+                <td>Check</td>
+                <td>If changes: asks <code>Launch metal.Be now? [Y/n]</code><br>
+                    Checks multiple paths: <code>~/metal.Be</code>, <code>/metal.Be</code>, <code>C:/metal.Be</code></td>
+            </tr>
+            <tr>
+                <td>Launch</td>
+                <td><code>gh repo clone metal.Be ~/metal.Be</code> (if not present).<br>
+                    <code>bash Go.Be.sh</code></td>
+            </tr>
+        </table>
+
+        <h3>Helper functions in Go.Fe.2.sh</h3>
+        <table>
+            <tr><th>Function</th><th>What it does</th></tr>
+            <tr>
+                <td><code>log()</code></td>
+                <td>Appends timestamped line to <code>$LOGFILE</code>.</td>
+            </tr>
+            <tr>
+                <td><code>run_install()</code></td>
+                <td>Runs command with <code>timeout</code>/<code>gtimeout</code> wrapper (300s default).<br>
+                    Exit 124 = timeout. Nonzero = fail. Zero = OK. Logs everything.</td>
+            </tr>
+            <tr>
+                <td><code>install_pkg()</code></td>
+                <td>Checks <code>command -v</code> first. Then auto-selects: brew (Mac), apt/dnf/pacman (Linux).</td>
+            </tr>
+        </table>
+
+        <h3>Metal repo — Go.Fe.bat <span class="repo-tag repo-metal">metal</span></h3>
+        <p>Thin launcher. Two modes:</p>
+        <table>
+            <tr><th>Command</th><th>What happens</th></tr>
+            <tr>
+                <td><code>Go.Fe</code></td>
+                <td><code>call Go.Fe.2.bat</code> — runs the full toolchain</td>
+            </tr>
+            <tr>
+                <td><code>Go.Fe diet</code></td>
+                <td><code>%SystemRoot%\System32\curl.exe</code> downloads Go.Li.bat from website → <code>%TEMP%</code> → <code>call</code> it</td>
+            </tr>
+        </table>
+
+        <h3>Be repo <span class="repo-tag repo-be">Be</span></h3>
         <table>
             <tr><th>File</th><th>What it does</th></tr>
             <tr>
                 <td><code>Go.Be.bat</code></td>
-                <td>Launches <code>claude</code> with <code>--permission-mode bypassPermissions</code>, tilde commands, opus model, high effort.</td>
+                <td>Launches <code>claude</code> with <code>--permission-mode bypassPermissions</code>, opus model, high effort.</td>
             </tr>
             <tr>
                 <td><code>Go.Be.sh</code></td>
-                <td>Same. Does <code>exec &lt; /dev/tty</code> first to fix stdin for curl|bash chains.</td>
+                <td><code>exec &lt; /dev/tty</code> (fix stdin for curl|bash chains), then same as .bat.</td>
             </tr>
         </table>
 
         <!-- ═══════════════════════════════════════════ -->
         <h2>Windows flow — full schematic</h2>
 
-        <div class="flow-box"><span class="dim">User runs in Admin CMD:</span>
+        <div class="flow-box"><span class="dim">User runs in CMD:</span>
 <span class="accent">curl -fsSL joeycastillo.us/metal/Go.Fe.bat -o %TEMP%\Go.Fe.bat && %TEMP%\Go.Fe.bat</span>
 
 <span class="dim">┌──────────────────────────────────────────────────────────────┐</span>
@@ -322,29 +496,49 @@
 <span class="dim">│</span> <span class="accent">Go.Fe.2.bat</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">runs from C:\metal</span>                    <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ IRON (Fe) ═══</span>                                         <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 1/3] dev tools (winget + npm + pip) — inline             <span class="dim">│</span>
-<span class="dim">│</span>           refresh PATH from registry                          <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 2/3] identity + memory — inline                         <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 3/3] gh auth + gcloud auth                              <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 1/3] Dev tools (all inline)                             <span class="dim">│</span>
+<span class="dim">│</span>    check .tools-done → skip if version matches               <span class="dim">│</span>
+<span class="dim">│</span>    ask [Y/n]                                                 <span class="dim">│</span>
+<span class="dim">│</span>    create log file in logs/                                  <span class="dim">│</span>
+<span class="dim">│</span>    [1/3] winget: Git, GCC, gh, Python, Node, gcloud,         <span class="dim">│</span>
+<span class="dim">│</span>                  Rust, Make                                   <span class="dim">│</span>
+<span class="dim">│</span>    [2/3] npm: Claude Code, Wrangler                          <span class="dim">│</span>
+<span class="dim">│</span>           pip: Snowflake CLI                                 <span class="dim">│</span>
+<span class="dim">│</span>    [3/3] browsers: Chrome, Firefox, Brave, Opera              <span class="dim">│</span>
+<span class="dim">│</span>    :refresh_path from registry                               <span class="dim">│</span>
+<span class="dim">│</span>    write .tools-done                                         <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 2/3] Identity (inline)                                  <span class="dim">│</span>
+<span class="dim">│</span>    copy .gitconfig → %USERPROFILE%                            <span class="dim">│</span>
+<span class="dim">│</span>    copy claude settings → %USERPROFILE%\.claude               <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 3/3] Auth                                               <span class="dim">│</span>
+<span class="dim">│</span>    gh auth login (skip if already authed)                     <span class="dim">│</span>
+<span class="dim">│</span>    gcloud auth login (skip if already authed)                 <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ LITHIUM (Li) ═══</span>                                      <span class="dim">│</span>
-<span class="dim">│</span>  curl.exe Go.Li.bat → %TEMP% → call it                      <span class="dim">│</span>
+<span class="dim">│</span>    check .diet-done → skip if version matches                <span class="dim">│</span>
+<span class="dim">│</span>    %SystemRoot%\System32\curl.exe Go.Li.bat → %TEMP%         <span class="dim">│</span>
+<span class="dim">│</span>    call "%TEMP%\Go.Li.bat"                                   <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">▼</span>                                                     <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">┌────────────────────────────────────────────────────┐</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">│</span> <span class="accent">Go.Li.bat</span>  <span class="repo-tag repo-web" style="font-size:0.65rem">web</span>  <span class="dim">runs from %TEMP%</span>              <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">│</span>                                                    <span class="dim">│</span>    <span class="dim">│</span>
-<span class="dim">│</span>  <span class="dim">│</span>  Shows 12 steps → [A] all / [P] pick / [S] skip   <span class="dim">│</span>    <span class="dim">│</span>
+<span class="dim">│</span>  <span class="dim">│</span>  12 steps → [A] all / [P] pick / [S] skip          <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">│</span>  Bloatware, Cortana, taskbar, dark mode,           <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">│</span>  explorer, power, privacy, notifications,           <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">│</span>  keyboard, start menu, clock, OneDrive              <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">└────────────────────────────────────────────────────┘</span>    <span class="dim">│</span>
+<span class="dim">│</span>    write .diet-done                                          <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ BERYLLIUM (Be) ═══</span>                                    <span class="dim">│</span>
-<span class="dim">│</span>  If changes → "Reboot now?" → reboot or continue            <span class="dim">│</span>
-<span class="dim">│</span>  gh repo clone metal.Be → C:\metal.Be                        <span class="dim">│</span>
-<span class="dim">│</span>  Check claude on PATH (refresh if needed)                     <span class="dim">│</span>
-<span class="dim">│</span>  call "C:\metal.Be\Go.Be.bat"                                <span class="dim">│</span>
+<span class="dim">│</span>    If changes → "Reboot now? [Y/n]"                          <span class="dim">│</span>
+<span class="dim">│</span>    gh repo clone metal.Be → C:\metal.Be                      <span class="dim">│</span>
+<span class="dim">│</span>    where claude → refresh PATH if needed                      <span class="dim">│</span>
+<span class="dim">│</span>    fallback: check %APPDATA%\npm\claude.cmd                  <span class="dim">│</span>
+<span class="dim">│</span>    call "C:\metal.Be\Go.Be.bat"                              <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">└─────────┼────────────────────────────────────────────────────┘</span>
           <span class="dim">│</span>
@@ -382,12 +576,31 @@
 <span class="dim">│</span> <span class="accent">Go.Fe.2.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">runs from ~/metal</span>                      <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ IRON (Fe) ═══</span>                                         <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 1/3] dev tools (brew / apt / npm / pip) — inline         <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 2/3] identity + memory — inline                          <span class="dim">│</span>
-<span class="dim">│</span>  [Fe 3/3] gh auth + gcloud auth                              <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 1/3] Dev tools (all inline)                             <span class="dim">│</span>
+<span class="dim">│</span>    check .tools-done → skip if version matches               <span class="dim">│</span>
+<span class="dim">│</span>    ask [Y/n] &lt; /dev/tty                                     <span class="dim">│</span>
+<span class="dim">│</span>    Mac: xcode-select → Homebrew → brew install               <span class="dim">│</span>
+<span class="dim">│</span>    Linux: apt / dnf / pacman (auto-detected)                 <span class="dim">│</span>
+<span class="dim">│</span>    git, gh, python3, node, make, Rust (rustup), gcloud       <span class="dim">│</span>
+<span class="dim">│</span>    npm: Claude Code, Wrangler                                <span class="dim">│</span>
+<span class="dim">│</span>    pip: Snowflake CLI                                        <span class="dim">│</span>
+<span class="dim">│</span>    Mac browsers: Chrome, Firefox, Brave, Opera (brew cask)   <span class="dim">│</span>
+<span class="dim">│</span>    Linux: Firefox only                                       <span class="dim">│</span>
+<span class="dim">│</span>    write .tools-done                                         <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 2/3] Identity (inline)                                  <span class="dim">│</span>
+<span class="dim">│</span>    cp .gitconfig → ~/.gitconfig                              <span class="dim">│</span>
+<span class="dim">│</span>    sed: fix GPG path for Mac or Linux                        <span class="dim">│</span>
+<span class="dim">│</span>    cp Claude settings → ~/.claude/                            <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  [Fe 3/3] Auth                                               <span class="dim">│</span>
+<span class="dim">│</span>    gh auth login &lt; /dev/tty (skip if authed)                 <span class="dim">│</span>
+<span class="dim">│</span>    gcloud auth login &lt; /dev/tty (skip if authed)             <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ LITHIUM (Li) ═══</span>                                      <span class="dim">│</span>
-<span class="dim">│</span>  curl Go.Li.sh | bash                                        <span class="dim">│</span>
+<span class="dim">│</span>    check .diet-done → skip if version matches                <span class="dim">│</span>
+<span class="dim">│</span>    curl -fsSL Go.Li.sh | bash                                <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">▼</span>                                                     <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">┌────────────────────────────────────────────────────┐</span>    <span class="dim">│</span>
@@ -397,11 +610,13 @@
 <span class="dim">│</span>  <span class="dim">│</span>  [A] all / [P] pick / [S] skip                    <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">│</span>  Offers to launch metal.Be at end                 <span class="dim">│</span>    <span class="dim">│</span>
 <span class="dim">│</span>  <span class="dim">└────────────────────────────────────────────────────┘</span>    <span class="dim">│</span>
+<span class="dim">│</span>    write .diet-done                                          <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  <span class="warn">═══ BERYLLIUM (Be) ═══</span>                                    <span class="dim">│</span>
-<span class="dim">│</span>  If changes → "Launch Be now?"                               <span class="dim">│</span>
-<span class="dim">│</span>  gh repo clone metal.Be → ~/metal.Be                         <span class="dim">│</span>
-<span class="dim">│</span>  bash Go.Be.sh                                               <span class="dim">│</span>
+<span class="dim">│</span>    If changes → "Launch Be now? [Y/n]"                       <span class="dim">│</span>
+<span class="dim">│</span>    Check ~/metal.Be, /metal.Be, C:/metal.Be                  <span class="dim">│</span>
+<span class="dim">│</span>    gh repo clone metal.Be (if not present)                    <span class="dim">│</span>
+<span class="dim">│</span>    bash Go.Be.sh                                             <span class="dim">│</span>
 <span class="dim">│</span>         <span class="dim">│</span>                                                     <span class="dim">│</span>
 <span class="dim">└─────────┼────────────────────────────────────────────────────┘</span>
           <span class="dim">│</span>
@@ -421,7 +636,7 @@
 
         <div class="flow-box"><span class="accent">curl ... Go.Na.bat</span>  or  <span class="accent">curl ... Go.Na.sh | bash</span>
 
-  Confirms → removes C:\metal + C:\metal.Be (or ~/metal + ~/metal.Be)
+  Confirms [y/N] → removes C:\metal + C:\metal.Be (or ~/metal + ~/metal.Be)
   Tools and OS changes stay. Run Go.Fe to start fresh.</div>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -464,6 +679,7 @@
             <li><strong>macOS bash is 3.2</strong> — no <code>${var,,}</code>, no associative arrays. Use <code>case</code> statements.</li>
             <li><strong>curl|bash eats stdin</strong> — all <code>read</code> commands must use <code>&lt; /dev/tty</code>. Be needs <code>exec &lt; /dev/tty</code> before launching claude.</li>
             <li><strong>Private repos</strong> — metal and metal.Be are private. Clone will silently fail if auth is wrong. Always verify the clone worked.</li>
+            <li><strong>Go.Fe diet needs internet</strong> — downloads Go.Li.bat from website. No offline fallback.</li>
         </ul>
 
     </div>
