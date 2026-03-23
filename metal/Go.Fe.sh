@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # metal.Fe — Iron. The foundation.
-# v1.6 — 2026-03-23
+# v1.6.1 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Fe.sh | bash
 # Installs git, gh, clones metal, runs full toolchain + identity + auth.
 # Idempotent — safe to run again.

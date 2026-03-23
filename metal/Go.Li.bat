@@ -1,6 +1,6 @@
 @echo off
 rem metal.Li — Lithium. OS diet.
-rem v1.6 — 2026-03-23
+rem v1.6.1 — 2026-03-23
 rem curl -fsSL https://joeycastillo.us/metal/Go.Li.bat -o %TEMP%\Go.Li.bat && %TEMP%\Go.Li.bat
 rem Zero dependencies. Just run as Administrator.
 rem Apply all at once or choose step by step.
