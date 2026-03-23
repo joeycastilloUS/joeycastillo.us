@@ -80,18 +80,19 @@ if exist "C:\metal\.git" (
 ) else (
     echo [4/5] Cloning metal...
     gh repo clone joeycastilloUS/metal C:\metal
-    if !errorlevel! neq 0 (
-        echo ERROR: clone failed.
-        goto :error
-    )
+)
+if not exist "C:\metal\go-runtime.bat" (
+    echo.
+    echo   ERROR: metal repo not found at C:\metal
+    echo   Clone may have failed. Try manually:
+    echo     gh repo clone joeycastilloUS/metal C:\metal
+    goto :error
 )
 
 rem === Step 5: Run full toolchain ===
 echo.
 echo [5/5] Launching metal.Fe...
-pushd C:\metal
-call go-runtime.bat
-popd
+call "C:\metal\go-runtime.bat"
 
 goto :end
 

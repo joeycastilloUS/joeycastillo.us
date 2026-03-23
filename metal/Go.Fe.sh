@@ -78,16 +78,27 @@ fi
 
 # === Step 4: Clone or update metal ===
 METAL_DIR="$HOME/metal"
+[ ! -d "$METAL_DIR" ] && [ -d "/metal" ] && METAL_DIR="/metal"
+[ ! -d "$METAL_DIR" ] && [ -d "C:/metal" ] && METAL_DIR="C:/metal"
+
 if [[ -d "$METAL_DIR/.git" ]]; then
     echo "[4/5] Pulling latest metal..."
     git -C "$METAL_DIR" pull --ff-only
 else
     echo "[4/5] Cloning metal..."
     gh repo clone joeycastilloUS/metal "$METAL_DIR"
+    METAL_DIR="$HOME/metal"
+fi
+
+if [ ! -f "$METAL_DIR/go-runtime.sh" ]; then
+    echo ""
+    echo "  ERROR: metal repo not found at $METAL_DIR"
+    echo "  Clone may have failed. Try manually:"
+    echo "    gh repo clone joeycastilloUS/metal ~/metal"
+    exit 1
 fi
 
 # === Step 5: Run full toolchain ===
 echo ""
 echo "[5/5] Launching metal.Fe..."
-cd "$METAL_DIR"
-bash go-runtime.sh < /dev/tty
+bash "$METAL_DIR/go-runtime.sh" < /dev/tty
