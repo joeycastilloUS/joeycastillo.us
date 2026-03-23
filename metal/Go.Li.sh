@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # metal.Li — Lithium. OS diet.
+# v1.6.0 — 2026-03-23
 # curl -fsSL https://joeycastillo.us/metal/Go.Li.sh | bash
 # Strips bloat, dark mode, privacy, power. No dev tools.
 # Mac and Linux. Idempotent — safe to run again.
@@ -8,6 +9,7 @@ set -e
 
 echo ""
 echo "  metal.Li — Lithium. OS diet."
+echo "  v1.6.0 — 2026-03-23"
 echo "  Strip the fat. Dark mode. Full power."
 echo ""
 
