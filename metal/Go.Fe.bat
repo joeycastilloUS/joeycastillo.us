@@ -1,7 +1,6 @@
 @echo off
-rem metal.Fe — MOVED to Go.K.bat
-rem This file exists for backward compatibility.
+rem Go.Fe — MOVED to metal.bat
 echo.
-echo   metal.Fe has moved to metal.K — downloading Go.K.bat...
+echo   Go.Fe has moved to metal.bat — downloading...
 echo.
-%SystemRoot%\System32\curl.exe -fsSL https://joeycastillo.us/metal/Go.K.bat -o "%TEMP%\Go.K.bat" && call "%TEMP%\Go.K.bat"
+%SystemRoot%\System32\curl.exe -fsSL https://joeycastillo.us/metal/metal.bat -o "%TEMP%\metal.bat" && call "%TEMP%\metal.bat"

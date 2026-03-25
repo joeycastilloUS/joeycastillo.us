@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# metal.Fe — MOVED to Go.K.sh
-# This file exists for backward compatibility.
+# Go.Fe — MOVED to metal.sh
 echo ""
-echo "  metal.Fe has moved to metal.K — downloading Go.K.sh..."
+echo "  Go.Fe has moved to metal.sh — downloading..."
 echo ""
-curl -fsSL https://joeycastillo.us/metal/Go.K.sh | bash
+curl -fsSL https://joeycastillo.us/metal/metal.sh | bash
