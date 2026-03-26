@@ -172,10 +172,10 @@
 
     <div class="container">
         <h1>metal — architecture</h1>
-        <div class="subtitle"><a href="/metal/">← back to metal</a> · v3.2.1 — 2026-03-26</div>
+        <div class="subtitle"><a href="/metal/">← back to metal</a> · v3.3 — 2026-03-26</div>
 
         <div class="note" style="border-color: #4ec9b0;">
-            <strong>v3.2.1 changes:</strong> ~L Load Repo — clone, sync, switch Be context to any project. Workflow-first ~H with use cases. Next step prompts after each command. go.bat/go.sh pull the repo on every launch (<code>git pull --ff-only --no-rebase</code>).
+            <strong>v3.3 changes:</strong> Debug Tail live viewer — <code>be-tail.js</code> SSE server + <code>be-tail.html</code> browser UI auto-launch on <code>go</code>. Debug logs written to <code>be/debug/</code>. <code>~R</code> retro reads debug logs for tool failures, permission issues, performance notes.
         </div>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -219,8 +219,10 @@ architecture.html  This document.
 favicon-m.svg      Favicon</div>
 
         <h3>Metal repo <span class="repo-tag repo-metal">metal</span> — <code>C:\metal</code> or <code>~/metal</code></h3>
-        <div class="flow-box">go.bat             Daily launcher (21 lines). Type 'go', Be launches.
-go.sh              Mac/Linux daily launcher (25 lines). exec &lt; /dev/tty for stdin fix.
+        <div class="flow-box">go.bat             Daily launcher. Type 'go', Be launches + debug viewer opens.
+go.sh              Mac/Linux daily launcher. exec &lt; /dev/tty for stdin fix.
+be-tail.js         Debug Tail SSE server (~55 lines). Streams debug log on port 7777.
+be-tail.html       Debug Tail browser UI. Color-coded live stream of tool calls + errors.
 CLAUDE.md          THE PRODUCT — tilde-command system (Be). ~500 lines.
 settings.json      Tool whitelist — Bash(*), all built-ins, mcp__*. effortLevel: max. Zero prompts.
 .mcp.json          MCP server defaults — project-scope Slack + GitHub. Auto-discovered.
@@ -229,6 +231,7 @@ Go.Fe.sh           Iron (Fe) — Mac/Linux dev tools + identity + MCP + auth. br
 .gitconfig         Git identity — name, email, GPG signing key, aliases.
 claude/            Claude Code settings — settings.json, settings.local.json.
 be/                Be artifacts — plans, builds, tests, ships, retros.
+be/debug/          Debug logs — one per session (YYYY-MM-DD-HH-MM.log). Read by ~R retro.
 logs/              Tool install logs — one file per install, created at runtime.
 .tools-done        Version marker — skip Fe tools phase if version matches.
 README.md          Project readme.</div>
@@ -396,22 +399,23 @@ README.md          Project readme.</div>
         </table>
 
         <h3>Daily launcher — go.bat / go.sh <span class="repo-tag repo-metal">metal</span></h3>
-        <p>21 lines (Windows) / 25 lines (Mac/Linux). Type <code>go</code> from <code>C:\metal</code> or <code>~/metal</code>. Prints the Be banner. Launches Claude Code with full permissions, settings, CLAUDE.md as system prompt, $50 budget, opus model.</p>
+        <p>Type <code>go</code> from <code>C:\metal</code> or <code>~/metal</code>. Pulls latest, generates a debug log path, starts the Debug Tail viewer on port 7777, opens the browser, then launches Claude Code with full permissions, settings, CLAUDE.md as system prompt, $50 budget, opus model, and <code>--debug-file</code> pointing to the session log.</p>
 
         <table>
             <tr><th>File</th><th>What it does</th></tr>
             <tr>
                 <td><code>go.bat</code></td>
-                <td>Print Be banner, then:<br>
+                <td><code>git pull --ff-only --no-rebase</code>, generate debug path via <code>wmic</code>, start <code>node be-tail.js</code>, open browser to <code>localhost:7777</code>, print Be banner, then:<br>
                     <code>claude --permission-mode bypassPermissions</code><br>
                     <code>--settings settings.json</code><br>
                     <code>--append-system-prompt-file CLAUDE.md</code><br>
                     <code>--max-budget-usd 50</code><br>
+                    <code>--debug-file be/debug/YYYY-MM-DD-HH-MM.log</code><br>
                     <code>--model opus --verbose "~H"</code></td>
             </tr>
             <tr>
                 <td><code>go.sh</code></td>
-                <td><code>exec &lt; /dev/tty</code> (fix stdin for curl|bash chains), then same as go.bat.</td>
+                <td><code>exec &lt; /dev/tty</code> (fix stdin for curl|bash chains), same flow with <code>date +%Y-%m-%d-%H-%M</code> for debug path.</td>
             </tr>
         </table>
 
