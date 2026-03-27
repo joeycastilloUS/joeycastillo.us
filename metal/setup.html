@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPG Setup — metal</title>
+    <link rel="icon" type="image/svg+xml" href="/metal/favicon-m.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: #0a0a0a;
+            border-bottom: 1px solid #1a1a1a;
+            z-index: 10;
+            flex-wrap: wrap;
+        }
+        .nav a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+        }
+        .nav a:hover { color: #4ec9b0; }
+        .container {
+            max-width: 700px;
+            width: 100%;
+            margin-top: 3rem;
+        }
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: #ffffff;
+            margin-bottom: 0.25rem;
+        }
+        .tagline {
+            color: #4ec9b0;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+        .version-line {
+            color: #555;
+            font-size: 0.8rem;
+            margin-bottom: 2rem;
+        }
+        .version-line a {
+            color: #4ec9b0;
+            text-decoration: none;
+        }
+        .version-line a:hover { color: #6fd9c0; }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 400;
+            color: #fff;
+            margin-bottom: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid #1a1a1a;
+        }
+
+        /* STEP CARDS */
+        .step-card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.2s;
+        }
+        .step-card:hover { border-color: #333; }
+        .step-number {
+            color: #4ec9b0;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+        .step-title {
+            font-size: 1.05rem;
+            font-weight: 400;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+        .step-desc {
+            color: #999;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            margin-bottom: 0.75rem;
+        }
+
+        /* COMMAND BOXES */
+        .command-box {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            position: relative;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            margin: 0.5rem 0;
+        }
+        .command-box:hover { border-color: #555; }
+        .command-box code {
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.8rem;
+            color: #4ec9b0;
+            word-break: break-all;
+            display: block;
+            white-space: pre-wrap;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 0.6rem;
+            right: 0.6rem;
+            background: #333;
+            border: none;
+            color: #aaa;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { background: #444; color: #fff; }
+        .copy-btn.copied { background: #2d5a3d; color: #4ec9b0; }
+
+        .note {
+            color: #666;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            line-height: 1.5;
+        }
+        .note code {
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            color: #4ec9b0;
+            font-size: 0.75rem;
+        }
+
+        .warning {
+            background: #1a1a0a;
+            border: 1px solid #554400;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            color: #d4a843;
+            font-size: 0.8rem;
+            margin: 0.75rem 0;
+            line-height: 1.5;
+        }
+
+        .success {
+            background: #0a1a0a;
+            border: 1px solid #1a4a1a;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            color: #4CAF50;
+            font-size: 0.8rem;
+            margin: 0.75rem 0;
+            line-height: 1.5;
+        }
+
+        /* PLATFORM TABS */
+        .platform-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0;
+        }
+        .platform-tab {
+            background: transparent;
+            border: 1px solid #333;
+            border-bottom: none;
+            color: #666;
+            padding: 0.4rem 1rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-family: inherit;
+            border-radius: 6px 6px 0 0;
+            transition: all 0.2s;
+        }
+        .platform-tab:hover { color: #aaa; }
+        .platform-tab.active {
+            background: #1a1a1a;
+            color: #4ec9b0;
+            border-color: #333;
+        }
+        .platform-section { display: none; }
+        .platform-section.active { display: block; }
+        .platform-section .command-box {
+            border-radius: 0 8px 8px 8px;
+            margin-top: 0;
+        }
+
+        .footer {
+            color: #333;
+            font-size: 0.75rem;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 1rem;
+        }
+        .footer a { color: #444; text-decoration: none; }
+        .footer a:hover { color: #4ec9b0; }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 2rem; }
+            .command-box code { font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="https://joeycastillo.us">joeycastillo.us</a>
+        <a href="/metal">metal</a>
+        <a href="/metal/architecture.html">architecture</a>
+        <a href="/metal/history.html">history</a>
+    </nav>
+
+    <div class="container">
+
+        <h1>GPG Setup</h1>
+        <div class="tagline">Signed commits. Verified on GitHub. One-time setup.</div>
+        <div class="version-line">
+            <a href="/metal">&larr; metal</a>
+        </div>
+
+        <!-- ═══ WHY ═══ -->
+        <div class="section-title">Why</div>
+        <div class="step-card">
+            <div class="step-desc">
+                GPG signing proves every commit came from you. GitHub shows a green "Verified" badge
+                next to signed commits. Without it, anyone can commit as your name/email and there's
+                no cryptographic proof it was actually you.
+            </div>
+            <div class="step-desc" style="color: #666;">
+                This page walks through generating a key, wiring it to git and GitHub, and verifying
+                the whole chain works. Takes about 2 minutes.
+            </div>
+        </div>
+
+        <!-- ═══ STEP 1 ═══ -->
+        <div class="section-title">Setup</div>
+
+        <div class="step-card" id="step1">
+            <div class="step-number">Step 1</div>
+            <div class="step-title">Generate a GPG key</div>
+            <div class="step-desc">
+                Create a 4096-bit RSA key tied to your git email. The batch command runs non-interactively.
+            </div>
+            <div class="platform-tabs">
+                <button class="platform-tab active" onclick="show('s1','win')">Windows</button>
+                <button class="platform-tab" onclick="show('s1','mac')">Mac / Linux</button>
+            </div>
+            <div id="s1-win" class="platform-section active">
+                <div class="command-box" onclick="copy('s1-win-cmd','s1-win-btn')">
+                    <code id="s1-win-cmd">gpg --batch --gen-key ^
+  --%%no-protection ^
+  Key-Type: RSA ^
+  Key-Length: 4096 ^
+  Name-Real: Your Name ^
+  Name-Email: your@email.com ^
+  Expire-Date: 0 ^
+  %%commit</code>
+                    <button class="copy-btn" id="s1-win-btn">copy</button>
+                </div>
+            </div>
+            <div id="s1-mac" class="platform-section">
+                <div class="command-box" onclick="copy('s1-mac-cmd','s1-mac-btn')">
+                    <code id="s1-mac-cmd">gpg --batch --gen-key <<'EOF'
+Key-Type: RSA
+Key-Length: 4096
+Subkey-Type: RSA
+Subkey-Length: 4096
+Name-Real: Your Name
+Name-Email: your@email.com
+Expire-Date: 0
+%no-protection
+%commit
+EOF</code>
+                    <button class="copy-btn" id="s1-mac-btn">copy</button>
+                </div>
+            </div>
+            <div class="note">Replace <code>Your Name</code> and <code>your@email.com</code> with your git identity. The email must match what's in your git config.</div>
+        </div>
+
+        <!-- ═══ STEP 2 ═══ -->
+        <div class="step-card" id="step2">
+            <div class="step-number">Step 2</div>
+            <div class="step-title">Get your key ID</div>
+            <div class="step-desc">
+                List your secret keys and grab the 16-character key ID from the output.
+            </div>
+            <div class="command-box" onclick="copy('s2-cmd','s2-btn')">
+                <code id="s2-cmd">gpg --list-secret-keys --keyid-format long your@email.com</code>
+                <button class="copy-btn" id="s2-btn">copy</button>
+            </div>
+            <div class="note">
+                Look for the line starting with <code>sec   rsa4096/</code> — the part after the slash is your key ID.
+                Example: <code>sec   rsa4096/45992F4AD577C138</code> &rarr; key ID is <code>45992F4AD577C138</code>
+            </div>
+        </div>
+
+        <!-- ═══ STEP 3 ═══ -->
+        <div class="step-card" id="step3">
+            <div class="step-number">Step 3</div>
+            <div class="step-title">Configure git to sign commits</div>
+            <div class="step-desc">
+                Tell git which key to use and enable signing by default.
+            </div>
+            <div class="command-box" onclick="copy('s3-cmd','s3-btn')">
+                <code id="s3-cmd">git config --global user.signingkey YOUR_KEY_ID
+git config --global commit.gpgsign true</code>
+                <button class="copy-btn" id="s3-btn">copy</button>
+            </div>
+            <div class="note">Replace <code>YOUR_KEY_ID</code> with the 16-character ID from step 2.</div>
+        </div>
+
+        <!-- ═══ STEP 4 ═══ -->
+        <div class="step-card" id="step4">
+            <div class="step-number">Step 4</div>
+            <div class="step-title">Grant GitHub CLI the GPG scope</div>
+            <div class="step-desc">
+                The GitHub CLI needs the <code>write:gpg_key</code> scope to upload your public key.
+                This opens a browser for OAuth approval.
+            </div>
+            <div class="command-box" onclick="copy('s4-cmd','s4-btn')">
+                <code id="s4-cmd">gh auth refresh -h github.com -s write:gpg_key</code>
+                <button class="copy-btn" id="s4-btn">copy</button>
+            </div>
+            <div class="warning">
+                This command is interactive. It will display a one-time device code and open your browser.
+                Enter the code on GitHub to approve the scope. You only need to do this once.
+            </div>
+        </div>
+
+        <!-- ═══ STEP 5 ═══ -->
+        <div class="step-card" id="step5">
+            <div class="step-number">Step 5</div>
+            <div class="step-title">Upload your public key to GitHub</div>
+            <div class="step-desc">
+                Export and pipe the public key directly to GitHub via the CLI.
+            </div>
+            <div class="platform-tabs">
+                <button class="platform-tab active" onclick="show('s5','unix')">Mac / Linux / Git Bash</button>
+                <button class="platform-tab" onclick="show('s5','ps')">PowerShell</button>
+            </div>
+            <div id="s5-unix" class="platform-section active">
+                <div class="command-box" onclick="copy('s5-unix-cmd','s5-unix-btn')">
+                    <code id="s5-unix-cmd">gpg --armor --export your@email.com | gh gpg-key add -</code>
+                    <button class="copy-btn" id="s5-unix-btn">copy</button>
+                </div>
+            </div>
+            <div id="s5-ps" class="platform-section">
+                <div class="command-box" onclick="copy('s5-ps-cmd','s5-ps-btn')">
+                    <code id="s5-ps-cmd">gpg --armor --export your@email.com | gh gpg-key add -</code>
+                    <button class="copy-btn" id="s5-ps-btn">copy</button>
+                </div>
+            </div>
+            <div class="success">
+                If this succeeds, your key is now on GitHub. Every signed commit from this machine
+                will show the green "Verified" badge.
+            </div>
+        </div>
+
+        <!-- ═══ STEP 6 ═══ -->
+        <div class="step-card" id="step6">
+            <div class="step-number">Step 6</div>
+            <div class="step-title">Verify it works</div>
+            <div class="step-desc">
+                Make a test commit and check that it's signed.
+            </div>
+            <div class="command-box" onclick="copy('s6-cmd','s6-btn')">
+                <code id="s6-cmd">git commit --allow-empty -m "test: verify GPG signing"
+git log --show-signature -1</code>
+                <button class="copy-btn" id="s6-btn">copy</button>
+            </div>
+            <div class="note">
+                You should see <code>gpg: Good signature from "Your Name &lt;your@email.com&gt;"</code> in the output.
+                Push the commit and check GitHub — look for the green "Verified" badge.
+            </div>
+        </div>
+
+        <!-- ═══ TROUBLESHOOTING ═══ -->
+        <div class="section-title">Troubleshooting</div>
+
+        <div class="step-card">
+            <div class="step-title" style="font-size: 0.95rem;"><code>gpg failed to sign the data</code></div>
+            <div class="step-desc">
+                Usually means git is pointing to a key ID that doesn't exist on this machine.
+                Run <code>gpg --list-secret-keys --keyid-format long</code> to see what keys you have,
+                then update <code>git config --global user.signingkey</code> to match.
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title" style="font-size: 0.95rem;"><code>insufficient OAuth scopes</code></div>
+            <div class="step-desc">
+                GitHub CLI doesn't have the GPG scope yet. Run step 4 — it's a one-time browser approval.
+                Must be run interactively (not from a script or agent).
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title" style="font-size: 0.95rem;">Commits show "Unverified" on GitHub</div>
+            <div class="step-desc">
+                The email in your GPG key must match a verified email on your GitHub account.
+                Check with <code>gpg --list-keys your@email.com</code> and compare against
+                GitHub &rarr; Settings &rarr; Emails.
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title" style="font-size: 0.95rem;">New machine, same identity</div>
+            <div class="step-desc">
+                You can either generate a new key on each machine (and add each to GitHub),
+                or export your private key and import it on the new machine:
+            </div>
+            <div class="command-box" onclick="copy('export-cmd','export-btn')">
+                <code id="export-cmd"># Export (on old machine)
+gpg --armor --export-secret-keys your@email.com > private.key
+
+# Import (on new machine)
+gpg --import private.key
+rm private.key</code>
+                <button class="copy-btn" id="export-btn">copy</button>
+            </div>
+            <div class="warning">
+                The private key file is sensitive. Transfer it securely and delete it immediately after import.
+            </div>
+        </div>
+
+        <div class="footer">
+            <a href="/metal">&larr; metal</a>
+        </div>
+
+    </div>
+
+    <script>
+        function show(group, platform) {
+            document.querySelectorAll(`[id^="${group}-"]`).forEach(el => {
+                if (el.classList.contains('platform-section')) el.classList.remove('active');
+            });
+            const parent = event.target.closest('.step-card') || document.getElementById(`step${group.replace('s','')}`);
+            if (parent) parent.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`${group}-${platform}`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function copy(codeId, btnId) {
+            const cmd = document.getElementById(codeId).textContent;
+            const btn = document.getElementById(btnId);
+            navigator.clipboard.writeText(cmd).then(() => {
+                btn.textContent = 'copied';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'copy';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
