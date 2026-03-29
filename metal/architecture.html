@@ -172,10 +172,10 @@
 
     <div class="container">
         <h1>metal — architecture</h1>
-        <div class="subtitle"><a href="/metal/">← back to metal</a> · v3.3 — 2026-03-26</div>
+        <div class="subtitle"><a href="/metal/">← back to metal</a> · v4.0 — 2026-03-29</div>
 
         <div class="note" style="border-color: #4ec9b0;">
-            <strong>v3.3 changes:</strong> Debug Tail live viewer — <code>be-tail.js</code> SSE server + <code>be-tail.html</code> browser UI auto-launch on <code>go</code>. Debug logs written to <code>be/debug/</code>. <code>~R</code> retro reads debug logs for tool failures, permission issues, performance notes.
+            <strong>v4.0 changes:</strong> ~chain-reaction (named workflow macros with loops), ~fix command, CLAUDE.md kernel split (45k→14k, specs lazy-loaded from <code>be/docs/</code>), quote system overhaul, ~jc rework, pure C auth library.
         </div>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -223,15 +223,17 @@ favicon-m.svg      Favicon</div>
 go.sh              Mac/Linux daily launcher. exec &lt; /dev/tty for stdin fix.
 be-tail.js         Debug Tail SSE server (~55 lines). Streams debug log on port 7777.
 be-tail.html       Debug Tail browser UI. Color-coded live stream of tool calls + errors.
-CLAUDE.md          THE PRODUCT — tilde-command system (Be). ~500 lines.
+CLAUDE.md          THE PRODUCT — tilde-command kernel (~14k chars). Routes to be/docs/.
 settings.json      Tool whitelist — Bash(*), all built-ins, mcp__*. effortLevel: max. Zero prompts.
 .mcp.json          MCP server defaults — project-scope Slack + GitHub. Auto-discovered.
 Go.Fe.bat          Iron (Fe) — Windows dev tools + identity + MCP + auth.
 Go.Fe.sh           Iron (Fe) — Mac/Linux dev tools + identity + MCP + auth. brew/apt/dnf/pacman.
 .gitconfig         Git identity — name, email, GPG signing key, aliases.
 claude/            Claude Code settings — settings.json, settings.local.json.
-be/                Be artifacts — plans, builds, tests, ships, retros.
+be/                Be artifacts — plans, builds, tests, ships, retros, transfers.
+be/docs/           Lazy-loaded specs — commands.md (21 commands), conventions.md (deploy/auth).
 be/debug/          Debug logs — one per session (YYYY-MM-DD-HH-MM.log). Read by ~R retro.
+auth/              Pure C auth library — crypt, totp, qr, auth, gate. Zero deps beyond libc.
 logs/              Tool install logs — one file per install, created at runtime.
 .tools-done        Version marker — skip Fe tools phase if version matches.
 README.md          Project readme.</div>
@@ -322,31 +324,65 @@ README.md          Project readme.</div>
         <!-- ═══════════════════════════════════════════ -->
         <h2>Tilde commands (Be)</h2>
 
-        <p>The tilde-command system. Defined in <code>CLAUDE.md</code>, injected every session via <code>--append-system-prompt-file</code>.</p>
+        <p>The tilde-command system. Defined in <code>CLAUDE.md</code> (kernel, ~14k chars) with full specs lazy-loaded from <code>be/docs/commands.md</code> and <code>be/docs/conventions.md</code>.</p>
 
         <table>
             <tr><th>Command</th><th>Name</th><th>What it does</th></tr>
+            <tr><td><code>~L</code></td><td>Load</td><td>Load a repo — clone, sync, switch context</td></tr>
             <tr><td><code>~I</code></td><td>Inspect</td><td>Read a repo, URL, or codebase — report what's there</td></tr>
             <tr><td><code>~P</code></td><td>Plan</td><td>Plan it, render it, save it</td></tr>
             <tr><td><code>~PU</code></td><td>User Story</td><td>Plan as a user story with acceptance criteria</td></tr>
             <tr><td><code>~PT</code></td><td>Plan Test</td><td>Plan the test strategy</td></tr>
             <tr><td><code>~E</code></td><td>Estimate</td><td>Break a plan into sized kanban boards</td></tr>
-            <tr><td><code>~L</code></td><td>Load</td><td>Load a repo — clone, sync, switch context</td></tr>
             <tr><td><code>~A</code></td><td>Add</td><td>Add something new — review, report, commit, demo</td></tr>
             <tr><td><code>~U</code></td><td>Update</td><td>Update existing code or feature</td></tr>
             <tr><td><code>~D</code></td><td>Delete</td><td>Remove code, feature, or files</td></tr>
+            <tr><td><code>~F</code></td><td>Fix</td><td>Fix a bug — diagnose, fix, write a test, ship proof</td></tr>
             <tr><td><code>~B</code></td><td>Build</td><td>Build it — or pull next from the board</td></tr>
             <tr><td><code>~BT</code></td><td>Build Test</td><td>Build the tests for a feature</td></tr>
             <tr><td><code>~T</code></td><td>Test</td><td>Test it, fix what's broken</td></tr>
-            <tr><td><code>~S</code></td><td>Ship</td><td>Commit, push, version bump</td></tr>
-            <tr><td><code>~R</code></td><td>Retro</td><td>Retrospect recent work — or refactor code</td></tr>
+            <tr><td><code>~S</code></td><td>Ship</td><td>Commit, push, version bump, deploy</td></tr>
+            <tr><td><code>~Demo</code></td><td>Demo</td><td>Demo, review, or refactor code</td></tr>
+            <tr><td><code>~R</code></td><td>Retro</td><td>Retrospect recent work — what went well, what didn't</td></tr>
+            <tr><td><code>~M</code></td><td>MCP</td><td>Manage MCP servers — add, remove, diagnose, setup</td></tr>
             <tr><td><code>~CR</code></td><td>Recover</td><td>Crash recovery — read the dirt, resume the chain</td></tr>
-            <tr><td><code>~H</code></td><td>Help</td><td>Show workflow guide</td></tr>
+            <tr><td><code>~Transfer</code></td><td>Transfer</td><td>Project handoff — scan, clean, manifest for recipient</td></tr>
+            <tr><td><code>~H</code></td><td>Help</td><td>Three-column workflow guide with use cases</td></tr>
+            <tr><td><code>~JC</code></td><td>Joey's Take</td><td>40 years of architecture advice, on demand</td></tr>
         </table>
 
         <div class="note">
-            Every tilde command (except <code>~H</code>) produces an HTML report. Chain: do the work → render report → update index → commit → push → launch demo.
+            Every tilde command (except <code>~H</code>) produces an HTML report. Chain reaction: do the work → review → render report → update index → commit → push → launch demo.
         </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>~chain-reaction</h2>
+
+        <p>Named workflow macros with loop segments. Define a chain once, run it forever.</p>
+
+        <div class="flow-box"><span class="accent">~P  ~E  /~B  ~T  ~F/  ~S  ~R</span>
+
+  Commands outside <span class="dim">/</span> run once, left to right.
+  Commands inside <span class="dim">/ /</span> loop until: board exhausted + tests pass + nothing to fix.
+
+  Built-in chains:
+    <span class="accent">~GO</span>      <span class="dim">~P ~E /~B ~T ~F/ ~S ~R</span>     Plan to retro
+    <span class="accent">~QUICK</span>   <span class="dim">~A ~T ~S</span>                  Add, test, ship
+    <span class="accent">~FIXSHIP</span> <span class="dim">~F ~T ~S</span>                  Hotfix: fix, test, ship
+    <span class="accent">~POLISH</span>  <span class="dim">/~T ~F/ ~S</span>                Test/fix loop, ship</div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>CLAUDE.md kernel split</h2>
+
+        <p>CLAUDE.md was 45k characters — too large. Split into a lean kernel (~14k) with full specs lazy-loaded from <code>be/docs/</code>.</p>
+
+        <div class="flow-box"><span class="accent">CLAUDE.md</span>          Kernel — tilde table, rules, conventions, routing
+<span class="accent">be/docs/commands.md</span>  Full specs for all 21 tilde commands
+<span class="accent">be/docs/conventions.md</span>  Deploy, auth, manifest conventions
+
+  <span class="dim">Routing rule:</span> When a tilde command is invoked, read the
+  relevant doc file FIRST, find that command's section,
+  then execute. The kernel routes — the doc executes.</div>
 
         <!-- ═══════════════════════════════════════════ -->
         <h2>Every script, what it does</h2>
@@ -627,7 +663,7 @@ README.md          Project readme.</div>
 <span class="dim">│</span>         --max-budget-usd 50                                   <span class="dim">│</span>
 <span class="dim">│</span>         --model opus --verbose "~H"                           <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  ~P plan  ~A add  ~B build  ~T test  ~S ship  ~R retro       <span class="dim">│</span>
+<span class="dim">│</span>  ~GO plan-to-retro  ~QUICK add+test+ship  ~FIXSHIP hotfix    <span class="dim">│</span>
 <span class="dim">└──────────────────────────────────────────────────────────────┘</span></div>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -677,7 +713,7 @@ README.md          Project readme.</div>
 <span class="dim">│</span>         --max-budget-usd 50                                   <span class="dim">│</span>
 <span class="dim">│</span>         --model opus --verbose "~H"                           <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  ~P plan  ~A add  ~B build  ~T test  ~S ship  ~R retro       <span class="dim">│</span>
+<span class="dim">│</span>  ~GO plan-to-retro  ~QUICK add+test+ship  ~FIXSHIP hotfix    <span class="dim">│</span>
 <span class="dim">└──────────────────────────────────────────────────────────────┘</span></div>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -702,9 +738,12 @@ README.md          Project readme.</div>
 <span class="dim">│</span>         --verbose                                              <span class="dim">│</span>
 <span class="dim">│</span>         "~H"                                                   <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  CLAUDE.md = tilde command system (Be, ~500 lines)       <span class="dim">│</span>
+<span class="dim">│</span>  CLAUDE.md = tilde command kernel (~14k chars)                <span class="dim">│</span>
+<span class="dim">│</span>  be/docs/ = command specs + conventions (lazy-loaded)         <span class="dim">│</span>
 <span class="dim">│</span>  settings.json = tool whitelist (zero approval prompts)       <span class="dim">│</span>
 <span class="dim">│</span>  "~H" = initial prompt, prints tilde command reference        <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│</span>  Then: <span class="accent">~GO</span>, <span class="accent">~QUICK</span>, <span class="accent">~FIXSHIP</span>, or any tilde command.          <span class="dim">│</span>
 <span class="dim">└──────────────────────────────────────────────────────────────┘</span></div>
 
         <!-- ═══════════════════════════════════════════ -->
