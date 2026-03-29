@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPG Setup — metal</title>
+    <link rel="icon" type="image/svg+xml" href="/metal/favicon-m.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: #0a0a0a;
+            border-bottom: 1px solid #1a1a1a;
+            z-index: 10;
+            flex-wrap: wrap;
+        }
+        .nav a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+        }
+        .nav a:hover { color: #4ec9b0; }
+        .container {
+            max-width: 700px;
+            width: 100%;
+            margin-top: 3rem;
+        }
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: #ffffff;
+            margin-bottom: 0.25rem;
+        }
+        .tagline {
+            color: #4ec9b0;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+        .version-line {
+            color: #555;
+            font-size: 0.8rem;
+            margin-bottom: 2rem;
+        }
+        .version-line a {
+            color: #4ec9b0;
+            text-decoration: none;
+        }
+        .version-line a:hover { color: #6fd9c0; }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 400;
+            color: #fff;
+            margin-bottom: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid #1a1a1a;
+        }
+
+        .step-card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.2s;
+        }
+        .step-card:hover { border-color: #333; }
+        .step-number {
+            color: #4ec9b0;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+        .step-title {
+            font-size: 1.05rem;
+            font-weight: 400;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+        .step-desc {
+            color: #999;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            margin-bottom: 0.75rem;
+        }
+
+        .command-box {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            position: relative;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            margin: 0.5rem 0;
+        }
+        .command-box:hover { border-color: #555; }
+        .command-box code {
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.8rem;
+            color: #4ec9b0;
+            word-break: break-all;
+            display: block;
+            white-space: pre-wrap;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 0.6rem;
+            right: 0.6rem;
+            background: #333;
+            border: none;
+            color: #aaa;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { background: #444; color: #fff; }
+        .copy-btn.copied { background: #2d5a3d; color: #4ec9b0; }
+
+        .note {
+            color: #666;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            line-height: 1.5;
+        }
+        .note code {
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            color: #4ec9b0;
+            font-size: 0.75rem;
+        }
+
+        .warning {
+            background: #1a1a0a;
+            border: 1px solid #554400;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            color: #d4a843;
+            font-size: 0.8rem;
+            margin: 0.75rem 0;
+            line-height: 1.5;
+        }
+
+        .auto-badge {
+            display: inline-block;
+            background: #0d1f1a;
+            border: 1px solid #1a4a2a;
+            color: #4ec9b0;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        .footer {
+            color: #333;
+            font-size: 0.75rem;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 1rem;
+        }
+        .footer a { color: #444; text-decoration: none; }
+        .footer a:hover { color: #4ec9b0; }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 2rem; }
+            .command-box code { font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="https://joeycastillo.us">joeycastillo.us</a>
+        <a href="/metal">metal</a>
+        <a href="/metal/architecture.html">architecture</a>
+        <a href="/metal/history.html">history</a>
+    </nav>
+
+    <div class="container">
+
+        <h1>GPG Setup</h1>
+        <div class="tagline">Signed commits. Verified on GitHub. Two steps.</div>
+        <div class="version-line">
+            <a href="/metal">&larr; metal</a>
+        </div>
+
+        <!-- ═══ HOW IT WORKS ═══ -->
+        <div class="step-card" style="border-color: #1a3a2a;">
+            <div class="step-desc" style="margin-bottom: 0;">
+                Claude Code handles key generation, git config, and uploading to GitHub automatically.
+                The only thing it can't do is the one-time OAuth browser approval &mdash; that's your one step.
+            </div>
+        </div>
+
+        <!-- ═══ STEP 1 ═══ -->
+        <div class="section-title">You Do This</div>
+
+        <div class="step-card">
+            <div class="step-number">Step 1 &mdash; the only manual step</div>
+            <div class="step-title">Grant GitHub CLI the GPG scope</div>
+            <div class="step-desc">
+                Run this in your terminal. It opens a browser &mdash; approve it, come back.
+            </div>
+            <div class="command-box" onclick="copy('s1-cmd','s1-btn')">
+                <code id="s1-cmd">gh auth refresh -h github.com -s write:gpg_key</code>
+                <button class="copy-btn" id="s1-btn">copy</button>
+            </div>
+            <div class="warning">
+                Interactive &mdash; opens your browser with a device code. Approve it on GitHub. One-time only.
+            </div>
+        </div>
+
+        <!-- ═══ STEP 2 ═══ -->
+        <div class="section-title">Claude Code Does The Rest</div>
+
+        <div class="step-card">
+            <div class="step-number">Step 2</div>
+            <div class="step-title">Tell Claude Code you're ready</div>
+            <div class="step-desc">
+                After the browser approval, just tell Claude Code to finish the GPG setup.
+                It will automatically:
+            </div>
+            <div style="color: #999; font-size: 0.85rem; line-height: 2;">
+                <span class="auto-badge">auto</span> Generate a 4096-bit RSA key matching your git identity<br>
+                <span class="auto-badge">auto</span> Configure git to sign all commits with the new key<br>
+                <span class="auto-badge">auto</span> Upload the public key to your GitHub account<br>
+                <span class="auto-badge">auto</span> Verify the whole chain works
+            </div>
+            <div class="note" style="margin-top: 1rem;">
+                That's it. Every commit from this machine will show the green "Verified" badge on GitHub.
+            </div>
+        </div>
+
+        <!-- ═══ TROUBLESHOOTING ═══ -->
+        <div class="section-title">If Something Breaks</div>
+
+        <div class="step-card">
+            <div class="step-title" style="font-size: 0.95rem;"><code>gpg failed to sign the data</code></div>
+            <div class="step-desc" style="margin-bottom: 0;">
+                Git is pointing to a key that doesn't exist on this machine. Tell Claude Code &mdash; it'll
+                generate a new one and rewire everything.
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title" style="font-size: 0.95rem;"><code>insufficient OAuth scopes</code></div>
+            <div class="step-desc" style="margin-bottom: 0;">
+                You haven't done Step 1 yet. Run the <code>gh auth refresh</code> command above.
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-title" style="font-size: 0.95rem;">New machine?</div>
+            <div class="step-desc" style="margin-bottom: 0;">
+                Run Step 1 again on the new machine, then let Claude Code do Step 2. Fresh key per machine.
+            </div>
+        </div>
+
+        <div class="footer">
+            <a href="/metal">&larr; metal</a>
+        </div>
+
+    </div>
+
+    <script>
+        function copy(codeId, btnId) {
+            const cmd = document.getElementById(codeId).textContent;
+            const btn = document.getElementById(btnId);
+            navigator.clipboard.writeText(cmd).then(() => {
+                btn.textContent = 'copied';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'copy';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
