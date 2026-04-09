@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>metal — tilde command reference</title>
+    <link rel="icon" type="image/svg+xml" href="/metal/favicon-m.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .nav {
+            position: fixed; top: 0; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: #0a0a0a; border-bottom: 1px solid #1a1a1a;
+            z-index: 10; flex-wrap: wrap;
+        }
+        .nav a { color: #666; text-decoration: none; font-size: 0.8rem; transition: color 0.2s; }
+        .nav a:hover { color: #4ec9b0; }
+        .container { max-width: 800px; width: 100%; margin-top: 3rem; }
+        h1 { font-size: 2rem; font-weight: 300; margin-bottom: 0.25rem; color: #fff; }
+        .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 2.5rem; }
+        .subtitle a { color: #4ec9b0; text-decoration: none; }
+        .subtitle a:hover { color: #6fd9c0; }
+        h2 {
+            font-size: 1.1rem; font-weight: 600; color: #4ec9b0;
+            margin: 2.5rem 0 1rem; padding-bottom: 0.4rem;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        h3 { font-size: 0.95rem; color: #6FC3DF; margin: 1.5rem 0 0.5rem; }
+        .cmd-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1.5rem; }
+        .cmd-table th { text-align: left; color: #4ec9b0; font-size: 0.75rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid #222; }
+        .cmd-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #111; font-size: 0.85rem; color: #ccc; vertical-align: top; }
+        .cmd-table tr:hover { background: #111; }
+        .cmd { color: #6FC3DF; font-family: 'Cascadia Code', 'Fira Code', monospace; font-weight: 600; }
+        .exempt { color: #888; font-style: italic; }
+        .gate { color: #4caf50; }
+        .chain-final { color: #ff9800; }
+        .section { margin: 1rem 0; padding: 1rem 1.25rem; background: #111; border: 1px solid #1a1a1a; border-radius: 6px; }
+        .section p, .section li { font-size: 0.85rem; color: #bbb; line-height: 1.7; }
+        .section ul { padding-left: 1.25rem; }
+        .section li { margin: 0.25rem 0; }
+        .section strong { color: #ddd; }
+        .section code { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.8rem; color: #4ec9b0; background: #1a1a1a; padding: 0.1rem 0.4rem; border-radius: 3px; }
+        .chain-box {
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 1.1rem; letter-spacing: 0.5px;
+            color: #4ec9b0; margin: 0.75rem 0;
+        }
+        .chain-box .loop { color: #666; }
+        .dod-item { display: flex; gap: 0.5rem; margin: 0.25rem 0; font-size: 0.85rem; }
+        .dod-num { color: #4caf50; font-weight: 700; min-width: 1.5rem; }
+        .dod-text { color: #ccc; }
+        .dod-text strong { color: #ddd; }
+        .footer { color: #333; font-size: 0.75rem; text-align: center; padding: 3rem 0 1rem; }
+        .back-to-top {
+            position: fixed; bottom: 2rem; right: 2rem;
+            width: 44px; height: 44px;
+            background: #6FC3DF; color: #000; border: none; border-radius: 50%;
+            font-size: 1.2rem; font-weight: 900; cursor: pointer;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+            z-index: 99; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+        }
+        .back-to-top.visible { opacity: 1; visibility: visible; }
+        .back-to-top:hover { background: #9DD9EE; transform: scale(1.1); }
+        @media print {
+            body { background: #fff; color: #111; padding: 0; }
+            .nav, .back-to-top { display: none; }
+            .container { margin-top: 0; max-width: 100%; }
+            h1 { color: #111; }
+            h2 { color: #111; border-bottom-color: #ccc; }
+            h3 { color: #333; }
+            .section { background: #f5f5f5; border-color: #ddd; }
+            .section p, .section li, .dod-text { color: #333; }
+            .cmd { color: #0066cc; }
+            .cmd-table td { color: #333; border-bottom-color: #ddd; }
+            .cmd-table th { color: #333; border-bottom-color: #ccc; }
+            .gate { color: #228b22; }
+            .chain-final { color: #cc6600; }
+            .exempt { color: #888; }
+            .chain-box { color: #0066cc; }
+            .chain-box .loop { color: #999; }
+            .footer { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="https://joeycastillo.us">joeycastillo.us</a>
+        <a href="https://ai-pantheon.ai">ai-pantheon.ai</a>
+        <a href="https://kastil-systems.com">kastil-systems.com</a>
+        <a href="https://acmedev.com">acmedev.com</a>
+        <a href="/meet">meet now</a>
+    </nav>
+
+    <div class="container">
+        <h1>metal &mdash; tilde command reference</h1>
+        <div class="subtitle">
+            <a href="/metal/">&larr; back to metal</a> &middot;
+            <a href="/metal/architecture.html">architecture</a> &middot;
+            <a href="/metal/history.html">history</a> &middot;
+            Print this page for a complete offline reference
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>All Commands</h2>
+
+        <table class="cmd-table">
+            <tr><th>Command</th><th>Aliases</th><th>What</th><th>DoD</th></tr>
+            <tr><td><span class="cmd">~i</span></td><td>~I, ~inspect</td><td>Inspect a repo, codebase, or URL</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~p</span></td><td>~P, ~plan</td><td>Plan work &mdash; intent, scope, approach</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~pu</span></td><td>~PU</td><td>Plan as user story &mdash; As a..., I want..., So that...</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~pt</span></td><td>~PT</td><td>Plan test strategy</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~e</span></td><td>~E, ~estimate</td><td>Size a plan into Fibonacci boards (3 or 5 pts)</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~a</span></td><td>~A, ~add</td><td>Add something new + immediate review</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~u</span></td><td>~U, ~update</td><td>Update existing code or feature + review</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~d</span></td><td>~D, ~delete</td><td>Remove code, feature, or files + review</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~f</span></td><td>~F, ~fix</td><td>Diagnose + fix + write test + review</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~b</span></td><td>~B, ~build</td><td>Build from board or argument. Completes entire board</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~bt</span></td><td>~BT</td><td>Build tests for a feature + review</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~t</span></td><td>~T, ~test</td><td>Test current work, fix what's broken</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~s</span></td><td>~S, ~ship</td><td>Commit, push, deploy, ship report</td><td><span class="chain-final">chain-final</span></td></tr>
+            <tr><td><span class="cmd">~demo</span></td><td>~D, ~Demo</td><td>Demo, review, or refactor</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~r</span></td><td>~R, ~retro</td><td>Retrospect on recent work</td><td><span class="chain-final">chain-final</span></td></tr>
+            <tr><td><span class="cmd">~n</span></td><td>~N, ~new</td><td>Create a new project repo</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~l</span></td><td>~L, ~load</td><td>Load a repo into Be's working context</td><td><span class="exempt">exempt</span></td></tr>
+            <tr><td><span class="cmd">~li</span></td><td>~LI, ~list</td><td>List all local + remote Be projects</td><td><span class="exempt">exempt</span></td></tr>
+            <tr><td><span class="cmd">~ul</span></td><td>~UL, ~unload</td><td>Close out a project &mdash; housekeep + report</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~m</span></td><td>~M, ~mcp</td><td>Manage MCP servers</td><td><span class="exempt">exempt</span></td></tr>
+            <tr><td><span class="cmd">~monitor</span></td><td>~M</td><td>Watch a deploy</td><td><span class="exempt">exempt</span></td></tr>
+            <tr><td><span class="cmd">~transfer</span></td><td></td><td>Generate project handoff manifest</td><td><span class="gate">gate</span></td></tr>
+            <tr><td><span class="cmd">~cr</span></td><td>~CR, ~crash</td><td>Recover from a crash mid-command</td><td><span class="exempt">exempt</span></td></tr>
+            <tr><td><span class="cmd">~jc</span></td><td>~JC</td><td>Joey's take &mdash; 40+ years of advice</td><td><span class="exempt">exempt</span></td></tr>
+            <tr><td><span class="cmd">~h</span></td><td>~H, ~help</td><td>Display help &mdash; commands, workflow, quotes</td><td><span class="exempt">exempt</span></td></tr>
+        </table>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>~chain-reaction &mdash; Named Workflow Macros</h2>
+
+        <div class="section">
+            <p>Commands outside <code>/</code> run once, left to right. Commands inside <code>/ /</code> loop until the exit condition is met: board exhausted, tests pass, nothing to fix.</p>
+
+            <h3>Built-in Chains</h3>
+            <div class="chain-box">
+                <strong>GO</strong> &nbsp;&nbsp; ~P ~E <span class="loop">/</span>~B ~T<span class="loop">/</span> ~S ~R &nbsp;&nbsp;<span style="color:#666;font-size:0.8rem">&mdash; Full lifecycle: plan to retro</span>
+            </div>
+            <div class="chain-box">
+                <strong>HOTFIX</strong> &nbsp;&nbsp; ~I ~P <span class="loop">/</span>~T ~F<span class="loop">/</span> ~S ~R &nbsp;&nbsp;<span style="color:#666;font-size:0.8rem">&mdash; Inspect, plan fix, test/fix loop, ship</span>
+            </div>
+
+            <h3>Custom Chains</h3>
+            <p><code>~chain-reaction new</code> &mdash; interview mode, build a chain interactively.</p>
+            <p><code>~&lt;NAME&gt;</code> &mdash; shorthand to run any named chain (e.g. <code>~GO</code>).</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Definition of Done (DoD) &mdash; 7-Item Mandatory Gate</h2>
+
+        <div class="section">
+            <p>Every tilde command that produces an artifact must pass <strong>all 7 items</strong> before the command is considered complete.</p>
+
+            <div style="margin: 1rem 0;">
+                <div class="dod-item"><span class="dod-num">1.</span><span class="dod-text"><strong>Code committed</strong> &mdash; All changes in a git commit with a descriptive message. No uncommitted work.</span></div>
+                <div class="dod-item"><span class="dod-num">2.</span><span class="dod-text"><strong>Commit hash in telemetry</strong> &mdash; The <code>be/telemetry.json</code> entry has a non-null commit field. Backfilled in the same commit.</span></div>
+                <div class="dod-item"><span class="dod-num">3.</span><span class="dod-text"><strong>Board updated</strong> &mdash; If a board item was worked, it moved to Done with commit hash: <code>{item} &middot; pts &middot; ~cmd &#x2705; (abc1234)</code>.</span></div>
+                <div class="dod-item"><span class="dod-num">4.</span><span class="dod-text"><strong>HTML report saved</strong> &mdash; Report exists in <code>be/</code> with correct datetime filename.</span></div>
+                <div class="dod-item"><span class="dod-num">5.</span><span class="dod-text"><strong>Index updated</strong> &mdash; <code>be/index.html</code> has an entry linking to the new report.</span></div>
+                <div class="dod-item"><span class="dod-num">6.</span><span class="dod-text"><strong>Pushed to remote</strong> &mdash; <code>git push</code> succeeded. Work exists on origin, not just locally.</span></div>
+                <div class="dod-item"><span class="dod-num">7.</span><span class="dod-text"><strong>No prior work damaged</strong> &mdash; Done board items untouched unless a new item explicitly targets them.</span></div>
+            </div>
+
+            <h3>Chain-Final Rule (#8)</h3>
+            <p>Chain-final commands (<code>~s</code>, <code>~r</code>) must also pass: <strong>Chain complete</strong> &mdash; every preceding step has a telemetry entry with a non-null commit hash. No gaps in the trail.</p>
+
+            <h3>Failure Mode</h3>
+            <p>If any DoD item fails, the command is not Done. Fix in-place and re-verify. The gate holds.</p>
+
+            <h3>Exempt Commands</h3>
+            <p><code>~h</code>, <code>~li</code>, <code>~l</code>, <code>~cr</code>, <code>~jc</code>, <code>~m</code> &mdash; utility commands, inline output only, no artifacts.</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Definition of Ready (DoR) &mdash; 3-Item Session Pre-Flight</h2>
+
+        <div class="section">
+            <p>Before the first edit of a session, read and verify:</p>
+            <div style="margin: 1rem 0;">
+                <div class="dod-item"><span class="dod-num">1.</span><span class="dod-text"><strong>Board state</strong> &mdash; Read <code>be/board.md</code>. Know what's Done, In Progress, Ready. Don't touch Done items.</span></div>
+                <div class="dod-item"><span class="dod-num">2.</span><span class="dod-text"><strong>Last telemetry entry</strong> &mdash; Was the previous chain completed? If last entry is <code>~b</code> without a following <code>~s</code>, flag it.</span></div>
+                <div class="dod-item"><span class="dod-num">3.</span><span class="dod-text"><strong>Source of truth</strong> &mdash; If project CLAUDE.md declares canonical files, respect them.</span></div>
+            </div>
+            <p>3 file reads. Takes seconds. Prevents cross-session work loss.</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Chain Reaction Flow</h2>
+
+        <div class="section">
+            <p>Every tilde command (except <code>~h</code>) follows this chain:</p>
+            <div class="chain-box" style="font-size: 0.9rem; line-height: 2;">
+                do the work &rarr; render report &rarr; save with datetime<br>
+                &rarr; update Be index &rarr; log telemetry<br>
+                &rarr; commit (backfill hash) &rarr; push<br>
+                &rarr; verify DoD (all 7 pass) &rarr; launch demo
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Board Convention</h2>
+
+        <div class="section">
+            <h3>Work Items &mdash; Triple Format</h3>
+            <p>Every item is a triple: <code>{what, verb, context}</code></p>
+            <p>Verb maps to a tilde command:</p>
+            <table class="cmd-table" style="margin: 0.5rem 0;">
+                <tr><td>"add to"</td><td><span class="cmd">~a</span></td></tr>
+                <tr><td>"update with"</td><td><span class="cmd">~u</span></td></tr>
+                <tr><td>"remove from"</td><td><span class="cmd">~d</span></td></tr>
+                <tr><td>"fix in"</td><td><span class="cmd">~f</span></td></tr>
+                <tr><td>"plan tests for"</td><td><span class="cmd">~pt</span></td></tr>
+            </table>
+
+            <h3>Sizing</h3>
+            <p>Fibonacci only: <strong>3</strong> or <strong>5</strong> points per item. A 5 is something a college student can do in one night, complete and perfect. Boards total 13&ndash;21 points.</p>
+
+            <h3>Board States</h3>
+            <p><strong>Ready</strong> &rarr; <strong>In Progress</strong> &rarr; <strong>Done</strong></p>
+            <p>Done format: <code>{item} &middot; pts &middot; ~cmd &#x2705; (commit-hash)</code></p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Versioning</h2>
+
+        <div class="section">
+            <p><strong>Version is 0. Always.</strong> No semantic versions. No major.minor.patch.</p>
+            <p>Every change is a <strong>revision</strong>: <code>git rev-list --count HEAD</code></p>
+            <p>Display: <code>v0 &middot; rN &middot; YYYY-MM-DD &middot; pts</code></p>
+            <p>Total points from <code>be/board.md</code>. Computed by <code>be/pts.py</code> at launch.</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>HTML Report Template</h2>
+
+        <div class="section">
+            <ul>
+                <li>Background: <code>#111111</code></li>
+                <li>Raised surfaces: <code>#1A1A1A</code></li>
+                <li>Accent: <code>#6FC3DF</code> (tron blue)</li>
+                <li>Font: Helvetica Neue, Helvetica, Arial, sans-serif</li>
+                <li>Nav: black sticky bar, tron blue bottom border, "Be" brand</li>
+                <li>Max width: 800px</li>
+                <li>No frameworks. No build tools. Vanilla HTML/CSS.</li>
+                <li>DoD checklist before footer: <code>&check; Item (detail)</code> or <code>&cross; Item (reason)</code></li>
+            </ul>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Folder Structure</h2>
+
+        <div class="section">
+<pre style="color:#4ec9b0;font-size:0.8rem;line-height:1.8;">project/
+  be/
+    index.html       &larr; auto-generated artifact index
+    board.md         &larr; kanban state
+    docs/            &larr; command specs + conventions (lazy-loaded)
+    plans/           &larr; ~p, ~e, ~i outputs
+    builds/          &larr; ~b, ~a, ~u, ~d, ~f outputs
+    tests/           &larr; ~t, ~bt outputs
+    ships/           &larr; ~s outputs
+    retros/          &larr; ~demo, ~retro outputs
+    transfers/       &larr; ~transfer outputs</pre>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Telemetry</h2>
+
+        <div class="section">
+            <p>Every command (except <code>~h</code>) logs to <code>be/telemetry.json</code>:</p>
+            <ul>
+                <li><strong>triple</strong>: <code>{description, verb, project}</code></li>
+                <li><strong>command</strong>: the tilde command</li>
+                <li><strong>date / time / duration_sec</strong>: wall-clock timing</li>
+                <li><strong>commit</strong>: backfilled after commit</li>
+            </ul>
+            <p>Rolling 100 entries max. Viewer at <code>be/telemetry.html</code>.</p>
+            <p>Verb mapping: ~a &rarr; "added to", ~b &rarr; "built in", ~u &rarr; "updated in", ~d &rarr; "deleted from", ~f &rarr; "fixed in", ~s &rarr; "shipped from", ~p &rarr; "planned for", ~e &rarr; "estimated for", ~i &rarr; "inspected in", ~t &rarr; "tested in", ~r &rarr; "retro'd in".</p>
+        </div>
+
+        <div class="footer">
+            v0 &middot; metal &middot; joeycastillo.us/metal/reference.html
+        </div>
+    </div>
+
+    <button class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">&#x2191;</button>
+    <script>
+    window.addEventListener('scroll', function() {
+        var btn = document.querySelector('.back-to-top');
+        if (window.scrollY > 400) { btn.classList.add('visible'); } else { btn.classList.remove('visible'); }
+    });
+    </script>
+</body>
+</html>
