@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>metal — telemetry</title>
+    <link rel="icon" type="image/svg+xml" href="/metal/favicon-m.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .nav {
+            position: fixed; top: 0; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: #0a0a0a;
+            border-bottom: 1px solid #1a1a1a;
+            z-index: 10; flex-wrap: wrap;
+        }
+        .nav a {
+            color: #666; text-decoration: none; font-size: 0.8rem;
+            transition: color 0.2s;
+        }
+        .nav a:hover { color: #4ec9b0; }
+        .container { max-width: 860px; width: 100%; margin-top: 3rem; }
+        h1 {
+            font-size: 2rem; font-weight: 300;
+            margin-bottom: 0.25rem; color: #ffffff;
+        }
+        .subtitle {
+            color: #666; font-size: 0.85rem; margin-bottom: 2rem;
+        }
+        .subtitle a { color: #4ec9b0; text-decoration: none; }
+        .subtitle a:hover { color: #6fd9c0; }
+        .stats {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem; margin-bottom: 2rem;
+        }
+        .stat {
+            background: #111; border: 1px solid #1a1a1a;
+            border-left: 2px solid #4ec9b0;
+            padding: 0.75rem 1rem; border-radius: 3px;
+        }
+        .stat-label {
+            color: #555; font-size: 0.7rem; text-transform: uppercase;
+            letter-spacing: 0.05em; margin-bottom: 0.25rem;
+        }
+        .stat-value {
+            color: #4ec9b0; font-size: 1.4rem;
+            font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+            font-weight: 400;
+        }
+        .filter-bar {
+            display: flex; gap: 0.5rem; margin-bottom: 1.5rem;
+            flex-wrap: wrap; align-items: center;
+        }
+        .filter-bar .label {
+            color: #555; font-size: 0.75rem;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            margin-right: 0.25rem;
+        }
+        .type-btn {
+            background: #111; color: #888;
+            border: 1px solid #1a1a1a; padding: 0.3rem 0.75rem;
+            font-size: 0.75rem; cursor: pointer; border-radius: 3px;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            transition: all 0.15s;
+        }
+        .type-btn:hover { color: #4ec9b0; border-color: #4ec9b0; }
+        .type-btn.active {
+            color: #4ec9b0; border-color: #4ec9b0;
+            background: #0e1a17;
+        }
+        .entry {
+            border-left: 2px solid #4ec9b0; background: #0e0e0e;
+            padding: 0.6rem 0.9rem; margin-bottom: 0.5rem;
+            border-radius: 2px; font-size: 0.82rem;
+        }
+        .entry.prompt { border-left-color: #B39DDB; background: #0d0b14; }
+        .entry .meta {
+            display: flex; gap: 0.75rem; color: #555;
+            font-size: 0.7rem; margin-bottom: 0.3rem;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            flex-wrap: wrap;
+        }
+        .entry .meta .date { color: #4ec9b0; }
+        .entry .meta .cmd {
+            background: #0e1a17; color: #4ec9b0;
+            padding: 0.05rem 0.4rem; border-radius: 2px;
+        }
+        .entry.prompt .meta .cmd {
+            background: #1a1429; color: #B39DDB;
+        }
+        .entry .desc { color: #ccc; line-height: 1.5; }
+        .entry .triple {
+            color: #666; font-size: 0.72rem; margin-top: 0.3rem;
+            font-family: "Cascadia Code", "Consolas", monospace;
+        }
+        .entry .triple .verb { color: #4ec9b0; }
+        .entry.prompt .prompt-body {
+            color: #ccc;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            white-space: pre-wrap; font-size: 0.78rem;
+            background: #080808; padding: 0.5rem 0.7rem;
+            border-radius: 2px; margin-top: 0.2rem;
+        }
+        .entry.prompt .redacted-tag {
+            color: #E07070; font-weight: 600; font-size: 0.7rem;
+        }
+        .empty {
+            color: #555; text-align: center; padding: 2rem;
+            font-size: 0.85rem; font-style: italic;
+        }
+        footer {
+            color: #444; font-size: 0.72rem; text-align: center;
+            margin-top: 3rem; padding-top: 1rem;
+            border-top: 1px solid #1a1a1a;
+            font-family: "Cascadia Code", "Consolas", monospace;
+        }
+        @media (max-width: 640px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="https://joeycastillo.us">joeycastillo.us</a>
+        <a href="https://ai-pantheon.ai">ai-pantheon.ai</a>
+        <a href="https://kastil-systems.com">kastil-systems.com</a>
+        <a href="https://acmedev.com">acmedev.com</a>
+        <a href="/meet">meet now</a>
+    </nav>
+
+    <div class="container">
+        <h1>metal &mdash; telemetry</h1>
+        <div class="subtitle">
+            <a href="/metal/">&larr; back to metal</a> &middot;
+            <a href="/metal/history.html">history</a> &middot;
+            <a href="/metal/architecture.html">architecture</a> &middot;
+            <a href="/metal/reference.html">reference</a>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">Commands</div>
+                <div class="stat-value" id="stat-cmds">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Prompts</div>
+                <div class="stat-value" id="stat-prompts">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Redacted</div>
+                <div class="stat-value" id="stat-redacted">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Days covered</div>
+                <div class="stat-value" id="stat-days">0</div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <span class="label">Type:</span>
+            <button class="type-btn active" data-type="all">All</button>
+            <button class="type-btn" data-type="commands">Commands</button>
+            <button class="type-btn" data-type="prompts">Prompts</button>
+        </div>
+
+        <div id="timeline"></div>
+
+        <footer>metal &middot; Be &middot; v0 &middot; r511 &middot; 2026-04-11 &middot; 932 pts &middot; generated 2026-04-11 07:59 UTC</footer>
+    </div>
+
+<script>
+const COMMANDS = [{"triple": {"description": "prompt capture + site telemetry release", "verb": "shipped from", "project": "metal"}, "command": "~s", "description": "Boards 51+52+53+54 — prompt capture layer + unified viewer + public telemetry page + ship/verify. 54 pts, 11-item chain-final DoD, metal + site repos.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "13:35", "duration_sec": 300, "tokens": null, "cost_usd": null, "commit": "7f9c710f312539553646e29f38d7943ac3e4fc40"}, {"triple": {"description": "r506 history entry", "verb": "added to", "project": "metal"}, "command": "~a", "description": "Board 54.2 — r506 latest history entry covers prompt capture (Board 51) + unified viewer (Board 52) + public telemetry page (Board 53) + self-healing deploy chain + ship/verify.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "13:30", "duration_sec": 240, "tokens": null, "cost_usd": null, "commit": "597c9b445d4eb0237c8388d0300e15120422ce6e"}, {"triple": {"description": "site telemetry smoke", "verb": "tested in", "project": "metal"}, "command": "~t", "description": "Board 54.3 — site telemetry smoke test: 35 checks across structural, data integrity, secret leak scan, runtime. All green.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "13:25", "duration_sec": 200, "tokens": null, "cost_usd": null, "commit": "d070e5e74ab1ecd57b8bfae958369ea5735a7a3b"}, {"triple": {"description": "deploy chain site telemetry step", "verb": "updated in", "project": "metal"}, "command": "~u", "description": "Board 53.3 — ~s deploy chain in be/docs/conventions.md now runs build_site_telemetry.py before push so public telemetry viewer self-heals at every ship. Board 53 Done, Board 54 unblocked.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "13:20", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": "1d461ca2929b7b2b4d0493e9bc8957c74fc09977"}, {"triple": {"description": "site nav telemetry link", "verb": "updated in", "project": "metal"}, "command": "~u", "description": "Board 53.2 — added /metal/telemetry.html nav link to all 5 joeycastillo.us/metal pages (index/history/architecture/reference/setup); bumped r481 → r501 where inline.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "13:15", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": "36cee3840921d464f2749af2d06d4a5846f7229f"}, {"triple": {"description": "site telemetry page", "verb": "added to", "project": "metal"}, "command": "~a", "description": "Board 53.1 — built be/tools/build_site_telemetry.py + generated joeycastillo.us/metal/telemetry.html (site-styled merged viewer, 17/17 structural + node --check all green).", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "13:10", "duration_sec": 300, "tokens": null, "cost_usd": null, "commit": "593453f19901bb708b18f1c912afad9a540ebc6c"}, {"triple": {"description": "merged viewer smoke", "verb": "tested in", "project": "metal"}, "command": "~t", "description": "Board 52.4 — merged viewer smoke test: 13 structural checks + 5 runtime simulations all pass. Board 52 fully Done, unblocks Board 53.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "13:00", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "7061c05dffc7cea8deb4ec79a7471384575bcdcc"}, {"triple": {"description": "telemetry rule + prompts re-inline", "verb": "updated in", "project": "metal"}, "command": "~u", "description": "Board 52.3 — CLAUDE.md telemetry rule extended: rebuild step now re-inlines prompts.jsonl into telemetry.html PROMPTS const", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:55", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "bbc41d795d634750dc57ab58c1e67dc6a98cda28"}, {"triple": {"description": "Type filter + prompt CSS", "verb": "added to", "project": "metal"}, "command": "~a", "description": "Board 52.2 — Type filter UI (All/Commands/Prompts) + .entry.prompt CSS + .type-btn listener", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:50", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "19ab88edc02837eae366924e9fa6bc16938e0b24"}, {"triple": {"description": "telemetry.html merged timeline", "verb": "updated in", "project": "metal"}, "command": "~u", "description": "Board 52.1 — telemetry.html merged timeline: PROMPTS inline block + _type/_sortKey entry unification + prompt render branch", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:45", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "19ab88edc02837eae366924e9fa6bc16938e0b24"}, {"triple": {"description": "prompt capture hook end-to-end", "verb": "tested in", "project": "metal"}, "command": "~t", "description": "Board 51.4 — prompt capture hook end-to-end test, 5 scenarios pass (happy, redact, empty, non-JSON, missing field). Board 51 fully Done, unblocks Board 52.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:40", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "13fd83bf3a0261213630aa4de78cd01f92cd0628"}, {"triple": {"description": "prompts.jsonl bootstrap + schema", "verb": "added to", "project": "metal"}, "command": "~a", "description": "Board 51.3 — prompts.jsonl bootstrapped with inline schema row, append-only, one JSON per line", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:35", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "adfd0cdd9458d28f337b39f81dfe9367f60c16b2"}, {"triple": {"description": "UserPromptSubmit hook entry", "verb": "added to", "project": "metal"}, "command": "~a", "description": "Board 51.2 — UserPromptSubmit hook wired in settings.json pointing at be/tools/capture_prompt.py", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:30", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "3110f51773151341bf17a512fef2ab2bae43ed12"}, {"triple": {"description": "capture_prompt.py stdin+redact+append", "verb": "added to", "project": "metal"}, "command": "~a", "description": "Board 51.1 — capture_prompt.py hook script with stdin JSON parse, secret redaction, silent failure, stdlib only", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:25", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "47261a0599664d0d3c5af29690ddd80209660248"}, {"triple": {"description": "FQDN + CLAUDE.md proposal updates", "verb": "updated in", "project": "metal"}, "command": "~u", "description": "Board 50 items 1-2 closed via External Contributor rule (7076193 — Board 49 shipped the substance)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:20", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "90a7a8b13c7499be18e1a743bd1fbbfbe5899f71"}, {"triple": "{Board 67 go.bat parser fix, retro'd in, metal}", "command": "~r", "description": "Retro go.bat fix chain — diagnosis fast, call :label worked, PS smoke harness reusable. Snags: telemetry edit races, bash-hosted cmd stdin bleed, trim tail-vs-oldest still open.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:10", "duration_sec": 600, "tokens": null, "cost_usd": null, "commit": "e310088"}, {"triple": "{Board 67 go.bat parser fix, shipped from, metal}", "command": "~s", "description": "Ship Board 67 — go.bat parser error flood fix complete. Chain: ~p d13b7a8 → ~e 469bbc8 → ~b 08da7e5 → ~t afc8a43 → ~s. 11 pts. Site synced.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "12:00", "duration_sec": 600, "tokens": null, "cost_usd": null, "commit": "001a67e"}, {"triple": "{Board 67 go.bat parser fix, tested in, metal}", "command": "~t", "description": "Test go.bat fix — 6 scenarios pass (untracked, modified, deleted, spaces, long path, error flood). Zero parser errors. Regression checks clean for :launch and menu dispatch.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "11:55", "duration_sec": 360, "tokens": null, "cost_usd": null, "commit": "afc8a43"}, {"triple": "{Board 67 go.bat parser fix, built in, metal}", "command": "~b", "description": "Build Board 67 — go.bat fixes landed: killed file-preview FOR, quoted TEMP paths, call :show_entry label, ASCII hyphens. 4 items, 8 pts done.", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "11:50", "duration_sec": 600, "tokens": null, "cost_usd": null, "commit": "08da7e5"}, {"triple": "{go.bat parser error flood fix, estimated for, metal}", "command": "~e", "description": "Estimate go.bat fixes — Board 67, 6 items, 11 pts, hotfix no hard prereq, runs ahead of ai-metal.dev chain", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "11:40", "duration_sec": 480, "tokens": null, "cost_usd": null, "commit": "469bbc8"}, {"triple": "{go.bat parser error flood fix, planned for, metal}", "command": "~p", "description": "Plan go.bat fix — kill dirty-tree file preview FOR, quote TEMP paths, flatten IF-ELSE via call :label, replace em-dashes in echo", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "11:32", "duration_sec": 1800, "tokens": null, "cost_usd": null, "commit": "d13b7a8"}, {"triple": "{ai-metal.dev third surface, estimated for, metal}", "command": "~e", "description": "Estimate ai-metal.dev third surface — 6 new boards (61–66), 25 items, 63 pts, strictly linear chain, no hard prereq", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "06:30", "duration_sec": 900, "tokens": null, "cost_usd": null, "commit": "7a878eb"}, {"triple": "{ai-metal.dev third surface, planned for, metal}", "command": "~p", "description": "Plan ai-metal.dev as rolling WIP demo — 3rd surface alongside .ai + .net, 6 phases, ~63 pts, board-completion trigger, Python stdlib generator in metal/be/tools/", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "06:11", "duration_sec": 600, "tokens": null, "cost_usd": null, "commit": "5b71327"}, {"triple": "{metal, unloaded from, metal}", "command": "~ul", "description": "Unload metal — clean state, no items in progress, 14 session commits (~h chain r453–r466) all shipped + retro'd", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "05:35", "duration_sec": 120, "tokens": null, "cost_usd": null, "commit": "62771cf"}, {"triple": "{~h chain, retro'd in, metal}", "command": "~r", "description": "Retro ~h chain — 5 iterations, compression + dynamic Latest + Discipline block, actions on telemetry trim + points-from-board", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "05:28", "duration_sec": 420, "tokens": null, "cost_usd": null, "commit": "4c68ce0"}, {"triple": "{~h chain, shipped from, metal}", "command": "~s", "description": "Ship ~h chain — Discipline + Compact Option A + ~new/~chain-reaction options + Latest block + spec fix (≤50→≤40)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "05:13", "duration_sec": 600, "tokens": null, "cost_usd": null, "commit": "eb9e11c"}, {"triple": "{~h Latest block, added to, metal}", "command": "~a", "description": "Add dynamic What's New block at top of ~h — 3 entries with rev/date/time/command/desc from telemetry", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "04:38", "duration_sec": 300, "tokens": null, "cost_usd": null, "commit": "29121d9"}, {"triple": "{~h ~new and ~chain-reaction options, updated in, metal}", "command": "~u", "description": "Surface ~new arg shape and ~chain-reaction sub-forms in ~h display (+1 row, still fits)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "04:22", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": "e8ca843"}, {"triple": "{compact ~h Option A, built in, metal}", "command": "~b", "description": "Swap ~h spec to single-column Option A — 55 rows → 19 rows, 95 cols → 71 cols", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "03:50", "duration_sec": 420, "tokens": null, "cost_usd": null, "commit": "42b81e9"}, {"triple": "{compact ~h display, planned for, metal}", "command": "~p", "description": "Plan one-screen ~h — measured 55 rows/95 cols, target 24x80, 3 options, recommend Option A", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "03:26", "duration_sec": 240, "tokens": null, "cost_usd": null, "commit": "6f5942c"}, {"triple": "{~h discipline section, updated in, metal}", "command": "~u", "description": "Add Discipline block to ~h display — DoR + DoD + Proposal now visible", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-11", "time": "03:21", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": "032083f"}, {"triple": "{metal DoD audit, inspected in, metal}", "command": "~i", "description": "Full metal audit — DoD enforcement gaps, site drift, GPG status (14 findings)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-09", "time": "03:24", "duration_sec": 300, "tokens": null, "cost_usd": null, "commit": "0abc727"}, {"triple": "{launcher bugs, shipped from, metal}", "command": "~s", "description": "Ship fix launcher bugs — python3, single-quote parsing, Unicode in go.bat", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-08", "time": "20:14", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": "75e8d44"}, {"triple": "{launcher bugs, built in, metal}", "command": "~b", "description": "Fix go.bat — chcp 65001, be/pts.py standalone, py call, go.sh consistency", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-08", "time": "20:14", "duration_sec": 120, "tokens": null, "cost_usd": null, "commit": "75e8d44"}, {"triple": "{metal, unloaded as, metal}", "command": "~ul", "description": "Unload metal — r367, 561 pts, clean, 8 session commits, 3 open items carried forward", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-08", "time": "20:11", "duration_sec": 90, "tokens": null, "cost_usd": null, "commit": "6795e0f"}, {"triple": "{revision numbering + inspect, shipped from, metal}", "command": "~s", "description": "Ship revision numbering — v0, dynamic banner (revision + date + pts), inspect gaps", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-08", "time": "18:52", "duration_sec": 150, "tokens": null, "cost_usd": null, "commit": "aa7f8c9"}, {"triple": "{revision numbering, updated in, metal}", "command": "~u", "description": "Version is 0 — every change is a revision (counter + datetime), no semantic versions", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-08", "time": "16:35", "duration_sec": 120, "tokens": null, "cost_usd": null, "commit": "965ac3d"}, {"triple": "{Version + DoD visibility gaps, inspected in, metal}", "command": "~i", "description": "Inspect metal — site v3.3 stale, ~h missing DoD, commands.md missing DoD", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-08", "time": "16:27", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": "3875746"}, {"triple": "{Be Definition of Done, shipped from, metal}", "command": "~s", "description": "Ship DoD — Boards 40-41, 29 pts, 8 items, DoD gate + DoR pre-flight + 4 quotes", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-07", "time": "16:01", "duration_sec": 120, "tokens": null, "cost_usd": null, "commit": "a4b788a"}, {"triple": "{Board 41 DoD verification, built in, metal}", "command": "~b", "description": "Board 41 complete — bahalaka CLAUDE.md, 32 null commits fixed, DoD gate test plan", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-06", "time": "02:21", "duration_sec": 360, "tokens": null, "cost_usd": null, "commit": "6756c09"}, {"triple": "{Board 40 DoD + DoR core rules, built in, metal}", "command": "~b", "description": "Board 40 complete — DoD (7+1 items), DoR (3 items), checklist template, chain flow updated", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-06", "time": "02:10", "duration_sec": 300, "tokens": null, "cost_usd": null, "commit": "c609a58"}, {"triple": "{Definition of Done, estimated for, metal}", "command": "~e", "description": "Estimate DoD — 2 boards, 29 pts, 8 items (Board 40-41)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "21:02", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": "1622da8"}, {"triple": "{Jeff Sutherland quote #2, added to, metal}", "command": "~a", "description": "Add Jeff Sutherland quote #19 — limiting factors to dev speed", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "20:05", "duration_sec": 30, "tokens": null, "cost_usd": null, "commit": "d2dfd0c"}, {"triple": "{Jeff Sutherland quote, added to, metal}", "command": "~a", "description": "Add Jeff Sutherland quote to rotation (#18)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "20:02", "duration_sec": 30, "tokens": null, "cost_usd": null, "commit": "89bc6a7"}, {"triple": "{Norman Campbell + Ken Kadlec quotes, added to, metal}", "command": "~a", "description": "Add 2 quotes to rotation — Norman Campbell (Javelin Era) + Ken Kadlec (Javelin Era)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "19:57", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": "0ae1da9"}, {"triple": "{Board 39 chain-reaction help cleanup, built in, metal}", "command": "~b", "description": "Board 39 — remove chain-reaction tutorial, compact command + ~h detail", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "14:31", "duration_sec": 240, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{Board 38 help display cleanup, built in, metal}", "command": "~b", "description": "Board 38 — help cleanup, remove invite/share, reassign ~m ~d aliases", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "14:31", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{chain cleanup, retro'd in, metal}", "command": "~r", "description": "Retro — chain cleanup GO chain complete, Board 37, 3 pts", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "14:12", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{Board 37 chain cleanup, built in, metal}", "command": "~b", "description": "Board 37 — chain cleanup, kill 6 chains keep GO + HOTFIX, 3 pts", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "14:12", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{chain cleanup, estimated for, metal}", "command": "~e", "description": "Estimate chain cleanup — 1 board (37), 1 item, 3 pts", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "14:12", "duration_sec": 30, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{chain cleanup, planned for, metal}", "command": "~p", "description": "Plan chain cleanup — kill 6 chains, keep GO + HOTFIX", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "14:03", "duration_sec": 120, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{Board 36 ~list transfer discovery, built in, metal}", "command": "~b", "description": "Board 36 — ~list transfer discovery, 2 items, 6 pts, complete", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "13:05", "duration_sec": 180, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{~list + transfers, estimated for, metal}", "command": "~e", "description": "Estimate ~list + transfers — 1 board, 2 items, 6 pts", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "12:53", "duration_sec": 60, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{~list + transfers, planned for, metal}", "command": "~p", "description": "Plan ~list enhancement — surface open transfers across local Be projects", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-04-05", "time": "12:49", "duration_sec": 120, "tokens": null, "cost_usd": null, "commit": null}, {"triple": "{board 18: item 4 in progress â€” first auth deploy test, built in, metal}", "command": "~b", "description": "board 18: item 4 in progress â€” first auth deploy test", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "13:19", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "64ff8d3", "id": 15}, {"triple": "{auth hardening + lakemedical.org deploy â€” TLS, TripleSet, tests, deploy, Be impr, planned for, lakemedical.org}", "command": "~p", "description": "auth hardening + lakemedical.org deploy â€” TLS, TripleSet, tests, deploy, Be improvements", "project": "lakemedical.org", "repo": "joeycastilloUS/lakemedical.org", "date": "2026-03-29", "time": "13:30", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "6bd059c", "id": 16}, {"triple": "{~TRANSFER: project handoff command â€” scan, clean, manifest, planned for, metal}", "command": "~p", "description": "~TRANSFER: project handoff command â€” scan, clean, manifest", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "13:42", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "0abe9dc", "id": 17}, {"triple": "{auth hardening + ~TRANSFER: 4 boards, 14 items, 60 pts (Boards 19-22), estimated for, metal}", "command": "~e", "description": "auth hardening + ~TRANSFER: 4 boards, 14 items, 60 pts (Boards 19-22)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "13:47", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "e23af35", "id": 18}, {"triple": "{~TRANSFER spec + scan patterns + cleanup logic to CLAUDE.md, added to, metal}", "command": "~a", "description": "~TRANSFER spec + scan patterns + cleanup logic to CLAUDE.md", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "13:50", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "499987a", "id": 19}, {"triple": "{transfer manifest HTML template to Be conventions in CLAUDE.md, added to, metal}", "command": "~a", "description": "transfer manifest HTML template to Be conventions in CLAUDE.md", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "13:50", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "5f0cf1f", "id": 20}, {"triple": "{~H command table + be/transfers/ folder convention for ~TRANSFER, updated in, metal}", "command": "~u", "description": "~H command table + be/transfers/ folder convention for ~TRANSFER", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "13:51", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "1a96c5a", "id": 21}, {"triple": "{Board 19 complete: ~TRANSFER command â€” 4 items, 16 pts, built in, metal}", "command": "~b", "description": "Board 19 complete: ~TRANSFER command â€” 4 items, 16 pts", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "13:59", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "bab7e12", "id": 22}, {"triple": "{manifest for KASTIL-1, executed in, kastil}", "command": "~transfer", "description": "manifest for KASTIL-1", "project": "kastil", "repo": "joeycastilloUS/kastil", "date": "2026-03-29", "time": "14:45", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "6ae52e1", "id": 23}, {"triple": "{rename ~TRANSFER to ~TRN + never delete artifacts rule, retro'd in, metal}", "command": "~r", "description": "rename ~TRANSFER to ~TRN + never delete artifacts rule", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "14:46", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "5487419", "id": 24}, {"triple": "{report: ~TRANSFER â†’ ~TRN + never delete artifacts, retro'd in, metal}", "command": "~r", "description": "report: ~TRANSFER â†’ ~TRN + never delete artifacts", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "14:47", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "57d1603", "id": 25}, {"triple": "{updated manifest for KASTIL-1 â€” Be v2.1, ~TRANSFER â†’ ~TRN naming, executed in, kastil}", "command": "~trn", "description": "updated manifest for KASTIL-1 â€” Be v2.1, ~TRANSFER â†’ ~TRN naming", "project": "kastil", "repo": "joeycastilloUS/kastil", "date": "2026-03-29", "time": "17:17", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "f314676", "id": 26}, {"triple": "{rename ~TRN to ~transfer (lowercase) across all live files, updated in, metal}", "command": "~u", "description": "rename ~TRN to ~transfer (lowercase) across all live files", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "17:37", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "588150a", "id": 27}, {"triple": "{reorganize tilde command menu â€” 3 groups, workflow order, planned for, metal}", "command": "~p", "description": "reorganize tilde command menu â€” 3 groups, workflow order", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "17:38", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "2724fa8", "id": 28}, {"triple": "{tilde menu reorg: 10 groups â†’ 6 lifecycle phases, planned for, metal}", "command": "~p", "description": "tilde menu reorg: 10 groups â†’ 6 lifecycle phases", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "18:06", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "29765ef", "id": 29}, {"triple": "{tilde menu reorg v2 â€” 6 lifecycle groups (Load & Inspect, Planning, Build & Test, planned for, metal}", "command": "~p", "description": "tilde menu reorg v2 â€” 6 lifecycle groups (Load & Inspect, Planning, Build & Test, Ship & Review, Ops, Wisdom)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "18:11", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "6e2172a", "id": 30}, {"triple": "{reorganize ~H command menu â€” 6 groups, workflow order, updated in, metal}", "command": "~u", "description": "reorganize ~H command menu â€” 6 groups, workflow order", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "18:18", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "92801c3", "id": 31}, {"triple": "{menu reorg + ~transfer rename â€” 13 checks, all passing, tested in, metal}", "command": "~t", "description": "menu reorg + ~transfer rename â€” 13 checks, all passing", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "18:23", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "04d7f8f", "id": 32}, {"triple": "{menu reorg + ~transfer rename â€” 5 commits, 13 tests passing, shipped from, metal}", "command": "~s", "description": "menu reorg + ~transfer rename â€” 5 commits, 13 tests passing", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "18:24", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "b24201e", "id": 33}, {"triple": "{~s: all tilde commands lowercase across all live files, updated in, metal}", "command": "~u", "description": "~s: all tilde commands lowercase across all live files", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "18:32", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "1733240", "id": 34}, {"triple": "{~s: ~h menu as three-column layout â€” one screen, updated in, metal}", "command": "~u", "description": "~s: ~h menu as three-column layout â€” one screen", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "19:42", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "a41419c", "id": 35}, {"triple": "{~s: three forms for every tilde command â€” ~l = ~L = ~load, updated in, metal}", "command": "~u", "description": "~s: three forms for every tilde command â€” ~l = ~L = ~load", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "19:47", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "01838b3", "id": 36}, {"triple": "{tilde command overhaul â€” lowercase, 3 columns, 3-form aliases, shipped from, metal}", "command": "~ship", "description": "tilde command overhaul â€” lowercase, 3 columns, 3-form aliases", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "20:10", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "53b4ef2", "id": 37}, {"triple": "{menu reorder, ~demo + ~retro split, ~invite ~share ~monitor added, updated in, metal}", "command": "~update", "description": "menu reorder, ~demo + ~retro split, ~invite ~share ~monitor added", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "20:21", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "8089801", "id": 38}, {"triple": "{~invite, ~share, ~monitor â€” three new commands + ~transfer refactor, planned for, metal}", "command": "~p", "description": "~invite, ~share, ~monitor â€” three new commands + ~transfer refactor", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "20:25", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "9ac80f3", "id": 39}, {"triple": "{kastil â€” where metal meets nous (140 .md files, integration analysis), inspected in, nous}", "command": "~i", "description": "kastil â€” where metal meets nous (140 .md files, integration analysis)", "project": "nous", "repo": "joeycastilloUS/nous", "date": "2026-03-29", "time": "20:36", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "88c054b", "id": 40}, {"triple": "{kastil executable inventory â€” 60 executables, 7 platforms, inspected in, kastil}", "command": "~i", "description": "kastil executable inventory â€” 60 executables, 7 platforms", "project": "kastil", "repo": "joeycastilloUS/kastil", "date": "2026-03-29", "time": "20:48", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "f21199c", "id": 41}, {"triple": "{CLAUDE.md kernel + lazy-load split â€” 45k to 12k, planned for, metal}", "command": "~p", "description": "CLAUDE.md kernel + lazy-load split â€” 45k to 12k", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "20:55", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "06c2e2f", "id": 42}, {"triple": "{CLAUDE.md kernel split â€” 4 items, 1 board, 16 pts, estimated for, metal}", "command": "~e", "description": "CLAUDE.md kernel split â€” 4 items, 1 board, 16 pts", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "21:00", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "14f4232", "id": 43}, {"triple": "{be/docs/commands.md â€” all 18 command specs extracted, added to, metal}", "command": "~a", "description": "be/docs/commands.md â€” all 18 command specs extracted", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "21:04", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "e897445", "id": 44}, {"triple": "{be/docs/conventions.md â€” deploy, auth, manifest conventions, added to, metal}", "command": "~a", "description": "be/docs/conventions.md â€” deploy, auth, manifest conventions", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "21:05", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "51da9b7", "id": 45}, {"triple": "{CLAUDE.md kernel â€” 45k to 14k, command specs + conventions to be/docs/, updated in, metal}", "command": "~u", "description": "CLAUDE.md kernel â€” 45k to 14k, command specs + conventions to be/docs/", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "21:10", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "a9f5b5e", "id": 46}, {"triple": "{Board 23 complete â€” CLAUDE.md kernel split, 45k to 14k, built in, metal}", "command": "~b", "description": "Board 23 complete â€” CLAUDE.md kernel split, 45k to 14k", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "21:11", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "44d46a1", "id": 47}, {"triple": "{~fix command â€” fix + test workflow (~f / ~F / ~fix), added to, metal}", "command": "~a", "description": "~fix command â€” fix + test workflow (~f / ~F / ~fix)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "21:22", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "085eeca", "id": 48}, {"triple": "{~e: Fix Quote System â€” 3 items, 1 board, 13 pts, planned for, metal}", "command": "~p", "description": "~e: Fix Quote System â€” 3 items, 1 board, 13 pts", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:24", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "6f5eca2", "id": 49}, {"triple": "{remove all -Be quotes â€” only Joey's real words remain, deleted from, metal}", "command": "~d", "description": "remove all -Be quotes â€” only Joey's real words remain", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:25", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "3b919be", "id": 50}, {"triple": "{cycling rule + ~nugget -jc restriction â€” real quotes only, full cycling, updated in, metal}", "command": "~u", "description": "cycling rule + ~nugget -jc restriction â€” real quotes only, full cycling", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:26", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "7fd7843", "id": 51}, {"triple": "{Board 24 complete â€” Fix Quote System (3 items, 13 pts), built in, metal}", "command": "~b", "description": "Board 24 complete â€” Fix Quote System (3 items, 13 pts)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:28", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "cd2f90a", "id": 52}, {"triple": "{Fix Quotes + ~fix Command â€” Board 24 complete, 5 commits, shipped from, metal}", "command": "~s", "description": "Fix Quotes + ~fix Command â€” Board 24 complete, 5 commits", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:30", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "d54002e", "id": 53}, {"triple": "{~chain-reaction â€” named workflow macros with loop segments, planned for, metal}", "command": "~p", "description": "~chain-reaction â€” named workflow macros with loop segments", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:33", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "02cefb0", "id": 54}, {"triple": "{Who Joey Is â€” verbal judo, economy of words, never negative, updated in, metal}", "command": "~u", "description": "Who Joey Is â€” verbal judo, economy of words, never negative", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:35", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "dd66454", "id": 55}, {"triple": "{~jc attribution â€” -jc for Joey's words, -Be for Be channeling, updated in, metal}", "command": "~u", "description": "~jc attribution â€” -jc for Joey's words, -Be for Be channeling", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:38", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "9cb0b61", "id": 56}, {"triple": "{QUOTES â€” added #9 wake bake GO, updated in, metal}", "command": "~u", "description": "QUOTES â€” added #9 wake bake GO", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:40", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "d590108", "id": 57}, {"triple": "{~jc drops all sign-off tags â€” -jc reserved for real quotes only, updated in, metal}", "command": "~u", "description": "~jc drops all sign-off tags â€” -jc reserved for real quotes only", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:41", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "7254f7e", "id": 58}, {"triple": "{remove ~nugget command, deleted from, metal}", "command": "~d", "description": "remove ~nugget command", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "22:44", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "360c016", "id": 59}, {"triple": "{Chain Reaction â€” ~fix, quotes, ~jc, ~nugget removal (8 commits), shipped from, metal}", "command": "~s", "description": "Chain Reaction â€” ~fix, quotes, ~jc, ~nugget removal (8 commits)", "project": "metal", "repo": "joeycastilloUS/metal", "date": "2026-03-29", "time": "23:19", "duration_sec": null, "tokens": null, "cost_usd": null, "commit": "caabc85", "id": 60}];
+const PROMPTS = [{"timestamp": "2026-04-11T12:35:00Z", "session_id": null, "cwd": "C:/metal", "prompt": "[BOOTSTRAP] Schema: {timestamp: ISO-8601 UTC, session_id: str|null, cwd: str|null, prompt: str (redacted if needed), redacted: bool, length: int}. Rows are append-only — one JSON object per line, no cap, no truncation. Real user prompts begin on the line after this bootstrap row.", "redacted": false, "length": 0}];
+let activeType = "all";
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function buildEntries() {
+  let entries = [];
+  if (activeType === "all" || activeType === "commands") {
+    entries.push(...COMMANDS.map(e => ({
+      ...e, _type: "command",
+      _sortKey: (e.date || "") + " " + (e.time || "")
+    })));
+  }
+  if (activeType === "all" || activeType === "prompts") {
+    entries.push(...PROMPTS.filter(p => (p.length || 0) > 0).map(p => {
+      const ts = p.timestamp || "";
+      return {
+        ...p, _type: "prompt",
+        date: ts.slice(0, 10), time: ts.slice(11, 16),
+        project: "metal", command: "~prompt",
+        _sortKey: ts.slice(0, 10) + " " + ts.slice(11, 16)
+      };
+    }));
+  }
+  entries.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
+  return entries;
+}
+
+function renderEntries() {
+  const entries = buildEntries();
+  const tl = document.getElementById("timeline");
+  if (entries.length === 0) {
+    tl.innerHTML = '<div class="empty">No entries for this filter.</div>';
+    return;
+  }
+  tl.innerHTML = entries.map(e => {
+    if (e._type === "prompt") {
+      const redacted = e.redacted
+        ? ' <span class="redacted-tag">[REDACTED]</span>'
+        : "";
+      const sid = e.session_id
+        ? ' <span class="sid">' + escapeHtml(e.session_id.slice(0, 8)) + '</span>'
+        : "";
+      return '<div class="entry prompt">' +
+        '<div class="meta">' +
+          '<span class="date">' + escapeHtml(e.date) + " " + escapeHtml(e.time) + '</span>' +
+          '<span class="cmd">~prompt</span>' +
+          ' <span>' + (e.length || 0) + ' chars</span>' +
+          sid + redacted +
+        '</div>' +
+        '<div class="prompt-body">' + escapeHtml(e.prompt || "") + '</div>' +
+      '</div>';
+    }
+    const triple = e.triple || {};
+    const tripleHtml = triple.description
+      ? '<div class="triple">{' +
+          escapeHtml(triple.description) + ', ' +
+          '<span class="verb">' + escapeHtml(triple.verb || "") + '</span>, ' +
+          escapeHtml(triple.project || "") +
+        '}</div>'
+      : "";
+    return '<div class="entry">' +
+      '<div class="meta">' +
+        '<span class="date">' + escapeHtml(e.date || "") + " " + escapeHtml(e.time || "") + '</span>' +
+        '<span class="cmd">' + escapeHtml(e.command || "") + '</span>' +
+        ' <span>' + escapeHtml(e.project || "") + '</span>' +
+      '</div>' +
+      '<div class="desc">' + escapeHtml(e.description || "") + '</div>' +
+      tripleHtml +
+    '</div>';
+  }).join("");
+}
+
+function renderStats() {
+  const cmdCount = COMMANDS.length;
+  const realPrompts = PROMPTS.filter(p => (p.length || 0) > 0);
+  const promptCount = realPrompts.length;
+  const redactedCount = realPrompts.filter(p => p.redacted).length;
+  const dates = new Set();
+  COMMANDS.forEach(e => { if (e.date) dates.add(e.date); });
+  realPrompts.forEach(p => {
+    const ts = p.timestamp || "";
+    if (ts) dates.add(ts.slice(0, 10));
+  });
+  document.getElementById("stat-cmds").textContent = cmdCount;
+  document.getElementById("stat-prompts").textContent = promptCount;
+  document.getElementById("stat-redacted").textContent = redactedCount;
+  document.getElementById("stat-days").textContent = dates.size;
+}
+
+document.querySelectorAll(".type-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeType = btn.dataset.type;
+    renderEntries();
+  });
+});
+
+renderStats();
+renderEntries();
+</script>
+</body>
+</html>

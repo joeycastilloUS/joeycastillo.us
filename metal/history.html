@@ -128,10 +128,21 @@
 
     <div class="container">
         <h1>metal — version history</h1>
-        <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/architecture.html">architecture</a></div>
+        <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/telemetry.html">telemetry</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/architecture.html">architecture</a></div>
 
         <div class="version">
-            <div class="version-header">r481 <span class="date">2026-04-11</span> <span class="tag">latest</span></div>
+            <div class="version-header">r506 <span class="date">2026-04-11</span> <span class="tag">latest</span></div>
+            <ul>
+                <li><strong>Prompt capture layer</strong> &mdash; Board 51 (14 pts). New <code>UserPromptSubmit</code> hook in <code>settings.json</code> pipes every typed prompt through <code>be/tools/capture_prompt.py</code>, which redacts 12 secret patterns (<code>sk-</code>, <code>ghp_</code>, <code>xox[baprs]-</code>, <code>AKIA</code>, <code>AIza</code>, <code>password=</code>, &hellip;) before appending one JSON row per prompt to <code>be/prompts.jsonl</code>. Stdlib-only, silent-failure on any exception so capture never blocks user input</li>
+                <li><strong>Unified telemetry viewer</strong> &mdash; Board 52 (14 pts). <code>be/telemetry.html</code> now renders a merged timeline of command telemetry + user prompts. New Type filter (All / Commands / Prompts), purple-bordered prompt entries with <code>[REDACTED]</code> badges, interleaved newest-first via a shared <code>_sortKey</code>. 13 structural + 5 runtime simulation checks all pass</li>
+                <li><strong>Public telemetry page</strong> &mdash; Board 53 (13 pts). New <code>/metal/telemetry.html</code> viewer on the public site, matching the <code>#0a0a0a</code> / <code>#4ec9b0</code> site aesthetic. Built by <code>be/tools/build_site_telemetry.py</code> (stdlib Python), which inlines <code>telemetry.json</code> + <code>prompts.jsonl</code> at deploy time. Stats grid (commands / prompts / redacted / days), Type filter, site-wide nav link added across index / history / architecture / reference / setup</li>
+                <li><strong>~s deploy chain &mdash; self-healing site telemetry</strong> &mdash; <code>be/docs/conventions.md</code> now codifies <code>build_site_telemetry.py</code> as step 2 of the deploy chain, so the public viewer converges with the private one at every ship. Idempotent, skip-when-absent, no dependency footprint added</li>
+                <li><strong>Ship + verify</strong> &mdash; Board 54 (13 pts). 35/35 smoke-test checks green on the public viewer (structural, data integrity, secret leak scan, runtime). Bootstrap <code>length:0</code> prompt rows filtered from display so schema placeholders never reach the public page</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r481 <span class="date">2026-04-11</span></div>
             <ul>
                 <li><strong>go.bat parser error flood fixed</strong> &mdash; Board 67 (11 pts). Dirty-tree listing no longer spews <code>'-'</code>, <code>'ision:'</code>, <code>'/f'</code>, or literal <code>%T [%S]</code> leaks. Root cause: an inner FOR loop was echoing the first 5 lines of every dirty file, pushing arbitrary file contents back through the batch parser</li>
                 <li><strong>Fix: <code>call :show_entry</code> label pattern</strong> &mdash; each dirty entry runs in its own parser scope, replacing the fragile nested IF-ELSE chain inside the FOR body. Adds scope isolation that the batch language itself lacks</li>
