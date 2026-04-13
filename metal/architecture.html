@@ -159,6 +159,18 @@
         }
         .note strong { color: #ccc; }
         .note.warn { border-left-color: #c9a96f; }
+        .back-to-top {
+            position: fixed; bottom: 2rem; right: 2rem;
+            width: 44px; height: 44px;
+            background: #6FC3DF; color: #000; border: none; border-radius: 50%;
+            font-size: 1.2rem; font-weight: 900; cursor: pointer;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+            z-index: 99; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+        }
+        .back-to-top.visible { opacity: 1; visibility: visible; }
+        .back-to-top:hover { background: #9DD9EE; transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -172,11 +184,7 @@
 
     <div class="container">
         <h1>metal — architecture</h1>
-        <div class="subtitle"><a href="/metal/">← back to metal</a> · v4.0 — 2026-03-29</div>
-
-        <div class="note" style="border-color: #4ec9b0;">
-            <strong>v4.0 changes:</strong> ~chain-reaction (named workflow macros with loops), ~fix command, CLAUDE.md kernel split (45k→14k, specs lazy-loaded from <code>be/docs/</code>), quote system overhaul, ~jc rework, pure C auth library.
-        </div>
+        <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/history.html">history</a> · <a href="/metal/telemetry.html">telemetry</a> · v0 · r501 · 2026-04-11 · 932 pts</div>
 
         <!-- ═══════════════════════════════════════════ -->
         <h2>Two repos</h2>
@@ -219,10 +227,8 @@ architecture.html  This document.
 favicon-m.svg      Favicon</div>
 
         <h3>Metal repo <span class="repo-tag repo-metal">metal</span> — <code>C:\metal</code> or <code>~/metal</code></h3>
-        <div class="flow-box">go.bat             Daily launcher. Type 'go', Be launches + debug viewer opens.
-go.sh              Mac/Linux daily launcher. exec &lt; /dev/tty for stdin fix.
-be-tail.js         Debug Tail SSE server (~55 lines). Streams debug log on port 7777.
-be-tail.html       Debug Tail browser UI. Color-coded live stream of tool calls + errors.
+        <div class="flow-box">go.bat             Daily launcher (103 lines). Dirty-tree handler + Claude Code launch.
+go.sh              Mac/Linux daily launcher (98 lines). exec &lt; /dev/tty for stdin fix.
 CLAUDE.md          THE PRODUCT — tilde-command kernel (~14k chars). Routes to be/docs/.
 settings.json      Tool whitelist — Bash(*), all built-ins, mcp__*. effortLevel: max. Zero prompts.
 .mcp.json          MCP server defaults — project-scope Slack + GitHub. Auto-discovered.
@@ -328,7 +334,10 @@ README.md          Project readme.</div>
 
         <table>
             <tr><th>Command</th><th>Name</th><th>What it does</th></tr>
+            <tr><td><code>~N</code></td><td>New</td><td>Create a new project — repo, be/ scaffold, CLAUDE.md</td></tr>
+            <tr><td><code>~LI</code></td><td>List</td><td>List all projects — local, remote, open transfers</td></tr>
             <tr><td><code>~L</code></td><td>Load</td><td>Load a repo — clone, sync, switch context</td></tr>
+            <tr><td><code>~UL</code></td><td>Unload</td><td>Close out a project — housekeep, report, switch back</td></tr>
             <tr><td><code>~I</code></td><td>Inspect</td><td>Read a repo, URL, or codebase — report what's there</td></tr>
             <tr><td><code>~P</code></td><td>Plan</td><td>Plan it, render it, save it</td></tr>
             <tr><td><code>~PU</code></td><td>User Story</td><td>Plan as a user story with acceptance criteria</td></tr>
@@ -342,6 +351,7 @@ README.md          Project readme.</div>
             <tr><td><code>~BT</code></td><td>Build Test</td><td>Build the tests for a feature</td></tr>
             <tr><td><code>~T</code></td><td>Test</td><td>Test it, fix what's broken</td></tr>
             <tr><td><code>~S</code></td><td>Ship</td><td>Commit, push, version bump, deploy</td></tr>
+            <tr><td><code>~Monitor</code></td><td>Monitor</td><td>Watch the deploy — verify it's live and healthy</td></tr>
             <tr><td><code>~Demo</code></td><td>Demo</td><td>Demo, review, or refactor code</td></tr>
             <tr><td><code>~R</code></td><td>Retro</td><td>Retrospect recent work — what went well, what didn't</td></tr>
             <tr><td><code>~M</code></td><td>MCP</td><td>Manage MCP servers — add, remove, diagnose, setup</td></tr>
@@ -360,16 +370,48 @@ README.md          Project readme.</div>
 
         <p>Named workflow macros with loop segments. Define a chain once, run it forever.</p>
 
-        <div class="flow-box"><span class="accent">~P  ~E  /~B  ~T  ~F/  ~S  ~R</span>
+        <div class="flow-box"><span class="accent">~P  ~E  /~B  ~T/  ~S  ~R</span>
 
   Commands outside <span class="dim">/</span> run once, left to right.
-  Commands inside <span class="dim">/ /</span> loop until: board exhausted + tests pass + nothing to fix.
+  Commands inside <span class="dim">/ /</span> loop until: board exhausted + tests pass.
 
   Built-in chains:
-    <span class="accent">~GO</span>      <span class="dim">~P ~E /~B ~T ~F/ ~S ~R</span>     Plan to retro
-    <span class="accent">~QUICK</span>   <span class="dim">~A ~T ~S</span>                  Add, test, ship
-    <span class="accent">~FIXSHIP</span> <span class="dim">~F ~T ~S</span>                  Hotfix: fix, test, ship
-    <span class="accent">~POLISH</span>  <span class="dim">/~T ~F/ ~S</span>                Test/fix loop, ship</div>
+    <span class="accent">~GO</span>      <span class="dim">~P ~E /~B ~T/ ~S ~R</span>       Full lifecycle: plan to retro
+    <span class="accent">~HOTFIX</span>  <span class="dim">~I ~P /~T ~F/ ~S ~R</span>       Inspect, plan fix, test/fix loop, ship, retro</div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <h2>Definition of Done (DoD)</h2>
+
+        <p>Every tilde command that produces an artifact must pass <strong>all 7 items</strong> before the command is considered complete. If any item fails, the command is not Done. Fix in-place and re-verify.</p>
+
+        <div class="flow-box">
+  <span class="accent">The 7 Items</span>
+
+  1. <strong>Code committed</strong> — All changes in a git commit with descriptive message. No uncommitted work.
+  2. <strong>Commit hash in telemetry</strong> — be/telemetry.json entry has a non-null commit field.
+  3. <strong>Board updated</strong> — If a board item was worked, it moved to Done with commit hash.
+  4. <strong>HTML report saved</strong> — Report exists in be/ with correct datetime filename.
+  5. <strong>Index updated</strong> — be/index.html has an entry linking to the new report.
+  6. <strong>Pushed to remote</strong> — git push succeeded. Work exists on origin.
+  7. <strong>No prior work damaged</strong> — Done items untouched unless a new item targets them.
+
+  <span class="accent">Chain-final commands</span> (~s, ~r) also require:
+  8. <strong>Chain complete</strong> — Every preceding step has a telemetry entry with non-null commit hash.
+
+  <span class="accent">DoD-exempt commands:</span> ~h, ~li, ~l, ~cr, ~jc, ~m (utility, no artifacts)</div>
+
+        <h3>Definition of Ready (DoR)</h3>
+
+        <p>Before the first edit of a session, verify:</p>
+
+        <div class="flow-box">
+  1. <strong>Board state</strong> — Read be/board.md. Know what's Done, In Progress, Ready.
+  2. <strong>Last telemetry entry</strong> — Was the previous chain completed? Flag if not.
+  3. <strong>Source of truth</strong> — Respect canonical files declared in CLAUDE.md.</div>
+
+        <div class="note">
+            DoD is defined in CLAUDE.md (source of truth), with an execution copy in be/docs/commands.md and a pre-deploy gate in be/docs/conventions.md.
+        </div>
 
         <!-- ═══════════════════════════════════════════ -->
         <h2>CLAUDE.md kernel split</h2>
@@ -435,23 +477,26 @@ README.md          Project readme.</div>
         </table>
 
         <h3>Daily launcher — go.bat / go.sh <span class="repo-tag repo-metal">metal</span></h3>
-        <p>Type <code>go</code> from <code>C:\metal</code> or <code>~/metal</code>. Pulls latest, generates a debug log path, starts the Debug Tail viewer on port 7777, opens the browser, then launches Claude Code with full permissions, settings, CLAUDE.md as system prompt, $50 budget, opus model, and <code>--debug-file</code> pointing to the session log.</p>
+        <p>Type <code>go</code> from <code>C:\metal</code> or <code>~/metal</code>. Checks for dirty working tree (offers Stash/Discard/Ignore/Delete/Keep), pulls latest if clean, counts revision and points via <code>be/pts.py</code>, prints the Be banner with <code>v0 · rN · date · pts</code>, then launches Claude Code.</p>
 
         <table>
             <tr><th>File</th><th>What it does</th></tr>
             <tr>
-                <td><code>go.bat</code></td>
-                <td><code>git pull --ff-only --no-rebase</code>, generate debug path via <code>wmic</code>, start <code>node be-tail.js</code>, open browser to <code>localhost:7777</code>, print Be banner, then:<br>
-                    <code>claude --permission-mode bypassPermissions</code><br>
-                    <code>--settings settings.json</code><br>
-                    <code>--append-system-prompt-file CLAUDE.md</code><br>
-                    <code>--max-budget-usd 50</code><br>
-                    <code>--debug-file be/debug/YYYY-MM-DD-HH-MM.log</code><br>
-                    <code>--model opus --verbose "~H"</code></td>
+                <td><code>go.bat</code><br><span style="color:#666;font-size:0.8rem">103 lines</span></td>
+                <td>1. <code>git status --porcelain</code> → dirty-tree handler (5 options with file preview)<br>
+                    2. Clean path: <code>git pull --ff-only --no-rebase</code><br>
+                    3. <code>git rev-list --count HEAD</code> → revision<br>
+                    4. <code>py be/pts.py</code> → total points<br>
+                    5. Print Be banner<br>
+                    6. <code>claude --permission-mode bypassPermissions</code><br>
+                    &nbsp;&nbsp;&nbsp;<code>--settings settings.json</code><br>
+                    &nbsp;&nbsp;&nbsp;<code>--append-system-prompt-file CLAUDE.md</code><br>
+                    &nbsp;&nbsp;&nbsp;<code>--max-budget-usd 50</code><br>
+                    &nbsp;&nbsp;&nbsp;<code>--model opus "~h"</code></td>
             </tr>
             <tr>
-                <td><code>go.sh</code></td>
-                <td><code>exec &lt; /dev/tty</code> (fix stdin for curl|bash chains), same flow with <code>date +%Y-%m-%d-%H-%M</code> for debug path.</td>
+                <td><code>go.sh</code><br><span style="color:#666;font-size:0.8rem">98 lines</span></td>
+                <td>Same flow. <code>exec &lt; /dev/tty</code> (fix stdin for curl|bash). <code>python3 be/pts.py</code> with fallback to <code>python</code>.</td>
             </tr>
         </table>
 
@@ -654,16 +699,20 @@ README.md          Project readme.</div>
           <span class="dim">│</span>
           <span class="dim">▼</span>
 <span class="dim">┌──────────────────────────────────────────────────────────────┐</span>
-<span class="dim">│</span> <span class="accent">go.bat</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">21 lines — daily launcher</span>               <span class="dim">│</span>
+<span class="dim">│</span> <span class="accent">go.bat</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">103 lines — daily launcher</span>              <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  Print Be banner                                             <span class="dim">│</span>
+<span class="dim">│</span>  Dirty-tree check → [S]tash/[D]iscard/[I]gnore/[X]del/[K]eep <span class="dim">│</span>
+<span class="dim">│</span>  Clean → git pull --ff-only --no-rebase                      <span class="dim">│</span>
+<span class="dim">│</span>  rev-list --count HEAD → revision                            <span class="dim">│</span>
+<span class="dim">│</span>  py be/pts.py → total points                                <span class="dim">│</span>
+<span class="dim">│</span>  Print Be banner: v0 · rN · date · pts                       <span class="dim">│</span>
 <span class="dim">│</span>  claude --permission-mode bypassPermissions                   <span class="dim">│</span>
 <span class="dim">│</span>         --settings settings.json                              <span class="dim">│</span>
 <span class="dim">│</span>         --append-system-prompt-file CLAUDE.md                  <span class="dim">│</span>
 <span class="dim">│</span>         --max-budget-usd 50                                   <span class="dim">│</span>
-<span class="dim">│</span>         --model opus --verbose "~H"                           <span class="dim">│</span>
+<span class="dim">│</span>         --model opus "~h"                                     <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  ~GO plan-to-retro  ~QUICK add+test+ship  ~FIXSHIP hotfix    <span class="dim">│</span>
+<span class="dim">│</span>  ~GO plan-to-retro  ~HOTFIX inspect+fix+ship                 <span class="dim">│</span>
 <span class="dim">└──────────────────────────────────────────────────────────────┘</span></div>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -703,17 +752,20 @@ README.md          Project readme.</div>
           <span class="dim">│</span>
           <span class="dim">▼</span>
 <span class="dim">┌──────────────────────────────────────────────────────────────┐</span>
-<span class="dim">│</span> <span class="accent">go.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">25 lines — daily launcher</span>                <span class="dim">│</span>
+<span class="dim">│</span> <span class="accent">go.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>  <span class="dim">98 lines — daily launcher</span>                 <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  exec &lt; /dev/tty  (fix stdin for curl|bash)                  <span class="dim">│</span>
-<span class="dim">│</span>  Print Be banner                                             <span class="dim">│</span>
+<span class="dim">│</span>  Dirty-tree check → [S]tash/[D]iscard/[I]gnore/[X]del/[K]eep <span class="dim">│</span>
+<span class="dim">│</span>  Clean → git pull --ff-only --no-rebase                      <span class="dim">│</span>
+<span class="dim">│</span>  python3 be/pts.py → total points                            <span class="dim">│</span>
+<span class="dim">│</span>  Print Be banner: v0 · rN · date · pts                       <span class="dim">│</span>
 <span class="dim">│</span>  claude --permission-mode bypassPermissions                   <span class="dim">│</span>
 <span class="dim">│</span>         --settings settings.json                              <span class="dim">│</span>
 <span class="dim">│</span>         --append-system-prompt-file CLAUDE.md                  <span class="dim">│</span>
 <span class="dim">│</span>         --max-budget-usd 50                                   <span class="dim">│</span>
-<span class="dim">│</span>         --model opus --verbose "~H"                           <span class="dim">│</span>
+<span class="dim">│</span>         --model opus "~h"                                     <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  ~GO plan-to-retro  ~QUICK add+test+ship  ~FIXSHIP hotfix    <span class="dim">│</span>
+<span class="dim">│</span>  ~GO plan-to-retro  ~HOTFIX inspect+fix+ship                 <span class="dim">│</span>
 <span class="dim">└──────────────────────────────────────────────────────────────┘</span></div>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -725,25 +777,23 @@ README.md          Project readme.</div>
 <span class="dim">┌──────────────────────────────────────────────────────────────┐</span>
 <span class="dim">│</span> <span class="accent">go.bat / go.sh</span>  <span class="repo-tag repo-metal" style="font-size:0.65rem">metal</span>                                    <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  Print Be banner:                                            <span class="dim">│</span>
-<span class="dim">│</span>    "Beryllium. Lightest structural metal."                    <span class="dim">│</span>
-<span class="dim">│</span>    "One signal in. Full chain reaction out."                  <span class="dim">│</span>
-<span class="dim">│</span>    "~H for commands"                                          <span class="dim">│</span>
+<span class="dim">│</span>  Dirty-tree check → [S]tash/[D]iscard/[I]gnore/[X]del/[K]eep <span class="dim">│</span>
+<span class="dim">│</span>  Clean → git pull --ff-only --no-rebase                      <span class="dim">│</span>
+<span class="dim">│</span>  Count revision + points (be/pts.py)                         <span class="dim">│</span>
+<span class="dim">│</span>  Print Be banner: v0 · rN · date · pts                       <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  claude --permission-mode bypassPermissions                   <span class="dim">│</span>
 <span class="dim">│</span>         --settings settings.json                              <span class="dim">│</span>
 <span class="dim">│</span>         --append-system-prompt-file CLAUDE.md                  <span class="dim">│</span>
 <span class="dim">│</span>         --max-budget-usd 50                                   <span class="dim">│</span>
-<span class="dim">│</span>         --model opus                                          <span class="dim">│</span>
-<span class="dim">│</span>         --verbose                                              <span class="dim">│</span>
-<span class="dim">│</span>         "~H"                                                   <span class="dim">│</span>
+<span class="dim">│</span>         --model opus "~h"                                     <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
 <span class="dim">│</span>  CLAUDE.md = tilde command kernel (~14k chars)                <span class="dim">│</span>
 <span class="dim">│</span>  be/docs/ = command specs + conventions (lazy-loaded)         <span class="dim">│</span>
 <span class="dim">│</span>  settings.json = tool whitelist (zero approval prompts)       <span class="dim">│</span>
-<span class="dim">│</span>  "~H" = initial prompt, prints tilde command reference        <span class="dim">│</span>
+<span class="dim">│</span>  "~h" = initial prompt, prints tilde command reference        <span class="dim">│</span>
 <span class="dim">│</span>                                                              <span class="dim">│</span>
-<span class="dim">│</span>  Then: <span class="accent">~GO</span>, <span class="accent">~QUICK</span>, <span class="accent">~FIXSHIP</span>, or any tilde command.          <span class="dim">│</span>
+<span class="dim">│</span>  Then: <span class="accent">~GO</span>, <span class="accent">~HOTFIX</span>, or any tilde command.                   <span class="dim">│</span>
 <span class="dim">└──────────────────────────────────────────────────────────────┘</span></div>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -764,25 +814,22 @@ README.md          Project readme.</div>
         <p>Bumping <code>VERSION</code> in Go.Fe forces tools to re-run on next launch.</p>
 
         <!-- ═══════════════════════════════════════════ -->
-        <h2>Version stamps</h2>
+        <h2>Versioning</h2>
 
-        <p>Version appears in these files:</p>
+        <p><strong>Version is 0. Always.</strong> No semantic versions. Every change is a <strong>revision</strong> — the git commit count: <code>git rev-list --count HEAD</code>.</p>
+        <p>Display format: <code>v0 · r388 · 2026-04-09 · 626 pts</code> (version zero + revision + date + total board points).</p>
+        <p>Total points come from <code>be/board.md</code> — summed by <code>be/pts.py</code>. The launcher computes revision and points at launch time.</p>
+
+        <p style="margin-top: 1rem;">Version/revision appears in:</p>
 
         <table>
             <tr><th>Repo</th><th>File</th><th>Where</th></tr>
-            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>install.bat</code></td><td>comment + echo</td></tr>
-            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>install.sh</code></td><td>comment + echo</td></tr>
-            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>Go.Li.bat</code></td><td>comment + echo</td></tr>
-            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>Go.Li.sh</code></td><td>comment + echo</td></tr>
-            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>Go.Na.bat</code></td><td>comment + echo</td></tr>
-            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>Go.Na.sh</code></td><td>comment + echo</td></tr>
-            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>index.html</code></td><td>version display</td></tr>
-            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>history.html</code></td><td>new entry</td></tr>
-            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>go.bat</code></td><td>comment</td></tr>
-            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>go.sh</code></td><td>comment</td></tr>
-            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Fe.bat</code></td><td><code>set "VERSION=..."</code></td></tr>
-            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Fe.sh</code></td><td><code>VERSION="..."</code></td></tr>
-            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>README.md</code></td><td>version display</td></tr>
+            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>go.bat / go.sh</code></td><td>computed at launch: <code>git rev-list --count HEAD</code> + <code>be/pts.py</code></td></tr>
+            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>README.md</code></td><td><code>v0 — every change is a revision</code></td></tr>
+            <tr><td><span class="repo-tag repo-metal">metal</span></td><td><code>Go.Fe.bat / Go.Fe.sh</code></td><td><code>VERSION=...</code> (tools-done gate only)</td></tr>
+            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>index.html</code></td><td>hero version line</td></tr>
+            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>architecture.html</code></td><td>subtitle</td></tr>
+            <tr><td><span class="repo-tag repo-web">web</span></td><td><code>history.html</code></td><td>revision entries</td></tr>
         </table>
 
         <!-- ═══════════════════════════════════════════ -->
@@ -799,5 +846,12 @@ README.md          Project readme.</div>
         </ul>
 
     </div>
+    <button class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">&#x2191;</button>
+    <script>
+    window.addEventListener('scroll', function() {
+        var btn = document.querySelector('.back-to-top');
+        if (window.scrollY > 400) { btn.classList.add('visible'); } else { btn.classList.remove('visible'); }
+    });
+    </script>
 </body>
 </html>

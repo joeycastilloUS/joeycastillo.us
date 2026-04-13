@@ -103,6 +103,18 @@
             color: #ccc;
             font-weight: 500;
         }
+        .back-to-top {
+            position: fixed; bottom: 2rem; right: 2rem;
+            width: 44px; height: 44px;
+            background: #6FC3DF; color: #000; border: none; border-radius: 50%;
+            font-size: 1.2rem; font-weight: 900; cursor: pointer;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+            z-index: 99; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+        }
+        .back-to-top.visible { opacity: 1; visibility: visible; }
+        .back-to-top:hover { background: #9DD9EE; transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -116,27 +128,92 @@
 
     <div class="container">
         <h1>metal — version history</h1>
-        <div class="subtitle"><a href="/metal/">← back to metal</a></div>
+        <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/telemetry.html">telemetry</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/architecture.html">architecture</a></div>
 
         <div class="version">
-            <div class="version-header">v4.1 <span class="date">2026-04-03</span> <span class="tag">latest</span></div>
+            <div class="version-header">r506 <span class="date">2026-04-11</span> <span class="tag">latest</span></div>
             <ul>
-                <li><strong>~new (~N)</strong> — create a new project from scratch: scaffold <code>be/</code>, init git, create GitHub repo, ready to <code>~p</code></li>
-                <li><strong>~unload (~UL)</strong> — inverse of <code>~load</code>. Housekeeping audit (uncommitted changes, unpushed commits, board items in progress), status report, clean project close</li>
-                <li><strong>Command telemetry</strong> — every tilde command auto-logs to <code>be/telemetry.json</code>. Rolling 100 triplesets. HTML viewer with filters, sort, activity chart at <code>be/telemetry.html</code></li>
-                <li><strong>Retro commitments</strong> — 5 lessons from retros baked into command specs: infra awareness in <code>~e</code>, preflight + tarball audit in <code>~b</code>, test ordering in <code>~t</code>/<code>~bt</code>, Cloudflare platform rules in conventions</li>
-                <li><strong>Use Cases section</strong> — SEO agency case study on the site. Responsive grid layout</li>
-                <li><strong>metal primer</strong> — features, capabilities, industry comparison, NOUS integration doc</li>
-                <li><strong>NOUS relay→prime tests</strong> — 26 checks, API verified, Board 26</li>
-                <li><strong>Go.Fe.bat fix</strong> — WinLibs portable zip replaced with MSYS2 for GCC install</li>
-                <li><strong>Board cleanup</strong> — cancelled boards 9–12, 18, 20–22 (104 pts stale React refs / outdated domain)</li>
-                <li><strong>Quote #15</strong> — "Users don't like change, they're lazy..." added to the cycling pool</li>
-                <li><strong>4 boards, 73 pts</strong> — Board 26 (NOUS tests, 16 pts) + Board 27 (Use Cases, 8 pts) + Board 28 (Retro Commitments, 14 pts) + Board 29 (Telemetry, 16 pts) + Board 30 (~new, 13 pts)</li>
+                <li><strong>Prompt capture layer</strong> &mdash; Board 51 (14 pts). New <code>UserPromptSubmit</code> hook in <code>settings.json</code> pipes every typed prompt through <code>be/tools/capture_prompt.py</code>, which redacts 12 secret patterns (<code>sk-</code>, <code>ghp_</code>, <code>xox[baprs]-</code>, <code>AKIA</code>, <code>AIza</code>, <code>password=</code>, &hellip;) before appending one JSON row per prompt to <code>be/prompts.jsonl</code>. Stdlib-only, silent-failure on any exception so capture never blocks user input</li>
+                <li><strong>Unified telemetry viewer</strong> &mdash; Board 52 (14 pts). <code>be/telemetry.html</code> now renders a merged timeline of command telemetry + user prompts. New Type filter (All / Commands / Prompts), purple-bordered prompt entries with <code>[REDACTED]</code> badges, interleaved newest-first via a shared <code>_sortKey</code>. 13 structural + 5 runtime simulation checks all pass</li>
+                <li><strong>Public telemetry page</strong> &mdash; Board 53 (13 pts). New <code>/metal/telemetry.html</code> viewer on the public site, matching the <code>#0a0a0a</code> / <code>#4ec9b0</code> site aesthetic. Built by <code>be/tools/build_site_telemetry.py</code> (stdlib Python), which inlines <code>telemetry.json</code> + <code>prompts.jsonl</code> at deploy time. Stats grid (commands / prompts / redacted / days), Type filter, site-wide nav link added across index / history / architecture / reference / setup</li>
+                <li><strong>~s deploy chain &mdash; self-healing site telemetry</strong> &mdash; <code>be/docs/conventions.md</code> now codifies <code>build_site_telemetry.py</code> as step 2 of the deploy chain, so the public viewer converges with the private one at every ship. Idempotent, skip-when-absent, no dependency footprint added</li>
+                <li><strong>Ship + verify</strong> &mdash; Board 54 (13 pts). 35/35 smoke-test checks green on the public viewer (structural, data integrity, secret leak scan, runtime). Bootstrap <code>length:0</code> prompt rows filtered from display so schema placeholders never reach the public page</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v4.0 <span class="date">2026-03-29</span></div>
+            <div class="version-header">r481 <span class="date">2026-04-11</span></div>
+            <ul>
+                <li><strong>go.bat parser error flood fixed</strong> &mdash; Board 67 (11 pts). Dirty-tree listing no longer spews <code>'-'</code>, <code>'ision:'</code>, <code>'/f'</code>, or literal <code>%T [%S]</code> leaks. Root cause: an inner FOR loop was echoing the first 5 lines of every dirty file, pushing arbitrary file contents back through the batch parser</li>
+                <li><strong>Fix: <code>call :show_entry</code> label pattern</strong> &mdash; each dirty entry runs in its own parser scope, replacing the fragile nested IF-ELSE chain inside the FOR body. Adds scope isolation that the batch language itself lacks</li>
+                <li><strong>Robust FOR /F</strong> &mdash; <code>%TEMP%</code> paths now quoted with <code>usebackq</code>; <code>tokens=1,2</code> replaced with <code>tokens=1*</code> so filenames with spaces are preserved</li>
+                <li><strong>ASCII hyphens in echoes</strong> &mdash; em-dash removed from echoed strings (REM comments keep it); eliminates code-page edge cases</li>
+                <li><strong>6-scenario smoke test</strong> &mdash; untracked, modified, deleted, spaces-in-filename, long path, zero-flood all pass. Clean-tree and menu-dispatch regression-safe</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r463 <span class="date">2026-04-11</span></div>
+            <ul>
+                <li><strong>~h Discipline section</strong> &mdash; DoR (3-read pre-flight), DoD (7 items + 4 chain-final), and Proposal convention now surfaced in help display instead of buried in rules</li>
+                <li><strong>Compact ~h (Option A)</strong> &mdash; main display collapsed from 55 rows to 20, widest col 95&rarr;71. Dropped redundant WORKFLOW arrow column + USE CASES column (both derivable from Flow line + Chain expansions)</li>
+                <li><strong>~new + ~chain-reaction options surfaced</strong> &mdash; <code>~new &lt;name&gt; [org] &lt;fqdn&gt;</code> arg shape inline, plus third Chains row documenting <code>~&lt;NAME&gt;</code> shorthand and <code>~chain-reaction new</code> interview mode</li>
+                <li><strong>Dynamic Latest block</strong> &mdash; top of <code>~h</code> now computed at render time from <code>be/telemetry.json</code>. Shows the last 3 non-backfill work entries with revision, date, time, command, and description. No manual maintenance &mdash; always fresh</li>
+                <li><strong>Spec tightening</strong> &mdash; description truncation corrected from <code>&le;50 chars</code> to <code>&le;40 chars</code> to match the actual 80-col width budget</li>
+                <li><strong>5 iterations, 1 chain</strong> &mdash; all commits r453&ndash;r463, one ship, full chain-final DoD (11 items)</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r416 <span class="date">2026-04-10</span></div>
+            <ul>
+                <li><strong>~tag command</strong> &mdash; universal tagging system. Tag anything with triples (<code>{subject, tagged as, value}</code>), stored in <code>be/tags.json</code>, searchable, git-managed. HTML viewer at <code>be/tags.html</code> with filter + group-by</li>
+                <li><strong>Ship DoD expanded</strong> &mdash; chain-final commands (~s, ~r) now require 11 items: original 7 + chain complete + site in sync + ~h in sync + revision current</li>
+                <li><strong>Creator credit</strong> &mdash; "by Joey Castillo" line added to go.bat/go.sh launcher banner. Visible every session</li>
+                <li><strong>Site sync</strong> &mdash; all 4 pages updated: ~tag in tilde tables, DoD 9-11 documented, 48 boards / 680 pts stats, reference.html updated with ~tag + chain-final rules</li>
+                <li><strong>2 boards, 35 pts</strong> &mdash; Board 47 (~tag command, 16 pts) + Board 48 (ship DoD + site sync + credit, 19 pts)</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r395 <span class="date">2026-04-09</span></div>
+            <ul>
+                <li><strong>Version is 0. Always.</strong> &mdash; semver removed everywhere. Every change is a revision (<code>git rev-list --count HEAD</code>). Display: <code>v0 &middot; rN &middot; date &middot; pts</code>. History page converted from vX.Y to rN format</li>
+                <li><strong>Site accuracy</strong> &mdash; launcher section rewritten (103/98-line dirty-tree handlers, no debug/verbose), stats updated (45 boards, 626 pts), v0 hero line, architecture versioning section rewritten</li>
+                <li><strong>Back-to-top arrow</strong> &mdash; tron blue circle on all pages, appears after 400px scroll, modeled after wateroflife.supply</li>
+                <li><strong>Tilde command reference</strong> &mdash; new reference.html: all 25 commands, DoD/DoR spec, chain reaction syntax, print-friendly</li>
+                <li><strong>README rewrite</strong> &mdash; v0 format, all 25 tilde commands, DoD mention, current file table</li>
+                <li><strong>GPG fix</strong> &mdash; removed local <code>commit.gpgsign=false</code> override contradicting .gitconfig template</li>
+                <li><strong>2 boards, 40 pts</strong> &mdash; Board 45 (site accuracy, 21 pts) + Board 46 (history + arrow + reference, 19 pts)</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r390 <span class="date">2026-04-09</span></div>
+            <ul>
+                <li><strong>Definition of Done</strong> &mdash; 7-item mandatory quality gate enforced on every tilde command. DoD section added to index, architecture, commands.md, and conventions.md</li>
+                <li><strong>Definition of Ready</strong> &mdash; 3-item session pre-flight: board state, last telemetry entry, source of truth</li>
+                <li><strong>Chain cleanup</strong> &mdash; removed ghost chains (QUICK, FIXSHIP, POLISH). GO and HOTFIX are the two built-in chains. GO loop fixed: <code>/~B ~T/</code> not <code>/~B ~T ~F/</code></li>
+                <li><strong>New commands</strong> &mdash; <code>~New</code> (create project), <code>~List</code> (discover projects), <code>~Unload</code> (close out), <code>~Monitor</code> (watch deploy)</li>
+                <li><strong>DoD in docs</strong> &mdash; be/docs/commands.md gets DoD preamble + cross-references on all 23 command specs. be/docs/conventions.md gets pre-deploy gate + HTML snippet template</li>
+                <li><strong>Command telemetry</strong> &mdash; rolling 100-entry work log with commit hash backfill, HTML viewer dashboard</li>
+                <li><strong>5 boards, 65 pts</strong> &mdash; Board 40 (DoD rules), 41 (DoD verification), 42 (launcher fixes), 43 (DoD in docs), 44 (site sync)</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r316 <span class="date">2026-04-03</span></div>
+            <ul>
+                <li><strong>~new + ~unload</strong> &mdash; create projects and close them out cleanly</li>
+                <li><strong>~list</strong> &mdash; discover all local + remote Be projects with transfer scan</li>
+                <li><strong>Board cleanup</strong> &mdash; cancelled stale boards (9-12, 18, 20-22), 104 pts removed</li>
+                <li><strong>Retro commitments</strong> &mdash; infra awareness, preflight audit, test ordering, Cloudflare platform rules</li>
+                <li><strong>3 boards, 27 pts</strong> &mdash; Board 28 (retro commitments), 29 (telemetry), 30 (~new command)</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r268 <span class="date">2026-03-29</span></div>
             <ul>
                 <li><strong>~chain-reaction</strong> — named workflow macros with loop segments. <code>~GO</code> runs plan-to-retro. <code>/</code> markers define loops: <code>~P ~E /~B ~T ~F/ ~S ~R</code>. Built-in chains: GO, QUICK, FIXSHIP, POLISH</li>
                 <li><strong>~fix (~F)</strong> — new tilde command: diagnose, fix, write a test, ship proof. Slots into chains between ~T and ~S</li>
@@ -149,7 +226,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v3.5 <span class="date">2026-03-28</span></div>
+            <div class="version-header">r215 <span class="date">2026-03-28</span></div>
             <ul>
                 <li><strong>Deploy chain</strong> — <code>~S</code> reads <code>deploy.json</code> and deploys to Cloudflare Pages. Convention: <code>project.subdomain.domain</code></li>
                 <li><strong>Pure C auth library</strong> — <code>crypt.c/h</code> (SHA-256, SHA-1, HMAC-SHA-1), <code>totp.c/h</code> (RFC 6238 TOTP), <code>qr.c/h</code> (QR code generation), <code>auth.c/h</code> (register/verify/session), <code>gate.c/h</code> (HTTP auth server). Zero dependencies beyond libc</li>
@@ -161,7 +238,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v3.3 <span class="date">2026-03-26</span></div>
+            <div class="version-header">r169 <span class="date">2026-03-26</span></div>
             <ul>
                 <li><strong>Debug Tail live viewer</strong> — <code>be-tail.js</code> (Node SSE server, ~55 lines, zero deps) + <code>be-tail.html</code> (vanilla HTML/JS/CSS). Color-coded stream: errors red, warnings amber, tool calls tron blue, API calls purple</li>
                 <li><strong>Auto-launch on <code>go</code></strong> — go.bat/go.sh write debug log to <code>be/debug/YYYY-MM-DD-HH-MM.log</code>, start the viewer on port 7777, pass <code>--debug-file</code> to Claude</li>
@@ -172,7 +249,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v3.2.1 <span class="date">2026-03-26</span></div>
+            <div class="version-header">r155 <span class="date">2026-03-26</span></div>
             <ul>
                 <li><strong>git pull on every launch</strong> — go.bat/go.sh run <code>git pull --ff-only --no-rebase</code> before starting Claude Code; CLAUDE.md always fresh</li>
                 <li><strong>Dirty tree fix</strong> — <code>--no-rebase</code> overrides <code>pull.rebase = true</code> in git config, works cleanly with modified/untracked files</li>
@@ -180,7 +257,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v3.2 <span class="date">2026-03-26</span></div>
+            <div class="version-header">r145 <span class="date">2026-03-26</span></div>
             <ul>
                 <li><strong>~L Load Repo</strong> — clone, sync, switch Be's working context to any project; the entry point for multi-repo work</li>
                 <li><strong>Workflow-first ~H</strong> — shows the workflow chain first, then 6 use cases in plain English, then grouped command reference</li>
@@ -191,7 +268,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v3.1 <span class="date">2026-03-26</span></div>
+            <div class="version-header">r130 <span class="date">2026-03-26</span></div>
             <ul>
                 <li><strong>~M (MCP) tilde command</strong> — manage MCP servers from within a session: add, remove, diagnose, setup, sync, auth</li>
                 <li><strong>.mcp.json in repo</strong> — Slack + GitHub as portable project-scope defaults, auto-discovered by Claude Code</li>
@@ -204,7 +281,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v3.0 <span class="date">2026-03-25</span></div>
+            <div class="version-header">r113 <span class="date">2026-03-25</span></div>
             <ul>
                 <li><strong>One repo</strong> — metal and metal.Be merged into a single <code>metal</code> repo; CLAUDE.md lives at root</li>
                 <li><strong>go.bat (21 lines)</strong> — slim daily launcher replaces 53-line proxy + 106-line Go.Be.bat chain</li>
@@ -219,7 +296,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v2.0 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r73 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Consolidated</strong> — tools.bat/sh, setup.bat/sh, provision.bat inlined into Go.Fe; six fewer files</li>
                 <li><strong>Go.Fe.bat diet</strong> — downloads Go.Li.bat from website instead of calling old provision.bat</li>
@@ -228,7 +305,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.9 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r68 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Architecture docs</strong> — full system schematic with flow diagrams, script tables, known gotchas</li>
                 <li><strong>Architecture link on main page</strong> — joeycastillo.us/metal/architecture.html</li>
@@ -237,35 +314,35 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.8.4 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r67 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Fix false admin check in Go.Li.bat</strong> — net session unreliable when called from another batch file; removed check, steps handle errors individually</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v1.8.3 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r65 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Fix curl not found in Fe</strong> — PATH refresh drops System32; now uses %SystemRoot%\System32\curl.exe</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v1.8.2 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r63 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Li in Fe flow uses Go.Li.bat/sh</strong> — downloads the real Li script with list + all/pick/skip menu instead of old boring provision.bat preamble</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v1.8.1 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r61 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Rename go-runtime → Go.Fe.2</strong> — cleaner naming, step 5 now says "Launch full toolchain (Fe → Li → Be)"</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v1.8 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r59 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Preview before action</strong> — every script shows a numbered list of what it will do before doing anything</li>
                 <li><strong>Go.Fe: install all or skip</strong> — shows 5 steps, then [A] all / [S] skip</li>
@@ -274,14 +351,14 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.7.1 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r57 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Fix Be launch after fresh install</strong> — PATH not refreshed after tools.bat installs Claude Code via npm; now refreshes PATH from registry and checks %APPDATA%\npm</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v1.7 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r55 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>metal.Na (Sodium)</strong> — uninstall/reset script; removes metal repos for fresh install testing, leaves tools and OS changes</li>
                 <li><strong>Na card on website</strong> — Windows and Mac/Linux commands with copy button</li>
@@ -290,14 +367,14 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.6.1 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r53 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Fix Go.Fe clone verification</strong> — clone could fail silently on fresh machines; now verifies repo exists before launching runtime, clear error if not</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v1.6 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r52 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Go.Li: every step is optional</strong> — shows numbered list upfront, apply all at once or pick one by one</li>
                 <li><strong>Go.Li.bat: self-contained, zero deps</strong> — all 12 Windows diet steps inline, no git/gh/repo needed</li>
@@ -307,7 +384,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.5.3 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r50 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Go.Li.sh: launch metal.Be after diet</strong> — asks if you want to launch Be when diet finishes; clones repo if needed</li>
                 <li><strong>Be Mac command</strong> — website command now clones + runs in one step instead of bare ./Go.Be.sh</li>
@@ -315,21 +392,21 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.5.2 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r49 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Fix Go.Be.sh frozen stdin</strong> — claude launched but couldn't read keyboard; exec &lt; /dev/tty reconnects terminal</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v1.5.1 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r48 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Fix browser install hanging</strong> — winget list updates source index on every call, can hang for ages; replaced with instant .exe path checks</li>
             </ul>
         </div>
 
         <div class="version">
-            <div class="version-header">v1.5 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r46 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Go.Li: every step is optional</strong> — each diet step asks before applying, safe to run on any machine</li>
                 <li><strong>Go.Li.bat: self-contained, zero deps</strong> — all 12 diet steps inline, no git/gh/repo needed</li>
@@ -340,7 +417,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.3.1 <span class="date">2026-03-23</span></div>
+            <div class="version-header">r44 <span class="date">2026-03-23</span></div>
             <ul>
                 <li><strong>Fix Go.Fe.bat winget "already installed"</strong> — winget returns non-zero for existing packages; no longer treated as fatal</li>
                 <li><strong>Fix curl|bash stdin</strong> — all read commands use &lt; /dev/tty so piped execution works</li>
@@ -350,7 +427,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.3 <span class="date">2026-03-21</span></div>
+            <div class="version-header">r42 <span class="date">2026-03-21</span></div>
             <ul>
                 <li><strong>boot.sh</strong> — Mac/Linux bootstrap: git, gh, brew, xcode-select, apt/dnf/pacman</li>
                 <li><strong>Mac/Linux parity</strong> — go-runtime.sh, tools.sh with brew/apt/dnf/pacman support</li>
@@ -363,7 +440,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.2 <span class="date">2026-03-21</span></div>
+            <div class="version-header">r30 <span class="date">2026-03-21</span></div>
             <ul>
                 <li><strong>go init</strong> — handles prompts and auto-launch for new projects</li>
                 <li><strong>meep! meep! GO!</strong> — launch sequence with countdown</li>
@@ -372,7 +449,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.1.1 <span class="date">2026-03-21</span></div>
+            <div class="version-header">r24 <span class="date">2026-03-21</span></div>
             <ul>
                 <li><strong>Fix pip install</strong> — use python -m pip for snowflake-cli</li>
                 <li><strong>Fix WinLibs hang</strong> — --force on GCC install to prevent extraction stall</li>
@@ -380,7 +457,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.1 <span class="date">2026-03-21</span></div>
+            <div class="version-header">r18 <span class="date">2026-03-21</span></div>
             <ul>
                 <li><strong>GO mode</strong> — launch Claude Code with full tool permissions and ADD system prompt</li>
                 <li><strong>McAfee removal</strong> — added to bloatware list</li>
@@ -390,7 +467,7 @@
         </div>
 
         <div class="version">
-            <div class="version-header">v1.0 <span class="date">2026-03-20</span> <span class="tag">genesis</span></div>
+            <div class="version-header">r14 <span class="date">2026-03-20</span> <span class="tag">genesis</span></div>
             <ul>
                 <li><strong>Full Windows 11 provisioning</strong> — strip bloatware, dark mode, privacy lockdown, power settings, clean taskbar, fast keyboard</li>
                 <li><strong>Dev toolchain</strong> — Git, GCC, Python, Node, Rust, gh, gcloud, Claude Code, Wrangler, Snowflake CLI, four browsers</li>
@@ -402,5 +479,12 @@
         </div>
 
     </div>
+    <button class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">&#x2191;</button>
+    <script>
+    window.addEventListener('scroll', function() {
+        var btn = document.querySelector('.back-to-top');
+        if (window.scrollY > 400) { btn.classList.add('visible'); } else { btn.classList.remove('visible'); }
+    });
+    </script>
 </body>
 </html>
