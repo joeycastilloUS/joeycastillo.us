@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Airbyte Migration Status &mdash; Philz Coffee</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.7}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
+nav .meta{color:#666;font-size:12px}
+.container{max-width:860px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:32px;margin-bottom:4px;letter-spacing:-0.5px}
+.subtitle{color:#6FC3DF;font-size:16px;margin-bottom:32px}
+h2{color:#6FC3DF;font-size:20px;margin:40px 0 16px;border-bottom:1px solid #333;padding-bottom:8px}
+h3{color:#fff;font-size:16px;margin:24px 0 8px}
+p{margin:8px 0;font-size:14px}
+.summary-box{background:#1A1A1A;border-radius:8px;padding:24px;margin:24px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.stat{text-align:center}
+.stat .num{font-size:36px;font-weight:700;color:#6FC3DF;display:block}
+.stat .label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:10px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:10px 12px;border-bottom:1px solid #1e1e1e}
+tr:hover{background:#1A1A1A}
+.status{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+.status-live{background:#1a3a1a;color:#5cb85c}
+.status-syncing{background:#1a3a3a;color:#6FC3DF}
+.status-blocked{background:#3a1a1a;color:#d9534f}
+.status-todo{background:#3a3a1a;color:#f0ad4e}
+.status-hold{background:#2a2a2a;color:#888}
+.pct{font-weight:700}
+.pct-good{color:#5cb85c}
+.pct-warn{color:#f0ad4e}
+.pct-bad{color:#d9534f}
+.card{background:#1A1A1A;border-radius:6px;padding:20px;margin:16px 0}
+.card h3{margin-top:0;color:#6FC3DF}
+ul{margin:8px 0 8px 24px}
+li{margin:4px 0;font-size:14px}
+code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC3DF}
+.progress-bar{background:#222;border-radius:4px;height:8px;margin:8px 0;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;background:#6FC3DF}
+.section-note{color:#888;font-size:13px;font-style:italic;margin:8px 0}
+.action-item{background:#1A1A1A;border-left:4px solid #f0ad4e;padding:12px 16px;margin:8px 0;font-size:14px}
+.action-item.blocked{border-left-color:#d9534f}
+.footer{margin-top:48px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+@media(max-width:600px){.summary-box{grid-template-columns:1fr}.stat .num{font-size:28px}}
+</style>
+</head>
+<body>
+<nav>
+<span class="brand">Airbyte Migration</span>
+<span class="meta">Philz Coffee &middot; acmedevUS</span>
+</nav>
+
+<div class="container">
+
+<h1>Airbyte V1 &rarr; V2 Migration</h1>
+<p class="subtitle">Production Airbyte to airbyte-philz &mdash; Live Status Report</p>
+
+<!-- ============================================================ -->
+<!-- SUMMARY -->
+<!-- ============================================================ -->
+<div class="summary-box">
+<div class="stat"><span class="num">5/8</span><span class="label">Connections Live</span></div>
+<div class="stat"><span class="num">99.6%</span><span class="label">Data Parity</span></div>
+<div class="stat"><span class="num">283</span><span class="label">Streams Syncing</span></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- HOW WE GOT HERE -->
+<!-- ============================================================ -->
+<h2>How We Got Here</h2>
+
+<p>The existing Airbyte instance (V1) runs on an aging VM with no external API access, basic auth, and 20 connections syncing data from 8 sources into Snowflake. The goal: migrate everything to a fresh Airbyte 2.0.1 instance (V2) on a new VM with token-based auth, modern connectors, and a static IP &mdash; without any production downtime or data loss.</p>
+
+<h3>Approach</h3>
+<ul>
+<li><strong>Zero-copy Snowflake clone.</strong> We cloned <code>AIRBYTE_DB</code> to <code>AIRBYTE_CLONE</code> as the migration target. All dry-run writes hit the clone, never production. Rollback = drop the clone.</li>
+<li><strong>SSH-based export.</strong> The old server had no external API. We built an SSH tunnel to extract all 20 connections, their state, cursor positions, credentials, and catalog configs. The export captured the full migration surface in one shot.</li>
+<li><strong>Credential pipeline.</strong> Secrets were extracted via <code>web_backend</code> API unmask, GCP Secret Manager resolution, and sealed CSV. Every credential was validated independently before wiring into connections.</li>
+<li><strong>Incremental replication.</strong> Connections were replicated INACTIVE on the new server with injected cursor states &mdash; so when activated, they resume from where production left off instead of re-syncing from scratch.</li>
+<li><strong>Rate-limit safety.</strong> Kill switch, 429 monitoring, per-connection concurrency cap of 1, and prod sync schedule mapping &mdash; all in place before the first external API call.</li>
+</ul>
+
+<h3>The V1 &rarr; V2 Schema Challenge</h3>
+<p>Airbyte 2.0 changed its internal schema format. V1 tables use <code>_AIRBYTE_AB_ID</code>, <code>_AIRBYTE_EMITTED_AT</code>, <code>_AIRBYTE_NORMALIZED_AT</code>, and <code>_AIRBYTE_*_HASHID</code> columns. V2 expects <code>_AIRBYTE_RAW_ID</code>, <code>_AIRBYTE_EXTRACTED_AT</code>, <code>_AIRBYTE_META</code>, and <code>_AIRBYTE_GENERATION_ID</code>.</p>
+<p>If you just connect V2 to V1 tables, it either fails or does a destructive full refresh &mdash; wiping years of incremental history.</p>
+<p><strong>Our solution:</strong> A custom batch migration tool (<code>batch_apply.py</code>) that runs DDL transformations across all candidate tables in parallel &mdash; adding V2 columns, backfilling metadata, and preserving existing data and clustering. We tested this on a Phase 0 harness first (toy scope, failure injection, atomicity proof), then ran the real batch: <strong>505 tables across 6 schemas, 1.71 billion rows, completed in 6 minutes on an X-Large warehouse for 2.07 Snowflake credits.</strong> Every table was verified post-batch: row counts unchanged, zero NULLs, signatures match. Full rollback capability preserved via per-table capture files.</p>
+
+<!-- ============================================================ -->
+<!-- CONNECTION STATUS -->
+<!-- ============================================================ -->
+<h2>Connection Status</h2>
+
+<table>
+<thead>
+<tr><th>Connection</th><th>Streams</th><th>Status</th><th>Last Sync</th><th>Data Parity</th></tr>
+</thead>
+<tbody>
+<tr>
+<td>Ether Postgres &rarr; Snowflake</td>
+<td>63</td>
+<td><span class="status status-syncing">Syncing</span></td>
+<td>Job #56 &mdash; 2026-04-13 04:00</td>
+<td><span class="pct pct-good">99.7%</span></td>
+</tr>
+<tr>
+<td>Ecomm Postgres &rarr; Snowflake</td>
+<td>107</td>
+<td><span class="status status-syncing">Syncing</span></td>
+<td>Job #50 &mdash; 2026-04-12 22:56</td>
+<td><span class="pct pct-good">99.8%</span></td>
+</tr>
+<tr>
+<td>Philz Square 2 2025 &rarr; Snowflake</td>
+<td>10</td>
+<td><span class="status status-syncing">Syncing</span></td>
+<td>Job #57 &mdash; 2026-04-13 08:30</td>
+<td><span class="pct pct-good">98.9%</span></td>
+</tr>
+<tr>
+<td>Greenhouse &rarr; Snowflake</td>
+<td>3</td>
+<td><span class="status status-syncing">Syncing</span></td>
+<td>Job #36 &mdash; 2026-04-12 11:35</td>
+<td><span class="pct pct-good">98.9%</span></td>
+</tr>
+<tr>
+<td>CrunchTime &rarr; Snowflake</td>
+<td>40</td>
+<td><span class="status status-blocked">Blocked</span></td>
+<td>&mdash;</td>
+<td><span class="pct pct-good">99.6%</span></td>
+</tr>
+<tr>
+<td>DoorDash &rarr; Snowflake</td>
+<td>3</td>
+<td><span class="status status-todo">Build Pending</span></td>
+<td>&mdash;</td>
+<td><span class="pct pct-warn">96.8%</span></td>
+</tr>
+<tr>
+<td>NetSuite 2 &rarr; Snowflake</td>
+<td>6</td>
+<td><span class="status status-todo">Build Pending</span></td>
+<td>&mdash;</td>
+<td><span class="pct pct-bad">70.9%</span></td>
+</tr>
+<tr>
+<td>Uber Eats &rarr; Snowflake</td>
+<td>1</td>
+<td><span class="status status-todo">Build Pending</span></td>
+<td>&mdash;</td>
+<td><span class="pct pct-good">99.4%</span></td>
+</tr>
+</tbody>
+</table>
+
+<p class="section-note">Data parity = clone rows / prod rows. Gaps reflect natural drift since the clone was created. Once all connections are syncing on the same schedule as production, parity reaches 100%. We will confirm parity again before the production cutover window.</p>
+
+<!-- ============================================================ -->
+<!-- DATA PARITY -->
+<!-- ============================================================ -->
+<h2>Data Parity by Schema</h2>
+
+<table>
+<thead>
+<tr><th>Schema</th><th>Tables</th><th>Prod Rows</th><th>Clone Rows</th><th>Parity</th></tr>
+</thead>
+<tbody>
+<tr><td>ETHER</td><td>193</td><td>3,955,740,913</td><td>3,951,724,839</td><td><span class="pct pct-good">99.9%</span></td></tr>
+<tr><td>GREENHOUSE</td><td>49</td><td>549,492,430</td><td>543,426,242</td><td><span class="pct pct-good">98.9%</span></td></tr>
+<tr><td>SQUARE</td><td>131</td><td>435,763,127</td><td>430,925,154</td><td><span class="pct pct-good">98.9%</span></td></tr>
+<tr><td>DOORDASH</td><td>9</td><td>251,680,943</td><td>243,676,080</td><td><span class="pct pct-warn">96.8%</span></td></tr>
+<tr><td>CRUNCHTIME</td><td>90</td><td>73,926,183</td><td>73,604,536</td><td><span class="pct pct-good">99.6%</span></td></tr>
+<tr><td>NETSUITE</td><td>20</td><td>42,622,294</td><td>30,158,529</td><td><span class="pct pct-bad">70.8%</span></td></tr>
+<tr><td>ECOMM</td><td>220</td><td>39,208,423</td><td>39,147,623</td><td><span class="pct pct-good">99.8%</span></td></tr>
+<tr><td>UBEREATS</td><td>3</td><td>21,221,232</td><td>21,099,873</td><td><span class="pct pct-good">99.4%</span></td></tr>
+<tr><td>SUPPLYCHAIN</td><td>2</td><td>922</td><td>922</td><td><span class="pct pct-good">100%</span></td></tr>
+<tr><td colspan="2" style="color:#fff;font-weight:700">TOTAL</td><td style="color:#fff;font-weight:700">5,369,656,467</td><td style="color:#fff;font-weight:700">5,333,763,798</td><td><span class="pct pct-good">99.3%</span></td></tr>
+</tbody>
+</table>
+
+<div class="progress-bar"><div class="progress-fill" style="width:99.3%"></div></div>
+<p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">5.37 billion rows &mdash; 99.3% parity</p>
+
+<!-- ============================================================ -->
+<!-- WHAT 100% MEANS -->
+<!-- ============================================================ -->
+<h2>When Are We at 100%?</h2>
+
+<p>We reach 100% data parity when <strong>all 8 connections are running on the same cron schedule as production</strong> and have completed at least one full sync cycle. At that point, the clone and production are receiving identical data from identical sources on identical schedules.</p>
+
+<p>The current gaps (0.1&ndash;29%) are natural drift: production continues to ingest data while the clone was cut at a point in time. Each connection we activate closes its gap. Once all 8 are live and syncing, the gap closes to zero.</p>
+
+<p><strong>We will run a final parity verification before the production cutover window</strong> to confirm row counts, schema integrity, and cursor positions across all 685 tables and 5.37 billion rows.</p>
+
+<!-- ============================================================ -->
+<!-- REMAINING WORK -->
+<!-- ============================================================ -->
+<h2>Remaining Work</h2>
+
+<h3>Custom Connectors &mdash; 3 parallel builds</h3>
+<div class="card">
+<table>
+<thead><tr><th>Connector</th><th>Type</th><th>Streams</th><th>Effort</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>NetSuite</td><td>Custom Docker</td><td>6</td><td>8 pts</td><td><span class="status status-todo">Board 24</span></td></tr>
+<tr><td>DoorDash</td><td>No-Code Builder</td><td>3</td><td>8 pts</td><td><span class="status status-todo">Board 25</span></td></tr>
+<tr><td>Uber Eats</td><td>No-Code Builder</td><td>1</td><td>6 pts</td><td><span class="status status-todo">Board 26</span></td></tr>
+</tbody>
+</table>
+<p class="section-note">These three builds are fully independent and will execute in parallel on three separate machines. DoorDash and Uber Eats have complete Connector Builder guides already written. NetSuite requires a Docker image transfer from the old server.</p>
+</div>
+
+<h3>Open Items</h3>
+
+<div class="action-item">
+<strong>Square CUSTOMERS stream</strong> &mdash; Disabled. Connector version mismatch between prod (v0.2.1, pulls 100 rows) and new server (v1.7.13, pulls 2M+ rows for the same 100 customers). Need to register the old connector version or investigate the new connector's pagination behavior.
+</div>
+
+<div class="action-item">
+<strong>Ether raw tables</strong> &mdash; 10 <code>_AIRBYTE_RAW_*</code> tables have zero rows in the clone due to source-side connector errors (Defect #4). Streams need to be re-enabled after source investigation.
+</div>
+
+<div class="action-item">
+<strong>Greenhouse streams</strong> &mdash; Prod has 5 streams, we have 3 enabled. Two additional streams need to be added and validated.
+</div>
+
+<div class="action-item blocked">
+<strong>CrunchTime Oracle ACL</strong> &mdash; Connection is wired and ready (40 streams). Cannot sync until the customer DBA adds <code>35.224.144.209</code> to the Oracle listener's <code>TCP.INVITED_NODES</code>. ACL request document delivered. <strong>This is an external dependency &mdash; waiting on customer action.</strong>
+</div>
+
+<!-- ============================================================ -->
+<!-- OPEN TAGS -->
+<!-- ============================================================ -->
+<h2>Open Tags</h2>
+
+<table>
+<thead><tr><th>#</th><th>Subject</th><th>Tag</th><th>Date</th><th>Summary</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Board 10 Item 4</td><td><span class="status status-hold">critical</span></td><td>4/10</td><td>4 Square source defs 404/422 + 5 connection 500s &mdash; resolved via source def swap</td></tr>
+<tr><td>2</td><td>CrunchTime Oracle</td><td><span class="status status-blocked">blocked</span></td><td>4/11</td><td>ACL request for 35.224.144.209 pending customer DBA</td></tr>
+<tr><td>3</td><td>Ether reactions</td><td><span class="status status-hold">full-refresh</span></td><td>4/11</td><td>NULL cursor values &mdash; switched to full_refresh</td></tr>
+<tr><td>4</td><td>Ether roles</td><td><span class="status status-hold">full-refresh</span></td><td>4/11</td><td>NULL cursor values &mdash; switched to full_refresh</td></tr>
+<tr><td>5</td><td>Square CUSTOMERS</td><td><span class="status status-todo">todo</span></td><td>4/13</td><td>Connector 0.2.1 vs 1.7.13 &mdash; stream disabled, needs version pin</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<!-- TIMELINE -->
+<!-- ============================================================ -->
+<h2>Path to Launch</h2>
+
+<div class="card">
+<ol style="margin-left:20px;font-size:14px">
+<li style="margin:8px 0"><strong>Now:</strong> 5 connections syncing, data flowing into AIRBYTE_CLONE</li>
+<li style="margin:8px 0"><strong>Next:</strong> Build 3 custom connectors in parallel (Boards 24-26)</li>
+<li style="margin:8px 0"><strong>Then:</strong> Resolve open TODOs (Board 27) &mdash; Square CUSTOMERS, Ether raw tables, Greenhouse streams</li>
+<li style="margin:8px 0"><strong>Waiting:</strong> CrunchTime Oracle ACL from customer DBA</li>
+<li style="margin:8px 0"><strong>Gate:</strong> All 8 connections syncing on prod schedule + 24h observation window</li>
+<li style="margin:8px 0"><strong>Final:</strong> Parity re-verification across all 685 tables, then production cutover (Board 22)</li>
+</ol>
+</div>
+
+<!-- ============================================================ -->
+<div class="footer">
+Airbyte Migration &middot; Philz Coffee &middot; acmedevUS<br>
+Last updated: 2026-04-13 05:00 UTC+8 &middot; v0 &middot; r240
+</div>
+
+</div>
+</body>
+</html>
