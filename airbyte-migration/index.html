@@ -251,22 +251,23 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <!-- ============================================================ -->
 <h2>How Cutover Works</h2>
 
-<p>Once all 11 connections are syncing and we confirm 100% data parity, the cutover is a database rename swap in Snowflake:</p>
+<p>Once all connections are verified, the cutover is a database rename swap in Snowflake:</p>
 
 <ol style="margin:16px 0 16px 24px;font-size:14px">
+<li style="margin:8px 0"><strong>Pause</strong> all connections on old Airbyte servers <strong>except</strong> DoorDash and Uber Eats</li>
 <li style="margin:8px 0"><strong>Rename</strong> <code>AIRBYTE_DB</code> &rarr; <code>AIRBYTE_ARCHIVE</code></li>
 <li style="margin:8px 0"><strong>Rename</strong> <code>AIRBYTE_CLONE</code> &rarr; <code>AIRBYTE_DB</code></li>
 <li style="margin:8px 0"><strong>Update</strong> the V2 Airbyte Snowflake destinations to point at <code>AIRBYTE_DB</code></li>
-<li style="margin:8px 0"><strong>Disable</strong> both V1 Airbyte servers (airbyte + airbyte-2)</li>
-<li style="margin:8px 0"><strong>Repoint</strong> old Snowflake connections to <code>AIRBYTE_ARCHIVE</code> as a fallback</li>
+<li style="margin:8px 0"><strong>DoorDash + Uber Eats keep running</strong> on the old server, writing to <code>AIRBYTE_ARCHIVE</code></li>
+<li style="margin:8px 0"><strong>New no-code DoorDash + Uber Eats</strong> connectors write to <code>DOORDASH_V2</code> and <code>UBEREATS_V2</code> schemas in <code>AIRBYTE_DB</code></li>
 </ol>
 
-<p>Every downstream consumer &mdash; dashboards, reports, dbt &mdash; keeps working because the database name stays <code>AIRBYTE_DB</code>. The archive sits there as an instant rollback: rename it back if anything breaks. No data movement, no downtime.</p>
+<p>Every downstream consumer &mdash; dashboards, reports, dbt &mdash; keeps working because the database name stays <code>AIRBYTE_DB</code>. DoorDash and Uber Eats data continues uninterrupted on the old server. New <code>_V2</code> schemas are available when you're ready to port &mdash; no rush, no disruption. The archive sits there as an instant rollback: rename it back if anything breaks.</p>
 
 <!-- ============================================================ -->
 <div class="footer">
 Airbyte Migration &middot; Philz Coffee &middot; acmedevUS<br>
-Last updated: 2026-04-14 &middot; v0 &middot; r245
+Last updated: 2026-04-14 &middot; v0 &middot; r250
 </div>
 
 </div>
