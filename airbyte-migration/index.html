@@ -139,8 +139,8 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <td>DoorDash &rarr; Snowflake</td>
 <td>airbyte-philz (Docker transfer)</td>
 <td>3</td>
-<td><span class="status status-todo">Debugging</span></td>
-<td>Jobs #64-67 &mdash; 0 rows (connector issue)</td>
+<td><span class="status status-blocked">Credentials</span></td>
+<td>API returns 403 &mdash; key permissions revoked (see below)</td>
 </tr>
 <tr>
 <td>NetSuite 2 &rarr; Snowflake</td>
@@ -231,7 +231,7 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <h3>3 Connections Still Needed</h3>
 <ul>
 <li><strong>NetSuite</strong> (6 streams, 42.6M rows) &mdash; Custom Docker image staged in GCS, ready to import. Blocked on GCP IAM permissions (see below).</li>
-<li><strong>DoorDash</strong> (3 streams, 251.7M rows) &mdash; Docker connector transferred, connection wired. Sync completes but returns 0 rows. Need pod-level logs to diagnose. Blocked on GCP IAM permissions (see below).</li>
+<li><strong>DoorDash</strong> (3 streams, 251.7M rows) &mdash; <strong>Root cause found: DoorDash API credentials expired.</strong> See detailed diagnosis below.</li>
 <li><strong>CrunchTime</strong> (40 streams, 73.9M rows) &mdash; Connection fully wired and ready. Cannot sync until the customer DBA adds IP <code>35.224.144.209</code> to the Oracle listener&rsquo;s <code>TCP.INVITED_NODES</code>.</li>
 </ul>
 
@@ -254,12 +254,40 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <!-- ============================================================ -->
 <h2>Needs Your Help</h2>
 
+<div class="action-item blocked">
+<strong>DoorDash API Credentials &mdash; Expired / Revoked</strong><br>
+<span style="color:#d9534f;font-weight:700">Root cause identified 2026-04-15.</span> The DoorDash connector is fully built and wired (Docker image transferred, source created, connection configured, 3 streams). Syncs complete but return <strong>0 rows</strong>. We traced the issue to the DoorDash API itself:<br><br>
+
+<strong>What we tested:</strong>
+<table style="margin:12px 0;font-size:12px">
+<tr><th style="padding:4px 8px">Endpoint</th><th style="padding:4px 8px">Result</th></tr>
+<tr><td style="padding:4px 8px"><code>/developer/v2/store</code></td><td style="padding:4px 8px;color:#d9534f">403 &mdash; Missing permissions required to access API resource</td></tr>
+<tr><td style="padding:4px 8px"><code>/developer/v2/business</code></td><td style="padding:4px 8px;color:#d9534f">403 &mdash; Missing permissions required to access API resource</td></tr>
+<tr><td style="padding:4px 8px"><code>/developer/v2/merchant</code></td><td style="padding:4px 8px;color:#d9534f">403 &mdash; Missing permissions required to access API resource</td></tr>
+<tr><td style="padding:4px 8px"><code>/drive/v2/deliveries</code></td><td style="padding:4px 8px;color:#d9534f">403 &mdash; Missing permissions required to access API resource</td></tr>
+</table>
+
+<strong>What still works:</strong> JWT generation via the <code>airbytehelpers</code> Cloud Run service succeeds. The token is valid (issuer: <code>e72a215f</code>, key: <code>4bdbc98e</code>, audience: <code>doordash</code>). The connector&rsquo;s <code>check</code> and <code>discover</code> both pass. Only data retrieval is denied.<br><br>
+
+<strong>Production reference:</strong> The production DoorDash connection (<code>Philz Doordash &lt;&gt; Snowflake</code>) last synced successfully on <strong>2025-10-01</strong>, pulling from 3 streams:
+<ul style="margin:4px 0 4px 16px;font-size:12px">
+<li><code>order_details</code> &mdash; cursor at ACTIVE_DATE 2025-10-01, PK: ORDER_ITEM_ID</li>
+<li><code>transaction_details</code> &mdash; cursor at TIMESTAMP_LOCAL_DATE 2025-10-01, PK: TRANSACTION_ID</li>
+<li><code>temporary_deactivations</code> &mdash; cursor at CREATED_AT_TIME 2025-09-30, PK: STORE_ID + CREATED_AT_TIME</li>
+</ul>
+The DOORDASH schema in Snowflake has <strong>251.7M rows across 9 tables</strong>. No data has flowed since October 2025.<br><br>
+
+<strong>What we ruled out:</strong> config mismatch (matches prod exactly), connector version (same 0.2.5), V1&rarr;V2 protocol (other custom connectors work), start_date (tried 2021 and 2026), cursor state (tried fresh and injected), store_ids (tried with and without), connection reset (tried twice). Ran 8 sync attempts (jobs 64&ndash;72) &mdash; all identical: ~150s runtime, 0 records, 0 errors.<br><br>
+
+<strong>Action needed:</strong> Someone with access to the <strong>DoorDash Developer Portal</strong> needs to check the API key status for key ID <code>4bdbc98e-5da0-4480-9024-d4d85efa8001</code> and re-authorize data access permissions. Once the key is valid, the existing connector will sync immediately &mdash; no code or config changes needed.
+</div>
+
 <div class="action-item iam">
-<strong>GCP IAM Permissions (blocks 2 connections + all VM maintenance)</strong><br>
+<strong>GCP IAM Permissions (blocks NetSuite + VM maintenance)</strong><br>
 <code>joey.castillo.acmedev@gmail.com</code> currently has only <code>cloudscheduler.admin</code>, <code>firebase.admin</code>, and <code>run.admin</code> on <code>philzcoffee-staging</code>. <strong>Not</strong> an owner or editor.<br><br>
 <strong>Need granted:</strong> <code>roles/compute.instanceAdmin.v1</code> + <code>roles/iam.serviceAccountUser</code><br>
 <strong>Who can grant:</strong> Patrick Wong, Taylor Eke, or Wesley Szeto (project owners)<br>
-<strong>What it unblocks:</strong> NetSuite Docker import, DoorDash pod-level debugging, Cloud Run deploys, and all future VM maintenance via SSH.
+<strong>What it unblocks:</strong> NetSuite Docker import, Cloud Run deploys, and all future VM maintenance via SSH.
 </div>
 
 <div class="action-item blocked">
@@ -299,9 +327,9 @@ The new Airbyte server ships with Square connector v1.7.13, which pulls 2M+ reco
 <div class="card">
 <h3>Critical Path</h3>
 <ol style="margin:8px 0 8px 24px">
-<li><strong>GCP IAM grant</strong> (Wesley) &rarr; unblocks NetSuite + DoorDash</li>
+<li><strong>DoorDash API key re-authorization</strong> (Developer Portal) &rarr; unblocks DoorDash sync</li>
+<li><strong>GCP IAM grant</strong> (Wesley) &rarr; unblocks NetSuite Docker import + VM maintenance</li>
 <li><strong>NetSuite Docker import + sync</strong> (hours, once SSH available)</li>
-<li><strong>DoorDash pod-level debug + fix</strong> (hours&ndash;1 day, once SSH available)</li>
 <li><strong>CrunchTime Oracle ACL</strong> (customer DBA, independent timeline)</li>
 <li><strong>Final parity verification</strong> across all 11 connections</li>
 <li><strong>Cutover window</strong> (rename swap, &lt;30 min downtime)</li>
@@ -311,7 +339,7 @@ The new Airbyte server ships with Square connector v1.7.13, which pulls 2M+ reco
 <!-- ============================================================ -->
 <div class="footer">
 Airbyte Migration &middot; Philz Coffee &middot; acmedevUS<br>
-Last updated: 2026-04-14 21:50 &middot; v0 &middot; r275
+Last updated: 2026-04-15 &middot; v0 &middot; r148
 </div>
 
 </div>
