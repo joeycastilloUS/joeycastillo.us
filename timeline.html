@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline -- Joey Castillo</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon-jc.svg">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* -- TOP NAV -- */
+        .nav {
+            position: fixed; top: 0; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 1.5rem;
+            padding: 0.75rem 1rem; background: #0a0a0a;
+            border-bottom: 1px solid #1a1a1a; z-index: 100; flex-wrap: wrap;
+        }
+        .nav a { color: #666; text-decoration: none; font-size: 0.8rem; transition: color 0.2s; }
+        .nav a:hover { color: #6FC3DF; }
+
+        /* -- LAYOUT -- */
+        .shell {
+            display: flex;
+            min-height: 100vh;
+            padding-top: 3rem;
+        }
+
+        /* -- SIDEBAR -- */
+        .sidebar {
+            width: 2.8rem;
+            background: #0a0a0a;
+            border-right: 1px solid #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 1rem;
+            gap: 0.25rem;
+            position: fixed;
+            top: 3rem;
+            left: 0;
+            bottom: 0;
+            z-index: 50;
+        }
+        .tab {
+            width: 2.2rem;
+            height: 2.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            color: #444;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.6rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            text-decoration: none;
+        }
+        .tab:hover { color: #888; border-color: #222; }
+        .tab.active {
+            color: #6FC3DF;
+            border-color: #6FC3DF;
+            background: rgba(111, 195, 223, 0.05);
+            box-shadow: 0 0 8px rgba(111, 195, 223, 0.1);
+        }
+
+        /* -- MAIN -- */
+        .main {
+            margin-left: 2.8rem;
+            flex: 1;
+            padding: 2rem;
+            max-width: 800px;
+            margin-left: calc(2.8rem + max(0px, (100vw - 800px - 2.8rem) / 2));
+        }
+
+        /* -- HEADER -- */
+        .page-header {
+            margin-bottom: 2rem;
+        }
+        .page-header h1 {
+            font-size: 2rem;
+            font-weight: 200;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+        .page-header .sub {
+            color: #555;
+            font-size: 0.9rem;
+        }
+        .page-header .count {
+            color: #6FC3DF;
+        }
+
+        /* -- FILTERS -- */
+        .filters {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        .filter-btn {
+            background: transparent;
+            border: 1px solid #2a2a2a;
+            color: #666;
+            padding: 0.35rem 0.75rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .filter-btn:hover {
+            border-color: #444;
+            color: #999;
+        }
+        .filter-btn.active {
+            border-color: #6FC3DF;
+            color: #6FC3DF;
+            background: rgba(111, 195, 223, 0.05);
+        }
+
+        /* -- TIMELINE -- */
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: #1a1a1a;
+        }
+
+        /* -- ERA MARKER -- */
+        .era-marker {
+            position: relative;
+            margin: 2rem 0 1rem;
+        }
+        .era-marker::before {
+            content: '';
+            position: absolute;
+            left: -1.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0.75rem;
+            height: 0.75rem;
+            background: #6FC3DF;
+            border-radius: 50%;
+            border: 2px solid #0a0a0a;
+        }
+        .era-marker .era-name {
+            font-size: 0.7rem;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            color: #6FC3DF;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        /* -- TIMELINE CARD -- */
+        .tl-card {
+            position: relative;
+            background: #111;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            transition: border-color 0.2s;
+        }
+        .tl-card::before {
+            content: '';
+            position: absolute;
+            left: -1.6rem;
+            top: 1.2rem;
+            width: 0.5rem;
+            height: 0.5rem;
+            background: #333;
+            border-radius: 50%;
+            border: 1px solid #0a0a0a;
+        }
+        .tl-card:hover {
+            border-color: rgba(111, 195, 223, 0.3);
+        }
+        .tl-card .what {
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 0.4rem;
+        }
+        .tl-card .proud {
+            color: #6FC3DF;
+            font-size: 0.85rem;
+            font-style: italic;
+            margin-bottom: 0.5rem;
+        }
+        .tl-card .meta {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .tl-card .cat {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .tl-card .date {
+            font-size: 0.75rem;
+            color: #444;
+        }
+        .tl-card .people {
+            font-size: 0.8rem;
+            color: #888;
+        }
+        .tl-card .tags {
+            display: flex;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+            margin-top: 0.4rem;
+        }
+        .tl-card .tag {
+            font-size: 0.65rem;
+            color: #555;
+            background: rgba(111, 195, 223, 0.06);
+            padding: 0.1rem 0.4rem;
+            border-radius: 2px;
+        }
+
+        .loading {
+            color: #444;
+            font-size: 0.85rem;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .empty {
+            color: #444;
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 3rem 0;
+        }
+
+        /* -- MOBILE -- */
+        @media (max-width: 600px) {
+            .sidebar { width: 2.2rem; }
+            .tab { width: 1.8rem; height: 1.8rem; font-size: 0.5rem; }
+            .main { margin-left: 2.2rem; padding: 1.5rem 0.75rem; }
+            .page-header h1 { font-size: 1.6rem; }
+            .timeline { padding-left: 1.5rem; }
+            .era-marker::before { left: -1.25rem; width: 0.6rem; height: 0.6rem; }
+            .tl-card::before { left: -1.1rem; width: 0.4rem; height: 0.4rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="https://joeycastillo.us">joeycastillo.us</a>
+        <a href="https://ai-pantheon.ai">ai-pantheon.ai</a>
+        <a href="https://kastil-systems.com">kastil-systems.com</a>
+        <a href="https://acmedev.com">acmedev.com</a>
+        <a href="/meet">meet now</a>
+    </nav>
+
+    <div class="shell">
+        <div class="sidebar">
+            <a class="tab" href="/" title="Identity">H</a>
+            <a class="tab active" href="/timeline.html" title="Timeline">T</a>
+        </div>
+
+        <div class="main">
+            <div class="page-header">
+                <h1>Timeline</h1>
+                <div class="sub"><span class="count" id="visible-count">--</span> stories across <span class="count" id="era-count">--</span> eras</div>
+            </div>
+
+            <div class="filters" id="filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="creation">Creations</button>
+                <button class="filter-btn" data-filter="lesson">Lessons</button>
+                <button class="filter-btn" data-filter="growth">Growth</button>
+                <button class="filter-btn" data-filter="story">Stories</button>
+                <button class="filter-btn" data-filter="recognition">Recognition</button>
+                <button class="filter-btn" data-filter="sport">Athletics</button>
+            </div>
+
+            <div id="timeline" class="timeline">
+                <div class="loading">Loading timeline...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var allStories = [];
+        var activeFilter = 'all';
+
+        // Era sort order (earliest first)
+        var eraOrder = { early: 0, 'high-school': 1, javelin: 2, enterprise: 3, metal: 4 };
+        var eraLabels = {
+            early: 'Early Years',
+            'high-school': 'High School',
+            javelin: 'Javelin Era',
+            enterprise: 'Enterprise',
+            metal: 'Metal'
+        };
+
+        function parseDate(d) {
+            if (!d) return 9999;
+            return parseInt(d.replace('~', ''), 10) || 9999;
+        }
+
+        function renderTimeline(filter) {
+            var container = document.getElementById('timeline');
+            var stories = allStories;
+
+            if (filter !== 'all') {
+                stories = stories.filter(function(s) { return s.category === filter; });
+            }
+
+            document.getElementById('visible-count').textContent = stories.length;
+
+            if (stories.length === 0) {
+                container.innerHTML = '<div class="empty">No stories in this category yet.</div>';
+                return;
+            }
+
+            // Sort by era order, then by date
+            stories.sort(function(a, b) {
+                var eaOrd = eraOrder[a.triple.era] !== undefined ? eraOrder[a.triple.era] : 99;
+                var ebOrd = eraOrder[b.triple.era] !== undefined ? eraOrder[b.triple.era] : 99;
+                if (eaOrd !== ebOrd) return eaOrd - ebOrd;
+                return parseDate(a.date) - parseDate(b.date);
+            });
+
+            // Group by era
+            var html = '';
+            var currentEra = null;
+
+            stories.forEach(function(s) {
+                if (s.triple.era !== currentEra) {
+                    currentEra = s.triple.era;
+                    html += '<div class="era-marker"><span class="era-name">' +
+                        (eraLabels[currentEra] || currentEra) + '</span></div>';
+                }
+
+                html += '<div class="tl-card">';
+                html += '<div class="what">' + escapeHtml(s.triple.what) + '</div>';
+                html += '<div class="proud">' + escapeHtml(s.triple.proud) + '</div>';
+                html += '<div class="meta">';
+                html += '<span class="cat">' + s.category + '</span>';
+                if (s.date) html += '<span class="date">' + s.date + '</span>';
+                if (s.people && s.people.length > 0) {
+                    html += '<span class="people">' + escapeHtml(s.people.join(', ')) + '</span>';
+                }
+                html += '</div>';
+                if (s.tags && s.tags.length > 0) {
+                    html += '<div class="tags">';
+                    s.tags.forEach(function(t) {
+                        html += '<span class="tag">' + escapeHtml(t) + '</span>';
+                    });
+                    html += '</div>';
+                }
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Filter buttons
+        document.getElementById('filters').addEventListener('click', function(e) {
+            if (e.target.classList.contains('filter-btn')) {
+                document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+                e.target.classList.add('active');
+                activeFilter = e.target.getAttribute('data-filter');
+                renderTimeline(activeFilter);
+            }
+        });
+
+        // Load stories
+        fetch('/stories/index.json')
+            .then(function(r) { return r.json(); })
+            .then(function(stories) {
+                allStories = stories;
+                var eras = {};
+                stories.forEach(function(s) { eras[s.triple.era] = true; });
+                document.getElementById('era-count').textContent = Object.keys(eras).length;
+                renderTimeline('all');
+            })
+            .catch(function(err) {
+                document.getElementById('timeline').innerHTML =
+                    '<div class="loading">Timeline unavailable</div>';
+            });
+    </script>
+</body>
+</html>
