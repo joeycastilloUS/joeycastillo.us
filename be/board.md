@@ -13,11 +13,11 @@
 ## Board 2 -- Polish + Convention (13 pts)
 
 ### Ready
-- {sidebar nav with timeline tab, update with, index.html} . 3 . ~u
-- {responsive design pass for identity + timeline, update with, site} . 3 . ~u
-- {ingestion convention documentation, add to, stories/} . 3 . ~a
-- {story count live stats on identity page, update with, index.html} . 3 . ~u
 
 ### In Progress
 
 ### Done
+- {sidebar nav with timeline tab, update with, index.html} . 3 . ~u
+- {responsive design pass for identity + timeline, update with, site} . 3 . ~u
+- {ingestion convention documentation, add to, stories/} . 3 . ~a
+- {story count live stats on identity page, update with, index.html} . 3 . ~u
