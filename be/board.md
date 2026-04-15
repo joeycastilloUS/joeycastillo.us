@@ -1,0 +1,23 @@
+## Board 1 -- Foundation (18 pts)
+
+### Ready
+- {story schema, add to, stories/} . 3 . ~a
+- {seed stories from known bio + quotes, add to, stories/} . 5 . ~a
+- {identity page rebuild with declaration + featured cards, update with, index.html} . 5 . ~u
+- {timeline page with chronological view + category filters, add to, site root} . 5 . ~a
+
+### In Progress
+
+### Done
+
+## Board 2 -- Polish + Convention (13 pts)
+
+### Ready
+- {sidebar nav with timeline tab, update with, index.html} . 3 . ~u
+- {responsive design pass for identity + timeline, update with, site} . 3 . ~u
+- {ingestion convention documentation, add to, stories/} . 3 . ~a
+- {story count live stats on identity page, update with, index.html} . 3 . ~u
+
+### In Progress
+
+### Done
