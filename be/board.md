@@ -41,7 +41,7 @@
 ### In Progress
 
 ### Done
-- {enterprise stories, delete from, stories/} . 3 . ~d (eee68ba)
-- {creation + recognition categories, delete from, schema + pages} . 5 . ~d (eee68ba)
-- {homepage enterprise stats, delete from, index.html} . 3 . ~d (eee68ba)
-- {category filters, update with, timeline.html + index.html} . 5 . ~u (eee68ba)
+- {enterprise stories, delete from, stories/} . 3 . ~d (79fc28e)
+- {creation + recognition categories, delete from, schema + pages} . 5 . ~d (79fc28e)
+- {homepage enterprise stats, delete from, index.html} . 3 . ~d (79fc28e)
+- {category filters, update with, timeline.html + index.html} . 5 . ~u (79fc28e)
