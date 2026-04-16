@@ -33,3 +33,15 @@
 - {CBS Northstar products, add to, stories/} . 5 . ~a
 - {tight dashboard homepage, update with, index.html} . 5 . ~u
 - {dynamic eras + URL filter, update with, timeline.html} . 5 . ~u
+
+## Board 4 -- Category Cleanup (16 pts)
+
+### Ready
+
+### In Progress
+
+### Done
+- {enterprise stories, delete from, stories/} . 3 . ~d (eee68ba)
+- {creation + recognition categories, delete from, schema + pages} . 5 . ~d (eee68ba)
+- {homepage enterprise stats, delete from, index.html} . 3 . ~d (eee68ba)
+- {category filters, update with, timeline.html + index.html} . 5 . ~u (eee68ba)

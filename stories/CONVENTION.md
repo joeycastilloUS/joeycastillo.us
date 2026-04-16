@@ -32,7 +32,7 @@ How stories get from Joey's head into the archive.
     "proud": "Why this matters -- the pride, the significance",
     "era": "Named era of life"
   },
-  "category": "sport|creation|lesson|recognition|story|growth",
+  "category": "lesson|story|growth|sport",
   "date": "YYYY, ~YYYY, YYYY-MM-DD, or null",
   "people": ["Name"],
   "domain": "code|leadership|life|business|hardware|athletics|people",
@@ -45,12 +45,10 @@ How stories get from Joey's head into the archive.
 
 | Category | What it captures |
 |----------|-----------------|
-| sport | Seasons, records, stats, athletic moments |
-| creation | Things built -- software, systems, products |
 | lesson | Wisdom earned through pain or insight |
-| recognition | When others saw your value |
 | story | Full narratives -- the scene, the context |
 | growth | Level-ups -- before/after transformations |
+| sport | Seasons, records, stats, athletic moments |
 
 ## Featured vs Timeline
 
