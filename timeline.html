@@ -312,15 +312,13 @@
         var allStories = [];
         var activeFilter = 'all';
 
-        // Era sort order (earliest first)
-        var eraOrder = { early: 0, 'high-school': 1, javelin: 2, enterprise: 3, metal: 4 };
-        var eraLabels = {
-            early: 'Early Years',
-            'high-school': 'High School',
-            javelin: 'Javelin Era',
-            enterprise: 'Enterprise',
-            metal: 'Metal'
-        };
+        // Read ?filter= from URL
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('filter')) activeFilter = params.get('filter');
+
+        // Eras discovered dynamically from stories -- sorted by earliest date seen
+        var eraOrder = {};
+        var eraLabels = {};
 
         function parseDate(d) {
             if (!d) return 9999;
@@ -342,10 +340,10 @@
                 return;
             }
 
-            // Sort by era order, then by date
+            // Sort by era order (dynamically discovered), then by date
             stories.sort(function(a, b) {
-                var eaOrd = eraOrder[a.triple.era] !== undefined ? eraOrder[a.triple.era] : 99;
-                var ebOrd = eraOrder[b.triple.era] !== undefined ? eraOrder[b.triple.era] : 99;
+                var eaOrd = eraOrder[a.triple.era] !== undefined ? eraOrder[a.triple.era] : 999;
+                var ebOrd = eraOrder[b.triple.era] !== undefined ? eraOrder[b.triple.era] : 999;
                 if (eaOrd !== ebOrd) return eaOrd - ebOrd;
                 return parseDate(a.date) - parseDate(b.date);
             });
@@ -405,10 +403,37 @@
             .then(function(r) { return r.json(); })
             .then(function(stories) {
                 allStories = stories;
-                var eras = {};
-                stories.forEach(function(s) { eras[s.triple.era] = true; });
-                document.getElementById('era-count').textContent = Object.keys(eras).length;
-                renderTimeline('all');
+
+                // Discover eras dynamically -- order by earliest date seen
+                var eraMinDate = {};
+                stories.forEach(function(s) {
+                    var era = s.triple.era;
+                    var d = parseDate(s.date);
+                    if (eraMinDate[era] === undefined || d < eraMinDate[era]) {
+                        eraMinDate[era] = d;
+                    }
+                });
+                var sortedEras = Object.keys(eraMinDate).sort(function(a, b) {
+                    return eraMinDate[a] - eraMinDate[b];
+                });
+                sortedEras.forEach(function(era, i) {
+                    eraOrder[era] = i;
+                    // Title case the era name for display
+                    eraLabels[era] = era.replace(/-/g, ' ').replace(/\b\w/g, function(c) {
+                        return c.toUpperCase();
+                    });
+                });
+
+                document.getElementById('era-count').textContent = sortedEras.length;
+
+                // Apply initial filter from URL
+                if (activeFilter !== 'all') {
+                    document.querySelectorAll('.filter-btn').forEach(function(b) {
+                        b.classList.remove('active');
+                        if (b.getAttribute('data-filter') === activeFilter) b.classList.add('active');
+                    });
+                }
+                renderTimeline(activeFilter);
             })
             .catch(function(err) {
                 document.getElementById('timeline').innerHTML =

@@ -21,3 +21,15 @@
 - {responsive design pass for identity + timeline, update with, site} . 3 . ~u
 - {ingestion convention documentation, add to, stories/} . 3 . ~a
 - {story count live stats on identity page, update with, index.html} . 3 . ~u
+
+## Board 3 -- Homepage Redesign (18 pts)
+
+### Ready
+
+### In Progress
+
+### Done
+- {placeholder stories, delete from, stories/} . 3 . ~d
+- {CBS Northstar products, add to, stories/} . 5 . ~a
+- {tight dashboard homepage, update with, index.html} . 5 . ~u
+- {dynamic eras + URL filter, update with, timeline.html} . 5 . ~u
