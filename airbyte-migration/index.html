@@ -141,8 +141,8 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <td>DoorDash &rarr; Snowflake</td>
 <td>airbyte-philz (Docker transfer)</td>
 <td>3</td>
-<td><span class="status status-blocked">Credentials</span></td>
-<td>API returns 403 &mdash; key permissions revoked (see below)</td>
+<td><span class="status status-todo">IP Whitelist</span></td>
+<td>Prod healthy (daily syncs). New server 403 &mdash; needs IP whitelist</td>
 </tr>
 <tr>
 <td>NetSuite 2 &rarr; Snowflake</td>
@@ -232,8 +232,8 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 
 <h3>3 Connections Still Needed</h3>
 <ul>
-<li><strong>NetSuite</strong> (6 streams, 42.6M rows) &mdash; Custom Docker image staged in GCS, ready to import. Blocked on GCP IAM permissions (see below).</li>
-<li><strong>DoorDash</strong> (3 streams, 251.7M rows) &mdash; <strong>Root cause found: DoorDash API credentials expired.</strong> See detailed diagnosis below.</li>
+<li><strong>NetSuite</strong> (6 streams, 42.6M rows) &mdash; <strong>Prod sync healthy but custom_wholesale crashes intermittently, causing 3x retry storm.</strong> <a href="/airbyte-migration/netsuite.html">Full investigation &rarr;</a></li>
+<li><strong>DoorDash</strong> (3 streams, 251.7M rows) &mdash; <strong>Prod is healthy</strong> (3.4M orders, fresh daily). New server gets 403 &mdash; likely IP whitelist issue, not credentials. See below.</li>
 <li><strong>CrunchTime</strong> (40 streams, 73.9M rows) &mdash; Connection fully wired and ready. Cannot sync until the customer DBA adds IP <code>35.224.144.209</code> to the Oracle listener&rsquo;s <code>TCP.INVITED_NODES</code>.</li>
 </ul>
 
@@ -256,32 +256,17 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <!-- ============================================================ -->
 <h2>Needs Your Help</h2>
 
-<div class="action-item blocked">
-<strong>DoorDash API Credentials &mdash; Expired / Revoked</strong><br>
-<span style="color:#d9534f;font-weight:700">Root cause identified 2026-04-15.</span> The DoorDash connector is fully built and wired (Docker image transferred, source created, connection configured, 3 streams). Syncs complete but return <strong>0 rows</strong>. We traced the issue to the DoorDash API itself:<br><br>
+<div class="action-item">
+<strong>DoorDash &mdash; Prod Healthy, New Server Needs IP Whitelist</strong><br>
+<span style="color:#5cb85c;font-weight:700">Updated 2026-04-17.</span> Previous diagnosis was wrong about credentials &mdash; <strong>production DoorDash works fine.</strong><br><br>
 
-<strong>What we tested:</strong>
-<table style="margin:12px 0;font-size:12px">
-<tr><th style="padding:4px 8px">Endpoint</th><th style="padding:4px 8px">Result</th></tr>
-<tr><td style="padding:4px 8px"><code>/developer/v2/store</code></td><td style="padding:4px 8px;color:#d9534f">403 &mdash; Missing permissions required to access API resource</td></tr>
-<tr><td style="padding:4px 8px"><code>/developer/v2/business</code></td><td style="padding:4px 8px;color:#d9534f">403 &mdash; Missing permissions required to access API resource</td></tr>
-<tr><td style="padding:4px 8px"><code>/developer/v2/merchant</code></td><td style="padding:4px 8px;color:#d9534f">403 &mdash; Missing permissions required to access API resource</td></tr>
-<tr><td style="padding:4px 8px"><code>/drive/v2/deliveries</code></td><td style="padding:4px 8px;color:#d9534f">403 &mdash; Missing permissions required to access API resource</td></tr>
-</table>
+<strong>Production (old server):</strong> Syncs daily at 3:30 AM PT. 3,430,010 ORDER_DETAILS rows, 1,724,819 TRANSACTION_DETAILS, data fresh as of April 16. 80 Philz stores active. Zero gaps in daily cadence.<br><br>
 
-<strong>What still works:</strong> JWT generation via the <code>airbytehelpers</code> Cloud Run service succeeds. The token is valid (issuer: <code>e72a215f</code>, key: <code>4bdbc98e</code>, audience: <code>doordash</code>). The connector&rsquo;s <code>check</code> and <code>discover</code> both pass. Only data retrieval is denied.<br><br>
+<strong>New server (airbyte-philz):</strong> Gets 403 on all DoorDash API endpoints. All 5 test jobs returned 0 records. Same connector version (0.2.5), same Cloud Run JWT helper, same config.<br><br>
 
-<strong>Production reference:</strong> The production DoorDash connection (<code>Philz Doordash &lt;&gt; Snowflake</code>) last synced successfully on <strong>2025-10-01</strong>, pulling from 3 streams:
-<ul style="margin:4px 0 4px 16px;font-size:12px">
-<li><code>order_details</code> &mdash; cursor at ACTIVE_DATE 2025-10-01, PK: ORDER_ITEM_ID</li>
-<li><code>transaction_details</code> &mdash; cursor at TIMESTAMP_LOCAL_DATE 2025-10-01, PK: TRANSACTION_ID</li>
-<li><code>temporary_deactivations</code> &mdash; cursor at CREATED_AT_TIME 2025-09-30, PK: STORE_ID + CREATED_AT_TIME</li>
-</ul>
-The DOORDASH schema in Snowflake has <strong>251.7M rows across 9 tables</strong>. No data has flowed since October 2025.<br><br>
+<strong>Root cause:</strong> DoorDash likely uses <strong>IP-based access control</strong>. The old server&rsquo;s IP is whitelisted; the new server&rsquo;s IP (<code>35.224.144.209</code>) is not. This is an IP whitelist issue, not a credential issue.<br><br>
 
-<strong>What we ruled out:</strong> config mismatch (matches prod exactly), connector version (same 0.2.5), V1&rarr;V2 protocol (other custom connectors work), start_date (tried 2021 and 2026), cursor state (tried fresh and injected), store_ids (tried with and without), connection reset (tried twice). Ran 8 sync attempts (jobs 64&ndash;72) &mdash; all identical: ~150s runtime, 0 records, 0 errors.<br><br>
-
-<strong>Action needed:</strong> Someone with access to the <strong>DoorDash Developer Portal</strong> needs to check the API key status for key ID <code>4bdbc98e-5da0-4480-9024-d4d85efa8001</code> and re-authorize data access permissions. Once the key is valid, the existing connector will sync immediately &mdash; no code or config changes needed.
+<strong>Action needed:</strong> Ask DoorDash if they have IP restrictions on the API. If so, add <code>35.224.144.209</code> to the whitelist. Once whitelisted, also fix <code>ORDER_ITEM_ID</code> column in AIRBYTE_CLONE destination schema.
 </div>
 
 <div class="action-item iam">

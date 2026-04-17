@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetSuite Prod Investigation &mdash; Philz Coffee</title>
+<link rel="stylesheet" href="/airbyte-migration/gate.css">
+<script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.7}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
+nav .meta{color:#666;font-size:12px}
+.container{max-width:860px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:32px;margin-bottom:4px;letter-spacing:-0.5px}
+.subtitle{color:#6FC3DF;font-size:16px;margin-bottom:32px}
+h2{color:#6FC3DF;font-size:20px;margin:40px 0 16px;border-bottom:1px solid #333;padding-bottom:8px}
+h3{color:#fff;font-size:16px;margin:24px 0 8px}
+p{margin:8px 0;font-size:14px}
+code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC3DF}
+pre{background:#1A1A1A;border-radius:8px;padding:16px;overflow-x:auto;margin:12px 0;font-size:13px;color:#ccc}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:10px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:10px 12px;border-bottom:1px solid #1e1e1e}
+tr:hover{background:#1A1A1A}
+.card{background:#1A1A1A;border-radius:6px;padding:20px;margin:16px 0}
+.card h3{margin-top:0;color:#6FC3DF}
+.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #222}
+.stat:last-child{border-bottom:none}
+.stat-label{color:#888;font-size:13px}
+.stat-value{color:#ccc;font-weight:600;font-size:13px}
+.red{color:#d9534f}
+.yellow{color:#f0ad4e}
+.green{color:#5cb85c}
+.verdict{background:#1A1A1A;border-left:4px solid #f0ad4e;padding:20px 24px;margin:24px 0;border-radius:0 8px 8px 0;font-size:15px;line-height:1.6}
+.highlight{background:#2a1a1a;border:1px solid #d9534f;border-radius:8px;padding:20px;margin:16px 0}
+.action-item{background:#1A1A1A;border-left:4px solid #f0ad4e;padding:12px 16px;margin:8px 0;font-size:14px}
+.action-item.critical{border-left-color:#d9534f}
+.action-item.low{border-left-color:#555}
+.back{display:inline-block;color:#6FC3DF;font-size:13px;margin-bottom:16px;text-decoration:none}
+.back:hover{text-decoration:underline}
+.footer{margin-top:48px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+@media(max-width:600px){h1{font-size:24px}}
+</style>
+</head>
+<body>
+<nav>
+<span class="brand">Airbyte Migration</span>
+<span class="meta">Philz Coffee &middot; acmedevUS</span>
+</nav>
+
+<div class="container">
+
+<a class="back" href="/airbyte-migration/">&larr; Back to Migration Status</a>
+
+<h1>NetSuite Prod Investigation</h1>
+<p class="subtitle">SSH into philzcoffee Airbyte VM &mdash; April 17, 2026</p>
+
+<div class="verdict">
+<strong class="yellow">VERDICT: NetSuite hasn't slowed down. It's failing and retrying.</strong><br>
+Each sync attempt still takes ~270 min (same as March). But since April 8, <code>custom_wholesale</code> intermittently crashes with a <code>NoneType</code> error, forcing 3 attempts per job. Three attempts &times; 270 min = 810 min wall clock. That's the "slowdown."
+</div>
+
+<!-- ============================================================ -->
+<h2>Connection Profile</h2>
+
+<div class="card">
+<div class="stat"><span class="stat-label">Connection</span><span class="stat-value">Philz NetSuite 2 &lt;&gt; Snowflake</span></div>
+<div class="stat"><span class="stat-label">Connection ID</span><span class="stat-value"><code>459d6be1-f0d6-47ec-ac8d-ee0361c2fc0a</code></span></div>
+<div class="stat"><span class="stat-label">Server</span><span class="stat-value">airbyte VM (philzcoffee project, us-central1-a)</span></div>
+<div class="stat"><span class="stat-label">Status</span><span class="stat-value green">active</span></div>
+<div class="stat"><span class="stat-label">Schedule</span><span class="stat-value">Daily at midnight Pacific</span></div>
+<div class="stat"><span class="stat-label">Source Image</span><span class="stat-value"><code>source-netsuite:0.4.1</code></span></div>
+<div class="stat"><span class="stat-label">Destination</span><span class="stat-value">Snowflake (NETSUITE schema)</span></div>
+<div class="stat"><span class="stat-label">Total Records</span><span class="stat-value">1,735,230 (as of Apr 17)</span></div>
+</div>
+
+<h3>Stream Configuration</h3>
+<div class="card">
+<table>
+<tr><th>Stream</th><th>Records</th><th>Sync Mode</th><th>Dest Mode</th><th>Cursor</th></tr>
+<tr><td>custom_sales_order</td><td>997,959</td><td class="red">full_refresh</td><td class="red">overwrite</td><td>lastmodifieddate</td></tr>
+<tr><td>custom_fulfillmentitem</td><td>625,149</td><td class="green">incremental</td><td class="green">append_dedup</td><td>lastmodifieddate</td></tr>
+<tr><td>custom_production</td><td>59,607</td><td class="red">full_refresh</td><td class="red">overwrite</td><td>lastmodifieddate</td></tr>
+<tr><td>custom_wholesale</td><td>44,192</td><td class="red">full_refresh</td><td class="red">overwrite</td><td>&mdash;</td></tr>
+<tr><td>custom_item</td><td>7,625</td><td class="red">full_refresh</td><td class="red">overwrite</td><td>&mdash;</td></tr>
+<tr><td>custom_inventory</td><td>698</td><td class="red">full_refresh</td><td>append</td><td>&mdash;</td></tr>
+</table>
+<p style="margin-top:12px"><strong class="red">5 of 6 streams are full_refresh</strong> &mdash; every sync re-reads ALL 1.7M records from NetSuite every night.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>The "Slowdown" Is Actually Retries</h2>
+
+<div class="card">
+<table>
+<tr><th>Job</th><th>Date</th><th>Attempts</th><th>Wall Clock</th><th>Detail</th></tr>
+<tr><td>34478</td><td>Apr 17</td><td class="green">1</td><td class="green">251 min</td><td>succeeded(251m)</td></tr>
+<tr><td>34445</td><td>Apr 16</td><td class="red">3</td><td class="red">776 min</td><td>failed(255m), failed(279m), succeeded(240m)</td></tr>
+<tr><td>34331</td><td>Apr 12</td><td class="red">3</td><td class="red">794 min</td><td>failed(275m), failed(263m), succeeded(254m)</td></tr>
+<tr><td>34267</td><td>Apr 10</td><td class="red">3</td><td class="red">838 min</td><td>failed(280m), failed(281m), succeeded(276m)</td></tr>
+<tr><td>34203</td><td>Apr 8</td><td class="red">3</td><td class="red">826 min</td><td>failed(273m), failed(261m), succeeded(292m)</td></tr>
+<tr><td>33977</td><td>Apr 1</td><td class="green">1</td><td class="green">305 min</td><td>succeeded(305m)</td></tr>
+<tr><td>33912</td><td>Mar 30</td><td class="green">1</td><td class="green">272 min</td><td>succeeded(272m)</td></tr>
+<tr><td>33849</td><td>Mar 28</td><td class="green">1</td><td class="green">273 min</td><td>succeeded(273m)</td></tr>
+<tr><td>33688</td><td>Mar 23</td><td class="green">1</td><td class="green">259 min</td><td>succeeded(259m)</td></tr>
+<tr><td>33657</td><td>Mar 22</td><td class="green">1</td><td class="green">256 min</td><td>succeeded(256m)</td></tr>
+</table>
+</div>
+
+<div class="highlight">
+<strong class="red">Pattern:</strong> Each attempt takes 255&ndash;305 min regardless of date. The per-attempt speed hasn't changed. But from April 8 onward, attempts 0 and 1 crash, forcing 3 attempts per job. 3 &times; 270 = 810 min (13.5 hours) &mdash; that's what it looks like when you see the jobs "slowing down."
+</div>
+
+<!-- ============================================================ -->
+<h2>Root Cause: custom_wholesale Crashes</h2>
+
+<div class="card">
+<p>Every failed attempt dies on the same stream with the same error:</p>
+<pre>custom_wholesale: AirbyteTracedException("'NoneType' object is not iterable")</pre>
+<p>The <code>source-netsuite:0.4.1</code> connector hits a null value in the NetSuite SuiteQL API response that it doesn't handle. This crashes the source, which crashes the entire sync attempt.</p>
+<p style="margin-top:12px"><strong>The error is intermittent</strong> &mdash; attempt 2 (the final retry) usually succeeds. This suggests a specific record or page that sometimes returns null depending on NetSuite's internal state, query timing, or concurrent access.</p>
+</div>
+
+<h3>custom_wholesale Is Also the Per-Record Bottleneck</h3>
+<div class="card">
+<table>
+<tr><th>Stream</th><th>Records</th><th>Time</th><th>Rate</th></tr>
+<tr><td>custom_sales_order</td><td>997K</td><td class="green">44 min</td><td class="green">22,680 rec/min</td></tr>
+<tr><td>custom_fulfillmentitem</td><td>625K</td><td>73 min</td><td>8,560 rec/min</td></tr>
+<tr><td>custom_production</td><td>59K</td><td class="green">1.5 min</td><td class="green">39,300 rec/min</td></tr>
+<tr><td class="red">custom_wholesale</td><td class="red">44K</td><td class="red">127&ndash;146 min</td><td class="red">300 rec/min</td></tr>
+<tr><td>custom_item</td><td>7.6K</td><td class="green">4 sec</td><td class="green">114,000 rec/min</td></tr>
+<tr><td>custom_inventory</td><td>698</td><td class="green">1 sec</td><td class="green">42,000 rec/min</td></tr>
+</table>
+<p style="margin-top:12px"><strong class="red">custom_wholesale reads at 300 rec/min</strong> &mdash; 75x slower than custom_sales_order. It takes 127&ndash;146 minutes for just 44K records, consuming nearly half the total sync time. The underlying SuiteQL query is likely complex (multi-table joins or a saved search) that NetSuite executes slowly.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Secondary: NetSuite 500 + 401 Errors</h2>
+
+<div class="card">
+<p>In some failed attempts, the logs show a different failure pattern on wholesale:</p>
+<pre>Backing off _send(...) for 5.0s
+  Request URL: suitetalk.api.netsuite.com/services/rest/query/v1/suiteql
+  Response Code: 500
+
+Caught retryable error... Response Code: 500
+
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized
+  for url: suiteql?limit=1000&offset=38000</pre>
+<p>NetSuite returns a <strong>500 Internal Server Error</strong> on the SuiteQL endpoint, the connector backs off and retries, but then gets a <strong>401 Unauthorized</strong> &mdash; the OAuth token likely expired during the 2+ hour wholesale read. The connector doesn't re-authenticate mid-stream.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>VM Health &mdash; Not the Issue</h2>
+
+<div class="card">
+<div class="stat"><span class="stat-label">Instance Type</span><span class="stat-value">n2-standard-16 (16 vCPU, 64 GB RAM)</span></div>
+<div class="stat"><span class="stat-label">Uptime</span><span class="stat-value">210 days</span></div>
+<div class="stat"><span class="stat-label">Memory</span><span class="stat-value green">28 GB used / 62 GB total (45%)</span></div>
+<div class="stat"><span class="stat-label">Disk</span><span class="stat-value green">61 GB used / 252 GB (26%)</span></div>
+<div class="stat"><span class="stat-label">Load Average</span><span class="stat-value green">0.12, 0.33, 0.42</span></div>
+<div class="stat"><span class="stat-label">Docker Containers</span><span class="stat-value green">8 healthy, all up 3&ndash;7 months</span></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Action Items</h2>
+
+<div class="action-item critical"><strong>1. Fix custom_wholesale NoneType crash.</strong> The <code>source-netsuite:0.4.1</code> connector doesn't handle null values in wholesale SuiteQL responses. Options: (a) patch the connector to handle None gracefully, (b) identify the specific wholesale record with null data and fix it in NetSuite, (c) add null-safe parsing to the SuiteQL query.</div>
+
+<div class="action-item critical"><strong>2. Switch full_refresh streams to incremental.</strong> <code>custom_sales_order</code> and <code>custom_production</code> already have <code>lastmodifieddate</code> cursor fields configured but are set to full_refresh. Switch to incremental/append_dedup. This alone would cut sync time from 270 min to ~130 min.</div>
+
+<div class="action-item"><strong>3. Investigate why custom_wholesale is 75x slower.</strong> 44K records at 300 rec/min suggests the underlying SuiteQL query is doing expensive joins or scanning a massive table. Check the actual SuiteQL query in the connector config.</div>
+
+<div class="action-item"><strong>4. Investigate OAuth token expiry.</strong> The 500 &rarr; 401 pattern suggests the OAuth token expires while wholesale grinds through its 2+ hour read. The connector should re-authenticate, but it doesn't.</div>
+
+<div class="action-item low"><strong>5. Consider separating custom_wholesale.</strong> If wholesale stays slow and intermittently fails, isolating it into its own connection means the other 5 streams sync independently.</div>
+
+<!-- ============================================================ -->
+<h2>Summary</h2>
+
+<div class="card">
+<table>
+<tr><th>Question</th><th>Answer</th></tr>
+<tr><td>Is NetSuite actually slower?</td><td class="green"><strong>No.</strong> Each sync attempt is the same speed as March (~270 min).</td></tr>
+<tr><td>Why does it take 13+ hours?</td><td class="red"><code>custom_wholesale</code> crashes, forcing 3 attempts &times; 270 min.</td></tr>
+<tr><td>What crashes it?</td><td class="red"><code>'NoneType' object is not iterable</code> in source-netsuite:0.4.1</td></tr>
+<tr><td>Why is wholesale slow?</td><td class="yellow">44K records at 300 rec/min (75x slower). SuiteQL query likely expensive.</td></tr>
+<tr><td>Is the VM stressed?</td><td class="green">No. 45% memory, 26% disk, load 0.12. Plenty of headroom.</td></tr>
+<tr><td>Quick win?</td><td class="green">Switch sales_order + production to incremental. Saves 45 min/attempt.</td></tr>
+</table>
+</div>
+
+<div class="footer">
+Investigation conducted via SSH into philzcoffee Airbyte prod VM &middot; April 17, 2026 &middot; acmedevUS
+</div>
+
+</div>
+</body>
+</html>
