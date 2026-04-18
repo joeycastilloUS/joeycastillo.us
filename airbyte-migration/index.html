@@ -142,14 +142,14 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <td>airbyte-philz (Docker transfer)</td>
 <td>3</td>
 <td><span class="status status-todo">IP Whitelist</span></td>
-<td>Prod healthy (daily syncs). New server 403 &mdash; needs IP whitelist</td>
+<td>Prod healthy (1M rec/day). New server wired &mdash; needs IP whitelist</td>
 </tr>
 <tr>
 <td>NetSuite 2 &rarr; Snowflake</td>
-<td>airbyte-philz (Docker transferred)</td>
-<td>6</td>
-<td><span class="status status-syncing">Image Ready</span></td>
-<td>Docker image loaded &mdash; needs source + connection wiring. <a href="/airbyte-migration/netsuite.html">Prod investigation &rarr;</a></td>
+<td>airbyte-philz</td>
+<td>5 (wholesale off)</td>
+<td><span class="status status-syncing">Syncing</span></td>
+<td>First sync running (1.1M+ records). custom_wholesale disabled. <a href="/airbyte-migration/netsuite.html">Prod investigation &rarr;</a></td>
 </tr>
 <tr>
 <td>Uber Eats &rarr; Snowflake</td>
@@ -233,7 +233,7 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <h3>3 Connections Still Needed</h3>
 <ul>
 <li><strong>NetSuite</strong> (6 streams, 42.6M rows) &mdash; <strong>Docker image transferred to airbyte-philz.</strong> Next: create source definition, wire connection, inject cursor state. Prod has a <a href="/airbyte-migration/netsuite.html">custom_wholesale retry storm</a> that needs fixing.</li>
-<li><strong>DoorDash</strong> (3 streams, 251.7M rows) &mdash; <strong>Prod is healthy</strong> (3.4M orders, fresh daily). New server gets 403 &mdash; likely IP whitelist issue, not credentials. See below.</li>
+<li><strong>DoorDash</strong> (3 streams, 251.7M rows) &mdash; <strong>Connection wired, streams configured.</strong> Blocked on IP whitelist for <code>35.224.144.209</code>. Prod healthy (1M rec/day).</li>
 <li><strong>CrunchTime</strong> (40 streams, 73.9M rows) &mdash; Connection fully wired and ready. Cannot sync until the customer DBA adds IP <code>35.224.144.209</code> to the Oracle listener&rsquo;s <code>TCP.INVITED_NODES</code>.</li>
 </ul>
 
@@ -257,16 +257,17 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <h2>Needs Your Help</h2>
 
 <div class="action-item">
-<strong>DoorDash &mdash; Prod Healthy, New Server Needs IP Whitelist</strong><br>
-<span style="color:#5cb85c;font-weight:700">Updated 2026-04-17.</span> Previous diagnosis was wrong about credentials &mdash; <strong>production DoorDash works fine.</strong><br><br>
+<strong>DoorDash &mdash; Connection Wired, Needs IP Whitelist</strong><br>
+<span style="color:#5cb85c;font-weight:700">Updated 2026-04-18.</span> Connection fully wired and ready on new server. Waiting on IP whitelist only.<br><br>
 
-<strong>Production (old server):</strong> Syncs daily at 3:30 AM PT. 3,430,010 ORDER_DETAILS rows, 1,724,819 TRANSACTION_DETAILS, data fresh as of April 16. 80 Philz stores active. Zero gaps in daily cadence.<br><br>
+<strong>Production (old server @ <code>34.171.185.39</code>):</strong> Syncs daily at 3:30 AM PT. ~1M records/day (692K order_details, 332K transaction_details, 1K temp_deactivations). 3.4M orders total, fresh through April 17. Confirmed via Snowflake &mdash; <code>AIRBYTE_DB.DOORDASH</code> tables have data through yesterday. Wesley was right.<br><br>
 
-<strong>New server (airbyte-philz):</strong> Gets 403 on all DoorDash API endpoints. All 5 test jobs returned 0 records. Same connector version (0.2.5), same Cloud Run JWT helper, same config.<br><br>
+<strong>New server (<code>35.224.144.209</code>):</strong> Connection <code>badf7381</code> wired to <code>AIRBYTE_CLONE.DOORDASH</code>. Custom connector <code>source-doordash:0.2.5</code> loaded. All 3 streams configured matching prod exactly:<br>
+&bull; <code>order_details</code> &mdash; incremental/append_dedup, cursor=ACTIVE_DATE, pk=ORDER_ITEM_ID<br>
+&bull; <code>transaction_details</code> &mdash; incremental/append_dedup, cursor=TIMESTAMP_LOCAL_DATE, pk=TRANSACTION_ID<br>
+&bull; <code>temporary_deactivations</code> &mdash; incremental/append_dedup, cursor=CREATED_AT_TIME, pk=STORE_ID+CREATED_AT_TIME<br><br>
 
-<strong>Root cause:</strong> DoorDash likely uses <strong>IP-based access control</strong>. The old server&rsquo;s IP is whitelisted; the new server&rsquo;s IP (<code>35.224.144.209</code>) is not. This is an IP whitelist issue, not a credential issue.<br><br>
-
-<strong>Action needed:</strong> Ask DoorDash if they have IP restrictions on the API. If so, add <code>35.224.144.209</code> to the whitelist. Once whitelisted, also fix <code>ORDER_ITEM_ID</code> column in AIRBYTE_CLONE destination schema.
+<strong>Blocked on:</strong> DoorDash API returns 403 from the new server IP. <strong>Add <code>35.224.144.209</code> to DoorDash API IP whitelist.</strong> Once whitelisted, trigger a manual sync to verify, then set cron to <code>0 30 3 * * ?</code> (3:30 AM PT daily).
 </div>
 
 <div class="action-item" style="border-left-color:#5cb85c">
