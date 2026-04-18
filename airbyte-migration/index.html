@@ -146,10 +146,10 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 </tr>
 <tr>
 <td>NetSuite 2 &rarr; Snowflake</td>
-<td>airbyte-philz (Docker transfer pending)</td>
+<td>airbyte-philz (Docker transferred)</td>
 <td>6</td>
-<td><span class="status status-blocked">Blocked</span></td>
-<td>Waiting on GCP IAM for Docker import</td>
+<td><span class="status status-syncing">Image Ready</span></td>
+<td>Docker image loaded &mdash; needs source + connection wiring. <a href="/airbyte-migration/netsuite.html">Prod investigation &rarr;</a></td>
 </tr>
 <tr>
 <td>Uber Eats &rarr; Snowflake</td>
@@ -232,7 +232,7 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 
 <h3>3 Connections Still Needed</h3>
 <ul>
-<li><strong>NetSuite</strong> (6 streams, 42.6M rows) &mdash; <strong>Prod sync healthy but custom_wholesale crashes intermittently, causing 3x retry storm.</strong> <a href="/airbyte-migration/netsuite.html">Full investigation &rarr;</a></li>
+<li><strong>NetSuite</strong> (6 streams, 42.6M rows) &mdash; <strong>Docker image transferred to airbyte-philz.</strong> Next: create source definition, wire connection, inject cursor state. Prod has a <a href="/airbyte-migration/netsuite.html">custom_wholesale retry storm</a> that needs fixing.</li>
 <li><strong>DoorDash</strong> (3 streams, 251.7M rows) &mdash; <strong>Prod is healthy</strong> (3.4M orders, fresh daily). New server gets 403 &mdash; likely IP whitelist issue, not credentials. See below.</li>
 <li><strong>CrunchTime</strong> (40 streams, 73.9M rows) &mdash; Connection fully wired and ready. Cannot sync until the customer DBA adds IP <code>35.224.144.209</code> to the Oracle listener&rsquo;s <code>TCP.INVITED_NODES</code>.</li>
 </ul>
@@ -269,12 +269,9 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <strong>Action needed:</strong> Ask DoorDash if they have IP restrictions on the API. If so, add <code>35.224.144.209</code> to the whitelist. Once whitelisted, also fix <code>ORDER_ITEM_ID</code> column in AIRBYTE_CLONE destination schema.
 </div>
 
-<div class="action-item iam">
-<strong>GCP IAM Permissions (blocks NetSuite + VM maintenance)</strong><br>
-<code>joey.castillo.acmedev@gmail.com</code> currently has only <code>cloudscheduler.admin</code>, <code>firebase.admin</code>, and <code>run.admin</code> on <code>philzcoffee-staging</code>. <strong>Not</strong> an owner or editor.<br><br>
-<strong>Need granted:</strong> <code>roles/compute.instanceAdmin.v1</code> + <code>roles/iam.serviceAccountUser</code><br>
-<strong>Who can grant:</strong> Patrick Wong, Taylor Eke, or Wesley Szeto (project owners)<br>
-<strong>What it unblocks:</strong> NetSuite Docker import, Cloud Run deploys, and all future VM maintenance via SSH.
+<div class="action-item" style="border-left-color:#5cb85c">
+<strong>GCP IAM Permissions &mdash; RESOLVED</strong><br>
+<span style="color:#5cb85c;font-weight:700">Granted 2026-04-17.</span> Wesley added <code>roles/compute.instanceAdmin.v1</code> + <code>roles/iam.serviceAccountUser</code> to <code>joey.castillo.acmedev@gmail.com</code>. SSH, Docker transfers, and VM maintenance now fully operational. NetSuite Docker image already transferred.
 </div>
 
 <div class="action-item blocked">
@@ -312,21 +309,30 @@ The new Airbyte server ships with Square connector v1.7.13, which pulls 2M+ reco
 <h2>What&rsquo;s Left Before Cutover</h2>
 
 <div class="card">
-<h3>Critical Path</h3>
+<h3>Critical Path (updated 2026-04-18)</h3>
 <ol style="margin:8px 0 8px 24px">
-<li><strong>DoorDash API key re-authorization</strong> (Developer Portal) &rarr; unblocks DoorDash sync</li>
-<li><strong>GCP IAM grant</strong> (Wesley) &rarr; unblocks NetSuite Docker import + VM maintenance</li>
-<li><strong>NetSuite Docker import + sync</strong> (hours, once SSH available)</li>
+<li><s style="color:#555">GCP IAM grant</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; Wesley granted 2026-04-17</li>
+<li><s style="color:#555">NetSuite Docker import</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; <code>source-netsuite:0.4.1</code> loaded on airbyte-philz</li>
+<li><strong>NetSuite source + connection wiring</strong> (next) &rarr; create source def, wire connection, inject cursor state, test sync</li>
+<li><strong>DoorDash IP whitelist</strong> (Wesley/Patrick) &rarr; add <code>35.224.144.209</code> to DoorDash API allowed IPs</li>
 <li><strong>CrunchTime Oracle ACL</strong> (customer DBA, independent timeline)</li>
+<li><strong>Ether cursor fixes</strong> &rarr; switch 3 detail streams from <code>id</code> to <code>updated_at</code>, reactions to incremental</li>
 <li><strong>Final parity verification</strong> across all 11 connections</li>
 <li><strong>Cutover window</strong> (rename swap, &lt;30 min downtime)</li>
 </ol>
 </div>
 
+<div class="card">
+<h3>Investigation Reports</h3>
+<ul style="margin:8px 0 8px 24px">
+<li><a href="/airbyte-migration/netsuite.html">NetSuite Prod Investigation</a> &mdash; wholesale NoneType crash, retry storm, 5/6 streams full_refresh</li>
+</ul>
+</div>
+
 <!-- ============================================================ -->
 <div class="footer">
 Airbyte Migration &middot; Philz Coffee &middot; acmedevUS<br>
-Last updated: 2026-04-15 &middot; v0 &middot; r148
+Last updated: 2026-04-18 &middot; v0
 </div>
 
 </div>
