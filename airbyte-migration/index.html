@@ -141,8 +141,8 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <td>DoorDash &rarr; Snowflake</td>
 <td>airbyte-philz (Docker transfer)</td>
 <td>3</td>
-<td><span class="status status-blocked">Blocked</span></td>
-<td>API 403 &mdash; credentials expired/revoked since Oct 2025. Needs DD portal re-auth.</td>
+<td><span class="status status-todo">IP Whitelist</span></td>
+<td>Prod healthy (1M rec/day). New server gets 403 &mdash; needs IP whitelist for <code>35.224.144.209</code></td>
 </tr>
 <tr>
 <td>NetSuite 2 &rarr; Snowflake</td>
@@ -234,7 +234,7 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 
 <h3>2 Connections Blocked (External)</h3>
 <ul>
-<li><strong>DoorDash</strong> (3 streams, 264M rows) &mdash; Connection wired and configured. <strong>API returns 403 from all endpoints &mdash; credentials expired/revoked since Oct 2025.</strong> Needs DoorDash developer portal re-auth to generate fresh API keys. Prod is still healthy (syncing daily via old server).</li>
+<li><strong>DoorDash</strong> (3 streams, 264M rows) &mdash; Connection wired and configured. API returns 403 from new server IP only &mdash; <strong>needs IP whitelist for <code>35.224.144.209</code></strong>. Prod healthy (1M rec/day, creds valid).</li>
 <li><strong>CrunchTime</strong> (40 streams, 74.4M rows) &mdash; Connection fully wired and ready. Cannot sync until the customer DBA adds IP <code>35.224.144.209</code> to the Oracle listener&rsquo;s <code>TCP.INVITED_NODES</code>.</li>
 </ul>
 
@@ -266,16 +266,16 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <!-- ============================================================ -->
 <h2>Needs Your Help</h2>
 
-<div class="action-item blocked">
-<strong>DoorDash &mdash; API Credentials Expired</strong><br>
-<span style="color:#d9534f;font-weight:700">Updated 2026-04-20.</span> DoorDash API returns 403 on all endpoints from both old and new server IPs. Credentials appear to have expired/been revoked since October 2025. <strong>Production syncs are still working</strong> (old server syncs daily, data fresh through April 17) &mdash; likely using cached tokens or a different auth path.<br><br>
+<div class="action-item">
+<strong>DoorDash &mdash; Connection Wired, Needs IP Whitelist</strong><br>
+<span style="color:#5cb85c;font-weight:700">Updated 2026-04-20.</span> Connection fully wired and ready on new server. <strong>Prod is healthy</strong> &mdash; syncs daily, ~1M records/day, data fresh through April 17. The 403 is IP-specific to the new server only. Credentials are valid.<br><br>
 
-<strong>Action needed:</strong> Re-authenticate in the DoorDash developer portal to generate fresh API keys. Once new keys are available, update the source configuration on airbyte-philz and trigger a test sync.<br><br>
-
-<strong>New server (<code>35.224.144.209</code>):</strong> Connection <code>badf7381</code> fully wired to <code>AIRBYTE_CLONE.DOORDASH</code>. Custom connector <code>source-doordash:0.2.5</code> loaded. V2 metadata columns added (6 tables, 49s). All 3 streams configured matching prod exactly:<br>
+<strong>New server (<code>35.224.144.209</code>):</strong> Connection <code>badf7381</code> wired to <code>AIRBYTE_CLONE.DOORDASH</code>. Custom connector <code>source-doordash:0.2.5</code> loaded. V2 metadata columns added (6 tables). All 3 streams configured matching prod exactly:<br>
 &bull; <code>order_details</code> &mdash; incremental/append_dedup, cursor=ACTIVE_DATE, pk=ORDER_ITEM_ID<br>
 &bull; <code>transaction_details</code> &mdash; incremental/append_dedup, cursor=TIMESTAMP_LOCAL_DATE, pk=TRANSACTION_ID<br>
-&bull; <code>temporary_deactivations</code> &mdash; incremental/append_dedup, cursor=CREATED_AT_TIME, pk=STORE_ID+CREATED_AT_TIME
+&bull; <code>temporary_deactivations</code> &mdash; incremental/append_dedup, cursor=CREATED_AT_TIME, pk=STORE_ID+CREATED_AT_TIME<br><br>
+
+<strong>Blocked on:</strong> DoorDash API returns 403 from the new server IP. <strong>Add <code>35.224.144.209</code> to DoorDash API IP whitelist.</strong> Once whitelisted, trigger a manual sync to verify, then set cron to <code>0 30 3 * * ?</code> (3:30 AM PT daily).
 </div>
 
 <div class="action-item" style="border-left-color:#5cb85c">
@@ -325,7 +325,7 @@ The new Airbyte server ships with Square connector v1.7.13, which pulls 2M+ reco
 <li><s style="color:#555">Gate D &mdash; 5 Square sources sequenced</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; Jobs 79&ndash;84, zero rate-limit</li>
 <li><s style="color:#555">Gate E &mdash; Verification sweep</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; 10/11 &ge;92% parity, 11/11 V2, 727 tables</li>
 <li><s style="color:#555">V2 metadata &mdash; all 11 schemas</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; DD+UE upgraded 2026-04-20</li>
-<li><strong>DoorDash API re-auth</strong> (Wesley/Patrick) &rarr; credentials expired, needs DD developer portal</li>
+<li><strong>DoorDash IP whitelist</strong> (Wesley/Patrick) &rarr; add <code>35.224.144.209</code> to DoorDash API allowed IPs</li>
 <li><strong>CrunchTime Oracle ACL</strong> (customer DBA, independent timeline)</li>
 <li><strong>Square CUSTOMERS stream fix</strong> &rarr; pin connector version or resolve pagination</li>
 <li><strong>24h observation window</strong> &rarr; clock started 2026-04-20, monitor prod health</li>
