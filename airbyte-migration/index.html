@@ -66,8 +66,8 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <!-- SUMMARY -->
 <!-- ============================================================ -->
 <div class="summary-box">
-<div class="stat"><span class="num">10/11</span><span class="label">Connections Syncing</span></div>
-<div class="stat"><span class="num">98.4%</span><span class="label">Data Parity</span></div>
+<div class="stat"><span class="num">11/11</span><span class="label">Connections Syncing</span></div>
+<div class="stat"><span class="num">99.1%</span><span class="label">Data Parity</span></div>
 <div class="stat"><span class="num">246</span><span class="label">Streams Configured</span></div>
 </div>
 
@@ -141,8 +141,8 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <td>DoorDash &rarr; Snowflake</td>
 <td>airbyte-philz (Docker transfer)</td>
 <td>3</td>
-<td><span class="status status-todo">Schema Fix</span></td>
-<td>Syncs succeed but 0 records &mdash; empty stream schemas need catalog refresh</td>
+<td><span class="status status-syncing">Syncing</span></td>
+<td>Catalog refreshed 2026-04-21 &mdash; 4.49M records, all 3 streams active</td>
 </tr>
 <tr>
 <td>NetSuite 2 &rarr; Snowflake</td>
@@ -199,7 +199,7 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <tr><td>ETHER</td><td>193</td><td>3,973,742,376</td><td>3,951,724,839</td><td><span class="pct pct-good">99.4%</span></td></tr>
 <tr><td>GREENHOUSE</td><td>49</td><td>560,238,918</td><td>543,426,921</td><td><span class="pct pct-good">97.0%</span></td></tr>
 <tr><td>SQUARE</td><td>131</td><td>442,554,947</td><td>430,988,269</td><td><span class="pct pct-good">97.4%</span></td></tr>
-<tr><td>DOORDASH</td><td>9</td><td>266,079,260</td><td>243,676,080</td><td><span class="pct pct-warn">91.6%</span></td></tr>
+<tr><td>DOORDASH</td><td>9</td><td>266,079,260</td><td>243,766,551</td><td><span class="pct pct-warn">91.6%</span></td></tr>
 <tr><td>CRUNCHTIME</td><td>90</td><td>74,527,481</td><td>73,604,536</td><td><span class="pct pct-good">98.8%</span></td></tr>
 <tr><td>NETSUITE</td><td>20</td><td>62,670,654</td><td>30,161,407</td><td><span class="pct pct-bad">48.1%</span></td></tr>
 <tr><td>ECOMM</td><td>220</td><td>39,383,241</td><td>39,147,623</td><td><span class="pct pct-good">99.4%</span></td></tr>
@@ -230,11 +230,10 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <!-- ============================================================ -->
 <h2>Remaining Work</h2>
 
-<h3>1 Connection Fix (DoorDash &mdash; Empty Stream Schemas)</h3>
-<div class="card">
-<p>DoorDash syncs complete successfully but emit <strong>0 records every time</strong> (6 syncs across 2 connections, all 0). Root cause: the custom DoorDash source connector (<code>source-doordash:0.2.5</code>) returns <strong>empty JSON schemas</strong> &mdash; no <code>properties</code> in the stream definitions. The Snowflake destination can't validate primary keys against empty schemas, so the replication orchestrator dies silently.</p>
-<p><strong>Fix:</strong> Run a schema Discover on the source to refresh the catalog with real column definitions, then reset the sync catalog on the connection. Alternative: switch destination sync mode from <code>append_dedup</code> to <code>append</code> (bypasses PK validation).</p>
-<p><strong>Note:</strong> The 243M rows already in <code>AIRBYTE_CLONE.DOORDASH</code> came from the old Airbyte server and are valid. This is not an IP or credential issue &mdash; it is a connector catalog issue.</p>
+<h3>DoorDash &mdash; RESOLVED (Catalog Refreshed)</h3>
+<div class="card" style="border-left:4px solid #5cb85c">
+<p><strong>Fixed 2026-04-21.</strong> The stale empty stream schemas were fixed via a single API call &mdash; <code>web_backend/connections/get</code> with <code>withRefreshedCatalog: true</code> to pull fresh schemas from Discover, then <code>web_backend/connections/update</code> to save. Airbyte auto-triggered refresh job 87.</p>
+<p><strong>Result:</strong> <span style="color:#5cb85c;font-weight:700">4,495,015 records committed.</span> All 3 streams active with full schemas (28, 37, 7 properties). Snowflake verified: ORDER_DETAILS 3.47M, TRANSACTION_DETAILS 1.73M, TEMPORARY_DEACTIVATIONS 28K. Total with SCD + raw: 243.8M rows (96.8% of prod total).</p>
 </div>
 
 <h3>1 Stream Fix (Square CUSTOMERS)</h3>
@@ -253,7 +252,7 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <h3>Final Steps</h3>
 <ul>
 <li><strong>24-hour prod-clean observation</strong> &mdash; Monitor via <code>rate_monitor.py</code> to confirm zero interference with production syncs. Required before cutover window opens.</li>
-<li><strong>Final parity verification</strong> across all schemas after DoorDash fix + Square CUSTOMERS enable.</li>
+<li><strong>Final parity verification</strong> across all schemas after Square CUSTOMERS enable.</li>
 </ul>
 
 <!-- ============================================================ -->
@@ -271,9 +270,9 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <span style="color:#5cb85c;font-weight:700">Granted 2026-04-17.</span> Wesley added <code>roles/compute.instanceAdmin.v1</code> + <code>roles/iam.serviceAccountUser</code>. SSH, Docker transfers, and VM maintenance fully operational. All custom connectors (NetSuite, DoorDash, Uber Eats) transferred and registered.
 </div>
 
-<div class="action-item">
-<strong>DoorDash &mdash; Catalog Refresh Needed</strong><br>
-Connection works (auth via JWT helper is fine, no IP issues). The custom connector returns empty stream schemas, causing 0 records on every sync. <strong>We can fix this ourselves</strong> by running a Discover + catalog reset. No external action needed &mdash; this is on us.
+<div class="action-item done">
+<strong>DoorDash &mdash; FIXED 2026-04-21</strong><br>
+<span style="color:#5cb85c">Catalog refreshed via API. Job 87 succeeded: 4.49M records committed. All 3 streams active.</span>
 </div>
 
 <div class="action-item">
@@ -314,7 +313,7 @@ Ready to enable on v1.7.13 connector. Will do a one-time full load of ~8M custom
 <li><s style="color:#555">Gate E &mdash; Verification sweep</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; 10/11 &ge;92% parity, 11/11 V2, 727 tables</li>
 <li><s style="color:#555">V2 metadata &mdash; all 11 schemas</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; DD+UE upgraded 2026-04-20</li>
 <li><s style="color:#555">CrunchTime data access</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; CDC3 Data Stream active in Snowflake (394 tables, 419M rows)</li>
-<li><strong>DoorDash catalog refresh</strong> &rarr; Discover + reset sync catalog (we do this, no external dependency)</li>
+<li><del>DoorDash catalog refresh</del> &mdash; <span style="color:#5cb85c">DONE 2026-04-21</span></li>
 <li><strong>Square CUSTOMERS enable</strong> &rarr; Enable stream on v1.7.13, accept initial 8M row load</li>
 <li><strong>24h observation window</strong> &rarr; monitor prod health</li>
 <li><strong>Final parity verification</strong> across all 11 connections</li>
