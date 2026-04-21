@@ -66,134 +66,141 @@ a:hover{text-decoration:underline}
 <!-- SUMMARY -->
 <!-- ============================================================ -->
 <div class="summary-box" style="grid-template-columns:1fr 1fr 1fr 1fr">
-<div class="stat"><span class="num">11/11</span><span class="label">Connections Active</span></div>
-<div class="stat"><span class="num">99.1%</span><span class="label">Data Parity</span></div>
-<div class="stat"><span class="num">248</span><span class="label">Streams Configured</span></div>
-<div class="stat"><a href="#open-issues" style="text-decoration:none"><span class="num" style="color:#5cb85c">0</span><span class="label" style="color:#5cb85c">Open Issues</span></a></div>
+<div class="stat"><span class="num">10/10</span><span class="label">Connections Active</span></div>
+<div class="stat"><span class="num">207</span><span class="label">Streams Configured</span></div>
+<div class="stat"><span class="num">104</span><span class="label">Incremental Streams</span></div>
+<div class="stat"><a href="#open-issues" style="text-decoration:none"><span class="num" style="color:#f0ad4e">2</span><span class="label" style="color:#f0ad4e">Open Issues</span></a></div>
 </div>
 
-<div class="progress-bar"><div class="progress-fill" style="width:99.1%"></div></div>
-<p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">5.46 billion rows &middot; 11 schemas &middot; 727 tables</p>
+<div class="progress-bar"><div class="progress-fill" style="width:80%"></div></div>
+<p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">10 connections &middot; all on cron &middot; 2 stuck refreshes blocking data flow</p>
 
 <!-- ============================================================ -->
 <!-- OPEN ISSUES -->
 <!-- ============================================================ -->
-<h2 id="open-issues" style="color:#6FC3DF">0 Open Issues &mdash; All Fixes Deployed</h2>
+<h2 id="open-issues" style="color:#f0ad4e">2 Open Issues</h2>
 
-<div class="action-item" style="border-left-color:#6FC3DF">
-<strong>#1 &mdash; NetSuite <code>custom_wholesale</code> &mdash; FIX DEPLOYED, SYNCING</strong><br>
-<span style="color:#6FC3DF">Docker 0.4.2 built + deployed. All 6 <code>parse_response()</code> patched with <code>or []</code> null guard. 6/6 streams enabled. <strong>Job 92 running &mdash; 150K+ records and climbing.</strong></span><br>
-<span style="color:#888;font-size:12px">Awaiting sync completion for Snowflake verification. Previous 5-stream sync: 1.69M records, 165 min.</span>
+<div class="action-item" style="border-left-color:#d9534f">
+<strong>#1 &mdash; Stuck Refresh: Square &mdash; BLOCKING CRON</strong><br>
+<span style="color:#d9534f">Refresh job running since 04-21 17:49 UTC, 0 records, 1 attempt. Triggered by timezone change (UTC &rarr; America/Los_Angeles). <strong>Daily cron at 00:30 PT cannot fire while refresh is running.</strong></span><br>
+<span style="color:#888;font-size:12px">Fix: Cancel stuck refresh via API, then monitor next cron cycle. SQUARE.PAYMENTS also shows 88% row deficit vs prod (119K vs 1M).</span>
 </div>
 
-<div class="action-item done">
-<strong>#2 &mdash; Square CUSTOMERS &mdash; FIXED 2026-04-21</strong><br>
-<span style="color:#5cb85c">Enabled on v1.7.13 (full_refresh/overwrite, 17 props). 11 streams now selected. Job 89 syncing.</span>
+<div class="action-item" style="border-left-color:#d9534f">
+<strong>#2 &mdash; Stuck Refresh: NetSuite &mdash; BLOCKING CRON</strong><br>
+<span style="color:#d9534f">Refresh job running since 04-21 18:25 UTC, 0 records, <strong>4 retry attempts</strong>. Triggered by cron schedule addition. <strong>Daily cron at 00:00 PT cannot fire.</strong></span><br>
+<span style="color:#888;font-size:12px">Fix: Cancel stuck refresh, verify Docker 0.4.2 connector still functional, trigger manual sync.</span>
 </div>
 
-<div class="action-item done">
-<strong>#3 &mdash; Append streams &mdash; FIXED 2026-04-21</strong><br>
-<span style="color:#5cb85c">ETHER.tax_rates + NETSUITE.custom_inventory converted from append to overwrite. Next sync cleans up duplicates.</span>
-</div>
-
-<h3 style="margin-top:32px">Production Readiness &mdash; 4 Boards, 52 pts</h3>
+<h3 style="margin-top:32px">Production Readiness &mdash; Boards 30-33 DONE (52 pts)</h3>
 <div class="card">
-<p>Full audit completed (r304). <strong>9 gaps identified, all planned.</strong></p>
+<p>Full audit (r304) found 9 gaps. All 4 boards built and shipped (r311).</p>
 <ol style="margin:8px 0 8px 24px">
-<li style="margin:8px 0"><span class="status status-todo">Board 30</span> <strong>Schedules + Activation</strong> &mdash; set cron on 8 connections, activate 3 inactive, fix Square TZ + UE namespace (13 pts)</li>
-<li style="margin:8px 0"><span class="status status-todo">Board 31</span> <strong>Cleanup + DR</strong> &mdash; decommission CrunchTime, purge 8 junk connections, GCP snapshots, NetSuite Docker docs (13 pts)</li>
-<li style="margin:8px 0"><span class="status status-todo">Board 32</span> <strong>Ecomm Incremental</strong> &mdash; convert ~80 full_refresh tables to incremental, 10-100x Snowflake savings (13 pts)</li>
-<li style="margin:8px 0"><span class="status status-todo">Board 33</span> <strong>Monitoring + SLA</strong> &mdash; webhook alerts, freshness SLAs, Paytronix Data Sharing investigation (13 pts)</li>
+<li style="margin:8px 0"><span class="status status-done">Board 30</span> <strong>Schedules + Activation</strong> &mdash; 7 cron schedules set, 3 connections activated, Square/Ecomm TZ fixed, Uber Eats namespace fixed (13 pts)</li>
+<li style="margin:8px 0"><span class="status status-done">Board 31</span> <strong>Cleanup + DR</strong> &mdash; CrunchTime decommissioned, 8 junk purged (19&rarr;10), GCP daily snapshot, NetSuite Docker docs (13 pts)</li>
+<li style="margin:8px 0"><span class="status status-done">Board 32</span> <strong>Ecomm Incremental</strong> &mdash; 98 tables converted (104 incremental, 3 full_refresh), 10-100x Snowflake savings (13 pts)</li>
+<li style="margin:8px 0"><span class="status status-done">Board 33</span> <strong>Monitoring + SLA</strong> &mdash; sync_monitor.py polling (webhook N/A), SLA doc, Paytronix Data Sharing investigated (2/10 overlap, keep Airbyte) (13 pts)</li>
 </ol>
-<p style="color:#888;font-size:13px;margin-top:12px">Board 30 is the #1 blocker. Data doesn't flow on schedule until cron is set.</p>
+<p style="color:#d9534f;font-size:13px;margin-top:12px"><strong>Config is correct. Operational verification pending.</strong> Stuck refreshes on Square + NetSuite must be cleared before cron schedules can prove themselves.</p>
+</div>
+
+<h3 style="margin-top:32px">Previously Resolved</h3>
+<div class="action-item done">
+<strong>NetSuite <code>custom_wholesale</code> &mdash; FIXED 2026-04-21</strong> &mdash; Docker 0.4.2, 6/6 streams patched. Now blocked by stuck refresh (issue #2 above).
+</div>
+<div class="action-item done">
+<strong>Square CUSTOMERS &mdash; FIXED 2026-04-21</strong> &mdash; Enabled on v1.7.13, 11 streams. Now blocked by stuck refresh (issue #1 above).
+</div>
+<div class="action-item done">
+<strong>Append streams &mdash; FIXED 2026-04-21</strong> &mdash; ETHER.tax_rates + NETSUITE.custom_inventory converted from append to overwrite.
 </div>
 
 <!-- ============================================================ -->
 <!-- CONNECTIONS -->
 <!-- ============================================================ -->
-<h2>Connections</h2>
+<h2>Connections (10 Active on airbyte-philz)</h2>
 
 <table>
 <thead>
-<tr><th>Connection</th><th>Source</th><th>Streams</th><th>Status</th><th>Last Sync</th></tr>
+<tr><th>Connection</th><th>Streams</th><th>Schedule</th><th>Status</th><th>Last Sync</th></tr>
 </thead>
 <tbody>
 <tr>
 <td>Ether Postgres</td>
-<td>airbyte-philz</td>
-<td>63</td>
-<td><span class="status status-live">Validated</span></td>
-<td>Job #56 &mdash; 27.5M records (04-12)</td>
+<td>63 (47 inc / 16 full)</td>
+<td>Hourly :00 UTC</td>
+<td><span class="status status-live">Active</span></td>
+<td>Sync running &mdash; ORDERS 35.4M rows (04-21)</td>
 </tr>
 <tr>
 <td>Ecomm Postgres</td>
-<td>airbyte-philz</td>
-<td>107</td>
-<td><span class="status status-live">Validated</span></td>
-<td>Job #50 &mdash; 11.5M records (04-12)</td>
+<td>107 (104 inc / 3 full)</td>
+<td>Daily 02:45 PT</td>
+<td><span class="status status-live">Active</span></td>
+<td>Refresh succeeded &mdash; 104 incremental (04-22)</td>
 </tr>
 <tr>
 <td>Philz Square 2 2025</td>
-<td>airbyte-philz</td>
-<td>11</td>
-<td><span class="status status-syncing">Daily Cron</span></td>
-<td>Job #89 &mdash; refresh syncing (04-21, +CUSTOMERS enabled)</td>
+<td>11 (1 inc / 10 full)</td>
+<td>Daily 00:30 PT</td>
+<td><span class="status status-blocked">Stuck Refresh</span></td>
+<td>Refresh stuck since 04-21. Cron blocked.</td>
 </tr>
 <tr>
 <td>Greenhouse</td>
-<td>airbyte-philz</td>
-<td>5</td>
-<td><span class="status status-live">Validated</span></td>
-<td>Job #69 &mdash; 13,825 records (04-14)</td>
+<td>5 (5 inc)</td>
+<td>Daily 03:00 PT</td>
+<td><span class="status status-live">Active</span></td>
+<td>Awaiting first cron sync (last: 04-14)</td>
 </tr>
 <tr>
 <td>CrunchTime</td>
-<td>CDC3 Data Stream</td>
 <td>394</td>
+<td>CDC3 real-time</td>
 <td><span class="status status-live">Live CDC</span></td>
-<td>419M rows, updated daily (04-20)</td>
+<td>419M rows via Data Stream (bypasses Airbyte)</td>
 </tr>
 <tr>
-<td>DoorDash</td>
-<td>airbyte-philz (Docker)</td>
-<td>3</td>
-<td><span class="status status-done">Fixed 04-21</span></td>
-<td>Job #87 &mdash; 4.49M records (04-21)</td>
+<td>DoorDash (Docker)</td>
+<td>3 (3 inc)</td>
+<td>Daily 03:30 PT</td>
+<td><span class="status status-live">Active</span></td>
+<td>Sync succeeded &mdash; 3.47M records (04-21)</td>
 </tr>
 <tr>
-<td>NetSuite 2</td>
-<td>airbyte-philz (Docker 0.4.2)</td>
-<td>6</td>
-<td><span class="status status-syncing">Syncing</span></td>
-<td>Job #92 &mdash; 6/6 streams, wholesale enabled (04-21)</td>
+<td>NetSuite (Docker 0.4.2)</td>
+<td>6 (1 inc / 5 full)</td>
+<td>Daily 00:00 PT</td>
+<td><span class="status status-blocked">Stuck Refresh</span></td>
+<td>Refresh stuck since 04-21, 4 attempts. Cron blocked.</td>
 </tr>
 <tr>
-<td>Uber Eats</td>
-<td>airbyte-philz (Docker)</td>
-<td>1</td>
-<td><span class="status status-live">Validated</span></td>
-<td>Job #63 &mdash; 12,646 records (04-13)</td>
+<td>Uber Eats (Docker)</td>
+<td>1 (1 inc)</td>
+<td>Daily 03:15 PT</td>
+<td><span class="status status-live">Active</span></td>
+<td>Awaiting first cron sync (last: 04-14)</td>
 </tr>
 <tr>
 <td>Comtrade (GCS)</td>
-<td>airbyte-philz</td>
-<td>1</td>
-<td><span class="status status-live">Validated</span></td>
-<td>Job #58 (04-19)</td>
+<td>1 (full)</td>
+<td>Weekly Sun</td>
+<td><span class="status status-live">Active</span></td>
+<td>Succeeded (04-19)</td>
 </tr>
 <tr>
 <td>Cropster (GCS)</td>
-<td>airbyte-philz</td>
-<td>1</td>
-<td><span class="status status-live">Validated</span></td>
-<td>Job #59 (04-19)</td>
+<td>1 (full)</td>
+<td>Weekly Sun</td>
+<td><span class="status status-live">Active</span></td>
+<td>Succeeded (04-19)</td>
 </tr>
 <tr>
-<td>Paytronix East</td>
-<td>airbyte-philz</td>
-<td>10</td>
-<td><span class="status status-live">Validated</span></td>
-<td>Job #62 &mdash; 14M+ records (04-13)</td>
+<td>Paytronix East&rarr;West</td>
+<td>10 (full)</td>
+<td>Daily 03:30 UTC</td>
+<td><span class="status status-live">Active</span></td>
+<td>Awaiting first cron sync (last: 04-14)</td>
 </tr>
 </tbody>
 </table>
@@ -201,29 +208,30 @@ a:hover{text-decoration:underline}
 <!-- ============================================================ -->
 <!-- DATA PARITY -->
 <!-- ============================================================ -->
-<h2>Data Parity</h2>
+<h2>Data Parity (Live Spot-Check 2026-04-22)</h2>
 
 <table>
 <thead>
-<tr><th>Schema</th><th>Tables</th><th>Prod</th><th>Clone</th><th>Parity</th></tr>
+<tr><th>Schema.Table</th><th>Prod (AIRBYTE_DB)</th><th>Clone (AIRBYTE_CLONE)</th><th>Delta</th></tr>
 </thead>
 <tbody>
-<tr><td>ETHER</td><td>193</td><td>3,973,742,376</td><td>3,951,724,839</td><td><span class="pct pct-good">99.4%</span></td></tr>
-<tr><td>GREENHOUSE</td><td>49</td><td>560,238,918</td><td>543,426,921</td><td><span class="pct pct-good">97.0%</span></td></tr>
-<tr><td>SQUARE</td><td>131</td><td>442,554,947</td><td>430,988,269</td><td><span class="pct pct-good">97.4%</span></td></tr>
-<tr><td>DOORDASH</td><td>9</td><td>266,079,260</td><td>243,766,551</td><td><span class="pct pct-warn">91.6%</span></td></tr>
-<tr><td>CRUNCHTIME</td><td>90</td><td>74,527,481</td><td>73,604,536</td><td><span class="pct pct-good">98.8%</span></td></tr>
-<tr><td>NETSUITE</td><td>20</td><td>62,670,654</td><td>30,161,407</td><td><span class="pct pct-bad">48.1%</span></td></tr>
-<tr><td>ECOMM</td><td>220</td><td>39,383,241</td><td>39,147,623</td><td><span class="pct pct-good">99.4%</span></td></tr>
-<tr><td>UBEREATS</td><td>3</td><td>21,435,015</td><td>21,099,873</td><td><span class="pct pct-good">98.4%</span></td></tr>
-<tr><td>PAYTRONIX</td><td>10</td><td>14,545,314</td><td>34,627,202</td><td><span class="pct pct-good">100%+</span></td></tr>
-<tr><td>COMTRADE</td><td>1</td><td>71</td><td>142</td><td><span class="pct pct-good">100%+</span></td></tr>
-<tr><td>CROPSTER</td><td>1</td><td>8</td><td>16</td><td><span class="pct pct-good">100%+</span></td></tr>
-<tr><td colspan="2" style="color:#fff;font-weight:700">TOTAL</td><td style="color:#fff;font-weight:700">5,455,177,285</td><td style="color:#fff;font-weight:700">5,368,456,908</td><td><span class="pct pct-good">98.4%</span></td></tr>
+<tr><td>ECOMM.SPREE_ORDERS</td><td>2,058,115</td><td>2,058,191</td><td><span class="pct pct-good">+76 (+0.0%)</span></td></tr>
+<tr><td>ECOMM.SPREE_PRODUCTS</td><td>547</td><td>547</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>SQUARE.ORDERS</td><td>9,830,522</td><td>9,705,708</td><td><span class="pct pct-warn">-124,814 (-1.3%)</span></td></tr>
+<tr><td style="color:#d9534f;font-weight:700">SQUARE.PAYMENTS</td><td>1,007,220</td><td style="color:#d9534f;font-weight:700">119,008</td><td><span class="pct pct-bad">-888,212 (-88.2%)</span></td></tr>
+<tr><td>GREENHOUSE.APPLICATIONS</td><td>226,792</td><td>225,755</td><td><span class="pct pct-warn">-1,037 (-0.5%)</span></td></tr>
+<tr><td>GREENHOUSE.CANDIDATES</td><td>185,862</td><td>184,921</td><td><span class="pct pct-warn">-941 (-0.5%)</span></td></tr>
+<tr><td>DOORDASH.ORDER_DETAILS</td><td>3,447,567</td><td>3,471,309</td><td><span class="pct pct-good">+23,742 (+0.7%)</span></td></tr>
+<tr><td>DOORDASH.TRANSACTION_DETAILS</td><td>1,733,295</td><td>1,733,760</td><td><span class="pct pct-good">+465 (+0.0%)</span></td></tr>
+<tr><td style="color:#f0ad4e">PAYTRONIX.WALLET</td><td>4,629,334</td><td style="color:#f0ad4e">11,467,872</td><td><span class="pct pct-warn">+6.8M (+147%)</span></td></tr>
+<tr><td>ETHER (all)</td><td colspan="2">193 tables match. ORDERS: 35.4M rows. Freshness: 04-21 19:00 UTC</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>NETSUITE (all)</td><td colspan="2">20 tables match. Stuck refresh blocking fresh data.</td><td><span class="pct pct-warn">STALE</span></td></tr>
 </tbody>
 </table>
 
-<p style="color:#888;font-size:13px"><strong>NetSuite 48.1%</strong>: clone uses <code>start_date: 2025</code> vs older prod, + wholesale stream disabled (NoneType fix pending). <strong>DoorDash 91.6%</strong>: SCD history tables catching up after fresh baseline sync. <strong>Paytronix/Comtrade/Cropster &gt;100%</strong>: re-syncs pulled fresher data than the baseline clone.</p>
+<p style="color:#d9534f;font-size:13px;font-weight:700">SQUARE.PAYMENTS: 88% row deficit. Either stream config difference, pagination limit, or stuck refresh preventing full data load. Investigate before cutover.</p>
+<p style="color:#f0ad4e;font-size:13px">PAYTRONIX: Clone has 6.8M more rows than prod. Clone captured historical data that prod has since cleaned. Not corruption &mdash; but needs investigation before rename swap.</p>
+<p style="color:#888;font-size:13px">GREENHOUSE/SQUARE staleness expected &mdash; connections just activated, first cron cycle fires tonight. Ecomm matched within 76 rows. DoorDash within 0.7%.</p>
 
 <!-- ============================================================ -->
 <!-- RECENTLY RESOLVED -->
@@ -231,18 +239,18 @@ a:hover{text-decoration:underline}
 <h2>Recently Resolved</h2>
 
 <div class="action-item done">
+<strong>Board 30-33: Production Readiness &mdash; SHIPPED 2026-04-22</strong><br>
+All 9 gaps from full audit closed. 52 pts across 4 boards: cron schedules set, 3 connections activated, CrunchTime decommissioned, 8 junk purged (19&rarr;10 connections), 98 Ecomm tables converted to incremental (104 inc / 3 full), sync_monitor.py created, freshness SLA defined, Paytronix Data Sharing investigated, GCP daily snapshots enabled, NetSuite Docker maintenance doc written.
+</div>
+
+<div class="action-item done">
 <strong>DoorDash &mdash; Fixed 2026-04-21</strong><br>
-Stale empty stream schemas fixed via API catalog refresh. Job 87: 4,495,015 records committed. All 3 streams active (28, 37, 7 properties).
+Stale empty stream schemas fixed via API catalog refresh. Job 87: 4,495,015 records committed. All 3 streams active.
 </div>
 
 <div class="action-item done">
 <strong>CrunchTime &mdash; Resolved 2026-04-21</strong><br>
-CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>IM_OWNER</code>, updated daily. 8x more tables and 10x more data than old Airbyte Oracle connection. Oracle ACL no longer needed.
-</div>
-
-<div class="action-item done">
-<strong>GCP IAM &mdash; Granted 2026-04-17</strong><br>
-Wesley added <code>compute.instanceAdmin.v1</code> + <code>iam.serviceAccountUser</code>. SSH, Docker, VM ops fully operational.
+CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>IM_OWNER</code>. Old Airbyte Oracle connection decommissioned.
 </div>
 
 <!-- ============================================================ -->
@@ -265,17 +273,26 @@ Wesley added <code>compute.instanceAdmin.v1</code> + <code>iam.serviceAccountUse
 
 <p>Database rename swap in Snowflake. Zero consumer changes needed.</p>
 
+<h3 style="color:#f0ad4e">Pre-Cutover Blockers (must clear first)</h3>
+<ol style="margin:8px 0 16px 24px;font-size:14px">
+<li style="margin:8px 0;color:#d9534f"><strong>Cancel stuck Square refresh</strong> &mdash; job blocking cron since 04-21</li>
+<li style="margin:8px 0;color:#d9534f"><strong>Cancel stuck NetSuite refresh</strong> &mdash; job blocking cron since 04-21, 4 attempts</li>
+<li style="margin:8px 0"><strong>Verify all 10 connections complete at least one cron sync</strong> &mdash; tonight is first test</li>
+<li style="margin:8px 0"><strong>Investigate SQUARE.PAYMENTS gap</strong> &mdash; 88% fewer rows than prod</li>
+<li style="margin:8px 0"><strong>Investigate PAYTRONIX surplus</strong> &mdash; 147% more rows than prod</li>
+</ol>
+
+<h3>Cutover Steps (after blockers cleared)</h3>
 <ol style="margin:16px 0 16px 24px;font-size:14px">
 <li style="margin:8px 0"><strong>Pause</strong> all connections on old Airbyte servers</li>
 <li style="margin:8px 0"><strong>Final parity check</strong> &mdash; row counts match across all schemas</li>
 <li style="margin:8px 0"><strong>Rename</strong> <code>AIRBYTE_DB</code> &rarr; <code>AIRBYTE_ARCHIVE</code></li>
 <li style="margin:8px 0"><strong>Rename</strong> <code>AIRBYTE_CLONE</code> &rarr; <code>AIRBYTE_DB</code></li>
 <li style="margin:8px 0"><strong>Update</strong> V2 destination to point at <code>AIRBYTE_DB</code></li>
-<li style="margin:8px 0"><strong>Enable cron schedules</strong> on all airbyte-philz connections</li>
 <li style="margin:8px 0"><strong>Decommission</strong> old servers after 48h observation</li>
 </ol>
 
-<p style="color:#888;font-size:13px">Downstream consumers (dashboards, dbt, reports) keep working &mdash; database name stays <code>AIRBYTE_DB</code>. Archive = instant rollback.</p>
+<p style="color:#888;font-size:13px">Cron schedules already set on all 10 connections &mdash; step 6 from old procedure is done. Downstream consumers keep working. Archive = instant rollback.</p>
 
 <!-- ============================================================ -->
 <!-- HOW WE GOT HERE -->
@@ -298,7 +315,7 @@ Wesley added <code>compute.instanceAdmin.v1</code> + <code>iam.serviceAccountUse
 <!-- ============================================================ -->
 <div class="footer">
 joeycastillo.us/airbyte-migration &middot; Philz Coffee &middot; acmedevUS<br>
-Last updated: 2026-04-21 11:32 UTC &middot; v0 &middot; r305
+Last updated: 2026-04-22 20:02 UTC &middot; v0 &middot; r312
 </div>
 
 </div>
