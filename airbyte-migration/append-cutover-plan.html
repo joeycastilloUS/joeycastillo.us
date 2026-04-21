@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Append Stream Cutover Plan &mdash; Airbyte Migration</title>
+<link rel="stylesheet" href="/airbyte-migration/gate.css">
+<script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.7}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
+nav .meta{color:#666;font-size:12px}
+.container{max-width:800px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px;letter-spacing:-0.5px}
+.subtitle{color:#6FC3DF;font-size:15px;margin-bottom:32px}
+h2{color:#6FC3DF;font-size:20px;margin:40px 0 16px;border-bottom:1px solid #333;padding-bottom:8px}
+h3{color:#fff;font-size:16px;margin:24px 0 8px}
+p{margin:8px 0;font-size:14px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:10px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:10px 12px;border-bottom:1px solid #1e1e1e}
+tr:hover{background:#1A1A1A}
+.card{background:#1A1A1A;border-radius:6px;padding:20px;margin:16px 0}
+.card h3{margin-top:0;color:#6FC3DF}
+ul{margin:8px 0 8px 24px}
+li{margin:4px 0;font-size:14px}
+ol{margin:8px 0 8px 24px}
+ol li{margin:8px 0;font-size:14px}
+code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC3DF}
+.summary-box{background:#1A1A1A;border-radius:8px;padding:24px;margin:24px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.stat{text-align:center}
+.stat .num{font-size:36px;font-weight:700;color:#6FC3DF;display:block}
+.stat .label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px}
+.risk-high{color:#d9534f;font-weight:700}
+.risk-low{color:#5cb85c;font-weight:700}
+.risk-med{color:#f0ad4e;font-weight:700}
+.step{background:#1A1A1A;border-left:4px solid #6FC3DF;padding:16px 20px;margin:12px 0;border-radius:0 6px 6px 0}
+.step h3{margin:0 0 8px 0;color:#fff;font-size:15px}
+.step p{margin:4px 0}
+.step.caution{border-left-color:#f0ad4e}
+.step.verify{border-left-color:#5cb85c}
+.verdict{background:#1a3a1a;border:1px solid #2a5a2a;border-radius:6px;padding:20px;margin:24px 0;text-align:center}
+.verdict .label{color:#5cb85c;font-size:20px;font-weight:700}
+.verdict p{color:#ccc}
+.footer{margin-top:48px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+@media(max-width:600px){.summary-box{grid-template-columns:1fr}.stat .num{font-size:28px}}
+</style>
+</head>
+<body>
+<nav>
+<span class="brand">Airbyte Migration</span>
+<span class="meta">Philz Coffee &middot; Append Stream Cutover Plan</span>
+</nav>
+
+<div class="container">
+
+<h1>Append Stream Cutover Plan</h1>
+<p class="subtitle">2 streams identified &mdash; convert to overwrite before rename swap</p>
+
+<!-- ============================================================ -->
+<!-- EXECUTIVE SUMMARY -->
+<!-- ============================================================ -->
+<h2>Executive Summary</h2>
+
+<div class="summary-box">
+<div class="stat"><span class="num">2</span><span class="label">Append Streams</span></div>
+<div class="stat"><span class="num">246</span><span class="label">Total Streams</span></div>
+<div class="stat"><span class="num">0.8%</span><span class="label">Affected</span></div>
+</div>
+
+<p>Out of 246 streams across all 19 Airbyte connections, only <strong>2 use append mode</strong>. Both are misconfigured &mdash; they are small reference tables that accumulate duplicate rows on every sync instead of being overwritten. The fix is simple: convert both to <code>full_refresh/overwrite</code> before cutover. No downstream impact expected.</p>
+
+<div class="verdict">
+<div class="label">Verdict: Simple Fix</div>
+<p>Convert 2 streams from append to overwrite. Each shrinks from millions of duplicates to their true size. Then proceed with standard rename cutover.</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- STREAM INVENTORY -->
+<!-- ============================================================ -->
+<h2>Stream Inventory</h2>
+
+<table>
+<thead>
+<tr>
+<th>Connection</th>
+<th>Stream</th>
+<th>Mode</th>
+<th>Rows/Sync</th>
+<th>Accumulated</th>
+<th>Gap vs Prod</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ether Postgres</td>
+<td><code>data_warehouse.tax_rates</code></td>
+<td>full_refresh / append</td>
+<td>534</td>
+<td>3,363,325</td>
+<td>144,714</td>
+</tr>
+<tr>
+<td>NetSuite 2</td>
+<td><code>custom_inventory</code></td>
+<td>full_refresh / append</td>
+<td>~698</td>
+<td>30,014</td>
+<td>29,316</td>
+</tr>
+</tbody>
+</table>
+
+<p style="color:#888;font-size:13px;font-style:italic">Both streams are <code>full_refresh/append</code> &mdash; the source dumps all rows every sync, and Airbyte appends them to the destination table instead of replacing. The table grows by N rows per sync, forever.</p>
+
+<!-- ============================================================ -->
+<!-- WHY MISCONFIGURED -->
+<!-- ============================================================ -->
+<h2>Why These Are Misconfigured</h2>
+
+<div class="card">
+<h3>ETHER.data_warehouse.tax_rates</h3>
+<p><strong>What it is:</strong> A reference table of tax rates. 534 rows represent the full dataset.</p>
+<p><strong>What happened:</strong> Configured as <code>full_refresh/append</code> on an hourly cron. Every hour, all 534 rows are appended. Over time, this created <strong>3.36 million rows</strong> &mdash; the same 534 tax rates duplicated over 6,300 times.</p>
+<p><strong>The gap:</strong> Production has 3,363,325 accumulated rows. The clone (currently INACTIVE for this stream on airbyte-philz) has 144,714 fewer. This gap is not missing data &mdash; it is fewer hours of duplication.</p>
+<p><strong>Should be:</strong> <code>full_refresh/overwrite</code> &mdash; 534 rows, refreshed hourly, table stays at 534.</p>
+</div>
+
+<div class="card">
+<h3>NETSUITE.custom_inventory</h3>
+<p><strong>What it is:</strong> A custom inventory reference table. Approximately 523 unique items per sync, ~698 rows with variants.</p>
+<p><strong>What happened:</strong> Configured as <code>full_refresh/append</code> on a manual schedule. Each manual trigger appends all rows again. The table has accumulated <strong>30,014 rows</strong> from repeated appends.</p>
+<p><strong>The gap:</strong> Production has 30,014 rows. The clone has 698 (one sync worth). The 29,316 row gap is entirely duplicate accumulation on prod that the clone hasn't replicated.</p>
+<p><strong>Should be:</strong> <code>full_refresh/overwrite</code> &mdash; ~698 rows, refreshed on demand, table stays at ~698.</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- CUTOVER RISK -->
+<!-- ============================================================ -->
+<h2>Cutover Risk Analysis</h2>
+
+<p>Append streams are the <span class="risk-high">highest risk category</span> for a clone-rename cutover. Here is why:</p>
+
+<div class="card">
+<h3>The Problem with Append + Rename Swap</h3>
+<p>For incremental or overwrite streams, the cutover is clean: pause prod, verify parity, rename databases, resume. The data is the same shape on both sides.</p>
+<p>For append streams, the data <strong>diverges by design</strong>. The clone has fewer appended copies than production. After the rename swap:</p>
+<ul>
+<li><strong>tax_rates</strong> would go from 3.36M rows to 3.22M rows &mdash; a visible drop of 144K rows</li>
+<li><strong>custom_inventory</strong> would go from 30K rows to 698 rows &mdash; a 97.7% drop</li>
+</ul>
+<p>If any downstream query uses <code>COUNT(*)</code>, <code>GROUP BY _AIRBYTE_EMITTED_AT</code>, or relies on the append timeline for auditing, it would break or produce different results after cutover.</p>
+
+<p style="margin-top:16px"><strong>This is not just lag &mdash; it is structural divergence.</strong> You cannot close the gap by running more syncs on the clone, because each sync adds a new batch of duplicates on <em>both</em> sides. The gap persists (and may grow) until the mode is changed.</p>
+</div>
+
+<div class="card">
+<h3>Risk Rating by Approach</h3>
+<table>
+<thead><tr><th>Approach</th><th>Risk</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Do nothing, rename swap as-is</td><td><span class="risk-high">HIGH</span></td><td>Row counts drop visibly. Any audit on <code>_AIRBYTE_EMITTED_AT</code> timeline breaks.</td></tr>
+<tr><td>Backfill missing rows into clone</td><td><span class="risk-med">MEDIUM</span></td><td>Closes the gap but preserves the misconfiguration. Tables keep growing post-cutover.</td></tr>
+<tr><td>Convert to overwrite, then cutover</td><td><span class="risk-low">LOW</span></td><td>Both sides shrink to true size. Clean swap. No future accumulation.</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<!-- RECOMMENDED PLAN -->
+<!-- ============================================================ -->
+<h2>Recommended Plan: Convert to Overwrite</h2>
+
+<p>The cleanest path is to fix the misconfiguration on both servers <em>before</em> the rename swap. This eliminates the divergence problem entirely.</p>
+
+<div class="step caution">
+<h3>Step 1: Verify No Downstream Dependency on Append History</h3>
+<p>Check whether any dbt model, dashboard, or report queries the <code>_AIRBYTE_EMITTED_AT</code> timeline on these two tables. Specifically look for:</p>
+<ul>
+<li><code>SELECT ... FROM data_warehouse.tax_rates WHERE _AIRBYTE_EMITTED_AT > ...</code></li>
+<li><code>GROUP BY DATE(_AIRBYTE_EMITTED_AT)</code> on either table</li>
+<li>Any audit or versioning logic that assumes one row per sync cycle</li>
+</ul>
+<p><strong>Expected result:</strong> No dependencies. These are reference tables &mdash; consumers query the latest values, not the append history. But verify before changing.</p>
+</div>
+
+<div class="step">
+<h3>Step 2: Change Both Streams to Overwrite on airbyte-philz</h3>
+<p>Use the Airbyte API to update the connection catalog:</p>
+<ul>
+<li><code>ETHER.data_warehouse.tax_rates</code> &rarr; <code>full_refresh | overwrite</code></li>
+<li><code>NETSUITE.custom_inventory</code> &rarr; <code>full_refresh | overwrite</code></li>
+</ul>
+<p>This is a catalog-level change via <code>POST /v1/connections/update</code> &mdash; change <code>destination_sync_mode</code> from <code>append</code> to <code>overwrite</code> in the stream config.</p>
+</div>
+
+<div class="step">
+<h3>Step 3: Run One Sync Each</h3>
+<p>Trigger a manual sync for both connections after the mode change. On the first overwrite sync:</p>
+<ul>
+<li><code>tax_rates</code>: 3.36M rows &rarr; <strong>534 rows</strong></li>
+<li><code>custom_inventory</code>: 30K rows &rarr; <strong>~698 rows</strong></li>
+</ul>
+<p>The tables shrink to their true size. All V2 metadata columns (<code>_AIRBYTE_RAW_ID</code>, <code>_AIRBYTE_EXTRACTED_AT</code>, <code>_AIRBYTE_META</code>) are populated fresh.</p>
+</div>
+
+<div class="step">
+<h3>Step 4: Proceed with Standard Rename Cutover</h3>
+<p>With both streams on overwrite, the clone and production will have identical row counts for these tables after one sync each. The rename swap proceeds with zero append-related risk.</p>
+<p>These two tables are now identical to every other <code>full_refresh/overwrite</code> stream in the system &mdash; no special handling needed.</p>
+</div>
+
+<div class="step verify">
+<h3>Step 5: Update Production Connections Post-Cutover</h3>
+<p>After the rename swap completes and the new <code>AIRBYTE_DB</code> is live, update the production connection configs on airbyte-philz to match the overwrite mode. This ensures the fix persists going forward.</p>
+<p><strong>Do not skip this.</strong> If you only change the clone-side config, the old append mode will be inherited when the connection configs are migrated.</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- ALTERNATIVE -->
+<!-- ============================================================ -->
+<h2>Alternative: Backfill from Production</h2>
+
+<div class="card">
+<p>If for any reason the append history must be preserved (audit requirement, compliance, etc.), the alternative is to backfill the missing rows from production into the clone before cutover:</p>
+
+<pre style="background:#222;padding:16px;border-radius:4px;font-size:13px;color:#ccc;overflow-x:auto;margin:12px 0">
+<code>-- Backfill tax_rates gap
+INSERT INTO AIRBYTE_CLONE.ETHER.DATA_WAREHOUSE__TAX_RATES
+SELECT * FROM AIRBYTE_DB.ETHER.DATA_WAREHOUSE__TAX_RATES
+WHERE _AIRBYTE_EMITTED_AT > (
+  SELECT MAX(_AIRBYTE_EMITTED_AT)
+  FROM AIRBYTE_CLONE.ETHER.DATA_WAREHOUSE__TAX_RATES
+);
+
+-- Backfill custom_inventory gap
+INSERT INTO AIRBYTE_CLONE.NETSUITE.CUSTOM_INVENTORY
+SELECT * FROM AIRBYTE_DB.NETSUITE.CUSTOM_INVENTORY
+WHERE _AIRBYTE_EMITTED_AT > (
+  SELECT MAX(_AIRBYTE_EMITTED_AT)
+  FROM AIRBYTE_CLONE.NETSUITE.CUSTOM_INVENTORY
+);</code></pre>
+
+<p><strong>Downside:</strong> This closes the gap but preserves the misconfiguration. The tables will continue to grow post-cutover. You will eventually need to convert to overwrite anyway &mdash; better to do it now while the migration provides a clean break point.</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- CRON SCHEDULE MATRIX -->
+<!-- ============================================================ -->
+<h2>Cron Schedule Matrix</h2>
+
+<p>Schedule awareness matters during cutover &mdash; no syncs should be running when the rename swap happens. Here are the active schedules for the affected connections:</p>
+
+<table>
+<thead>
+<tr><th>Connection</th><th>Schedule</th><th>Status on airbyte-philz</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr>
+<td>Ether Postgres</td>
+<td>Hourly cron</td>
+<td>INACTIVE</td>
+<td>tax_rates is one of 63 streams. Hourly schedule means the cutover window must fall between sync cycles.</td>
+</tr>
+<tr>
+<td>NetSuite 2</td>
+<td>Manual</td>
+<td>Active (manual trigger)</td>
+<td>custom_inventory is one of 5 streams. No cron overlap risk &mdash; syncs only on manual trigger.</td>
+</tr>
+<tr>
+<td>Philz Square 2 2025</td>
+<td>Daily 00:30 UTC</td>
+<td>Active</td>
+<td>No append streams. Safe window: 01:00&ndash;23:30 UTC.</td>
+</tr>
+<tr>
+<td>All others</td>
+<td>Manual / Inactive</td>
+<td>Various</td>
+<td>No cron conflicts. Safe to rename swap at any time outside the Square daily window.</td>
+</tr>
+</tbody>
+</table>
+
+<div class="card">
+<h3>Recommended Cutover Window</h3>
+<p><strong>02:00&ndash;06:00 UTC</strong> &mdash; after Square daily sync completes (~00:30 UTC + runtime), before business hours Pacific. All manual connections are paused. Ether hourly must be paused explicitly before the window opens.</p>
+<p>Total cutover time: <strong>&lt;30 minutes</strong> for the rename swap itself. Add 15 minutes buffer for pre-flight checks and post-swap verification.</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- FOOTER -->
+<!-- ============================================================ -->
+<div class="footer">
+Airbyte Migration &middot; Philz Coffee &middot; acmedevUS<br>
+Append Stream Cutover Plan &middot; 2026-04-21 &middot; v0
+</div>
+
+</div>
+</body>
+</html>
