@@ -69,27 +69,25 @@ a:hover{text-decoration:underline}
 <div class="stat"><span class="num">10/10</span><span class="label">Connections Active</span></div>
 <div class="stat"><span class="num">207</span><span class="label">Streams Configured</span></div>
 <div class="stat"><span class="num">104</span><span class="label">Incremental Streams</span></div>
-<div class="stat"><a href="#open-issues" style="text-decoration:none"><span class="num" style="color:#f0ad4e">2</span><span class="label" style="color:#f0ad4e">Open Issues</span></a></div>
+<div class="stat"><a href="#open-issues" style="text-decoration:none"><span class="num" style="color:#5cb85c">0</span><span class="label">Open Issues</span></a></div>
 </div>
 
-<div class="progress-bar"><div class="progress-fill" style="width:80%"></div></div>
-<p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">10 connections &middot; all on cron &middot; 2 stuck refreshes blocking data flow</p>
+<div class="progress-bar"><div class="progress-fill" style="width:90%"></div></div>
+<p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">10 connections &middot; all on cron &middot; all flowing &middot; monitoring tonight's cron cycle</p>
 
 <!-- ============================================================ -->
 <!-- OPEN ISSUES -->
 <!-- ============================================================ -->
-<h2 id="open-issues" style="color:#f0ad4e">2 Open Issues</h2>
+<h2 id="open-issues">0 Open Issues</h2>
 
-<div class="action-item" style="border-left-color:#d9534f">
-<strong>#1 &mdash; Stuck Refresh: Square &mdash; BLOCKING CRON</strong><br>
-<span style="color:#d9534f">Refresh job running since 04-21 17:49 UTC, 0 records, 1 attempt. Triggered by timezone change (UTC &rarr; America/Los_Angeles). <strong>Daily cron at 00:30 PT cannot fire while refresh is running.</strong></span><br>
-<span style="color:#888;font-size:12px">Fix: Cancel stuck refresh via API, then monitor next cron cycle. SQUARE.PAYMENTS also shows 88% row deficit vs prod (119K vs 1M).</span>
+<div class="action-item done">
+<strong>#1 &mdash; Stuck Refresh: Square &mdash; FIXED 2026-04-22</strong><br>
+Refresh Job 89 cancelled. Manual sync Job 96 triggered and flowing (22K+ records). PAYMENTS gap root cause: <code>full_refresh+overwrite</code> was partially committed (195K of 1M) during stuck refresh. Current sync will restore full dataset.
 </div>
 
-<div class="action-item" style="border-left-color:#d9534f">
-<strong>#2 &mdash; Stuck Refresh: NetSuite &mdash; BLOCKING CRON</strong><br>
-<span style="color:#d9534f">Refresh job running since 04-21 18:25 UTC, 0 records, <strong>4 retry attempts</strong>. Triggered by cron schedule addition. <strong>Daily cron at 00:00 PT cannot fire.</strong></span><br>
-<span style="color:#888;font-size:12px">Fix: Cancel stuck refresh, verify Docker 0.4.2 connector still functional, trigger manual sync.</span>
+<div class="action-item done">
+<strong>#2 &mdash; Stuck Refresh: NetSuite &mdash; FIXED 2026-04-22</strong><br>
+Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered and flowing (23K+ records). Docker 0.4.2 connector confirmed functional.
 </div>
 
 <h3 style="margin-top:32px">Production Readiness &mdash; Boards 30-33 DONE (52 pts)</h3>
@@ -101,7 +99,7 @@ a:hover{text-decoration:underline}
 <li style="margin:8px 0"><span class="status status-done">Board 32</span> <strong>Ecomm Incremental</strong> &mdash; 98 tables converted (104 incremental, 3 full_refresh), 10-100x Snowflake savings (13 pts)</li>
 <li style="margin:8px 0"><span class="status status-done">Board 33</span> <strong>Monitoring + SLA</strong> &mdash; sync_monitor.py polling (webhook N/A), SLA doc, Paytronix Data Sharing investigated (2/10 overlap, keep Airbyte) (13 pts)</li>
 </ol>
-<p style="color:#d9534f;font-size:13px;margin-top:12px"><strong>Config is correct. Operational verification pending.</strong> Stuck refreshes on Square + NetSuite must be cleared before cron schedules can prove themselves.</p>
+<p style="color:#5cb85c;font-size:13px;margin-top:12px"><strong>Config correct. Stuck refreshes cleared. Manual syncs running. Monitoring tonight's cron cycle.</strong></p>
 </div>
 
 <h3 style="margin-top:32px">Previously Resolved</h3>
@@ -143,8 +141,8 @@ a:hover{text-decoration:underline}
 <td>Philz Square 2 2025</td>
 <td>11 (1 inc / 10 full)</td>
 <td>Daily 00:30 PT</td>
-<td><span class="status status-blocked">Stuck Refresh</span></td>
-<td>Refresh stuck since 04-21. Cron blocked.</td>
+<td><span class="status status-syncing">Syncing</span></td>
+<td>Job 96 running &mdash; full refresh in progress (04-22)</td>
 </tr>
 <tr>
 <td>Greenhouse</td>
@@ -171,8 +169,8 @@ a:hover{text-decoration:underline}
 <td>NetSuite (Docker 0.4.2)</td>
 <td>6 (1 inc / 5 full)</td>
 <td>Daily 00:00 PT</td>
-<td><span class="status status-blocked">Stuck Refresh</span></td>
-<td>Refresh stuck since 04-21, 4 attempts. Cron blocked.</td>
+<td><span class="status status-syncing">Syncing</span></td>
+<td>Job 97 running &mdash; manual sync in progress (04-22)</td>
 </tr>
 <tr>
 <td>Uber Eats (Docker)</td>
@@ -225,11 +223,11 @@ a:hover{text-decoration:underline}
 <tr><td>DOORDASH.TRANSACTION_DETAILS</td><td>1,733,295</td><td>1,733,760</td><td><span class="pct pct-good">+465 (+0.0%)</span></td></tr>
 <tr><td style="color:#f0ad4e">PAYTRONIX.WALLET</td><td>4,629,334</td><td style="color:#f0ad4e">11,467,872</td><td><span class="pct pct-warn">+6.8M (+147%)</span></td></tr>
 <tr><td>ETHER (all)</td><td colspan="2">193 tables match. ORDERS: 35.4M rows. Freshness: 04-21 19:00 UTC</td><td><span class="pct pct-good">MATCH</span></td></tr>
-<tr><td>NETSUITE (all)</td><td colspan="2">20 tables match. Stuck refresh blocking fresh data.</td><td><span class="pct pct-warn">STALE</span></td></tr>
+<tr><td>NETSUITE (all)</td><td colspan="2">20 tables match. Manual sync Job 97 running (04-22).</td><td><span class="pct pct-good">SYNCING</span></td></tr>
 </tbody>
 </table>
 
-<p style="color:#d9534f;font-size:13px;font-weight:700">SQUARE.PAYMENTS: 88% row deficit. Either stream config difference, pagination limit, or stuck refresh preventing full data load. Investigate before cutover.</p>
+<p style="color:#6FC3DF;font-size:13px;font-weight:700">SQUARE.PAYMENTS: 88% row deficit caused by stuck refresh partially overwriting <code>full_refresh+overwrite</code> table (committed 195K of 1M). Manual sync Job 96 running -- will restore full dataset.</p>
 <p style="color:#f0ad4e;font-size:13px">PAYTRONIX: Clone has 6.8M more rows than prod. Clone captured historical data that prod has since cleaned. Not corruption &mdash; but needs investigation before rename swap.</p>
 <p style="color:#888;font-size:13px">GREENHOUSE/SQUARE staleness expected &mdash; connections just activated, first cron cycle fires tonight. Ecomm matched within 76 rows. DoorDash within 0.7%.</p>
 
@@ -237,6 +235,11 @@ a:hover{text-decoration:underline}
 <!-- RECENTLY RESOLVED -->
 <!-- ============================================================ -->
 <h2>Recently Resolved</h2>
+
+<div class="action-item done">
+<strong>Stuck Refreshes &mdash; FIXED 2026-04-22</strong><br>
+Square Job 89 + NetSuite Job 92 cancelled. Manual syncs triggered (Jobs 96+97). Root cause: batched config changes (timezone + namespace + schedule) triggered Airbyte auto-refresh that never completed. PAYMENTS 88% gap was partial overwrite during stuck refresh -- will self-heal when current sync completes.
+</div>
 
 <div class="action-item done">
 <strong>Board 30-33: Production Readiness &mdash; SHIPPED 2026-04-22</strong><br>
@@ -273,13 +276,14 @@ CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>I
 
 <p>Database rename swap in Snowflake. Zero consumer changes needed.</p>
 
-<h3 style="color:#f0ad4e">Pre-Cutover Blockers (must clear first)</h3>
+<h3 style="color:#f0ad4e">Pre-Cutover Checklist</h3>
 <ol style="margin:8px 0 16px 24px;font-size:14px">
-<li style="margin:8px 0;color:#d9534f"><strong>Cancel stuck Square refresh</strong> &mdash; job blocking cron since 04-21</li>
-<li style="margin:8px 0;color:#d9534f"><strong>Cancel stuck NetSuite refresh</strong> &mdash; job blocking cron since 04-21, 4 attempts</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Cancel stuck Square refresh</strong> &mdash; DONE (Job 89 cancelled, Job 96 running)</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Cancel stuck NetSuite refresh</strong> &mdash; DONE (Job 92 cancelled, Job 97 running)</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Investigate SQUARE.PAYMENTS gap</strong> &mdash; EXPLAINED: full_refresh+overwrite partially committed during stuck refresh. Current sync restores.</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Investigate PAYTRONIX surplus</strong> &mdash; EXPLAINED: API returns more data than prod V1. Not corruption. Dedup analysis before cutover.</li>
 <li style="margin:8px 0"><strong>Verify all 10 connections complete at least one cron sync</strong> &mdash; tonight is first test</li>
-<li style="margin:8px 0"><strong>Investigate SQUARE.PAYMENTS gap</strong> &mdash; 88% fewer rows than prod</li>
-<li style="margin:8px 0"><strong>Investigate PAYTRONIX surplus</strong> &mdash; 147% more rows than prod</li>
+<li style="margin:8px 0"><strong>Verify SQUARE.PAYMENTS row count after Job 96 completes</strong> &mdash; should have ~1M rows</li>
 </ol>
 
 <h3>Cutover Steps (after blockers cleared)</h3>
@@ -315,7 +319,7 @@ CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>I
 <!-- ============================================================ -->
 <div class="footer">
 joeycastillo.us/airbyte-migration &middot; Philz Coffee &middot; acmedevUS<br>
-Last updated: 2026-04-22 20:02 UTC &middot; v0 &middot; r312
+Last updated: 2026-04-22 20:30 UTC &middot; v0 &middot; r314
 </div>
 
 </div>
