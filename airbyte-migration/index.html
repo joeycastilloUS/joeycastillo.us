@@ -82,8 +82,9 @@ a:hover{text-decoration:underline}
 
 <div class="action-item" style="border-left-color:#d9534f">
 <strong>#1 &mdash; NetSuite <code>custom_wholesale</code> crashes on sync</strong><br>
-<code>streams.py:509</code> &mdash; <code>yield from response.json().get("items")</code> throws <code>TypeError: NoneType is not iterable</code> when SuiteQL returns no items. Stream disabled on production connection. 6th stream missing = <strong>NetSuite parity at 48.1%</strong>.<br>
-<span style="color:#888;font-size:12px"><strong>Fix:</strong> <code>or []</code> null guard in 6 locations, build Docker 0.4.2, test on isolated connection, deploy. ~1h active + 7h sync wait. <a href="/airbyte-migration/netsuite.html">Full plan &rarr;</a></span>
+<code>streams.py:509</code> &mdash; <code>response.json().get("items")</code> returns <code>None</code> when SuiteQL has no results &rarr; <code>TypeError: NoneType is not iterable</code>. 6 locations affected. Stream disabled. <strong>NetSuite parity at 48.1%</strong>.<br>
+<span style="color:#888;font-size:12px"><strong>Revised plan:</strong> Docker overlay FROM 0.4.1, patch all 6 with <code>or []</code>, gcloud scp + build on VM. ~30min active. <a href="/airbyte-migration/netsuite.html">Full plan &rarr;</a></span><br>
+<span style="color:#6FC3DF;font-size:12px"><strong>Status:</strong> Plan revised 2026-04-21. gcloud SSH verified, Docker 29.4.0 on VM, image cached. Ready to execute.</span>
 </div>
 
 <div class="action-item done">
@@ -104,7 +105,7 @@ a:hover{text-decoration:underline}
 <li style="margin:8px 0"><strong>Final parity verification</strong> across all 11 schemas</li>
 <li style="margin:8px 0"><strong>Cutover</strong> &mdash; Snowflake rename swap, &lt;30 min downtime</li>
 </ol>
-<p style="color:#888;font-size:13px;margin-top:12px">Active work: <strong>~1 hour</strong> (NetSuite Docker build). Then 24h observation + 7h sync wait.</p>
+<p style="color:#888;font-size:13px;margin-top:12px">Active work: <strong>~30 minutes</strong> (NetSuite Docker overlay build via gcloud). Then 24h observation + sync wait.</p>
 </div>
 
 <!-- ============================================================ -->
@@ -297,7 +298,7 @@ Wesley added <code>compute.instanceAdmin.v1</code> + <code>iam.serviceAccountUse
 <!-- ============================================================ -->
 <div class="footer">
 joeycastillo.us/airbyte-migration &middot; Philz Coffee &middot; acmedevUS<br>
-Last updated: 2026-04-21 &middot; v0
+Last updated: 2026-04-21 10:11 UTC &middot; v0 &middot; r302
 </div>
 
 </div>
