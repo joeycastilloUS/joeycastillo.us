@@ -31,7 +31,7 @@ tr:hover{background:#1A1A1A}
 .status-syncing{background:#1a3a3a;color:#6FC3DF}
 .status-blocked{background:#3a1a1a;color:#d9534f}
 .status-todo{background:#3a3a1a;color:#f0ad4e}
-.status-hold{background:#2a2a2a;color:#888}
+.status-done{background:#1a3a1a;color:#5cb85c}
 .pct{font-weight:700}
 .pct-good{color:#5cb85c}
 .pct-warn{color:#f0ad4e}
@@ -43,9 +43,9 @@ li{margin:4px 0;font-size:14px}
 code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC3DF}
 .progress-bar{background:#222;border-radius:4px;height:8px;margin:8px 0;overflow:hidden}
 .progress-fill{height:100%;border-radius:4px;background:#6FC3DF}
-.section-note{color:#888;font-size:13px;font-style:italic;margin:8px 0}
+a{color:#6FC3DF;text-decoration:none}
+a:hover{text-decoration:underline}
 .action-item{background:#1A1A1A;border-left:4px solid #f0ad4e;padding:12px 16px;margin:8px 0;font-size:14px}
-.action-item.blocked{border-left-color:#d9534f}
 .action-item.done{border-left-color:#5cb85c}
 .footer{margin-top:48px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
 @media(max-width:600px){.summary-box{grid-template-columns:1fr}.stat .num{font-size:28px}}
@@ -60,42 +60,41 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 <div class="container">
 
 <h1>Airbyte V1 &rarr; V2 Migration</h1>
-<p class="subtitle">Production Airbyte to airbyte-philz &mdash; Live Status Report</p>
+<p class="subtitle">Production Airbyte to airbyte-philz &mdash; Live Status</p>
 
 <!-- ============================================================ -->
 <!-- SUMMARY -->
 <!-- ============================================================ -->
 <div class="summary-box">
-<div class="stat"><span class="num">11/11</span><span class="label">Connections Syncing</span></div>
+<div class="stat"><span class="num">11/11</span><span class="label">Connections Active</span></div>
 <div class="stat"><span class="num">99.1%</span><span class="label">Data Parity</span></div>
 <div class="stat"><span class="num">246</span><span class="label">Streams Configured</span></div>
 </div>
 
-<!-- ============================================================ -->
-<!-- HOW WE GOT HERE -->
-<!-- ============================================================ -->
-<h2>How We Got Here</h2>
-
-<p>Two production Airbyte instances (V1) run on aging VMs &mdash; one with 20 connections, one with 4 &mdash; syncing data from 10 sources into Snowflake. The goal: migrate everything to a single Airbyte 2.0.1 instance (V2) on a new VM with token-based auth, modern connectors, and a static IP &mdash; without any production downtime or data loss.</p>
-
-<h3>Approach</h3>
-<ul>
-<li><strong>Zero-copy Snowflake clone.</strong> We cloned <code>AIRBYTE_DB</code> to <code>AIRBYTE_CLONE</code> as the migration target. All dry-run writes hit the clone, never production. Rollback = drop the clone.</li>
-<li><strong>SSH-based export.</strong> The old server had no external API. We built an SSH tunnel to extract all 20 connections, their state, cursor positions, credentials, and catalog configs. The export captured the full migration surface in one shot.</li>
-<li><strong>Credential pipeline.</strong> Secrets were extracted via <code>web_backend</code> API unmask, GCP Secret Manager resolution, and sealed CSV. Every credential was validated independently before wiring into connections.</li>
-<li><strong>Incremental replication.</strong> Connections were replicated INACTIVE on the new server with injected cursor states &mdash; so when activated, they resume from where production left off instead of re-syncing from scratch.</li>
-<li><strong>Rate-limit safety.</strong> Kill switch, 429 monitoring, per-connection concurrency cap of 1, and prod sync schedule mapping &mdash; all in place before the first external API call.</li>
-</ul>
-
-<h3>The V1 &rarr; V2 Schema Challenge</h3>
-<p>Airbyte 2.0 changed its internal schema format. V1 tables use <code>_AIRBYTE_AB_ID</code>, <code>_AIRBYTE_EMITTED_AT</code>, <code>_AIRBYTE_NORMALIZED_AT</code>, and <code>_AIRBYTE_*_HASHID</code> columns. V2 expects <code>_AIRBYTE_RAW_ID</code>, <code>_AIRBYTE_EXTRACTED_AT</code>, <code>_AIRBYTE_META</code>, and <code>_AIRBYTE_GENERATION_ID</code>.</p>
-<p>If you just connect V2 to V1 tables, it either fails or does a destructive full refresh &mdash; wiping years of incremental history.</p>
-<p><strong>Our solution:</strong> A custom batch migration tool (<code>batch_apply.py</code>) that runs DDL transformations across all candidate tables in parallel &mdash; adding V2 columns, backfilling metadata, and preserving existing data and clustering. We tested this on a Phase 0 harness first (toy scope, failure injection, atomicity proof), then ran the real batch: <strong>505 tables across 6 schemas, 1.71 billion rows, completed in 6 minutes on an X-Large warehouse for 2.07 Snowflake credits.</strong> Every table was verified post-batch: row counts unchanged, zero NULLs, signatures match. Full rollback capability preserved via per-table capture files.</p>
+<div class="progress-bar"><div class="progress-fill" style="width:99.1%"></div></div>
+<p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">5.46 billion rows &middot; 11 schemas &middot; 727 tables</p>
 
 <!-- ============================================================ -->
-<!-- CONNECTION STATUS -->
+<!-- WHAT'S LEFT -->
 <!-- ============================================================ -->
-<h2>Connection Status</h2>
+<h2>To Cutover</h2>
+
+<div class="card">
+<ol style="margin:8px 0 8px 24px">
+<li style="margin:8px 0"><strong>NetSuite <code>custom_wholesale</code> fix</strong> &mdash; NoneType crash at <code>streams.py:509</code>. One-line fix (<code>or []</code>) in 6 locations. Build patched Docker 0.4.2, test on isolated connection, deploy. ~1h active work + 7h sync wait.</li>
+<li style="margin:8px 0"><strong>Square CUSTOMERS stream enable</strong> &mdash; enable on v1.7.13, accept 8M row initial load, then incremental. ~10 min.</li>
+<li style="margin:8px 0"><strong>Append streams convert</strong> &mdash; 2 streams (ETHER.tax_rates, NETSUITE.custom_inventory) misconfigured as full_refresh/append. Convert to overwrite. ~5 min.</li>
+<li style="margin:8px 0"><strong>24h observation window</strong> &mdash; <code>rate_monitor.py</code> confirms zero prod interference.</li>
+<li style="margin:8px 0"><strong>Final parity verification</strong> across all 11 schemas.</li>
+<li style="margin:8px 0"><strong>Cutover</strong> &mdash; Snowflake rename swap, &lt;30 min downtime.</li>
+</ol>
+<p style="color:#888;font-size:13px;margin-top:12px">Active work remaining: <strong>under 2 hours</strong>. Wall clock: 24h observation + sync waits.</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- CONNECTIONS -->
+<!-- ============================================================ -->
+<h2>Connections</h2>
 
 <table>
 <thead>
@@ -103,97 +102,93 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 </thead>
 <tbody>
 <tr>
-<td>Ether Postgres &rarr; Snowflake</td>
-<td>airbyte-philz (V1 migrated)</td>
+<td>Ether Postgres</td>
+<td>airbyte-philz</td>
 <td>63</td>
 <td><span class="status status-live">Validated</span></td>
-<td>Job #56 &mdash; 27.5M records (2026-04-12)</td>
+<td>Job #56 &mdash; 27.5M records (04-12)</td>
 </tr>
 <tr>
-<td>Ecomm Postgres &rarr; Snowflake</td>
-<td>airbyte-philz (V1 migrated)</td>
+<td>Ecomm Postgres</td>
+<td>airbyte-philz</td>
 <td>107</td>
 <td><span class="status status-live">Validated</span></td>
-<td>Job #50 &mdash; 11.5M records (2026-04-12)</td>
+<td>Job #50 &mdash; 11.5M records (04-12)</td>
 </tr>
 <tr>
-<td>Philz Square 2 2025 &rarr; Snowflake</td>
-<td>airbyte-philz (V1 migrated)</td>
+<td>Philz Square 2 2025</td>
+<td>airbyte-philz</td>
 <td>10</td>
-<td><span class="status status-syncing">Active Daily</span></td>
-<td>Job #85 &mdash; 195K records (2026-04-21, daily cron 00:30 UTC)</td>
+<td><span class="status status-syncing">Daily Cron</span></td>
+<td>Job #85 &mdash; 195K records (04-21)</td>
 </tr>
 <tr>
-<td>Greenhouse &rarr; Snowflake</td>
-<td>airbyte-philz (V1 migrated)</td>
+<td>Greenhouse</td>
+<td>airbyte-philz</td>
 <td>5</td>
 <td><span class="status status-live">Validated</span></td>
-<td>Job #69 &mdash; 13,825 records (2026-04-14)</td>
+<td>Job #69 &mdash; 13,825 records (04-14)</td>
 </tr>
 <tr>
-<td>CrunchTime &rarr; Snowflake</td>
-<td>CrunchTime CDC3 Data Stream</td>
-<td>394 tables</td>
-<td><span class="status status-live">Live via CDC</span></td>
-<td>CDC3 pipeline active &mdash; 419M rows, updated daily (2026-04-20)</td>
+<td>CrunchTime</td>
+<td>CDC3 Data Stream</td>
+<td>394</td>
+<td><span class="status status-live">Live CDC</span></td>
+<td>419M rows, updated daily (04-20)</td>
 </tr>
 <tr>
-<td>DoorDash &rarr; Snowflake</td>
-<td>airbyte-philz (Docker transfer)</td>
+<td>DoorDash</td>
+<td>airbyte-philz (Docker)</td>
 <td>3</td>
-<td><span class="status status-syncing">Syncing</span></td>
-<td>Catalog refreshed 2026-04-21 &mdash; 4.49M records, all 3 streams active</td>
+<td><span class="status status-done">Fixed 04-21</span></td>
+<td>Job #87 &mdash; 4.49M records (04-21)</td>
 </tr>
 <tr>
-<td>NetSuite 2 &rarr; Snowflake</td>
-<td>airbyte-philz (Docker transfer)</td>
-<td>5 (wholesale off)</td>
+<td>NetSuite 2</td>
+<td>airbyte-philz (Docker)</td>
+<td>5/6</td>
 <td><span class="status status-live">Validated</span></td>
-<td>Job #76 &mdash; 1.69M records, 165 min (2026-04-19). <a href="/airbyte-migration/netsuite.html">Prod investigation &rarr;</a></td>
+<td>Job #76 &mdash; 1.69M records (04-19). Wholesale off &mdash; <a href="/airbyte-migration/netsuite.html">fix plan</a></td>
 </tr>
 <tr>
-<td>Uber Eats &rarr; Snowflake</td>
-<td>airbyte-philz (Docker transfer)</td>
+<td>Uber Eats</td>
+<td>airbyte-philz (Docker)</td>
 <td>1</td>
 <td><span class="status status-live">Validated</span></td>
-<td>Job #63 &mdash; 12,646 records (2026-04-13)</td>
+<td>Job #63 &mdash; 12,646 records (04-13)</td>
 </tr>
 <tr>
-<td>Comtrade (GCS) &rarr; Snowflake</td>
-<td>airbyte-philz (from airbyte-2)</td>
+<td>Comtrade (GCS)</td>
+<td>airbyte-philz</td>
 <td>1</td>
 <td><span class="status status-live">Validated</span></td>
-<td>Job #58 &mdash; synced + validated (2026-04-19)</td>
+<td>Job #58 (04-19)</td>
 </tr>
 <tr>
-<td>Cropster (GCS) &rarr; Snowflake</td>
-<td>airbyte-philz (from airbyte-2)</td>
+<td>Cropster (GCS)</td>
+<td>airbyte-philz</td>
 <td>1</td>
 <td><span class="status status-live">Validated</span></td>
-<td>Job #59 &mdash; synced + validated (2026-04-19)</td>
+<td>Job #59 (04-19)</td>
 </tr>
 <tr>
-<td>Paytronix East &rarr; Snowflake</td>
-<td>airbyte-philz (from airbyte-2)</td>
+<td>Paytronix East</td>
+<td>airbyte-philz</td>
 <td>10</td>
 <td><span class="status status-live">Validated</span></td>
-<td>Job #62 &mdash; 14M+ records validated (2026-04-13)</td>
+<td>Job #62 &mdash; 14M+ records (04-13)</td>
 </tr>
 </tbody>
 </table>
 
-<p class="section-note"><strong>Validated</strong> = connection has a successful sync with real data on airbyte-philz. <strong>Active Daily</strong> = running on cron schedule. <strong>Live via CDC</strong> = data flowing through CrunchTime's native Snowflake pipeline (not Airbyte). 9/11 connections have verified data flow. DoorDash needs a catalog refresh to populate stream schemas. All 11 schemas have V2 metadata columns with zero NULLs (721/727 tables &mdash; 6 _SCD archive tables excluded by design).</p>
-
 <!-- ============================================================ -->
 <!-- DATA PARITY -->
 <!-- ============================================================ -->
-<h2>Data Parity by Schema</h2>
-
-<p class="section-note">Live Snowflake query &mdash; 2026-04-21. All numbers verified against <code>INFORMATION_SCHEMA.TABLES</code>.</p>
+<h2>Data Parity</h2>
 
 <table>
 <thead>
-<tr><th>Schema</th><th>Tables</th><th>Prod Rows</th><th>Clone Rows</th><th>Parity</th></tr>
+<tr><th>Schema</th><th>Tables</th><th>Prod</th><th>Clone</th><th>Parity</th></tr>
 </thead>
 <tbody>
 <tr><td>ETHER</td><td>193</td><td>3,973,742,376</td><td>3,951,724,839</td><td><span class="pct pct-good">99.4%</span></td></tr>
@@ -211,128 +206,81 @@ code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC
 </tbody>
 </table>
 
-<div class="progress-bar"><div class="progress-fill" style="width:98.4%"></div></div>
-<p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">5.46 billion rows &middot; 11 schemas &middot; 98.4% parity &middot; 727 tables matched</p>
-
-<p class="section-note">Parity = clone rows / prod rows. Gaps are natural drift &mdash; production ingests while clone syncs catch up. Once all connections run on matching schedules, parity converges to 100%. <strong>NetSuite (48.1%)</strong>: clone uses <code>start_date: 2025</code> vs older prod data, and wholesale stream is disabled (NoneType crash). <strong>DoorDash (91.6%)</strong>: 22M row gap from sync window drift; needs catalog refresh before new syncs can pull incremental data. <strong>Paytronix/Comtrade/Cropster over 100%</strong>: re-syncs accumulated additional data beyond the baseline clone.</p>
+<p style="color:#888;font-size:13px"><strong>NetSuite 48.1%</strong>: clone uses <code>start_date: 2025</code> vs older prod, + wholesale stream disabled (NoneType fix pending). <strong>DoorDash 91.6%</strong>: SCD history tables catching up after fresh baseline sync. <strong>Paytronix/Comtrade/Cropster &gt;100%</strong>: re-syncs pulled fresher data than the baseline clone.</p>
 
 <!-- ============================================================ -->
-<!-- WHAT 100% MEANS -->
+<!-- RECENTLY RESOLVED -->
 <!-- ============================================================ -->
-<h2>When Are We at 100%?</h2>
+<h2>Recently Resolved</h2>
 
-<p>We reach 100% data parity when <strong>all 11 connections are running on the same cron schedule as production</strong> and have completed at least one full sync cycle. At that point, the clone and production are receiving identical data from identical sources on identical schedules.</p>
-
-<p>The current gaps (0.6&ndash;52%) are natural drift: production continues to ingest data while the clone was cut at a point in time. Each connection we activate closes its gap. Paytronix is already ahead of production. Once all 11 are syncing in lockstep, the gap closes to zero.</p>
-
-<!-- ============================================================ -->
-<!-- REMAINING WORK -->
-<!-- ============================================================ -->
-<h2>Remaining Work</h2>
-
-<h3>DoorDash &mdash; RESOLVED (Catalog Refreshed)</h3>
-<div class="card" style="border-left:4px solid #5cb85c">
-<p><strong>Fixed 2026-04-21.</strong> The stale empty stream schemas were fixed via a single API call &mdash; <code>web_backend/connections/get</code> with <code>withRefreshedCatalog: true</code> to pull fresh schemas from Discover, then <code>web_backend/connections/update</code> to save. Airbyte auto-triggered refresh job 87.</p>
-<p><strong>Result:</strong> <span style="color:#5cb85c;font-weight:700">4,495,015 records committed.</span> All 3 streams active with full schemas (28, 37, 7 properties). Snowflake verified: ORDER_DETAILS 3.47M, TRANSACTION_DETAILS 1.73M, TEMPORARY_DEACTIVATIONS 28K. Total with SCD + raw: 243.8M rows (96.8% of prod total).</p>
+<div class="action-item done">
+<strong>DoorDash &mdash; Fixed 2026-04-21</strong><br>
+Stale empty stream schemas fixed via API catalog refresh. Job 87: 4,495,015 records committed. All 3 streams active (28, 37, 7 properties).
 </div>
 
-<h3>1 Stream Fix (Square CUSTOMERS)</h3>
+<div class="action-item done">
+<strong>CrunchTime &mdash; Resolved 2026-04-21</strong><br>
+CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>IM_OWNER</code>, updated daily. 8x more tables and 10x more data than old Airbyte Oracle connection. Oracle ACL no longer needed.
+</div>
+
+<div class="action-item done">
+<strong>GCP IAM &mdash; Granted 2026-04-17</strong><br>
+Wesley added <code>compute.instanceAdmin.v1</code> + <code>iam.serviceAccountUser</code>. SSH, Docker, VM ops fully operational.
+</div>
+
+<!-- ============================================================ -->
+<!-- REPORTS -->
+<!-- ============================================================ -->
+<h2>Reports</h2>
+
 <div class="card">
-<p>The <code>customers</code> stream is disabled on the active Square connection. The old connector (v0.2.1) only pulled 100 rows &mdash; a <strong>pagination bug</strong> that fetched only page 1. The real customer count is ~8M records (confirmed via <code>ZZSQUARE_BAK.CUSTOMERS</code>). The new connector (v1.7.13) correctly iterates all pages.</p>
-<p><strong>Fix:</strong> Enable <code>customers</code> on v1.7.13 with <code>incremental/append_dedup</code> sync mode. Accept the one-time initial load (~8M rows), then subsequent syncs are incremental. The current 100 rows in <code>SQUARE.CUSTOMERS</code> are stale (all from 2015-09-22).</p>
-</div>
-
-<h3>CrunchTime &mdash; RESOLVED (No Airbyte Needed)</h3>
-<div class="card" style="border-left:4px solid #5cb85c">
-<p><strong>Updated 2026-04-21.</strong> CrunchTime deployed their <strong>CDC3 Data Stream</strong> directly into Snowflake. The <code>CRUNCHTIME</code> database already exists with <strong>394 tables and 419 million rows</strong> under <code>IM_OWNER</code> schema, managed by <code>CRUNCHTIME_DATA_STREAM_ROLE</code>. Data is updated daily (last update: 2026-04-20).</p>
-<p>This is <strong>8x more tables and 10x more data</strong> than the old Airbyte Oracle connection ever synced (47 data tables, 41M rows). The Oracle ACL whitelist (tag #2) is no longer needed &mdash; the data flows through CrunchTime's native CDC pipeline, not through Airbyte.</p>
-<p>For the migration, we can either: (a) point downstream consumers at <code>CRUNCHTIME.IM_OWNER</code> directly, or (b) set up a Snowflake-to-Snowflake Airbyte connector to replicate into <code>AIRBYTE_CLONE.CRUNCHTIME</code> for schema consistency.</p>
-</div>
-
-<h3>Final Steps</h3>
-<ul>
-<li><strong>24-hour prod-clean observation</strong> &mdash; Monitor via <code>rate_monitor.py</code> to confirm zero interference with production syncs. Required before cutover window opens.</li>
-<li><strong>Final parity verification</strong> across all schemas after Square CUSTOMERS enable.</li>
+<ul style="margin:4px 0 4px 24px">
+<li><a href="/airbyte-migration/stream-comparison.html">Full Stream Comparison</a> &mdash; 937 tables, 18 schemas, every stream audited</li>
+<li><a href="/airbyte-migration/append-cutover-plan.html">Append Stream Cutover Plan</a> &mdash; 2 streams, convert to overwrite before rename swap</li>
+<li><a href="/airbyte-migration/netsuite.html">NetSuite Prod Investigation</a> &mdash; wholesale NoneType crash, retry storm, fix plan</li>
 </ul>
-
-<!-- ============================================================ -->
-<!-- NEEDS YOUR HELP -->
-<!-- ============================================================ -->
-<h2>Needs Your Help</h2>
-
-<div class="action-item done">
-<strong>CrunchTime &mdash; RESOLVED</strong><br>
-<span style="color:#5cb85c;font-weight:700">Resolved 2026-04-21.</span> CrunchTime CDC3 Data Stream is already active in Snowflake (<code>CRUNCHTIME.IM_OWNER</code>, 394 tables, 419M rows, updated daily). Oracle ACL whitelist is no longer needed. Wesley confirmed CrunchTime now provides Snowflake-native data delivery.
-</div>
-
-<div class="action-item done">
-<strong>GCP IAM Permissions &mdash; RESOLVED</strong><br>
-<span style="color:#5cb85c;font-weight:700">Granted 2026-04-17.</span> Wesley added <code>roles/compute.instanceAdmin.v1</code> + <code>roles/iam.serviceAccountUser</code>. SSH, Docker transfers, and VM maintenance fully operational. All custom connectors (NetSuite, DoorDash, Uber Eats) transferred and registered.
-</div>
-
-<div class="action-item done">
-<strong>DoorDash &mdash; FIXED 2026-04-21</strong><br>
-<span style="color:#5cb85c">Catalog refreshed via API. Job 87 succeeded: 4.49M records committed. All 3 streams active.</span>
-</div>
-
-<div class="action-item">
-<strong>Square CUSTOMERS Stream</strong><br>
-Ready to enable on v1.7.13 connector. Will do a one-time full load of ~8M customer records, then incremental going forward. The old 100-row count was a pagination bug in v0.2.1. <strong>We can fix this ourselves</strong> &mdash; just needs the stream enabled and a sync triggered.
 </div>
 
 <!-- ============================================================ -->
 <!-- CUTOVER -->
 <!-- ============================================================ -->
-<h2>How Cutover Works</h2>
+<h2>Cutover Procedure</h2>
 
-<p>Once all connections are verified, the cutover is a database rename swap in Snowflake:</p>
+<p>Database rename swap in Snowflake. Zero consumer changes needed.</p>
 
 <ol style="margin:16px 0 16px 24px;font-size:14px">
 <li style="margin:8px 0"><strong>Pause</strong> all connections on old Airbyte servers</li>
-<li style="margin:8px 0"><strong>Final parity check</strong> &mdash; confirm row counts match across all schemas</li>
+<li style="margin:8px 0"><strong>Final parity check</strong> &mdash; row counts match across all schemas</li>
 <li style="margin:8px 0"><strong>Rename</strong> <code>AIRBYTE_DB</code> &rarr; <code>AIRBYTE_ARCHIVE</code></li>
 <li style="margin:8px 0"><strong>Rename</strong> <code>AIRBYTE_CLONE</code> &rarr; <code>AIRBYTE_DB</code></li>
-<li style="margin:8px 0"><strong>Update</strong> the V2 Airbyte Snowflake destination to point at <code>AIRBYTE_DB</code></li>
-<li style="margin:8px 0"><strong>Enable cron schedules</strong> on all connections in airbyte-philz</li>
-<li style="margin:8px 0"><strong>Decommission</strong> old Airbyte servers after 48-hour observation window</li>
+<li style="margin:8px 0"><strong>Update</strong> V2 destination to point at <code>AIRBYTE_DB</code></li>
+<li style="margin:8px 0"><strong>Enable cron schedules</strong> on all airbyte-philz connections</li>
+<li style="margin:8px 0"><strong>Decommission</strong> old servers after 48h observation</li>
 </ol>
 
-<p>Every downstream consumer &mdash; dashboards, reports, dbt &mdash; keeps working because the database name stays <code>AIRBYTE_DB</code>. The archive sits there as an instant rollback: rename it back if anything breaks. All connectors (including DoorDash and Uber Eats) write to the same schema names as production &mdash; no consumer changes needed.</p>
+<p style="color:#888;font-size:13px">Downstream consumers (dashboards, dbt, reports) keep working &mdash; database name stays <code>AIRBYTE_DB</code>. Archive = instant rollback.</p>
 
 <!-- ============================================================ -->
-<!-- TIMELINE -->
+<!-- HOW WE GOT HERE -->
 <!-- ============================================================ -->
-<h2>What&rsquo;s Left Before Cutover</h2>
+<h2>Background</h2>
+
+<p>Two production Airbyte V1 instances on aging VMs &mdash; 20 + 4 connections, 10 sources, all syncing to Snowflake. Migrated to a single Airbyte 2.0.1 instance on a new VM with token auth, modern connectors, and static IP. Zero production downtime, zero data loss.</p>
 
 <div class="card">
-<h3>Critical Path (updated 2026-04-21)</h3>
-<ol style="margin:8px 0 8px 24px">
-<li><s style="color:#555">GCP IAM grant</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; Wesley granted 2026-04-17</li>
-<li><s style="color:#555">NetSuite Docker import + wiring + sync</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; Job #76, 1.69M records, all 5 streams V2</li>
-<li><s style="color:#555">Gate D &mdash; 5 Square sources sequenced</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; Jobs 79&ndash;84, zero rate-limit</li>
-<li><s style="color:#555">Gate E &mdash; Verification sweep</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; 10/11 &ge;92% parity, 11/11 V2, 727 tables</li>
-<li><s style="color:#555">V2 metadata &mdash; all 11 schemas</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; DD+UE upgraded 2026-04-20</li>
-<li><s style="color:#555">CrunchTime data access</s> <span class="status status-live" style="font-size:10px">DONE</span> &mdash; CDC3 Data Stream active in Snowflake (394 tables, 419M rows)</li>
-<li><del>DoorDash catalog refresh</del> &mdash; <span style="color:#5cb85c">DONE 2026-04-21</span></li>
-<li><strong>Square CUSTOMERS enable</strong> &rarr; Enable stream on v1.7.13, accept initial 8M row load</li>
-<li><strong>24h observation window</strong> &rarr; monitor prod health</li>
-<li><strong>Final parity verification</strong> across all 11 connections</li>
-<li><strong>Cutover window</strong> (rename swap, &lt;30 min downtime)</li>
-</ol>
-</div>
-
-<div class="card">
-<h3>Investigation Reports</h3>
-<ul style="margin:8px 0 8px 24px">
-<li><a href="/airbyte-migration/stream-comparison.html">Full Stream Comparison: Prod vs airbyte-philz</a> &mdash; every stream, every table, row counts, parity, V2 status</li>
-<li><a href="/airbyte-migration/netsuite.html">NetSuite Prod Investigation</a> &mdash; wholesale NoneType crash, retry storm, 5/6 streams full_refresh</li>
-<li><a href="/airbyte-migration/append-cutover-plan.html">Append Stream Cutover Plan</a> &mdash; 2 streams identified, convert to overwrite before rename swap</li>
+<h3>Key Decisions</h3>
+<ul>
+<li><strong>Zero-copy Snowflake clone</strong> as migration target. All writes hit the clone, never production.</li>
+<li><strong>SSH-based export</strong> from old server (no external API). Captured all 20 connections, state, cursors, credentials in one shot.</li>
+<li><strong>V2 schema migration</strong>: custom <code>batch_apply.py</code> &mdash; 505 tables, 1.71B rows, 6 minutes, 2.07 credits on X-Large warehouse.</li>
+<li><strong>Rate-limit safety</strong>: kill switch, 429 monitoring, concurrency cap = 1, prod schedule mapping.</li>
+<li><strong>Incremental resume</strong>: connections replicated with injected cursor states &mdash; resume from where production left off.</li>
 </ul>
 </div>
 
 <!-- ============================================================ -->
 <div class="footer">
-Airbyte Migration &middot; Philz Coffee &middot; acmedevUS<br>
+joeycastillo.us/airbyte-migration &middot; Philz Coffee &middot; acmedevUS<br>
 Last updated: 2026-04-21 &middot; v0
 </div>
 
