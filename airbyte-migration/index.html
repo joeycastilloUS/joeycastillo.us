@@ -68,7 +68,7 @@ a:hover{text-decoration:underline}
 <div class="summary-box" style="grid-template-columns:1fr 1fr 1fr 1fr">
 <div class="stat"><span class="num">10/10</span><span class="label">Connections Active</span></div>
 <div class="stat"><span class="num">207</span><span class="label">Streams Configured</span></div>
-<div class="stat"><span class="num">104</span><span class="label">Incremental Streams</span></div>
+<div class="stat"><span class="num">106</span><span class="label">Incremental Streams</span></div>
 <div class="stat"><a href="#open-issues" style="text-decoration:none"><span class="num" style="color:#5cb85c">0</span><span class="label">Open Issues</span></a></div>
 </div>
 
@@ -128,7 +128,7 @@ Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered an
 <td>63 (47 inc / 16 full)</td>
 <td>Hourly :00 UTC</td>
 <td><span class="status status-live">Active</span></td>
-<td>Sync running &mdash; ORDERS 35.4M rows (04-21)</td>
+<td>Cron confirmed &mdash; Job 98 fired 21:00 UTC. ORDERS 35.5M rows.</td>
 </tr>
 <tr>
 <td>Ecomm Postgres</td>
@@ -139,10 +139,10 @@ Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered an
 </tr>
 <tr>
 <td>Philz Square 2 2025</td>
-<td>11 (1 inc / 10 full)</td>
+<td>11 (3 inc / 8 full)</td>
 <td>Daily 00:30 PT</td>
-<td><span class="status status-syncing">Syncing</span></td>
-<td>Job 96 running &mdash; full refresh in progress (04-22)</td>
+<td><span class="status status-live">Active</span></td>
+<td>PAYMENTS+REFUNDS now incremental. Cron tonight 00:30 PT.</td>
 </tr>
 <tr>
 <td>Greenhouse</td>
@@ -169,8 +169,8 @@ Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered an
 <td>NetSuite (Docker 0.4.2)</td>
 <td>6 (1 inc / 5 full)</td>
 <td>Daily 00:00 PT</td>
-<td><span class="status status-syncing">Syncing</span></td>
-<td>Job 97 running &mdash; manual sync in progress (04-22)</td>
+<td><span class="status status-live">Active</span></td>
+<td>Clean for cron. First sync tonight 00:00 PT.</td>
 </tr>
 <tr>
 <td>Uber Eats (Docker)</td>
@@ -222,12 +222,13 @@ Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered an
 <tr><td>DOORDASH.ORDER_DETAILS</td><td>3,447,567</td><td>3,471,309</td><td><span class="pct pct-good">+23,742 (+0.7%)</span></td></tr>
 <tr><td>DOORDASH.TRANSACTION_DETAILS</td><td>1,733,295</td><td>1,733,760</td><td><span class="pct pct-good">+465 (+0.0%)</span></td></tr>
 <tr><td style="color:#f0ad4e">PAYTRONIX.WALLET</td><td>4,629,334</td><td style="color:#f0ad4e">11,467,872</td><td><span class="pct pct-warn">+6.8M (+147%)</span></td></tr>
-<tr><td>ETHER (all)</td><td colspan="2">193 tables match. ORDERS: 35.4M rows. Freshness: 04-21 19:00 UTC</td><td><span class="pct pct-good">MATCH</span></td></tr>
-<tr><td>NETSUITE (all)</td><td colspan="2">20 tables match. Manual sync Job 97 running (04-22).</td><td><span class="pct pct-good">SYNCING</span></td></tr>
+<tr><td>ETHER.ORDERS</td><td>35,471,905</td><td>35,468,714</td><td><span class="pct pct-good">-3,191 (-0.0%)</span></td></tr>
+<tr><td>UBEREATS.ORDER_DETAILS</td><td>1,767,609</td><td>1,748,299</td><td><span class="pct pct-warn">-19,310 (-1.1%)</span></td></tr>
+<tr><td>NETSUITE (all)</td><td colspan="2">20 tables match. Clean for cron tonight 00:00 PT.</td><td><span class="pct pct-good">MATCH</span></td></tr>
 </tbody>
 </table>
 
-<p style="color:#6FC3DF;font-size:13px;font-weight:700">SQUARE.PAYMENTS: 88% row deficit caused by stuck refresh partially overwriting <code>full_refresh+overwrite</code> table (committed 195K of 1M). Manual sync Job 96 running -- will restore full dataset.</p>
+<p style="color:#6FC3DF;font-size:13px;font-weight:700">SQUARE.PAYMENTS: 88% deficit. Square API returns ~119K via full_refresh (date window limit). Prod's 1M accumulated over years via incremental. Now converted to incremental/append_dedup -- will accumulate daily.</p>
 <p style="color:#f0ad4e;font-size:13px">PAYTRONIX: Clone has 6.8M more rows than prod. Clone captured historical data that prod has since cleaned. Not corruption &mdash; but needs investigation before rename swap.</p>
 <p style="color:#888;font-size:13px">GREENHOUSE/SQUARE staleness expected &mdash; connections just activated, first cron cycle fires tonight. Ecomm matched within 76 rows. DoorDash within 0.7%.</p>
 
@@ -282,8 +283,10 @@ CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>I
 <li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Cancel stuck NetSuite refresh</strong> &mdash; DONE (Job 92 cancelled, Job 97 running)</li>
 <li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Investigate SQUARE.PAYMENTS gap</strong> &mdash; EXPLAINED: full_refresh+overwrite partially committed during stuck refresh. Current sync restores.</li>
 <li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Investigate PAYTRONIX surplus</strong> &mdash; EXPLAINED: API returns more data than prod V1. Not corruption. Dedup analysis before cutover.</li>
-<li style="margin:8px 0"><strong>Verify all 10 connections complete at least one cron sync</strong> &mdash; tonight is first test</li>
-<li style="margin:8px 0"><strong>Verify SQUARE.PAYMENTS row count after Job 96 completes</strong> &mdash; should have ~1M rows</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Convert PAYMENTS+REFUNDS to incremental</strong> &mdash; DONE: no more overwrite risk, accumulates daily</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Clear all running jobs before cron</strong> &mdash; DONE: 0 running/stuck jobs, clean slate</li>
+<li style="margin:8px 0"><strong>Verify all 10 connections complete at least one cron sync</strong> &mdash; 7 crons fire tonight, Ether already confirmed</li>
+<li style="margin:8px 0"><strong>Paytronix dedup analysis</strong> &mdash; 147% surplus needs investigation before rename swap</li>
 </ol>
 
 <h3>Cutover Steps (after blockers cleared)</h3>
@@ -319,7 +322,7 @@ CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>I
 <!-- ============================================================ -->
 <div class="footer">
 joeycastillo.us/airbyte-migration &middot; Philz Coffee &middot; acmedevUS<br>
-Last updated: 2026-04-22 20:30 UTC &middot; v0 &middot; r314
+Last updated: 2026-04-22 21:00 UTC &middot; v0 &middot; r316
 </div>
 
 </div>
