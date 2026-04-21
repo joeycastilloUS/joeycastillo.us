@@ -65,30 +65,48 @@ a:hover{text-decoration:underline}
 <!-- ============================================================ -->
 <!-- SUMMARY -->
 <!-- ============================================================ -->
-<div class="summary-box">
+<div class="summary-box" style="grid-template-columns:1fr 1fr 1fr 1fr">
 <div class="stat"><span class="num">11/11</span><span class="label">Connections Active</span></div>
 <div class="stat"><span class="num">99.1%</span><span class="label">Data Parity</span></div>
 <div class="stat"><span class="num">246</span><span class="label">Streams Configured</span></div>
+<div class="stat"><a href="#open-issues" style="text-decoration:none"><span class="num" style="color:#f0ad4e">3</span><span class="label" style="color:#f0ad4e">Open Issues</span></a></div>
 </div>
 
 <div class="progress-bar"><div class="progress-fill" style="width:99.1%"></div></div>
 <p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">5.46 billion rows &middot; 11 schemas &middot; 727 tables</p>
 
 <!-- ============================================================ -->
-<!-- WHAT'S LEFT -->
+<!-- OPEN ISSUES -->
 <!-- ============================================================ -->
-<h2>To Cutover</h2>
+<h2 id="open-issues" style="color:#f0ad4e">3 Open Issues</h2>
 
+<div class="action-item" style="border-left-color:#d9534f">
+<strong>#1 &mdash; NetSuite <code>custom_wholesale</code> crashes on sync</strong><br>
+<code>streams.py:509</code> &mdash; <code>yield from response.json().get("items")</code> throws <code>TypeError: NoneType is not iterable</code> when SuiteQL returns no items. Stream disabled on production connection. 6th stream missing = <strong>NetSuite parity at 48.1%</strong>.<br>
+<span style="color:#888;font-size:12px"><strong>Fix:</strong> <code>or []</code> null guard in 6 locations, build Docker 0.4.2, test on isolated connection, deploy. ~1h active + 7h sync wait. <a href="/airbyte-migration/netsuite.html">Full plan &rarr;</a></span>
+</div>
+
+<div class="action-item">
+<strong>#2 &mdash; Square CUSTOMERS stream disabled</strong><br>
+<code>customers</code> stream off on all Square connections. Old connector (v0.2.1) had pagination bug (100 rows only). New v1.7.13 works but stream was never re-enabled. <strong>~8M customer records missing.</strong><br>
+<span style="color:#888;font-size:12px"><strong>Fix:</strong> Enable stream, accept 8M row initial load, then incremental. ~10 min.</span>
+</div>
+
+<div class="action-item">
+<strong>#3 &mdash; 2 append streams misconfigured</strong><br>
+<code>ETHER.tax_rates</code> (534 rows/sync, 3.3M accumulated) and <code>NETSUITE.custom_inventory</code> (~698 rows/sync, 30K accumulated). Both are small reference tables running as full_refresh/append &mdash; duplicating data every sync. Must convert before cutover.<br>
+<span style="color:#888;font-size:12px"><strong>Fix:</strong> Switch to full_refresh/overwrite. ~5 min. <a href="/airbyte-migration/append-cutover-plan.html">Plan &rarr;</a></span>
+</div>
+
+<h3 style="margin-top:32px">Cutover Gates</h3>
 <div class="card">
+<p>After the 3 issues above are fixed:</p>
 <ol style="margin:8px 0 8px 24px">
-<li style="margin:8px 0"><strong>NetSuite <code>custom_wholesale</code> fix</strong> &mdash; NoneType crash at <code>streams.py:509</code>. One-line fix (<code>or []</code>) in 6 locations. Build patched Docker 0.4.2, test on isolated connection, deploy. ~1h active work + 7h sync wait.</li>
-<li style="margin:8px 0"><strong>Square CUSTOMERS stream enable</strong> &mdash; enable on v1.7.13, accept 8M row initial load, then incremental. ~10 min.</li>
-<li style="margin:8px 0"><strong>Append streams convert</strong> &mdash; 2 streams (ETHER.tax_rates, NETSUITE.custom_inventory) misconfigured as full_refresh/append. Convert to overwrite. ~5 min.</li>
-<li style="margin:8px 0"><strong>24h observation window</strong> &mdash; <code>rate_monitor.py</code> confirms zero prod interference.</li>
-<li style="margin:8px 0"><strong>Final parity verification</strong> across all 11 schemas.</li>
-<li style="margin:8px 0"><strong>Cutover</strong> &mdash; Snowflake rename swap, &lt;30 min downtime.</li>
+<li style="margin:8px 0"><strong>24h observation window</strong> &mdash; <code>rate_monitor.py</code> confirms zero prod interference</li>
+<li style="margin:8px 0"><strong>Final parity verification</strong> across all 11 schemas</li>
+<li style="margin:8px 0"><strong>Cutover</strong> &mdash; Snowflake rename swap, &lt;30 min downtime</li>
 </ol>
-<p style="color:#888;font-size:13px;margin-top:12px">Active work remaining: <strong>under 2 hours</strong>. Wall clock: 24h observation + sync waits.</p>
+<p style="color:#888;font-size:13px;margin-top:12px">Active work on issues: <strong>under 2 hours</strong>. Then 24h observation + sync waits.</p>
 </div>
 
 <!-- ============================================================ -->
