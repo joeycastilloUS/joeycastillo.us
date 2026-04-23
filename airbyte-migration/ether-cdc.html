@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ether CDC Upgrade &mdash; Fix Row Drift, Cut Sync Cost 95%</title>
+<link rel="stylesheet" href="/airbyte-migration/gate.css">
+<script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.7}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
+nav .meta{color:#666;font-size:12px}
+.container{max-width:860px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px;letter-spacing:-0.5px}
+.subtitle{color:#6FC3DF;font-size:15px;margin-bottom:28px}
+h2{color:#6FC3DF;font-size:18px;margin:36px 0 14px;border-bottom:1px solid #333;padding-bottom:8px}
+h3{color:#fff;font-size:15px;margin:20px 0 8px}
+p{margin:8px 0;font-size:14px}
+ul,ol{margin:8px 0 8px 24px}
+li{margin:4px 0;font-size:14px}
+code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC3DF}
+pre{background:#0a0a0a;padding:16px;border-radius:8px;overflow-x:auto;margin:12px 0;font-size:13px;color:#ccc;border:1px solid #222}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:10px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:10px 12px;border-bottom:1px solid #1e1e1e}
+tr:hover{background:#1A1A1A}
+.card{background:#1A1A1A;border-radius:6px;padding:20px;margin:16px 0}
+.card h3{margin-top:0;color:#6FC3DF}
+.verdict{background:#1a2a1a;border-left:4px solid #6FC3DF;padding:20px 24px;margin:24px 0;border-radius:0 8px 8px 0;font-size:15px;color:#6FC3DF;font-weight:700;line-height:1.5}
+.ask{background:#1A1A1A;border:2px solid #6FC3DF;border-radius:8px;padding:24px;margin:24px 0;text-align:center}
+.ask h3{color:#6FC3DF;font-size:18px;margin:0 0 12px}
+.ask pre{text-align:left;max-width:500px;margin:12px auto}
+a{color:#6FC3DF;text-decoration:none}
+a:hover{text-decoration:underline}
+.green{color:#5cb85c}
+.red{color:#d9534f}
+.yellow{color:#f0ad4e}
+.bold{font-weight:700}
+.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #222}
+.stat:last-child{border-bottom:none}
+.stat-label{color:#888;font-size:13px}
+.stat-value{font-weight:600;font-size:13px;text-align:right}
+.comparison{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+.comparison .col{background:#1A1A1A;border-radius:8px;padding:16px 20px}
+.comparison .col-title{font-weight:700;margin-bottom:10px;font-size:14px;text-align:center}
+.step{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px}
+.step-num{background:#6FC3DF;color:#000;font-weight:700;min-width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.step-content{flex:1}
+.step-content strong{color:#fff}
+.step-content p{color:#888;font-size:13px;margin:4px 0 0}
+.diagram{background:#0a0a0a;border:1px solid #333;border-radius:8px;padding:20px;margin:16px 0;font-family:monospace;font-size:13px;line-height:1.8;overflow-x:auto;white-space:pre}
+.summary-box{background:#1A1A1A;border-radius:8px;padding:24px;margin:24px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.summary-box .num{font-size:32px;font-weight:700;color:#6FC3DF;display:block;text-align:center}
+.summary-box .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;text-align:center;display:block}
+.footer{margin-top:48px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+@media(max-width:600px){.summary-box{grid-template-columns:1fr}.comparison{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+<span class="brand">Airbyte Migration</span>
+<span class="meta">Philz Coffee &middot; acmedevUS</span>
+</nav>
+
+<div class="container">
+
+<h1>Ether: Switch to CDC</h1>
+<p class="subtitle">Fix row drift. Capture all UPDATEs. Cut sync volume 95%. One config change.</p>
+
+<!-- ============================================================ -->
+<!-- THE ASK -->
+<!-- ============================================================ -->
+<div class="verdict">Switch Ether Postgres from cursor-based replication to CDC (logical replication). Eliminates header/detail row drift, captures all UPDATEs and DELETEs, reduces sync volume from 21.3M rows/hr to ~500. Two hours total including verification.</div>
+
+<div class="ask">
+<h3>One Question for Wesley</h3>
+<p style="font-size:15px;margin:12px 0">Is the Ether Postgres instance configured with <code>wal_level = logical</code>?</p>
+<pre>-- Run on Ether Postgres:
+SHOW wal_level;</pre>
+<p style="color:#888;font-size:13px;margin-top:12px">If <code>logical</code> &mdash; we switch immediately, Airbyte-side only.<br>
+If <code>replica</code> &mdash; one config change + restart (5 min on RDS/Cloud SQL).</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- WHAT IT DOES -->
+<!-- ============================================================ -->
+<h2>What CDC Changes</h2>
+
+<div class="summary-box">
+<div><span class="num" style="color:#5cb85c">0</span><span class="label">Row Drift</span></div>
+<div><span class="num" style="color:#5cb85c">100%</span><span class="label">UPDATEs Captured</span></div>
+<div><span class="num" style="color:#5cb85c">95%</span><span class="label">Volume Reduction</span></div>
+</div>
+
+<div class="comparison">
+<div class="col">
+<div class="col-title" style="color:#d9534f">Now: Cursor-Based</div>
+<div class="stat"><span class="stat-label">Sync method</span><span class="stat-value">63 separate SELECTs</span></div>
+<div class="stat"><span class="stat-label">Header/detail drift</span><span class="stat-value red">1&ndash;91 min</span></div>
+<div class="stat"><span class="stat-label">UPDATE tracking</span><span class="stat-value red">5 tables blind</span></div>
+<div class="stat"><span class="stat-label">DELETE tracking</span><span class="stat-value red">Impossible</span></div>
+<div class="stat"><span class="stat-label">reactions/sync</span><span class="stat-value red">21.3M rows</span></div>
+<div class="stat"><span class="stat-label">Sync duration</span><span class="stat-value red">52 min</span></div>
+<div class="stat"><span class="stat-label">Daily writes</span><span class="stat-value red">~100 GB</span></div>
+<div class="stat"><span class="stat-label">Idle between syncs</span><span class="stat-value red">8 min</span></div>
+</div>
+<div class="col">
+<div class="col-title" style="color:#5cb85c">After: CDC</div>
+<div class="stat"><span class="stat-label">Sync method</span><span class="stat-value">1 WAL stream</span></div>
+<div class="stat"><span class="stat-label">Header/detail drift</span><span class="stat-value green bold">0 (atomic)</span></div>
+<div class="stat"><span class="stat-label">UPDATE tracking</span><span class="stat-value green bold">All captured</span></div>
+<div class="stat"><span class="stat-label">DELETE tracking</span><span class="stat-value green bold">All captured</span></div>
+<div class="stat"><span class="stat-label">reactions/sync</span><span class="stat-value green bold">~500 rows</span></div>
+<div class="stat"><span class="stat-label">Sync duration</span><span class="stat-value green bold">Minutes</span></div>
+<div class="stat"><span class="stat-label">Daily writes</span><span class="stat-value green bold">~2&ndash;5 GB</span></div>
+<div class="stat"><span class="stat-label">Idle between syncs</span><span class="stat-value green bold">55+ min</span></div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- HOW IT WORKS -->
+<!-- ============================================================ -->
+<h2>How CDC Works vs Current</h2>
+
+<div class="diagram">  CURSOR-BASED (current)                     CDC (proposed)
+  ============================               ============================
+  Job starts                                 Job starts
+   -> SELECT * FROM orders                    -> Read WAL from last position
+      WHERE updated_at > cursor  [t+0m]       -> ALL tables, ALL changes,
+   -> SELECT * FROM order_products               in transaction order
+      WHERE updated_at > cursor  [t+12m]
+   -> SELECT * FROM sales_line_items           INSERT order #12345
+      WHERE updated_at > cursor  [t+91m]       INSERT line_item for #12345
+                                               INSERT tax for #12345
+  Header at t+0, detail at t+91.               = one atomic batch
+  Gap = 91 min. UPDATEs invisible.
+                                             Gap = 0. All changes captured.</div>
+
+<p>CDC reads the Postgres write-ahead log (WAL) instead of querying tables individually. The WAL records every INSERT, UPDATE, and DELETE across all tables in transaction order. Airbyte reads from a single position &mdash; header and detail rows from the same transaction arrive together.</p>
+
+<!-- ============================================================ -->
+<!-- IMPLEMENTATION STEPS -->
+<!-- ============================================================ -->
+<h2>Implementation (2 Hours)</h2>
+
+<h3>Postgres Side (~15 min)</h3>
+
+<div class="step">
+<div class="step-num">1</div>
+<div class="step-content">
+<strong>Verify WAL level</strong>
+<pre>SHOW wal_level;
+-- Must be 'logical'. If 'replica', change in config + restart.</pre>
+<p>RDS/Cloud SQL: parameter group change, auto-restart ~5 min. Self-hosted: edit postgresql.conf, restart.</p>
+</div>
+</div>
+
+<div class="step">
+<div class="step-num">2</div>
+<div class="step-content">
+<strong>Grant replication privilege</strong>
+<pre>ALTER USER airbyte_user REPLICATION;</pre>
+</div>
+</div>
+
+<div class="step">
+<div class="step-num">3</div>
+<div class="step-content">
+<strong>Create replication slot + publication</strong>
+<pre>SELECT pg_create_logical_replication_slot('airbyte_ether', 'pgoutput');
+CREATE PUBLICATION airbyte_ether_pub FOR ALL TABLES;</pre>
+</div>
+</div>
+
+<div class="step">
+<div class="step-num">4</div>
+<div class="step-content">
+<strong>Set replica identity for PK-less tables</strong>
+<pre>-- Only needed for the 11 junction tables without primary keys:
+ALTER TABLE table_name REPLICA IDENTITY FULL;</pre>
+<p>Tables with PKs use DEFAULT identity (no change needed).</p>
+</div>
+</div>
+
+<h3>Airbyte Side (~5 min)</h3>
+
+<div class="step">
+<div class="step-num">5</div>
+<div class="step-content">
+<strong>Switch source to CDC mode</strong>
+<p>Edit the Ether Postgres source. Change replication method from Standard to Logical Replication (CDC).</p>
+<pre>{
+  "replication_method": {
+    "method": "CDC",
+    "replication_slot": "airbyte_ether",
+    "publication": "airbyte_ether_pub",
+    "initial_waiting_seconds": 300
+  }
+}</pre>
+</div>
+</div>
+
+<div class="step">
+<div class="step-num">6</div>
+<div class="step-content">
+<strong>Reset + re-sync</strong>
+<p>First sync = initial snapshot (~52 min, same as current full sync). Every sync after that: minutes, WAL changes only.</p>
+</div>
+</div>
+
+<div class="step">
+<div class="step-num">7</div>
+<div class="step-content">
+<strong>Verify</strong>
+<p>Run 2 hourly syncs. Confirm WAL-only mode, confirm header/detail arrive together, confirm reactions volume dropped from 21.3M to ~500 rows.</p>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- RISK -->
+<!-- ============================================================ -->
+<h2>Risk Assessment</h2>
+
+<div class="card">
+<table>
+<tr><th>Risk</th><th>Likelihood</th><th>Mitigation</th></tr>
+<tr>
+<td>wal_level needs changing</td>
+<td class="yellow">Medium</td>
+<td>RDS/Cloud SQL: parameter group change + auto-restart. ~5 min downtime.</td>
+</tr>
+<tr>
+<td>WAL disk usage</td>
+<td style="color:#888">Low</td>
+<td>Hourly cron keeps slot lag small. Set <code>max_slot_wal_keep_size</code> to cap.</td>
+</tr>
+<tr>
+<td>Initial snapshot duration</td>
+<td style="color:#888">Low</td>
+<td>Same as current full sync (~52 min). One-time cost. Schedule off-hours.</td>
+</tr>
+<tr>
+<td>Data loss</td>
+<td style="color:#888">None</td>
+<td>Additive change. Existing Snowflake data stays. Connection config unchanged.</td>
+</tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<!-- SIZING -->
+<!-- ============================================================ -->
+<h2>Effort</h2>
+
+<div class="card">
+<div class="stat"><span class="stat-label">Postgres setup</span><span class="stat-value">15 min (4 SQL commands)</span></div>
+<div class="stat"><span class="stat-label">Airbyte config change</span><span class="stat-value">5 min (API or UI)</span></div>
+<div class="stat"><span class="stat-label">Initial snapshot</span><span class="stat-value">~52 min (one-time)</span></div>
+<div class="stat"><span class="stat-label">Verification</span><span class="stat-value">2 sync cycles</span></div>
+<div class="stat"><span class="stat-label">Total wall clock</span><span class="stat-value bold">~2 hours</span></div>
+<div class="stat"><span class="stat-label">Risk to existing data</span><span class="stat-value green bold">None</span></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- WHAT'S BROKEN (details last) -->
+<!-- ============================================================ -->
+<h2>Background: Current Issues</h2>
+
+<p>Ether runs cursor-based incremental replication &mdash; each of 63 tables is queried independently with <code>SELECT * WHERE updated_at > last_cursor</code>. This creates three row-integrity issues, all of which exist in production today (not introduced by migration).</p>
+
+<h3>Issue 1: Header/Detail Cursor Drift</h3>
+<div class="card">
+<p>Airbyte reads tables sequentially. Header tables and their detail tables are separate queries at different times in the same job. Measured from Job 56 (April 12):</p>
+<table>
+<tr><th>Header</th><th>Detail</th><th>Cursor Gap</th></tr>
+<tr><td><code>orders</code></td><td><code>order_products</code></td><td>2 min 8 sec</td></tr>
+<tr><td><code>sales_orders</code></td><td><code>sales_line_items_all</code></td><td>7 min 53 sec</td></tr>
+<tr><td><code>sales_orders</code></td><td><code>sales_line_items_merchandise</code></td><td class="red bold">1 hr 31 min</td></tr>
+<tr><td><code>sales_orders</code></td><td><code>sales_line_items_bag</code></td><td>14 min 45 sec</td></tr>
+</table>
+<p style="color:#888;margin-top:8px">A new sales order's header is captured, but its line items are 91 minutes behind. Detail rows appear on the next hourly sync. This is the "missing rows" Wesley reported.</p>
+</div>
+
+<h3>Issue 2: ID Cursor Misses UPDATEs</h3>
+<div class="card">
+<p>5 detail tables use auto-increment <code>id</code> as cursor instead of <code>updated_at</code>. Only new INSERTs (higher ID) are captured. If an existing row is UPDATED (tax recalculated, attribute changed), the sync never sees it.</p>
+<table>
+<tr><th>Table</th><th>Cursor</th><th>What's Invisible</th></tr>
+<tr><td><code>order_taxes</code></td><td class="red"><code>id</code></td><td>Tax recalculations, rate corrections</td></tr>
+<tr><td><code>order_product_attribute_values</code></td><td class="red"><code>id</code></td><td>Attribute changes on existing items</td></tr>
+<tr><td><code>orders_promotions</code></td><td class="red"><code>id</code></td><td>Promotion modifications</td></tr>
+<tr><td><code>cart_products</code></td><td class="red"><code>id</code></td><td>Cart item quantity changes</td></tr>
+<tr><td><code>cart_product_attribute_values</code></td><td class="red"><code>id</code></td><td>Cart customization changes</td></tr>
+</table>
+</div>
+
+<h3>Issue 3: Full-Refresh Truncate Window</h3>
+<div class="card">
+<p>Tables like <code>order_product_taxes</code> (5.75M rows) run <code>full_refresh/overwrite</code>. During sync (~52 min), Snowflake truncates then reloads. Any query joining <code>orders</code> to <code>order_product_taxes</code> during this window returns incomplete results.</p>
+</div>
+
+<h3>Issue 4: reactions Cost Bomb</h3>
+<div class="card">
+<p>The <code>reactions</code> table was forced to full_refresh because <code>updated_at</code> has NULL values. Cursor-based incremental can't handle NULLs. Result: 21.3M rows re-synced every hour to catch ~500 new ones. 77% of total Ether volume. ~100 GB/day in Snowflake writes.</p>
+
+<div class="comparison" style="margin-top:12px">
+<div class="col">
+<div class="col-title" style="color:#d9534f">reactions now</div>
+<div class="stat"><span class="stat-label">Per sync</span><span class="stat-value">21,322,942 rows</span></div>
+<div class="stat"><span class="stat-label">Per sync</span><span class="stat-value">4.3 GB</span></div>
+<div class="stat"><span class="stat-label">Useful rows</span><span class="stat-value">~500</span></div>
+<div class="stat"><span class="stat-label">Waste ratio</span><span class="stat-value red">42,600 : 1</span></div>
+</div>
+<div class="col">
+<div class="col-title" style="color:#5cb85c">reactions with CDC</div>
+<div class="stat"><span class="stat-label">Per sync</span><span class="stat-value">~500 rows</span></div>
+<div class="stat"><span class="stat-label">Per sync</span><span class="stat-value">~100 KB</span></div>
+<div class="stat"><span class="stat-label">Useful rows</span><span class="stat-value">~500</span></div>
+<div class="stat"><span class="stat-label">Waste ratio</span><span class="stat-value green bold">1 : 1</span></div>
+</div>
+</div>
+
+<p style="color:#888;margin-top:8px">CDC doesn't use cursors. It reads the WAL. Every INSERT is captured regardless of NULL column values. The NULL cursor problem becomes irrelevant.</p>
+</div>
+
+<h3>Why This Wasn't Done Before</h3>
+<div class="card">
+<p>Production Airbyte (v0.40.28) was configured years ago with cursor-based replication &mdash; the default in Airbyte. CDC is opt-in. At 6 streams (44 seconds per sync), cursor drift was sub-second and invisible. At 63 streams (52 minutes per sync), drift grew to 91 minutes and became the "missing rows" problem.</p>
+<p style="margin-top:8px"><strong>This exists in production today.</strong> We didn't create it. We measured it. And CDC fixes it.</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- TRACEABILITY -->
+<!-- ============================================================ -->
+<h2>Traceability</h2>
+
+<div class="card">
+<table>
+<tr><th>Date</th><th>Event</th><th>Commit</th></tr>
+<tr><td>2026-04-11</td><td>reactions + roles switched to full_refresh (NULL cursor)</td><td><code>7ce73f4</code></td></tr>
+<tr><td>2026-04-11</td><td>55 streams patched with primary keys</td><td><code>4b61f8d</code></td></tr>
+<tr><td>2026-04-12</td><td>Full 63-stream activation (Job 56, 27.5M rows)</td><td><code>6c5552c</code></td></tr>
+<tr><td>2026-04-14</td><td>63/63 stream parity confirmed with production</td><td><code>3462ebb</code></td></tr>
+<tr><td>2026-04-17</td><td>Cursor drift measured + documented (1&ndash;91 min gaps)</td><td><code>4d84229</code></td></tr>
+<tr><td>2026-04-22</td><td>115 clustering keys dropped from ETHER schema</td><td><code>9194cca</code></td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<div class="footer">
+joeycastillo.us/airbyte-migration &middot; Philz Coffee &middot; acmedevUS<br>
+Last updated: 2026-04-23 &middot; <a href="/airbyte-migration/">Back to Migration Status</a>
+</div>
+
+</div>
+</body>
+</html>
