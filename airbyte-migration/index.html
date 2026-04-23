@@ -30,6 +30,7 @@ tr:hover{background:#1A1A1A}
 .status-live{background:#1a3a1a;color:#5cb85c}
 .status-syncing{background:#1a3a3a;color:#6FC3DF}
 .status-blocked{background:#3a1a1a;color:#d9534f}
+.status-stuck{background:#3a1a1a;color:#d9534f}
 .status-todo{background:#3a3a1a;color:#f0ad4e}
 .status-done{background:#1a3a1a;color:#5cb85c}
 .pct{font-weight:700}
@@ -47,6 +48,8 @@ a{color:#6FC3DF;text-decoration:none}
 a:hover{text-decoration:underline}
 .action-item{background:#1A1A1A;border-left:4px solid #f0ad4e;padding:12px 16px;margin:8px 0;font-size:14px}
 .action-item.done{border-left-color:#5cb85c}
+.action-item.critical{border-left-color:#d9534f}
+.action-item.open{border-left-color:#f0ad4e}
 .footer{margin-top:48px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
 @media(max-width:600px){.summary-box{grid-template-columns:1fr}.stat .num{font-size:28px}}
 </style>
@@ -67,50 +70,37 @@ a:hover{text-decoration:underline}
 <!-- ============================================================ -->
 <div class="summary-box" style="grid-template-columns:1fr 1fr 1fr 1fr">
 <div class="stat"><span class="num">10/10</span><span class="label">Connections Active</span></div>
-<div class="stat"><span class="num">207</span><span class="label">Streams Configured</span></div>
-<div class="stat"><span class="num">106</span><span class="label">Incremental Streams</span></div>
-<div class="stat"><a href="#open-issues" style="text-decoration:none"><span class="num" style="color:#5cb85c">0</span><span class="label">Open Issues</span></a></div>
+<div class="stat"><span class="num">8/10</span><span class="label">Crons Verified</span></div>
+<div class="stat"><span class="num">207</span><span class="label">Streams</span></div>
+<div class="stat"><a href="#open-issues" style="text-decoration:none"><span class="num" style="color:#d9534f">4</span><span class="label">Open Issues</span></a></div>
 </div>
 
-<div class="progress-bar"><div class="progress-fill" style="width:90%"></div></div>
-<p style="text-align:center;color:#6FC3DF;font-weight:700;font-size:18px">10 connections &middot; all on cron &middot; all flowing &middot; monitoring tonight's cron cycle</p>
+<div class="progress-bar"><div class="progress-fill" style="width:85%"></div></div>
+<p style="text-align:center;color:#f0ad4e;font-weight:700;font-size:16px">8/10 connections proven on cron &middot; 2 stuck jobs blocking Square + NetSuite &middot; Ether CDC upgrade proposed</p>
 
 <!-- ============================================================ -->
 <!-- OPEN ISSUES -->
 <!-- ============================================================ -->
-<h2 id="open-issues">0 Open Issues</h2>
+<h2 id="open-issues">4 Open Issues</h2>
 
-<div class="action-item done">
-<strong>#1 &mdash; Stuck Refresh: Square &mdash; FIXED 2026-04-22</strong><br>
-Refresh Job 89 cancelled. Manual sync Job 96 triggered and flowing (22K+ records). PAYMENTS gap root cause: <code>full_refresh+overwrite</code> was partially committed (195K of 1M) during stuck refresh. Current sync will restore full dataset.
-</div>
-
-<div class="action-item done">
-<strong>#2 &mdash; Stuck Refresh: NetSuite &mdash; FIXED 2026-04-22</strong><br>
-Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered and flowing (23K+ records). Docker 0.4.2 connector confirmed functional.
+<div class="action-item critical">
+<strong>#1 &mdash; STUCK: Square Job 116 (13+ hours)</strong><br>
+Running since 2026-04-22 10:45 UTC with only 60,828 rows. Normal sync: 11 min / 195K rows. Job is stuck and blocking the daily cron (00:30 PT). This is the <strong>third time</strong> Square has had a stuck job &mdash; Jobs 49, 89/96/111 were all cancelled previously. Last successful sync: Job 85 on 2026-04-21 (195,759 rows, 11 min). <strong>Action: cancel Job 116 and trigger manual sync.</strong>
 </div>
 
-<h3 style="margin-top:32px">Production Readiness &mdash; Boards 30-33 DONE (52 pts)</h3>
-<div class="card">
-<p>Full audit (r304) found 9 gaps. All 4 boards built and shipped (r311).</p>
-<ol style="margin:8px 0 8px 24px">
-<li style="margin:8px 0"><span class="status status-done">Board 30</span> <strong>Schedules + Activation</strong> &mdash; 7 cron schedules set, 3 connections activated, Square/Ecomm TZ fixed, Uber Eats namespace fixed (13 pts)</li>
-<li style="margin:8px 0"><span class="status status-done">Board 31</span> <strong>Cleanup + DR</strong> &mdash; CrunchTime decommissioned, 8 junk purged (19&rarr;10), GCP daily snapshot, NetSuite Docker docs (13 pts)</li>
-<li style="margin:8px 0"><span class="status status-done">Board 32</span> <strong>Ecomm Incremental</strong> &mdash; 98 tables converted (104 incremental, 3 full_refresh), 10-100x Snowflake savings (13 pts)</li>
-<li style="margin:8px 0"><span class="status status-done">Board 33</span> <strong>Monitoring + SLA</strong> &mdash; sync_monitor.py polling (webhook N/A), SLA doc, Paytronix Data Sharing investigated (2/10 overlap, keep Airbyte) (13 pts)</li>
-</ol>
-<p style="color:#5cb85c;font-size:13px;margin-top:12px"><strong>Config correct. Stuck refreshes cleared. Manual syncs running. Monitoring tonight's cron cycle.</strong></p>
+<div class="action-item critical">
+<strong>#2 &mdash; STUCK: NetSuite Job 117 (13+ hours)</strong><br>
+Running since 2026-04-22 10:45 UTC with 112,630 rows. Normal sync: 2 hr / 1.69M rows. Job is stuck and blocking the daily cron (00:00 PT). This is the <strong>third time</strong> NetSuite has had a stuck job &mdash; Jobs 97, 109 were cancelled previously. Last successful sync: Job 76 on 2026-04-19 (1.69M rows, 2hr 3min). <strong>Action: cancel Job 117 and trigger manual sync.</strong>
 </div>
 
-<h3 style="margin-top:32px">Previously Resolved</h3>
-<div class="action-item done">
-<strong>NetSuite <code>custom_wholesale</code> &mdash; FIXED 2026-04-21</strong> &mdash; Docker 0.4.2, 6/6 streams patched. Now blocked by stuck refresh (issue #2 above).
+<div class="action-item open">
+<strong>#3 &mdash; Ether cursor drift: header/detail rows 1&ndash;91 min out of sync</strong><br>
+Ether uses cursor-based replication. Header tables (<code>orders</code>) and detail tables (<code>sales_line_items</code>) read at different times, creating 1&ndash;91 min gaps where detail rows appear one sync later. Also: 5 tables use <code>id</code> cursor and miss all UPDATEs. Fix: switch to CDC (logical replication). <strong>Requires Wesley to check <code>SHOW wal_level</code> on Ether Postgres.</strong> <a href="/airbyte-migration/ether-cdc.html">Full proposal &rarr;</a>
 </div>
-<div class="action-item done">
-<strong>Square CUSTOMERS &mdash; FIXED 2026-04-21</strong> &mdash; Enabled on v1.7.13, 11 streams. Now blocked by stuck refresh (issue #1 above).
-</div>
-<div class="action-item done">
-<strong>Append streams &mdash; FIXED 2026-04-21</strong> &mdash; ETHER.tax_rates + NETSUITE.custom_inventory converted from append to overwrite.
+
+<div class="action-item open">
+<strong>#4 &mdash; Google Sheets: Supply Chain Tracker not replicated</strong><br>
+GCP auth not resolved on airbyte-philz. Needs <code>gcloud auth login</code> + GCP Secret Manager resolution. Low priority &mdash; not blocking cutover. ~30 min to fix when ready.
 </div>
 
 <!-- ============================================================ -->
@@ -120,85 +110,85 @@ Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered an
 
 <table>
 <thead>
-<tr><th>Connection</th><th>Streams</th><th>Schedule</th><th>Status</th><th>Last Sync</th></tr>
+<tr><th>Connection</th><th>Streams</th><th>Schedule</th><th>Status</th><th>Last Sync (live 2026-04-23)</th></tr>
 </thead>
 <tbody>
 <tr>
 <td>Ether Postgres</td>
 <td>63 (47 inc / 16 full)</td>
 <td>Hourly :00 UTC</td>
-<td><span class="status status-live">Active</span></td>
-<td>Cron confirmed &mdash; Job 98 fired 21:00 UTC. ORDERS 35.5M rows.</td>
+<td><span class="status status-live">Cron OK</span></td>
+<td>Job 134 running now. Jobs 128&ndash;133 all succeeded hourly (~27.6M rows, ~51 min each). Cron proven.</td>
 </tr>
 <tr>
 <td>Ecomm Postgres</td>
 <td>107 (104 inc / 3 full)</td>
 <td>Daily 02:45 PT</td>
-<td><span class="status status-live">Active</span></td>
-<td>Refresh succeeded &mdash; 104 incremental (04-22)</td>
+<td><span class="status status-live">Cron OK</span></td>
+<td>Job 126 succeeded 2,227 rows (04-22). First incremental delta after 98-table conversion. Next cron 02:45 PT.</td>
 </tr>
-<tr>
-<td>Philz Square 2 2025</td>
+<tr style="background:#2a1a1a">
+<td style="color:#d9534f;font-weight:700">Philz Square 2 2025</td>
 <td>11 (3 inc / 8 full)</td>
 <td>Daily 00:30 PT</td>
-<td><span class="status status-live">Active</span></td>
-<td>PAYMENTS+REFUNDS now incremental. Cron tonight 00:30 PT.</td>
+<td><span class="status status-stuck">STUCK</span></td>
+<td style="color:#d9534f">Job 116 running 13+ hrs (60K rows). Blocking cron. Issue #1.</td>
 </tr>
 <tr>
 <td>Greenhouse</td>
 <td>5 (5 inc)</td>
 <td>Daily 03:00 PT</td>
-<td><span class="status status-live">Active</span></td>
-<td>Awaiting first cron sync (last: 04-14)</td>
+<td><span class="status status-live">Cron OK</span></td>
+<td>Job 123 succeeded 12 rows (04-22). Cron verified.</td>
 </tr>
 <tr>
 <td>CrunchTime</td>
 <td>394</td>
 <td>CDC3 real-time</td>
 <td><span class="status status-live">Live CDC</span></td>
-<td>419M rows via Data Stream (bypasses Airbyte)</td>
+<td>419M rows via Data Stream (bypasses Airbyte). Always current.</td>
 </tr>
 <tr>
 <td>DoorDash (Docker)</td>
 <td>3 (3 inc)</td>
 <td>Daily 03:30 PT</td>
-<td><span class="status status-live">Active</span></td>
-<td>Sync succeeded &mdash; 3.47M records (04-21)</td>
+<td><span class="status status-live">Cron OK</span></td>
+<td>Job 127 succeeded 161,375 rows (04-22). Fixed after clustering key drop.</td>
 </tr>
-<tr>
-<td>NetSuite (Docker 0.4.2)</td>
+<tr style="background:#2a1a1a">
+<td style="color:#d9534f;font-weight:700">NetSuite (Docker 0.4.2)</td>
 <td>6 (1 inc / 5 full)</td>
 <td>Daily 00:00 PT</td>
-<td><span class="status status-live">Active</span></td>
-<td>Clean for cron. First sync tonight 00:00 PT.</td>
+<td><span class="status status-stuck">STUCK</span></td>
+<td style="color:#d9534f">Job 117 running 13+ hrs (112K rows). Blocking cron. Issue #2.</td>
 </tr>
 <tr>
 <td>Uber Eats (Docker)</td>
 <td>1 (1 inc)</td>
 <td>Daily 03:15 PT</td>
-<td><span class="status status-live">Active</span></td>
-<td>Awaiting first cron sync (last: 04-14)</td>
+<td><span class="status status-live">Cron OK</span></td>
+<td>Job 124 succeeded 12,486 rows (04-22). Cron verified.</td>
 </tr>
 <tr>
 <td>Comtrade (GCS)</td>
 <td>1 (full)</td>
 <td>Weekly Sun</td>
-<td><span class="status status-live">Active</span></td>
-<td>Succeeded (04-19)</td>
+<td><span class="status status-live">Cron OK</span></td>
+<td>Job 121 succeeded 71 rows (04-22). Weekly cron verified.</td>
 </tr>
 <tr>
 <td>Cropster (GCS)</td>
 <td>1 (full)</td>
 <td>Weekly Sun</td>
-<td><span class="status status-live">Active</span></td>
-<td>Succeeded (04-19)</td>
+<td><span class="status status-live">Cron OK</span></td>
+<td>Job 122 succeeded 8 rows (04-22). Weekly cron verified.</td>
 </tr>
 <tr>
 <td>Paytronix East&rarr;West</td>
 <td>10 (full)</td>
 <td>Daily 03:30 UTC</td>
-<td><span class="status status-live">Active</span></td>
-<td>Awaiting first cron sync (last: 04-14)</td>
+<td><span class="status status-live">Cron OK</span></td>
+<td>Job 120 succeeded 15.3M rows (04-22). Cron verified.</td>
 </tr>
 </tbody>
 </table>
@@ -206,31 +196,46 @@ Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered an
 <!-- ============================================================ -->
 <!-- DATA PARITY -->
 <!-- ============================================================ -->
-<h2>Data Parity (Live Spot-Check 2026-04-22)</h2>
+<h2>Data Parity (Live Spot-Check 2026-04-23 00:30 UTC)</h2>
 
 <table>
 <thead>
 <tr><th>Schema.Table</th><th>Prod (AIRBYTE_DB)</th><th>Clone (AIRBYTE_CLONE)</th><th>Delta</th></tr>
 </thead>
 <tbody>
-<tr><td>ECOMM.SPREE_ORDERS</td><td>2,058,115</td><td>2,058,191</td><td><span class="pct pct-good">+76 (+0.0%)</span></td></tr>
+<tr><td>ETHER.ORDERS</td><td>35,488,892</td><td>35,488,847</td><td><span class="pct pct-good">-45 (-0.0%)</span></td></tr>
+<tr><td>ETHER.REACTIONS</td><td>21,390,522</td><td>21,390,561</td><td><span class="pct pct-good">+39 (+0.0%)</span></td></tr>
+<tr><td>ECOMM.SPREE_ORDERS</td><td>2,058,461</td><td>2,058,488</td><td><span class="pct pct-good">+27 (+0.0%)</span></td></tr>
 <tr><td>ECOMM.SPREE_PRODUCTS</td><td>547</td><td>547</td><td><span class="pct pct-good">MATCH</span></td></tr>
-<tr><td>SQUARE.ORDERS</td><td>9,830,522</td><td>9,705,708</td><td><span class="pct pct-warn">-124,814 (-1.3%)</span></td></tr>
-<tr><td style="color:#d9534f;font-weight:700">SQUARE.PAYMENTS</td><td>1,007,220</td><td style="color:#d9534f;font-weight:700">119,008</td><td><span class="pct pct-bad">-888,212 (-88.2%)</span></td></tr>
-<tr><td>GREENHOUSE.APPLICATIONS</td><td>226,792</td><td>225,755</td><td><span class="pct pct-warn">-1,037 (-0.5%)</span></td></tr>
-<tr><td>GREENHOUSE.CANDIDATES</td><td>185,862</td><td>184,921</td><td><span class="pct pct-warn">-941 (-0.5%)</span></td></tr>
-<tr><td>DOORDASH.ORDER_DETAILS</td><td>3,447,567</td><td>3,471,309</td><td><span class="pct pct-good">+23,742 (+0.7%)</span></td></tr>
-<tr><td>DOORDASH.TRANSACTION_DETAILS</td><td>1,733,295</td><td>1,733,760</td><td><span class="pct pct-good">+465 (+0.0%)</span></td></tr>
-<tr><td style="color:#f0ad4e">PAYTRONIX.WALLET</td><td>4,629,334</td><td style="color:#f0ad4e">11,467,872</td><td><span class="pct pct-warn">+6.8M (+147%)</span></td></tr>
-<tr><td>ETHER.ORDERS</td><td>35,471,905</td><td>35,468,714</td><td><span class="pct pct-good">-3,191 (-0.0%)</span></td></tr>
-<tr><td>UBEREATS.ORDER_DETAILS</td><td>1,767,609</td><td>1,748,299</td><td><span class="pct pct-warn">-19,310 (-1.1%)</span></td></tr>
-<tr><td>NETSUITE (all)</td><td colspan="2">20 tables match. Clean for cron tonight 00:00 PT.</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>SQUARE.ORDERS</td><td>9,850,434</td><td>9,830,522</td><td><span class="pct pct-warn">-19,912 (-0.2%)</span></td></tr>
+<tr><td>SQUARE.PAYMENTS</td><td>1,011,732</td><td>1,007,220</td><td><span class="pct pct-warn">-4,512 (-0.4%)</span></td></tr>
+<tr><td>SQUARE.CUSTOMERS</td><td>100</td><td>100</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>NETSUITE.CUSTOM_SALES_ORDER</td><td>1,003,006</td><td>1,001,767</td><td><span class="pct pct-warn">-1,239 (-0.1%)</span></td></tr>
+<tr><td>NETSUITE.CUSTOM_WHOLESALE</td><td>44,322</td><td>44,305</td><td><span class="pct pct-good">-17 (-0.0%)</span></td></tr>
+<tr><td>GREENHOUSE.APPLICATIONS</td><td>226,976</td><td>226,976</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>GREENHOUSE.CANDIDATES</td><td>186,010</td><td>186,010</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>DOORDASH.ORDER_DETAILS</td><td>3,450,819</td><td>3,450,819</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>DOORDASH.TRANSACTION_DETAILS</td><td>1,734,886</td><td>1,734,886</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>UBEREATS.ORDER_DETAILS</td><td>1,769,082</td><td>1,769,082</td><td><span class="pct pct-good">MATCH</span></td></tr>
+<tr><td>PAYTRONIX.WALLET</td><td>4,640,155</td><td>4,640,155</td><td><span class="pct pct-good">MATCH</span></td></tr>
 </tbody>
 </table>
 
-<p style="color:#6FC3DF;font-size:13px;font-weight:700">SQUARE.PAYMENTS: 88% deficit. Square API returns ~119K via full_refresh (date window limit). Prod's 1M accumulated over years via incremental. Now converted to incremental/append_dedup -- will accumulate daily.</p>
-<p style="color:#f0ad4e;font-size:13px">PAYTRONIX: Clone has 6.8M more rows than prod. Clone captured historical data that prod has since cleaned. Not corruption &mdash; but needs investigation before rename swap.</p>
-<p style="color:#888;font-size:13px">GREENHOUSE/SQUARE staleness expected &mdash; connections just activated, first cron cycle fires tonight. Ecomm matched within 76 rows. DoorDash within 0.7%.</p>
+<p style="color:#5cb85c;font-size:13px;font-weight:700">Massive improvement from last check: Greenhouse MATCH (was -0.5%), DoorDash MATCH (was +0.7%), Uber Eats MATCH (was -1.1%), Paytronix MATCH (was +147%). 10/15 tables at exact parity. SQUARE.PAYMENTS improved from -88% to -0.4%.</p>
+<p style="color:#f0ad4e;font-size:13px">SQUARE and NETSUITE gaps will close when stuck jobs are cleared and crons resume. Both are small (&lt;0.5%) and shrinking.</p>
+
+<h3>Infrastructure Health</h3>
+<div class="card">
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>Clustering keys on active schemas</td><td><span class="pct pct-good">0 remaining</span> (395 dropped on 2026-04-22)</td></tr>
+<tr><td>Orphaned generation rows</td><td><span class="pct pct-good">0 remaining</span> (15.3M purged on 2026-04-22)</td></tr>
+<tr><td>V2 Typing &amp; Deduping</td><td><span class="pct pct-good">All 10 schemas upgraded</span></td></tr>
+<tr><td>Post-clone cleanup automation</td><td><span class="pct pct-good">post_clone_cleanup.py ready</span></td></tr>
+<tr><td>GCP daily snapshots</td><td><span class="pct pct-good">Enabled</span> (06:00 UTC, 7d retention)</td></tr>
+<tr><td>Monitoring</td><td><span class="pct pct-good">sync_monitor.py + freshness SLA</span></td></tr>
+</table>
+</div>
 
 <!-- ============================================================ -->
 <!-- RECENTLY RESOLVED -->
@@ -238,23 +243,33 @@ Refresh Job 92 cancelled (had 4 retry attempts). Manual sync Job 97 triggered an
 <h2>Recently Resolved</h2>
 
 <div class="action-item done">
-<strong>Stuck Refreshes &mdash; FIXED 2026-04-22</strong><br>
-Square Job 89 + NetSuite Job 92 cancelled. Manual syncs triggered (Jobs 96+97). Root cause: batched config changes (timezone + namespace + schedule) triggered Airbyte auto-refresh that never completed. PAYMENTS 88% gap was partial overwrite during stuck refresh -- will self-heal when current sync completes.
+<strong>Ecomm + DoorDash sync failures &mdash; FIXED 2026-04-22</strong><br>
+Root cause: 395 clustering keys on <code>_AIRBYTE_EMITTED_AT</code> inherited from <code>CREATE DATABASE ... CLONE</code>. All dropped across 10 active schemas. Ecomm Job 126 succeeded (2,227 rows). DoorDash Job 127 succeeded (161K rows). <code>post_clone_cleanup.py</code> updated to catch all patterns.
+</div>
+
+<div class="action-item done">
+<strong>Board 34: Fix All Criticals &mdash; SHIPPED 2026-04-22</strong><br>
+12 clustering keys dropped (UE+GH). 15.3M orphaned generation rows purged (PTX/COM/CRP). 10/10 schemas clean. Full parity sweep verified.
+</div>
+
+<div class="action-item done">
+<strong>Stuck Refreshes (round 2) &mdash; FIXED 2026-04-22</strong><br>
+Square Job 89/96/111 + NetSuite Job 97/109 cancelled. Config changes trigger Airbyte auto-refresh that never completes. Root cause understood but recurrence pattern not yet eliminated &mdash; <strong>Jobs 116/117 stuck again (issue #1/#2 above).</strong>
 </div>
 
 <div class="action-item done">
 <strong>Board 30-33: Production Readiness &mdash; SHIPPED 2026-04-22</strong><br>
-All 9 gaps from full audit closed. 52 pts across 4 boards: cron schedules set, 3 connections activated, CrunchTime decommissioned, 8 junk purged (19&rarr;10 connections), 98 Ecomm tables converted to incremental (104 inc / 3 full), sync_monitor.py created, freshness SLA defined, Paytronix Data Sharing investigated, GCP daily snapshots enabled, NetSuite Docker maintenance doc written.
+52 pts: cron schedules, 3 activations, CrunchTime decommissioned, 8 junk purged, 98 Ecomm tables to incremental, sync_monitor.py, freshness SLA, GCP snapshots, NetSuite Docker docs.
 </div>
 
 <div class="action-item done">
-<strong>DoorDash &mdash; Fixed 2026-04-21</strong><br>
-Stale empty stream schemas fixed via API catalog refresh. Job 87: 4,495,015 records committed. All 3 streams active.
+<strong>NetSuite <code>custom_wholesale</code> &mdash; FIXED 2026-04-21</strong><br>
+Docker 0.4.2 overlay: 6 null guards in <code>parse_response()</code>. 6/6 streams enabled. Image on VM only (not pushed to GCR).
 </div>
 
 <div class="action-item done">
-<strong>CrunchTime &mdash; Resolved 2026-04-21</strong><br>
-CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>IM_OWNER</code>. Old Airbyte Oracle connection decommissioned.
+<strong>DoorDash catalog + CrunchTime CDC3 &mdash; FIXED 2026-04-21</strong><br>
+DoorDash: stale empty schemas fixed via API refresh, 4.49M records. CrunchTime: CDC3 Data Stream active (394 tables, 419M rows), old Oracle connection decommissioned.
 </div>
 
 <!-- ============================================================ -->
@@ -264,7 +279,7 @@ CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>I
 
 <div class="card">
 <ul style="margin:4px 0 4px 24px">
-<li><a href="/airbyte-migration/ether-cdc.html"><strong>Ether CDC Upgrade</strong></a> &mdash; fix row drift, capture UPDATEs, cut sync volume 95%</li>
+<li><a href="/airbyte-migration/ether-cdc.html"><strong>Ether CDC Upgrade Proposal</strong></a> &mdash; fix row drift, capture UPDATEs, cut sync volume 95%</li>
 <li><a href="/airbyte-migration/stream-comparison.html">Full Stream Comparison</a> &mdash; 937 tables, 18 schemas, every stream audited</li>
 <li><a href="/airbyte-migration/append-cutover-plan.html">Append Stream Cutover Plan</a> &mdash; 2 streams, convert to overwrite before rename swap</li>
 <li><a href="/airbyte-migration/netsuite.html">NetSuite Prod Investigation</a> &mdash; wholesale NoneType crash, retry storm, fix plan</li>
@@ -280,30 +295,30 @@ CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>I
 
 <h3 style="color:#f0ad4e">Pre-Cutover Checklist</h3>
 <ol style="margin:8px 0 16px 24px;font-size:14px">
-<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Cancel stuck Square refresh</strong> &mdash; DONE (Job 89 cancelled, Job 96 running)</li>
-<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Cancel stuck NetSuite refresh</strong> &mdash; DONE (Job 92 cancelled, Job 97 running)</li>
-<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Investigate SQUARE.PAYMENTS gap</strong> &mdash; EXPLAINED: full_refresh+overwrite partially committed during stuck refresh. Current sync restores.</li>
-<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Investigate PAYTRONIX surplus</strong> &mdash; EXPLAINED: API returns more data than prod V1. Not corruption. Dedup analysis before cutover.</li>
-<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Convert PAYMENTS+REFUNDS to incremental</strong> &mdash; DONE: no more overwrite risk, accumulates daily</li>
-<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Clear all running jobs before cron</strong> &mdash; DONE: 0 running/stuck jobs, clean slate</li>
-<li style="margin:8px 0"><strong>Verify all 10 connections complete at least one cron sync</strong> &mdash; 7 crons fire tonight, Ether already confirmed</li>
-<li style="margin:8px 0"><strong>Paytronix dedup analysis</strong> &mdash; 147% surplus needs investigation before rename swap</li>
+<li style="margin:8px 0"><strong style="color:#d9534f">Cancel stuck Square Job 116 + trigger clean sync</strong> &mdash; OPEN (3rd recurrence)</li>
+<li style="margin:8px 0"><strong style="color:#d9534f">Cancel stuck NetSuite Job 117 + trigger clean sync</strong> &mdash; OPEN (3rd recurrence)</li>
+<li style="margin:8px 0"><strong>Verify all 10 connections complete at least one clean cron cycle</strong> &mdash; 8/10 verified. Square + NetSuite blocked by stuck jobs.</li>
+<li style="margin:8px 0"><strong>Ether CDC upgrade</strong> &mdash; PROPOSED. Requires Wesley to check <code>SHOW wal_level</code>. <a href="/airbyte-migration/ether-cdc.html">Details</a></li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Fix Ecomm + DoorDash sync failures</strong> &mdash; DONE (clustering keys dropped)</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Convert PAYMENTS+REFUNDS to incremental</strong> &mdash; DONE</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Convert 98 Ecomm tables to incremental</strong> &mdash; DONE</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Drop all clustering keys on active schemas</strong> &mdash; DONE (395 dropped)</li>
+<li style="margin:8px 0;color:#5cb85c;text-decoration:line-through"><strong>Purge orphaned generation rows</strong> &mdash; DONE (15.3M purged)</li>
 </ol>
 
 <h3>Cutover Steps (after blockers cleared)</h3>
 <ol style="margin:16px 0 16px 24px;font-size:14px">
-<li style="margin:8px 0"><strong>Pause</strong> all connections on old Airbyte servers</li>
-<li style="margin:8px 0"><strong>Final parity check</strong> &mdash; row counts match across all schemas</li>
-<li style="margin:8px 0"><strong>Rename</strong> <code>AIRBYTE_DB</code> &rarr; <code>AIRBYTE_ARCHIVE</code></li>
-<li style="margin:8px 0"><strong>Rename</strong> <code>AIRBYTE_CLONE</code> &rarr; <code>AIRBYTE_DB</code></li>
-<li style="margin:8px 0"><strong>Update</strong> V2 destination to point at <code>AIRBYTE_DB</code></li>
-<li style="margin:8px 0"><strong>Decommission</strong> old servers after 48h observation</li>
+<li style="margin:8px 0"><strong>Run</strong> <code>post_clone_cleanup.py --execute --db AIRBYTE_DB</code> (automated pre-flight)</li>
+<li style="margin:8px 0"><strong>Run</strong> <code>batch_apply.py --cutover</code> against AIRBYTE_DB (V2 metadata on prod)</li>
+<li style="margin:8px 0"><strong>Verify</strong> with <code>verify_batch.py</code></li>
+<li style="margin:8px 0"><strong>Point</strong> airbyte-philz at AIRBYTE_DB</li>
+<li style="margin:8px 0"><strong>Activate</strong> all connections on airbyte-philz</li>
+<li style="margin:8px 0"><strong>Verify</strong> first cron cycle</li>
+<li style="margin:8px 0"><strong>Decommission</strong> old airbyte + airbyte-2 after 48h observation</li>
 </ol>
 
-<p style="color:#888;font-size:13px">Cron schedules already set on all 10 connections &mdash; step 6 from old procedure is done. Downstream consumers keep working. Archive = instant rollback.</p>
-
 <!-- ============================================================ -->
-<!-- HOW WE GOT HERE -->
+<!-- BACKGROUND -->
 <!-- ============================================================ -->
 <h2>Background</h2>
 
@@ -317,13 +332,28 @@ CDC3 Data Stream active in Snowflake &mdash; 394 tables, 419M rows under <code>I
 <li><strong>V2 schema migration</strong>: custom <code>batch_apply.py</code> &mdash; 505 tables, 1.71B rows, 6 minutes, 2.07 credits on X-Large warehouse.</li>
 <li><strong>Rate-limit safety</strong>: kill switch, 429 monitoring, concurrency cap = 1, prod schedule mapping.</li>
 <li><strong>Incremental resume</strong>: connections replicated with injected cursor states &mdash; resume from where production left off.</li>
+<li><strong>Post-clone cleanup</strong>: automated script drops inherited clustering keys + purges orphaned generation rows.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Work Completed</h3>
+<p>26 boards &middot; 239 items done &middot; 942 story points &middot; 336 revisions</p>
+<ul>
+<li>V2 metadata migration: 505 tables, 1.71B rows, 2.07 credits</li>
+<li>10 connections active with cron schedules matching production</li>
+<li>98 Ecomm tables converted from full_refresh to incremental</li>
+<li>3 custom Docker connectors transferred (NetSuite, DoorDash, Uber Eats)</li>
+<li>CrunchTime resolved via CDC3 Data Stream (394 tables, bypasses Airbyte)</li>
+<li>395 clustering keys dropped, 15.3M orphaned rows purged</li>
+<li>Full automation: post_clone_cleanup.py, sync_monitor.py, batch_apply.py</li>
 </ul>
 </div>
 
 <!-- ============================================================ -->
 <div class="footer">
 joeycastillo.us/airbyte-migration &middot; Philz Coffee &middot; acmedevUS<br>
-Last updated: 2026-04-22 21:00 UTC &middot; v0 &middot; r316
+Last updated: 2026-04-23 01:00 UTC &middot; v0 &middot; r336
 </div>
 
 </div>
