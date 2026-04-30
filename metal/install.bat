@@ -1,21 +1,21 @@
 @echo off
-rem metal — install. Tools + engine in one shot.
-rem v3.0 — 2026-03-25
+rem metal - install. Tools + engine in one shot.
+rem v3.1 - 2026-05-01
 rem curl -fsSL https://joeycastillo.us/metal/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
 rem Installs git, gh, clones metal, runs Fe (tools), launches Be.
-rem Idempotent — safe to run again.
+rem Idempotent - safe to run again.
 
 setlocal enabledelayedexpansion
 
 echo.
 echo   metal
-echo   v3.0 — 2026-03-25
+echo   v3.1 - 2026-05-01
 echo.
 echo   Dedicated to Our Lady of the Miraculous Medal
 echo.
 echo   This will:
 echo.
-echo     1. Install Git (via winget)
+echo     1. Install Git (winget; bootstrapped if missing)
 echo     2. Install GitHub CLI (via winget)
 echo     3. Authenticate with GitHub (gh auth login)
 echo     4. Clone metal repo to C:\metal
@@ -28,6 +28,23 @@ if /i "!CHOICE!"=="S" (
     echo.
     echo   Skipped.
     goto :end
+)
+
+rem === Step 0: Ensure winget is available ===
+where winget >nul 2>&1
+if !errorlevel! neq 0 (
+    echo [0/6] winget not found. Installing App Installer...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; try { Invoke-WebRequest 'https://aka.ms/getwinget' -OutFile $env:TEMP\winget.msixbundle; Add-AppxPackage $env:TEMP\winget.msixbundle } catch { Write-Host ('winget bootstrap failed: ' + $_.Exception.Message); exit 1 }"
+    call :refresh_path
+    where winget >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo.
+        echo   ERROR: winget unavailable after bootstrap.
+        echo   Install App Installer manually: https://aka.ms/getwinget
+        echo   Then run this script again.
+        goto :error
+    )
+    echo   winget ready.
 )
 
 rem === Step 1: Install Git ===
@@ -109,7 +126,7 @@ echo [5/6] Running Fe...
 if exist "C:\metal\Go.Fe.bat" (
     call "C:\metal\Go.Fe.bat"
 ) else (
-    echo   Go.Fe.bat not found — skipping tools setup.
+    echo   Go.Fe.bat not found - skipping tools setup.
 )
 
 rem === Step 6: Launch Be ===
@@ -146,7 +163,7 @@ goto :end
 
 :error
     echo.
-    echo   ERROR — see above. Fix and run again.
+    echo   ERROR - see above. Fix and run again.
     pause
 
 :end
