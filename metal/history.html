@@ -133,7 +133,14 @@
         <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/telemetry.html">telemetry</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/architecture.html">architecture</a></div>
 
         <div class="version">
-            <div class="version-header">r790 <span class="date">2026-05-02</span> <span class="tag">latest</span></div>
+            <div class="version-header">r794 <span class="date">2026-05-02</span> <span class="tag">latest</span></div>
+            <ul>
+                <li><strong>install.bat v3.4 &mdash; CRLF + inline ensure_claude (regression fix)</strong> &mdash; Board 95 (8 pts). v3.3 introduced a <code>:ensure_claude</code> subroutine that on real fresh installs aborted with "system cannot find batch label ensure_claude" mid-execution. Root cause: cmd.exe's label-stack frame was evicted from the parser cache when <code>npm install</code> (an external <code>.cmd</code>) ran from inside <code>call :ensure_claude</code> on an LF-only file. Three coordinated changes restore deterministic behavior: (1) <code>:ensure_claude</code> body is now inlined directly into Step 6 main flow &mdash; no subroutine, no label to re-resolve; (2) <code>npm install -g</code> changed to <code>call npm install -g</code> for explicit child-batch invocation; (3) <code>install.bat</code> converted from LF-only (194 LF) to CRLF (196 CRLF), the standard Windows .bat convention. Other <code>.bat</code> files in the repo keep LF for now &mdash; they have only simple linear flow and are unaffected</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r790 <span class="date">2026-05-02</span></div>
             <ul>
                 <li><strong>install.bat v3.3 &mdash; Claude install hardening</strong> &mdash; Board 94 (11 pts). Two coordinated changes guarantee Claude Code is installed and callable by the time install.bat exits. <em>Primary fix in <code>Go.Fe.ps1</code> Phase 2:</em> prepend <code>C:\Program Files\nodejs</code> to <code>$env:PATH</code>, resolve <code>npm.cmd</code> to a concrete path via probe + <code>Get-Command</code> fallback, loud failure when npm cannot be found, invoke <code>RunInstall</code> with the quoted full <code>$npmCmd</code> path. Fixes the silent <code>npm install -g claude</code> failure on fresh installs where Phase 1's PATH refresh missed the just-installed Node entry. <em>Contract enforcement in <code>install.bat</code>:</em> new <code>:ensure_claude</code> subroutine called before <code>go.bat</code>; probes <code>claude</code>, refreshes PATH, retries; if still missing, runs <code>npm install -g @anthropic-ai/claude-code</code> directly with visible output; if that fails, hard-fails with a one-line recovery command. install.bat now refuses to launch Be unless claude is callable</li>
             </ul>
