@@ -133,7 +133,14 @@
         <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/telemetry.html">telemetry</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/architecture.html">architecture</a></div>
 
         <div class="version">
-            <div class="version-header">r794 <span class="date">2026-05-02</span> <span class="tag">latest</span></div>
+            <div class="version-header">r798 <span class="date">2026-05-02</span> <span class="tag">latest</span></div>
+            <ul>
+                <li><strong>install.bat v3.5 &mdash; cd + go at end of install</strong> &mdash; Board 96 (3 pts). User-driven hotfix: the success path at the end of <code>install.bat</code> now uses <code>cd /d C:\metal</code> + <code>call go.bat</code>, identical to the recovery instruction the script prints on every error path. Replaces the older <code>pushd C:\metal</code> / <code>call "C:\metal\go.bat"</code> / <code>popd</code> sequence. Same end result, simpler control flow, one mental model for both success and recovery</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r794 <span class="date">2026-05-02</span></div>
             <ul>
                 <li><strong>install.bat v3.4 &mdash; CRLF + inline ensure_claude (regression fix)</strong> &mdash; Board 95 (8 pts). v3.3 introduced a <code>:ensure_claude</code> subroutine that on real fresh installs aborted with "system cannot find batch label ensure_claude" mid-execution. Root cause: cmd.exe's label-stack frame was evicted from the parser cache when <code>npm install</code> (an external <code>.cmd</code>) ran from inside <code>call :ensure_claude</code> on an LF-only file. Three coordinated changes restore deterministic behavior: (1) <code>:ensure_claude</code> body is now inlined directly into Step 6 main flow &mdash; no subroutine, no label to re-resolve; (2) <code>npm install -g</code> changed to <code>call npm install -g</code> for explicit child-batch invocation; (3) <code>install.bat</code> converted from LF-only (194 LF) to CRLF (196 CRLF), the standard Windows .bat convention. Other <code>.bat</code> files in the repo keep LF for now &mdash; they have only simple linear flow and are unaffected</li>
             </ul>
