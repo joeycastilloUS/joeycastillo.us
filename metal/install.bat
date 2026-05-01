@@ -1,6 +1,6 @@
 @echo off
 rem metal - install. Tools + engine in one shot.
-rem v3.2 - 2026-05-01
+rem v3.3 - 2026-05-02
 rem curl -fsSL https://joeycastillo.us/metal/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
 rem Installs git, gh, clones metal, runs Fe (tools), launches Be.
 rem Idempotent - safe to run again.
@@ -9,7 +9,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo   metal
-echo   v3.2 - 2026-05-01
+echo   v3.3 - 2026-05-02
 echo.
 echo   Dedicated to Our Lady of the Miraculous Medal
 echo.
@@ -134,24 +134,45 @@ echo.
 echo [6/6] Install complete. Launching Be...
 echo.
 
-rem Ensure claude is on PATH
-where claude >nul 2>&1
-if !errorlevel! neq 0 (
-    call :refresh_path
-    where claude >nul 2>&1
-    if !errorlevel! neq 0 (
-        if exist "%APPDATA%\npm\claude.cmd" set "PATH=!PATH!;%APPDATA%\npm"
-    )
-    where claude >nul 2>&1
-    if !errorlevel! neq 0 (
-        if exist "%USERPROFILE%\.local\bin\claude.exe" set "PATH=!PATH!;%USERPROFILE%\.local\bin"
-    )
-)
+rem Ensure claude is callable -- Fe should have installed it, but verify and self-heal.
+call :ensure_claude
+if !errorlevel! neq 0 goto :error
 
 pushd C:\metal
 call "C:\metal\go.bat"
 popd
 goto :end
+
+:ensure_claude
+    where claude >nul 2>&1
+    if !errorlevel! equ 0 exit /b 0
+    call :refresh_path
+    if exist "%APPDATA%\npm\claude.cmd" set "PATH=!PATH!;%APPDATA%\npm"
+    if exist "%USERPROFILE%\.local\bin\claude.exe" set "PATH=!PATH!;%USERPROFILE%\.local\bin"
+    where claude >nul 2>&1
+    if !errorlevel! equ 0 exit /b 0
+    echo.
+    echo   Fe did not install claude. Installing directly...
+    where npm >nul 2>&1
+    if !errorlevel! neq 0 set "PATH=!PATH!;C:\Program Files\nodejs"
+    where npm >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo   ERROR: npm not on PATH. Node.js install incomplete.
+        echo   Open a NEW terminal, run: npm install -g @anthropic-ai/claude-code
+        echo   Then run: cd \metal ^&^& go
+        exit /b 1
+    )
+    npm install -g @anthropic-ai/claude-code
+    call :refresh_path
+    if exist "%APPDATA%\npm\claude.cmd" set "PATH=!PATH!;%APPDATA%\npm"
+    where claude >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo   ERROR: claude still not found after direct install.
+        echo   Open a NEW terminal, run: cd \metal ^&^& go
+        exit /b 1
+    )
+    echo   claude installed.
+    exit /b 0
 
 :refresh_path
     rem Use PowerShell to read EXPANDED Machine + User Path values.
