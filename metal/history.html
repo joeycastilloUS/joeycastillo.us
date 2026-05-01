@@ -133,7 +133,14 @@
         <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/telemetry.html">telemetry</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/architecture.html">architecture</a></div>
 
         <div class="version">
-            <div class="version-header">r788 <span class="date">2026-05-01</span> <span class="tag">latest</span></div>
+            <div class="version-header">r790 <span class="date">2026-05-02</span> <span class="tag">latest</span></div>
+            <ul>
+                <li><strong>install.bat v3.3 &mdash; Claude install hardening</strong> &mdash; Board 94 (11 pts). Two coordinated changes guarantee Claude Code is installed and callable by the time install.bat exits. <em>Primary fix in <code>Go.Fe.ps1</code> Phase 2:</em> prepend <code>C:\Program Files\nodejs</code> to <code>$env:PATH</code>, resolve <code>npm.cmd</code> to a concrete path via probe + <code>Get-Command</code> fallback, loud failure when npm cannot be found, invoke <code>RunInstall</code> with the quoted full <code>$npmCmd</code> path. Fixes the silent <code>npm install -g claude</code> failure on fresh installs where Phase 1's PATH refresh missed the just-installed Node entry. <em>Contract enforcement in <code>install.bat</code>:</em> new <code>:ensure_claude</code> subroutine called before <code>go.bat</code>; probes <code>claude</code>, refreshes PATH, retries; if still missing, runs <code>npm install -g @anthropic-ai/claude-code</code> directly with visible output; if that fails, hard-fails with a one-line recovery command. install.bat now refuses to launch Be unless claude is callable</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r788 <span class="date">2026-05-01</span></div>
             <ul>
                 <li><strong>install.bat v3.2 &mdash; refresh_path PATH expansion hotfix</strong> &mdash; Board 93 (6 pts). Bug: <code>:refresh_path</code> read <code>HKLM\...\Environment\Path</code> via <code>reg query</code>, which returns the raw <code>REG_EXPAND_SZ</code> string with literal <code>%SystemRoot%</code> tokens. <code>set "PATH=..."</code> stored those literals; cmd.exe does not expand <code>%var%</code> tokens when walking PATH for command resolution, so <code>powershell.exe</code> (at <code>%SystemRoot%\System32\WindowsPowerShell\v1.0\</code>) became unfindable, killing Step 6's <code>go.bat</code> launcher with "powershell is not recognized." Fix: replace <code>reg query</code> with PowerShell <code>[Environment]::GetEnvironmentVariable('Path','Machine')</code> which expands REG_EXPAND_SZ via the Win32 API; PATH now stores fully expanded literals like <code>C:\Windows\System32</code></li>
             </ul>
