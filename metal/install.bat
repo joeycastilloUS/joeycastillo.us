@@ -1,6 +1,6 @@
 @echo off
 rem metal - install. Tools + engine in one shot.
-rem v3.1 - 2026-05-01
+rem v3.2 - 2026-05-01
 rem curl -fsSL https://joeycastillo.us/metal/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
 rem Installs git, gh, clones metal, runs Fe (tools), launches Be.
 rem Idempotent - safe to run again.
@@ -9,7 +9,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo   metal
-echo   v3.1 - 2026-05-01
+echo   v3.2 - 2026-05-01
 echo.
 echo   Dedicated to Our Lady of the Miraculous Medal
 echo.
@@ -154,10 +154,13 @@ popd
 goto :end
 
 :refresh_path
+    rem Use PowerShell to read EXPANDED Machine + User Path values.
+    rem reg query returns REG_EXPAND_SZ values literally (with %SystemRoot% etc),
+    rem which would corrupt PATH and make powershell.exe unfindable in later steps.
     set "NEW_PATH="
-    for /f "tokens=2,*" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "NEW_PATH=%%B"
+    for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path','Machine')"`) do set "NEW_PATH=%%P"
     set "USER_PATH="
-    for /f "tokens=2,*" %%A in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "USER_PATH=%%B"
+    for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path','User')"`) do set "USER_PATH=%%P"
     if defined USER_PATH (set "PATH=!NEW_PATH!;!USER_PATH!") else (set "PATH=!NEW_PATH!")
     exit /b
 
