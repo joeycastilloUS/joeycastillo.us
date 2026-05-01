@@ -1,6 +1,6 @@
 @echo off
 rem metal - install. Tools + engine in one shot.
-rem v3.4 - 2026-05-02
+rem v3.5 - 2026-05-02
 rem curl -fsSL https://joeycastillo.us/metal/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
 rem Installs git, gh, clones metal, runs Fe (tools), launches Be.
 rem Idempotent - safe to run again.
@@ -9,7 +9,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo   metal
-echo   v3.4 - 2026-05-02
+echo   v3.5 - 2026-05-02
 echo.
 echo   Dedicated to Our Lady of the Miraculous Medal
 echo.
@@ -171,9 +171,10 @@ if !errorlevel! neq 0 (
     echo   claude installed.
 )
 
-pushd C:\metal
-call "C:\metal\go.bat"
-popd
+rem Switch into the metal repo and launch go -- matches the manual recovery
+rem instruction printed on every error path, so the success path is identical.
+cd /d C:\metal
+call go.bat
 goto :end
 
 :refresh_path
