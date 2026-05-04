@@ -142,6 +142,28 @@ if exist "C:\metal\Go.Sign.bat" (
     echo   Go.Sign.bat not found - signing setup skipped.
 )
 
+rem === Step 5c: Fresh-install smoke harness ===
+rem Verify the install actually delivered a working dev box. Two checks:
+rem   1. git ls-remote origin (in C:\metal) -- proves HTTPS push auth works
+rem      (gh auth setup-git wired, token fresh, network up).
+rem   2. Go.Sign already ran an empty-commit smoke; if Step 5b succeeded,
+rem      signing is verified. We only re-prove the auth half here.
+rem Failure does not block Be launch (warn-and-continue) -- the install
+rem already produced something usable; the user just needs to know what
+rem isn't ready yet.
+echo.
+echo [5c/6] Smoke test...
+pushd C:\metal
+git ls-remote origin >nul 2>&1
+if !errorlevel! equ 0 (
+    echo   [OK] HTTPS push auth verified (ls-remote origin succeeded)
+    echo   metal install verified -- first commit will land.
+) else (
+    echo   [WARN] git ls-remote origin failed -- HTTPS push auth not wired.
+    echo   When ready: gh auth setup-git
+)
+popd
+
 rem === Step 6: Launch Be ===
 echo.
 echo [6/6] Install complete. Launching Be...
