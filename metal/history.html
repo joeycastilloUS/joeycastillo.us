@@ -133,7 +133,16 @@
         <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/telemetry.html">telemetry</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/architecture.html">architecture</a></div>
 
         <div class="version">
-            <div class="version-header">r798 <span class="date">2026-05-02</span> <span class="tag">latest</span></div>
+            <div class="version-header">r813 <span class="date">2026-05-04</span> <span class="tag">latest</span></div>
+            <ul>
+                <li><strong>Go.Sign install integration</strong> &mdash; Board 97 (17 pts, 5 phases). Closes the first-commit wall every fresh laptop hit. Root cause: shipped <code>.gitconfig</code> hardcoded <code>signingkey = B7213318225D642A</code> with <code>commit.gpgsign = true</code> &mdash; the key didn't exist on any new laptop, so the first <code>git commit</code> failed with "gpg failed to sign the data." Fix is split across two repos:
+                    <em>metal:</em> (1) new <code>Go.Sign.ps1</code> &mdash; idempotent script that reads identity from <code>gh api user</code>, finds or generates a per-laptop GPG key, registers via <code>gh gpg-key add</code>, writes <code>git config --global</code>, smoke-tests with an empty signed commit; (2) <code>Go.Fe.ps1</code> Step 2 calls <code>Go.Sign.ps1</code> instead of <code>cp .gitconfig</code>; (3) <code>.gitconfig</code> stripped to <code>[filter "lfs"]</code> only &mdash; identity moved to per-machine <code>git config --global</code>; (4) <code>be/tools/pre-commit.hook</code> as canonical hook source; <code>go.ps1</code> + <code>go.sh</code> SHA256-compare and self-install on every launch (Project DoD P4 promise kept); (5) <code>Go.Fe.ps1</code> Python install now filters MS Store stub at <code>WindowsApps</code> and verifies version output (mirrors the npm fix at line 138).
+                    <em>install.bat:</em> Step 5b calls <code>Go.Sign.bat</code> after Fe (gh authed, identity setup); Step 5c runs <code>git ls-remote origin</code> in <code>C:\metal</code> as fresh-install smoke verifying HTTPS push auth. Combined with Go.Sign's signed-commit smoke, install reports "first commit will land" before launching Be. Replaces the manual handoff documented at <a href="setup.html">setup.html</a>. Empirical proof: this entry exists because the very commit that documented the design landed signed on a laptop where the previous attempt had failed.</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r798 <span class="date">2026-05-02</span></div>
             <ul>
                 <li><strong>install.bat v3.5 &mdash; cd + go at end of install</strong> &mdash; Board 96 (3 pts). User-driven hotfix: the success path at the end of <code>install.bat</code> now uses <code>cd /d C:\metal</code> + <code>call go.bat</code>, identical to the recovery instruction the script prints on every error path. Replaces the older <code>pushd C:\metal</code> / <code>call "C:\metal\go.bat"</code> / <code>popd</code> sequence. Same end result, simpler control flow, one mental model for both success and recovery</li>
             </ul>

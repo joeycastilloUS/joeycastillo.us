@@ -204,55 +204,84 @@
     <div class="container">
 
         <h1>GPG Setup</h1>
-        <div class="tagline">Signed commits. Verified on GitHub. Two steps.</div>
+        <div class="tagline">Signed commits. Verified on GitHub. Now automated.</div>
         <div class="version-line">
             <a href="/metal">&larr; metal</a>
+        </div>
+
+        <!-- ═══ AUTOMATED NOTICE ═══ -->
+        <div class="step-card" style="border-color: #2a4a3a; background: #0d1f1a;">
+            <div class="step-number" style="color: #4ec9b0;">automated since r813</div>
+            <div class="step-title" style="color: #4ec9b0;">install.bat does this for you.</div>
+            <div class="step-desc" style="margin-bottom: 0;">
+                Board 97 baked the entire flow into <code>install.bat</code> Step 5b
+                (calls <code>Go.Sign.bat</code>). If you curl-installed metal, signing
+                is already wired. The manual recipe below is preserved for repair
+                scenarios &mdash; running <code>C:\metal\Go.Sign.bat</code> standalone
+                fixes a borked laptop without re-running the whole install.
+            </div>
         </div>
 
         <!-- ═══ HOW IT WORKS ═══ -->
         <div class="step-card" style="border-color: #1a3a2a;">
             <div class="step-desc" style="margin-bottom: 0;">
-                Claude Code handles key generation, git config, and uploading to GitHub automatically.
-                The only thing it can't do is the one-time OAuth browser approval &mdash; that's your one step.
+                <code>Go.Sign.ps1</code> handles key discovery / generation, git config,
+                and GitHub registration automatically. The only thing it can't do is
+                the one-time OAuth browser approval &mdash; that's your one step,
+                and it happens inline during install.
+            </div>
+        </div>
+
+        <!-- ═══ MANUAL REPAIR ═══ -->
+        <div class="section-title">If You Need To Run It Manually</div>
+
+        <div class="step-card">
+            <div class="step-number">One command</div>
+            <div class="step-title">Run Go.Sign on the laptop that's broken</div>
+            <div class="step-desc">
+                <code>Go.Sign.bat</code> is idempotent &mdash; safe on healthy
+                laptops (no-op), self-heals broken ones.
+            </div>
+            <div class="command-box" onclick="copy('s0-cmd','s0-btn')">
+                <code id="s0-cmd">C:\metal\Go.Sign.bat</code>
+                <button class="copy-btn" id="s0-btn">copy</button>
             </div>
         </div>
 
         <!-- ═══ STEP 1 ═══ -->
-        <div class="section-title">You Do This</div>
+        <div class="section-title">What Go.Sign Does &mdash; Step By Step</div>
 
         <div class="step-card">
-            <div class="step-number">Step 1 &mdash; the only manual step</div>
+            <div class="step-number">Step 1 &mdash; the only manual moment</div>
             <div class="step-title">Grant GitHub CLI the GPG scope</div>
             <div class="step-desc">
-                Run this in your terminal. It opens a browser &mdash; approve it, come back.
+                Run automatically by Go.Sign when needed. Opens a browser &mdash;
+                you approve it, control returns. Equivalent command:
             </div>
             <div class="command-box" onclick="copy('s1-cmd','s1-btn')">
                 <code id="s1-cmd">gh auth refresh -h github.com -s write:gpg_key</code>
                 <button class="copy-btn" id="s1-btn">copy</button>
             </div>
             <div class="warning">
-                Interactive &mdash; opens your browser with a device code. Approve it on GitHub. One-time only.
+                Interactive &mdash; opens your browser with a device code. Approve it on GitHub. One-time per laptop.
             </div>
         </div>
 
         <!-- ═══ STEP 2 ═══ -->
-        <div class="section-title">Claude Code Does The Rest</div>
-
         <div class="step-card">
             <div class="step-number">Step 2</div>
-            <div class="step-title">Tell Claude Code you're ready</div>
+            <div class="step-title">Go.Sign continues automatically</div>
             <div class="step-desc">
-                After the browser approval, just tell Claude Code to finish the GPG setup.
-                It will automatically:
+                After the browser approval, Go.Sign continues without further input:
             </div>
             <div style="color: #999; font-size: 0.85rem; line-height: 2;">
-                <span class="auto-badge">auto</span> Generate a 4096-bit RSA key matching your git identity<br>
-                <span class="auto-badge">auto</span> Configure git to sign all commits with the new key<br>
-                <span class="auto-badge">auto</span> Upload the public key to your GitHub account<br>
-                <span class="auto-badge">auto</span> Verify the whole chain works
+                <span class="auto-badge">auto</span> Find an existing local key matching your GitHub email, OR generate a fresh 4096-bit RSA key<br>
+                <span class="auto-badge">auto</span> Configure git to sign all commits with the chosen key<br>
+                <span class="auto-badge">auto</span> Upload the public key to your GitHub account (when generated)<br>
+                <span class="auto-badge">auto</span> Smoke-test with an empty signed commit in a scratch repo
             </div>
             <div class="note" style="margin-top: 1rem;">
-                That's it. Every commit from this machine will show the green "Verified" badge on GitHub.
+                Result: every commit from this machine shows the green "Verified" badge on GitHub.
             </div>
         </div>
 
@@ -262,22 +291,27 @@
         <div class="step-card">
             <div class="step-title" style="font-size: 0.95rem;"><code>gpg failed to sign the data</code></div>
             <div class="step-desc" style="margin-bottom: 0;">
-                Git is pointing to a key that doesn't exist on this machine. Tell Claude Code &mdash; it'll
-                generate a new one and rewire everything.
+                Git is pointing to a key that doesn't exist on this machine.
+                Run <code>C:\metal\Go.Sign.bat</code> &mdash; it finds an existing
+                key or generates a new one and rewires git config.
             </div>
         </div>
 
         <div class="step-card">
             <div class="step-title" style="font-size: 0.95rem;"><code>insufficient OAuth scopes</code></div>
             <div class="step-desc" style="margin-bottom: 0;">
-                You haven't done Step 1 yet. Run the <code>gh auth refresh</code> command above.
+                gh hasn't been granted <code>write:gpg_key</code> yet.
+                Go.Sign runs the refresh automatically on first key gen,
+                or run it yourself: <code>gh auth refresh -h github.com -s write:gpg_key</code>.
             </div>
         </div>
 
         <div class="step-card">
             <div class="step-title" style="font-size: 0.95rem;">New machine?</div>
             <div class="step-desc" style="margin-bottom: 0;">
-                Run Step 1 again on the new machine, then let Claude Code do Step 2. Fresh key per machine.
+                Just curl-install metal. <code>install.bat</code> runs
+                <code>Go.Sign.bat</code> at Step 5b automatically. Fresh key per
+                laptop; GitHub aggregates them all under your account.
             </div>
         </div>
 
