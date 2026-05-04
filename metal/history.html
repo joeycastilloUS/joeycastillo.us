@@ -133,7 +133,17 @@
         <div class="subtitle"><a href="/metal/">← back to metal</a> · <a href="/metal/telemetry.html">telemetry</a> · <a href="/metal/reference.html">reference</a> · <a href="/metal/architecture.html">architecture</a></div>
 
         <div class="version">
-            <div class="version-header">r813 <span class="date">2026-05-04</span> <span class="tag">latest</span></div>
+            <div class="version-header">r823 <span class="date">2026-05-04</span> <span class="tag">latest</span></div>
+            <ul>
+                <li><strong>Go.Sign sh sibling -- Mac/Linux parity</strong> &mdash; Board 98 (14 pts, 4 phases). Closes the first-commit wall on macOS and every Linux distro by mirroring Board 97's Windows pattern in bash:
+                    <em>metal:</em> (1) new <code>Go.Sign.sh</code> &mdash; bash port of <code>Go.Sign.ps1</code>, identical algorithm and idempotency; uses <code>gh api user --jq '.email'</code> instead of a separate <code>jq</code> dependency; gpg path probe walks <code>/opt/homebrew/bin</code> (Apple Silicon brew) -> <code>/usr/local/bin</code> (Intel brew / Linux) -> <code>/usr/bin</code> (system). ASCII + LF clean per Project DoD P1 + P2; <code>bash -n</code> parses cleanly; smoke-tested on Windows via Git Bash before any commit. (2) <code>Go.Fe.sh</code> Step 2 calls <code>bash Go.Sign.sh</code> instead of <code>cp .gitconfig + sed</code> -- the uname-branched gpg-path sed is gone, Go.Sign handles it.
+                    <em>install.sh:</em> Step 5b calls <code>Go.Sign.sh < /dev/tty</code> after Fe (preserves stdin for the gh auth refresh interactive flow when scope grant is needed); Step 5c runs <code>git ls-remote origin</code> in <code>$METAL_DIR</code> as the fresh-install smoke. Same defensive pattern as the Windows version: failure of either step warns but does not block Be launch.
+                    Empirical fresh-Mac and fresh-Linux VM tests outstanding (Joey's hands; needs VMs to actually validate). Until then, the bash sibling is verified by code-path symmetry to the Windows pattern + algorithmic smoke on this laptop.</li>
+            </ul>
+        </div>
+
+        <div class="version">
+            <div class="version-header">r813 <span class="date">2026-05-04</span></div>
             <ul>
                 <li><strong>Go.Sign install integration</strong> &mdash; Board 97 (17 pts, 5 phases). Closes the first-commit wall every fresh laptop hit. Root cause: shipped <code>.gitconfig</code> hardcoded <code>signingkey = B7213318225D642A</code> with <code>commit.gpgsign = true</code> &mdash; the key didn't exist on any new laptop, so the first <code>git commit</code> failed with "gpg failed to sign the data." Fix is split across two repos:
                     <em>metal:</em> (1) new <code>Go.Sign.ps1</code> &mdash; idempotent script that reads identity from <code>gh api user</code>, finds or generates a per-laptop GPG key, registers via <code>gh gpg-key add</code>, writes <code>git config --global</code>, smoke-tests with an empty signed commit; (2) <code>Go.Fe.ps1</code> Step 2 calls <code>Go.Sign.ps1</code> instead of <code>cp .gitconfig</code>; (3) <code>.gitconfig</code> stripped to <code>[filter "lfs"]</code> only &mdash; identity moved to per-machine <code>git config --global</code>; (4) <code>be/tools/pre-commit.hook</code> as canonical hook source; <code>go.ps1</code> + <code>go.sh</code> SHA256-compare and self-install on every launch (Project DoD P4 promise kept); (5) <code>Go.Fe.ps1</code> Python install now filters MS Store stub at <code>WindowsApps</code> and verifies version output (mirrors the npm fix at line 138).
