@@ -129,6 +129,19 @@ if exist "C:\metal\Go.Fe.bat" (
     echo   Go.Fe.bat not found - skipping tools setup.
 )
 
+rem === Step 5b: Run Go.Sign (identity + GPG + smoke test) ===
+rem Fe runs gh auth login at its Step 4. Go.Sign needs an authed gh
+rem to write user.signingkey from gh api user. Calling Go.Sign here
+rem ensures auth has completed. Idempotent -- safe to re-run; no-op
+rem if already healthy. Replaces the manual recipe at setup.html.
+echo.
+echo [5b/6] Running Go.Sign...
+if exist "C:\metal\Go.Sign.bat" (
+    call "C:\metal\Go.Sign.bat"
+) else (
+    echo   Go.Sign.bat not found - signing setup skipped.
+)
+
 rem === Step 6: Launch Be ===
 echo.
 echo [6/6] Install complete. Launching Be...
