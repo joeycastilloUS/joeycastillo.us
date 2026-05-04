@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>The Last System -- Jollibee QS Speed (Melvin)</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #e6edf3; overflow: hidden; }
+
+  /* Wrapper centers and scales the iPad-landscape canvas */
+  .stage { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #000; }
+  .pad   { width: 1024px; height: 700px; background: #0D1117; position: relative; transform-origin: center center; box-shadow: 0 0 40px rgba(88,166,255,0.06); }
+  @media (max-width: 1100px) {
+    .pad { transform: scale(calc(100vw / 1024)); }
+    .stage { align-items: flex-start; justify-content: flex-start; padding-top: env(safe-area-inset-top); }
+  }
+  @media (max-width: 1100px) and (orientation: portrait) {
+    .stage { padding: 0; }
+    .pad { transform: scale(calc(100vw / 1024)); transform-origin: top left; position: absolute; top: 0; left: 0; }
+  }
+
+  /* Brand strip */
+  .brand-strip { display: flex; justify-content: space-between; align-items: center; height: 36px; padding: 0 14px; background: #DA3633; color: #fff; font-weight: 700; letter-spacing: 0.04em; font-size: 13px; }
+  .brand-strip .name { display: flex; align-items: center; gap: 8px; }
+  .brand-strip .dot { width: 10px; height: 10px; border-radius: 50%; background: #FFC72C; box-shadow: 0 0 10px #FFC72C; }
+  .brand-strip .meta { font-size: 11px; opacity: 0.85; font-weight: 500; }
+
+  /* 3-column QS layout */
+  .qs-3col { display: grid; grid-template-columns: 1fr 280px 240px; height: calc(100% - 36px - 38px); gap: 0; }
+  .qs-col-left   { display: flex; flex-direction: column; background: #0D1117; overflow: hidden; }
+  .qs-col-center { display: flex; flex-direction: column; background: #161B22; border-left: 2px solid #30363D; border-right: 2px solid #30363D; }
+  .qs-col-right  { display: flex; flex-direction: column; background: #0D1117; }
+
+  /* Categories */
+  .qs-cat-bar { display: flex; height: 44px; background: #161B22; flex-shrink: 0; overflow-x: auto; }
+  .qs-cat-btn { flex: 0 0 auto; padding: 0 18px; height: 44px; background: #161B22; border: none; border-bottom: 3px solid transparent; color: #8B949E; font-size: 12.5px; font-weight: 600; letter-spacing: 0.5px; cursor: pointer; font-family: inherit; }
+  .qs-cat-btn:active { background: #21262D; }
+  .qs-cat-btn.active { color: #58A6FF; border-bottom-color: #58A6FF; }
+
+  /* Combo bar */
+  .qs-combo-bar { display: flex; gap: 4px; padding: 4px; background: #0D1117; flex-shrink: 0; }
+  .combo-btn { flex: 1; min-height: 56px; background: #1F6FEB; border: none; border-radius: 6px; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; box-shadow: 0 3px 0 #1158C7, inset 0 1px 0 rgba(255,255,255,0.1); cursor: pointer; transition: transform 60ms; font-family: inherit; }
+  .combo-btn:active { box-shadow: inset 0 2px 0 #0E4DA4; transform: translateY(2px); }
+  .cb-name { font-size: 13px; font-weight: 700; }
+  .cb-items { font-size: 10px; opacity: 0.75; }
+  .cb-price { font-size: 12px; font-weight: 600; }
+
+  /* Speed grid */
+  .speed-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; padding: 3px; flex: 1; overflow-y: auto; align-content: start; }
+  .speed-cell { min-height: 64px; background: #21262D; border: none; border-radius: 4px; color: #e6edf3; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; box-shadow: 0 2px 0 #0D1117, inset 0 1px 0 rgba(255,255,255,0.05); transition: box-shadow 0ms, transform 0ms, background 0ms; cursor: pointer; font-family: inherit; }
+  .speed-cell:active { box-shadow: inset 0 2px 0 #0D1117; transform: translateY(2px); background: #58A6FF; color: #0D1117; transition: box-shadow 60ms, transform 60ms; }
+  .speed-cell.flash { background: #238636; color: #fff; transition: background 200ms; }
+  .sc-name { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.15; }
+  .sc-price { font-size: 11px; color: #58A6FF; margin-top: 3px; }
+  .speed-cell:active .sc-price { color: #0D1117; font-weight: 700; }
+  .speed-cell.hidden { display: none; }
+
+  /* Center column -- check */
+  .qs-check-header { display: flex; justify-content: space-between; align-items: center; height: 44px; padding: 0 14px; background: #58A6FF; color: #0D1117; font-weight: 700; font-size: 13px; flex-shrink: 0; letter-spacing: 0.05em; }
+  .qs-check-scroll { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .qs-check-row { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid #21262D; font-size: 13.5px; animation: qs-slide-in 150ms ease-out; }
+  .qs-check-row.subtle { color: #8B949E; font-size: 12px; padding-top: 4px; padding-bottom: 4px; border-bottom: none; }
+  .qs-check-row.totals { border-top: 1px solid #30363D; padding-top: 6px; padding-bottom: 6px; border-bottom: none; }
+  .qc-name { color: #e6edf3; }
+  .qc-name-sm { color: #8B949E; font-style: italic; padding-left: 12px; }
+  .qc-price { color: #58A6FF; font-weight: 600; }
+  .qs-check-empty { padding: 36px 14px; text-align: center; color: #30363D; font-size: 22px; font-weight: 700; letter-spacing: 0.1em; }
+  .qs-check-total { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font-size: 22px; font-weight: 700; color: #58A6FF; background: #0D1117; border-top: 2px solid #58A6FF; flex-shrink: 0; }
+  .qs-check-total .label { font-size: 13px; letter-spacing: 0.05em; color: #8B949E; }
+
+  /* Right column -- tender */
+  .qs-tender-panel { flex: 1; display: flex; flex-direction: column; padding: 8px; gap: 6px; }
+  .qs-tender-total { height: 48px; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; color: #58A6FF; background: #161B22; border-radius: 6px; }
+  .qs-tender-btns { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .qs-cash-exact { height: 64px; background: #238636; border: none; border-radius: 6px; color: #fff; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 3px 0 #196C2E, inset 0 1px 0 rgba(255,255,255,0.1); transition: transform 60ms; font-family: inherit; }
+  .qs-cash-exact:active { box-shadow: inset 0 2px 0 #14532D; transform: translateY(2px); }
+  .qs-cash-btn { height: 42px; background: #21262D; border: none; border-radius: 4px; color: #e6edf3; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 0 #0D1117; font-family: inherit; }
+  .qs-cash-btn:active { box-shadow: inset 0 2px 0 #0D1117; transform: translateY(2px); }
+  .qs-card-btn { height: 50px; background: #1F6FEB; border: none; border-radius: 4px; color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 0 #1158C7; font-family: inherit; }
+  .qs-card-btn:active { box-shadow: inset 0 2px 0 #0E4DA4; transform: translateY(2px); }
+
+  /* Function key rail */
+  .qs-fn-bar { display: flex; height: 38px; background: #0D1117; border-top: 1px solid #30363D; flex-shrink: 0; }
+  .fn-key { flex: 1; border: none; background: #161B22; color: #8B949E; font-size: 11.5px; font-weight: 700; cursor: pointer; min-width: 60px; border-right: 1px solid #0D1117; letter-spacing: 0.04em; font-family: inherit; }
+  .fn-key:active { background: #21262D; color: #e6edf3; }
+  .fn-void { color: #F85149; }
+  .fn-mgr { color: #58A6FF; }
+
+  /* Touch-count overlay */
+  .touch-overlay { position: absolute; top: 6px; right: 14px; font-size: 11px; color: #8B949E; letter-spacing: 0.05em; pointer-events: none; }
+  .touch-overlay b { color: #58A6FF; }
+
+  /* Footer banner */
+  .footer-banner { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #444; font-size: 10px; letter-spacing: 0.05em; pointer-events: none; }
+  .footer-banner b { color: #58A6FF; }
+
+  @keyframes qs-slide-in {
+    from { transform: translateX(-12px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Manny / Melvin / MICROS / Peter / Compris pulse hint */
+  .souls { position: absolute; top: 4px; left: 14px; font-size: 10px; color: #444; letter-spacing: 0.04em; pointer-events: none; }
+  .souls b { color: #58A6FF; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="pad">
+
+    <!-- Brand strip -->
+    <div class="brand-strip">
+      <span class="name"><span class="dot"></span> JOLLIBEE &middot; QS SPEED &middot; MELVIN</span>
+      <span class="meta">terminal/pos-3 &middot; staff/garcia &middot; <span id="clock">--:--</span></span>
+    </div>
+
+    <!-- 3-column layout -->
+    <div class="qs-3col">
+
+      <!-- LEFT: cats + combos + speed grid -->
+      <div class="qs-col-left">
+        <div class="qs-cat-bar" id="cats">
+          <button class="qs-cat-btn active" data-cat="all">ALL</button>
+          <button class="qs-cat-btn" data-cat="chickenjoy">CHICKENJOY</button>
+          <button class="qs-cat-btn" data-cat="burgers">BURGERS</button>
+          <button class="qs-cat-btn" data-cat="burger-steak">BURGER STEAK</button>
+          <button class="qs-cat-btn" data-cat="spaghetti">SPAGHETTI</button>
+          <button class="qs-cat-btn" data-cat="breakfast">BREAKFAST</button>
+          <button class="qs-cat-btn" data-cat="sides">SIDES</button>
+          <button class="qs-cat-btn" data-cat="drinks">DRINKS</button>
+          <button class="qs-cat-btn" data-cat="desserts">DESSERTS</button>
+        </div>
+        <div class="qs-combo-bar" id="combos"></div>
+        <div class="speed-grid" id="grid"></div>
+      </div>
+
+      <!-- CENTER: running check -->
+      <div class="qs-col-center">
+        <div class="qs-check-header">
+          <span>DINE IN</span>
+          <span id="checkid">#1024</span>
+        </div>
+        <div class="qs-check-scroll" id="check"></div>
+        <div class="qs-check-total"><span class="label">TOTAL</span><span id="total">&#8369;0.00</span></div>
+      </div>
+
+      <!-- RIGHT: tender + fn rail -->
+      <div class="qs-col-right">
+        <div class="qs-tender-panel">
+          <div class="qs-tender-total" id="tendertotal">&#8369;0.00</div>
+          <div class="qs-tender-btns">
+            <button class="qs-cash-exact" id="btn-exact">CASH EXACT</button>
+            <button class="qs-cash-btn" data-cash="100">&#8369;100</button>
+            <button class="qs-cash-btn" data-cash="200">&#8369;200</button>
+            <button class="qs-cash-btn" data-cash="500">&#8369;500</button>
+            <button class="qs-cash-btn" data-cash="1000">&#8369;1000</button>
+            <button class="qs-card-btn" id="btn-card">CARD</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Function key rail -->
+    <div class="qs-fn-bar">
+      <button class="fn-key fn-void" id="btn-void">VOID</button>
+      <button class="fn-key">DISC</button>
+      <button class="fn-key">HOLD</button>
+      <button class="fn-key">REPRINT</button>
+      <button class="fn-key">NO SALE</button>
+      <button class="fn-key fn-mgr">MGR</button>
+    </div>
+
+    <div class="souls">souls: <b>Manny</b> 3-tap &middot; <b>Peter</b> 16ms &middot; <b>MICROS</b> 0-shift &middot; <b>Melvin</b> 0-trans &middot; <b>Compris</b></div>
+    <div class="touch-overlay">touches: <b id="touches">0</b></div>
+    <div class="footer-banner">The Last System &middot; <b>System Manifest</b> &middot; jollibee.com.ph &middot; tap items, watch the check fill, CASH EXACT to clear</div>
+  </div>
+</div>
+
+<script>
+/* === Items extracted from app/seed/jollibee/menu.triples (top-freq sorted) === */
+/* price in centavos (peso * 100) -- explicit currency math */
+const ITEMS = [
+  // [id, name, cents, category, freq]
+  ['cj-1pc-solo',     '1pc Chickenjoy',     8200,  'chickenjoy', 0.98],
+  ['fries-reg',       'Fries Reg',          5000,  'sides',      0.96],
+  ['coke-reg',        'Coke Reg',           5300,  'drinks',     0.95],
+  ['pmpie',           'Peach Mango Pie',    4800,  'desserts',   0.95],
+  ['spaghetti',       'Jolly Spaghetti',    6600,  'spaghetti',  0.94],
+  ['yumburger',       'Yumburger',          4800,  'burgers',    0.92],
+  ['bs-1pc',          'Burger Steak 1pc',   6000,  'burger-steak', 0.90],
+  ['choco-sundae',    'Choco Sundae',       3200,  'desserts',   0.88],
+  ['iced-tea-reg',    'Iced Tea Reg',       5300,  'drinks',     0.85],
+  ['cj-2pc',          '2pc Chickenjoy',    16300,  'chickenjoy', 0.85],
+  ['spag-drink',      'Spag w/ Drink',      9800,  'spaghetti',  0.85],
+  ['extra-rice',      'Extra Rice',         2500,  'sides',      0.85],
+  ['cheesy-yum',      'Cheesy Yumburger',   6900,  'burgers',    0.80],
+  ['bf-cj',           'BF Chickenjoy',      9500,  'breakfast',  0.85],
+  ['cj-1pc-drink',    'CJ + Drink',        11500,  'chickenjoy', 0.78],
+  ['bf-tapa',         'Beef Tapa',         11500,  'breakfast',  0.78],
+  ['coke-large',      'Coke Large',         6400,  'drinks',     0.78],
+  ['fries-med',       'Fries Med',          7000,  'sides',      0.78],
+  ['coke-float',      'Coke Float',         4600,  'drinks',     0.78],
+  ['mashed',          'Mashed Potato',      4500,  'sides',      0.72],
+  ['bf-longga',       'Longganisa',         9500,  'breakfast',  0.72],
+  ['mini-sundae',     'Mini Sundae',        2800,  'desserts',   0.65],
+  ['nuggets-6',       '6pc Nuggets',       10500,  'chickenjoy', 0.65],
+  ['iced-tea-lg',     'Iced Tea Large',     6400,  'drinks',     0.65],
+  ['fries-lg',        'Fries Large',        9500,  'sides',      0.65],
+  ['champ-jr',        'Champ Jr',          10500,  'burgers',    0.62],
+  ['cj-spicy',        '1pc CJ Spicy',       8500,  'chickenjoy', 0.62],
+  ['jolly-hotdog',    'Jolly Hotdog',       6900,  'burgers',    0.62],
+  ['bs-2pc',          'Burger Steak 2pc',  11900,  'burger-steak', 0.62],
+  ['bf-cornedbeef',   'Corned Beef',        9500,  'breakfast',  0.62],
+  ['sprite-reg',      'Sprite Reg',         5300,  'drinks',     0.65],
+  ['ccs-bbq',         'BBQ Chx Sand',       8800,  'burgers',    0.55],
+  ['palabok',         'Palabok',            8900,  'spaghetti',  0.55],
+  ['tunapie',         'Tuna Pie',           4500,  'sides',      0.58],
+  ['strawberry-sun',  'Strawberry Sundae',  4900,  'desserts',   0.50],
+  ['bf-bs',           'BF Burger Steak',    9500,  'breakfast',  0.55],
+  ['water',           'Bottled Water',      3000,  'drinks',     0.50],
+  ['royal',           'Royal Reg',          5300,  'drinks',     0.55],
+  ['bf-pancakes',     '2pc Pancakes',       7500,  'breakfast',  0.45],
+  ['coleslaw',        'Coleslaw',           4900,  'sides',      0.45],
+  ['cookies-cream',   'Cookies & Cream',    6300,  'desserts',   0.48],
+  ['iced-mocha',      'Iced Mocha',         8500,  'drinks',     0.55],
+  ['nuggets-10',      '10pc Nuggets',      18600,  'chickenjoy', 0.42],
+  ['ccs-chili',       'Chili Cheese Sand',  8800,  'burgers',    0.50],
+  ['hot-coffee',      'Hot Coffee',         5500,  'drinks',     0.48],
+];
+
+const COMBOS = [
+  ['super-a', 'Super Meal A',  18500, ['cj-1pc-solo', 'spaghetti', 'yumburger', 'coke-reg']],
+  ['super-b', 'Super Meal B',  19900, ['cj-1pc-solo', 'spaghetti', 'bs-1pc', 'coke-reg']],
+  ['super-c', 'Super Meal C',  17500, ['cj-1pc-solo', 'spaghetti', 'fries-reg', 'coke-reg']],
+];
+
+let check = [];
+let touchCount = 0;
+const VAT = 0.12;
+
+function fmt(cents) {
+  return '₱' + (cents / 100).toFixed(2);
+}
+
+function renderClock() {
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function renderGrid(catFilter) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  const items = ITEMS.filter(i => catFilter === 'all' || i[3] === catFilter)
+                     .sort((a, b) => b[4] - a[4]);
+  items.forEach(item => {
+    const [id, name, cents] = item;
+    const cell = document.createElement('button');
+    cell.className = 'speed-cell';
+    cell.dataset.id = id;
+    cell.innerHTML =
+      '<span class="sc-name">' + name + '</span>' +
+      '<span class="sc-price">' + fmt(cents) + '</span>';
+    cell.addEventListener('click', () => addItem(id, name, cents, cell));
+    grid.appendChild(cell);
+  });
+}
+
+function renderCombos() {
+  const cb = document.getElementById('combos');
+  cb.innerHTML = '';
+  COMBOS.forEach(c => {
+    const [id, name, cents, contains] = c;
+    const btn = document.createElement('button');
+    btn.className = 'combo-btn';
+    btn.innerHTML =
+      '<span class="cb-name">' + name + '</span>' +
+      '<span class="cb-items">' + contains.length + ' items</span>' +
+      '<span class="cb-price">' + fmt(cents) + '</span>';
+    btn.addEventListener('click', () => addItem(id, name, cents, btn));
+    cb.appendChild(btn);
+  });
+}
+
+function addItem(id, name, cents, srcEl) {
+  check.push({ id, name, cents });
+  touchCount++;
+  if (srcEl) {
+    srcEl.classList.add('flash');
+    setTimeout(() => srcEl.classList.remove('flash'), 220);
+  }
+  renderCheck();
+}
+
+function clearCheck() {
+  check = [];
+  renderCheck();
+}
+
+function renderCheck() {
+  const c = document.getElementById('check');
+  if (check.length === 0) {
+    c.innerHTML = '<div class="qs-check-empty">READY</div>';
+    document.getElementById('total').textContent = fmt(0);
+    document.getElementById('tendertotal').textContent = fmt(0);
+    document.getElementById('touches').textContent = touchCount;
+    return;
+  }
+  let subtotal = 0;
+  let html = '';
+  check.forEach(item => {
+    subtotal += item.cents;
+    html += '<div class="qs-check-row"><span class="qc-name">' + item.name +
+            '</span><span class="qc-price">' + fmt(item.cents) + '</span></div>';
+  });
+  const vat = Math.round(subtotal * VAT);
+  const total = subtotal + vat;
+  html +=
+    '<div class="qs-check-row totals subtle"><span>Subtotal</span><span>' + fmt(subtotal) + '</span></div>' +
+    '<div class="qs-check-row subtle"><span>VAT 12%</span><span>' + fmt(vat) + '</span></div>';
+  c.innerHTML = html;
+  document.getElementById('total').textContent = fmt(total);
+  document.getElementById('tendertotal').textContent = fmt(total);
+  document.getElementById('touches').textContent = touchCount;
+  c.scrollTop = c.scrollHeight;
+}
+
+/* Wire up category filter */
+document.querySelectorAll('.qs-cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.qs-cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderGrid(btn.dataset.cat);
+  });
+});
+
+/* Tender buttons */
+document.getElementById('btn-exact').addEventListener('click', () => {
+  if (check.length === 0) return;
+  touchCount++;
+  flashCheck('TENDERED -- CASH EXACT');
+  setTimeout(clearCheck, 600);
+});
+document.querySelectorAll('.qs-cash-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    if (check.length === 0) return;
+    touchCount++;
+    flashCheck('TENDERED -- CASH ₱' + b.dataset.cash);
+    setTimeout(clearCheck, 600);
+  });
+});
+document.getElementById('btn-card').addEventListener('click', () => {
+  if (check.length === 0) return;
+  touchCount++;
+  flashCheck('TENDERED -- CARD');
+  setTimeout(clearCheck, 600);
+});
+document.getElementById('btn-void').addEventListener('click', () => {
+  if (check.length === 0) return;
+  touchCount++;
+  check.pop();
+  renderCheck();
+});
+
+function flashCheck(msg) {
+  const c = document.getElementById('check');
+  c.innerHTML = '<div class="qs-check-empty" style="color:#238636;font-size:14px;letter-spacing:0.06em">' +
+                msg + '</div>';
+}
+
+/* Initial render */
+renderCombos();
+renderGrid('all');
+renderCheck();
+renderClock();
+setInterval(renderClock, 30000);
+
+/* Pre-seed an example check so visitors landing for the first time see context */
+addItem('cj-1pc-solo', '1pc Chickenjoy', 8200);
+addItem('spaghetti',   'Jolly Spaghetti', 6600);
+addItem('coke-reg',    'Coke Reg',        5300);
+touchCount = 0; /* reset -- the seed doesn't count toward the demo's touch budget */
+document.getElementById('touches').textContent = touchCount;
+</script>
+</body>
+</html>
