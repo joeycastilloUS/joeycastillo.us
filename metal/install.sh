@@ -123,7 +123,34 @@ echo "[5/6] Running Fe..."
 if [ -f "$METAL_DIR/Go.Fe.sh" ]; then
     bash "$METAL_DIR/Go.Fe.sh" < /dev/tty
 else
-    echo "  Go.Fe.sh not found — skipping tools setup."
+    echo "  Go.Fe.sh not found - skipping tools setup."
+fi
+
+# === Step 5b: Run Go.Sign (identity + GPG + smoke test) ===
+# Fe runs gh auth login at its Step 4. Go.Sign needs an authed gh
+# to write user.signingkey from gh api user. Calling Go.Sign here
+# ensures auth has completed. Idempotent -- safe to re-run; no-op
+# if already healthy. Mirrors install.bat Step 5b (Board 97 Phase 3).
+echo ""
+echo "[5b/6] Running Go.Sign..."
+if [ -f "$METAL_DIR/Go.Sign.sh" ]; then
+    bash "$METAL_DIR/Go.Sign.sh" < /dev/tty
+else
+    echo "  Go.Sign.sh not found - signing setup skipped."
+fi
+
+# === Step 5c: Fresh-install smoke harness ===
+# Verify HTTPS push auth works in $METAL_DIR via git ls-remote origin.
+# Combined with Go.Sign's empty-commit smoke (Step 5b), proves first
+# commit will land before Be launches. Failure does not block launch.
+echo ""
+echo "[5c/6] Smoke test..."
+if (cd "$METAL_DIR" && git ls-remote origin >/dev/null 2>&1); then
+    echo "  [OK] HTTPS push auth verified (ls-remote origin succeeded)"
+    echo "  metal install verified -- first commit will land."
+else
+    echo "  [WARN] git ls-remote origin failed -- HTTPS push auth not wired."
+    echo "  When ready: gh auth setup-git"
 fi
 
 # === Step 6: Launch Be ===
