@@ -43,6 +43,27 @@ footer { text-align: center; color: #444; font-size: 0.8rem; margin-top: 3rem; p
 footer a { color: #555; text-decoration: none; }
 footer a:hover { color: #6FC3DF; }
 em.q { color: #888; font-style: italic; }
+.actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 1.25rem 0 0; }
+.actions button { background: #131313; border: 1px solid #2a2a2a; color: #cfcfcf; font-family: inherit; font-size: 0.85rem; font-weight: 500; padding: 0.55rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+.actions button:hover { background: #1a1a1a; border-color: #6FC3DF; color: #6FC3DF; }
+@media print {
+  body { background: #fff; color: #000; }
+  .nav, .actions, footer { display: none !important; }
+  .container { max-width: 100%; padding: 0; }
+  h1, h3 { color: #000; }
+  h2 { color: #444; }
+  .card, .summary { border: 1px solid #ddd; background: #fff; page-break-inside: avoid; }
+  .card.win { border-left: 3px solid #2e7d32; }
+  .card.block { border-left: 3px solid #c77700; }
+  .card.next { border-left: 3px solid #1976d2; }
+  .card.win .tag { color: #2e7d32; }
+  .card.block .tag { color: #c77700; }
+  .card.next .tag { color: #1976d2; }
+  .summary .label, p, li { color: #222; }
+  .summary .val.big, .lede { color: #000; }
+  em.q { color: #444; }
+  code { background: #eee; color: #000; }
+}
 </style>
 </head>
 <body>
@@ -51,6 +72,10 @@ em.q { color: #888; font-style: italic; }
 
 <h1>Mendocino Farms DGX — Session 2026-05-05</h1>
 <p class="lede">A plain-English recap of what was built, what got tested, what got in the way, and where we go from here.</p>
+<div class="actions">
+  <button type="button" onclick="saveAsHTML()">Save as HTML</button>
+  <button type="button" onclick="saveAsPDF()">Save as PDF</button>
+</div>
 
 <div class="summary">
   <div class="row"><span class="label">Customer</span><span class="val">Mendocino Farms</span></div>
@@ -144,5 +169,27 @@ em.q { color: #888; font-style: italic; }
 <footer>
   joeycastillo.us / mendo / dgx · session 2026-05-05 · <a href="/">home</a>
 </footer>
+<script>
+function saveAsHTML() {
+  var clone = document.documentElement.cloneNode(true);
+  /* Strip the gate so the saved file opens straight to content */
+  clone.querySelectorAll('script[src*="gate.js"], link[href*="gate.css"], .metal-gate').forEach(function (e) { e.remove(); });
+  /* Strip the action bar + this script tag itself */
+  clone.querySelectorAll('.actions, script').forEach(function (e) { e.remove(); });
+  var html = '<!DOCTYPE html>\n' + clone.outerHTML;
+  var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mendocino-dgx-session-2026-05-05.html';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+function saveAsPDF() {
+  /* Use the browser print dialog -- user picks "Save as PDF" as destination.
+     Print stylesheet (in @media print above) handles the light-mode layout. */
+  window.print();
+}
+</script>
 </body>
 </html>
