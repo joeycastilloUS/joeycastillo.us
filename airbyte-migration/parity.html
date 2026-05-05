@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>airbyte-parity &mdash; Live Drift Detection &mdash; Philz Coffee</title>
+<link rel="stylesheet" href="/airbyte-migration/gate.css">
+<script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.7}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
+nav .meta{color:#666;font-size:12px}
+nav a{color:#6FC3DF;text-decoration:none}
+.container{max-width:860px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:32px;margin-bottom:6px;letter-spacing:-0.5px}
+.subtitle{color:#6FC3DF;font-size:16px;margin-bottom:24px}
+.hero{background:linear-gradient(135deg,#1A1A1A 0%,#0a1f24 100%);border-radius:12px;padding:24px 28px;margin-bottom:32px;border:1px solid #1f3540}
+.hero strong{color:#6FC3DF;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:8px}
+.hero a.cta{display:inline-block;margin-top:8px;background:#6FC3DF;color:#0a0a0a;padding:11px 20px;border-radius:6px;font-weight:700;text-decoration:none;font-size:14px;letter-spacing:0.3px}
+.hero a.cta:hover{background:#9fd6e8}
+h2{color:#6FC3DF;font-size:22px;margin:40px 0 14px;border-bottom:1px solid #333;padding-bottom:8px}
+h3{color:#fff;font-size:16px;margin:24px 0 8px}
+p{margin:8px 0;font-size:14px}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:10px 12px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+tr:hover{background:#1A1A1A}
+.summary-box{background:#1A1A1A;border-radius:8px;padding:24px;margin:24px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.stat{text-align:center}
+.stat .num{font-size:34px;font-weight:700;color:#6FC3DF;display:block}
+.stat .label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.card{background:#1A1A1A;border-radius:6px;padding:20px;margin:16px 0}
+.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.flow .step{background:#1A1A1A;border-left:4px solid #6FC3DF;padding:14px 18px;border-radius:0 6px 6px 0;font-size:13px}
+.flow .step .num{display:inline-block;background:#6FC3DF;color:#111;width:28px;height:28px;border-radius:50%;text-align:center;font-weight:700;line-height:28px;font-size:13px;margin-bottom:6px}
+.good{color:#5cb85c}.warn{color:#f0ad4e}.bad{color:#d9534f}
+code{background:#222;padding:2px 7px;border-radius:3px;font-size:12px;color:#6FC3DF}
+ul{margin:8px 0 8px 22px}
+li{margin:5px 0;font-size:14px}
+.status{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+.status-good{background:#1a3a1a;color:#5cb85c}
+.status-warn{background:#3a3a1a;color:#f0ad4e}
+.status-bad{background:#3a1a1a;color:#d9534f}
+.footer{margin-top:48px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+.footer a{color:#6FC3DF;text-decoration:none}
+@media(max-width:680px){.summary-box{grid-template-columns:1fr 1fr}.flow{grid-template-columns:1fr}.stat .num{font-size:26px}}
+</style>
+</head>
+<body>
+<nav>
+<span class="brand"><a href="/airbyte-migration/">Airbyte Migration</a> / Parity</span>
+<span class="meta">Philz Coffee &middot; acmedevUS</span>
+</nav>
+
+<div class="container">
+
+<h1>airbyte-parity</h1>
+<p class="subtitle">Live drift detection between <code>AIRBYTE_DB</code> and <code>AIRBYTE_CLONE</code> &mdash; per stream, per column, per row, over time.</p>
+
+<div class="hero">
+<strong>live dashboard</strong>
+<p style="margin:0 0 12px;font-size:15px">A self-refreshing single-page view of every drift event across 208 streams. Auto-polls every 30 seconds. Public, no auth required.</p>
+<a class="cta" href="https://airbyte-parity-d5vc4tye3a-uc.a.run.app/dashboard" target="_blank">Open the live dashboard &rarr;</a>
+<p style="color:#888;font-size:11.5px;margin-top:12px">
+Cloud Run rev 11 &middot; Snowflake-backed &middot; read-only on prod (BE_PARITY_READER, zero DML)
+</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>What it does</h2>
+<div class="card">
+<p style="font-size:15px"><strong>Given two Snowflake databases that both receive Airbyte loads, surface every place they diverge &mdash; per stream, per column, per row, over time &mdash; with enough resolution to act on.</strong></p>
+<p>Built for the Philz Coffee migration: prod data lands in <code>AIRBYTE_DB</code> via the legacy Airbyte instance, the new pipeline lands the same data in <code>AIRBYTE_CLONE</code> via airbyte-philz. The service compares both Snowflake databases and tells you exactly where they disagree, in real time.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Coverage</h2>
+<div class="summary-box">
+<div class="stat"><span class="num">208</span><span class="label">Streams Watched</span></div>
+<div class="stat"><span class="num">10</span><span class="label">Connections</span></div>
+<div class="stat"><span class="num">5</span><span class="label">Layers (L1-L5)</span></div>
+<div class="stat"><span class="num">173</span><span class="label">Tests Passing</span></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>The Three-Click Drift Drill</h2>
+<p>Four questions, three clicks each. The whole UX is built around this flow.</p>
+
+<div class="flow">
+<div class="step">
+<span class="num">1</span>
+<strong>Click any drifted run row</strong><br>
+The dashboard expands an inline <strong>L3 column profile panel</strong> &mdash; per-column row count, null count, hash, min, max for both sides. Disagreeing columns highlighted red.
+</div>
+<div class="step">
+<span class="num">2</span>
+<strong>Click "Drill to rows"</strong><br>
+Triggers <strong>L4</strong> (PK row-hash diff, LIMIT 1000), caches result in Firestore for 1 hour. Returns the drifted PK list with status pills: <code>DRIFT</code>, <code>PROD_ONLY</code>, <code>CLONE_ONLY</code>.
+</div>
+<div class="step">
+<span class="num">3</span>
+<strong>Click any drifted PK</strong><br>
+Fires <strong>L5</strong> surgical fetch from both sides. Side-by-side row diff with divergent fields highlighted server-side. The actual data, not abstractions.
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>The Five Layers</h2>
+<div class="card">
+<table>
+<thead><tr><th>Layer</th><th>Question</th><th>Mechanism</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td><strong>L1</strong></td><td>Same row count?</td><td><code>INFORMATION_SCHEMA.TABLES</code> metadata read</td><td class="good">free</td></tr>
+<tr><td><strong>L2</strong></td><td>Same content?</td><td><code>HASH_AGG</code> over non-meta columns, optionally time-windowed</td><td>credits per scan</td></tr>
+<tr><td><strong>L3</strong></td><td>Which column drifted?</td><td>Per-column <code>COUNT</code>, <code>NULL</code>, <code>HASH_AGG</code>, <code>MIN</code>, <code>MAX</code></td><td>credits per scan</td></tr>
+<tr><td><strong>L4</strong></td><td>Which rows drifted?</td><td><code>FULL OUTER JOIN</code> on PK with row-hash, <code>LIMIT 1000</code></td><td>credits + 1h Firestore cache</td></tr>
+<tr><td><strong>L5</strong></td><td>Which fields disagreed?</td><td>Two single-row <code>SELECT *</code> calls</td><td class="good">free single-row</td></tr>
+</tbody>
+</table>
+<p>The classifier maps a (L1, L2, L3) tuple into one of: <code>Clean</code>, <code>CountDrift</code>, <code>ValueDrift</code>, <code>StructuralDrift</code>, <code>Unexplained</code>, or <code>Missing</code>. <code>Unexplained</code> means the layers disagree &mdash; that's when you click "Drill to rows" to localize.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Snapshot vs. Transactional vs. Audit</h2>
+<div class="card">
+<p>Not every stream behaves the same. Each is classified into a <strong>parity role</strong>:</p>
+<table>
+<thead><tr><th>Role</th><th>Example</th><th>How it's compared</th></tr></thead>
+<tbody>
+<tr><td><code>transactional</code></td><td>ETHER.USERS, SQUARE.ORDERS</td><td>Standard PK join. Rows mutate over time on a stable identity.</td></tr>
+<tr><td><code>snapshot</code></td><td>NETSUITE.CUSTOM_INVENTORY</td><td>Composite key <code>(ID, day-of-time-column)</code>. <code>HASH_AGG</code> within (id, day) collapses within-day duplicates &mdash; the 87 NetSuite items captured 3&times;/day produce one signal per (item, day).</td></tr>
+<tr><td><code>audit</code></td><td>NETSUITE.BAK_*</td><td>Append-only logs &mdash; row-level comparison meaningless. L1-L3 still run; L4 and L5 deliberately skip.</td></tr>
+</tbody>
+</table>
+<p>Streams classified via <code>infra/parity-roles.json</code>. Defaults to transactional; only streams that need different treatment get an override.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Operational Tools</h2>
+<div class="card">
+<p>The same scripts that drove today's NetSuite catch-up are reusable for any other connection that falls behind:</p>
+<ul>
+<li><code>scripts/audit_clone_freshness.py</code> &mdash; per-stream prod/clone row counts + last-altered timestamp + gap_days. Read-only. Identifies stale schemas in seconds.</li>
+<li><code>scripts/refresh_clone_from_prod.py --dry-run</code> &mdash; previews <code>CREATE OR REPLACE TABLE ... CLONE</code> statements. Snowflake clone is metadata-only on prod (no read load, no credits charged on the source).</li>
+<li><code>scripts/refresh_clone_from_prod.py --connection &lt;name&gt; --apply</code> &mdash; executes the refresh. Re-baselines a stale clone in seconds. Then airbyte-philz incremental resumes.</li>
+<li><code>scripts/_dump_stream_catalog.py</code> &mdash; refreshes the static catalog from Airbyte API; resolves destination namespaces correctly per <code>namespaceDefinition</code> + <code>namespaceFormat</code>.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>Production Safety</h2>
+<div class="card">
+<table>
+<thead><tr><th>Surface</th><th>Read</th><th>Write</th></tr></thead>
+<tbody>
+<tr><td><strong>AIRBYTE_DB (prod)</strong></td><td class="good">SELECT + REFERENCES (BE_PARITY_READER role, 47,790 grants)</td><td class="good">never</td></tr>
+<tr><td><strong>Prod Airbyte</strong></td><td>n/a (decommissioned 2026-04-30)</td><td>n/a</td></tr>
+<tr><td><strong>AIRBYTE_CLONE</strong></td><td class="good">SELECT</td><td class="warn">refresh script writes (by design)</td></tr>
+<tr><td><strong>airbyte-philz</strong></td><td class="good">API reads</td><td class="warn">connection config edits when needed</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2>Try It Yourself</h2>
+<div class="card">
+<p><strong>For a stakeholder skim:</strong> just open the dashboard. The status grid + drift events tell the story in 30 seconds.</p>
+<p><strong>For a hands-on tour:</strong></p>
+<ol style="margin-left:24px">
+<li>Open the live dashboard. Watch it auto-refresh. Note the live counts in the cards.</li>
+<li>Scroll to "all streams" &mdash; 208 rows. Filter chips let you narrow to drifting / snapshot / audit / etc.</li>
+<li>Scroll to "recent runs" and pick any row with non-zero drift. Click it.</li>
+<li>The row expands inline showing the L3 column profile. Note red-highlighted columns.</li>
+<li>Click "Drill to rows ▾". L4 fires; drifted PKs appear with status pills.</li>
+<li>Click any drifted PK. L5 fires; side-by-side row diff with divergent fields highlighted.</li>
+</ol>
+<p>Three clicks from a drift event to <strong>"this column on this row, wrong"</strong>.</p>
+</div>
+
+<div class="footer">
+<a href="https://airbyte-parity-d5vc4tye3a-uc.a.run.app/dashboard">live dashboard</a>
+&nbsp;&middot;&nbsp;
+<a href="/airbyte-migration/">migration status</a>
+&nbsp;&middot;&nbsp;
+<a href="/airbyte-migration/stream-comparison.html">stream comparison</a>
+&nbsp;&middot;&nbsp;
+<a href="/airbyte-migration/ether-cdc.html">Ether CDC proposal</a>
+&nbsp;&middot;&nbsp;
+<a href="/airbyte-migration/netsuite.html">NetSuite</a>
+<br>
+<span style="color:#666;font-size:11px">Philz Coffee &middot; acmedevUS &middot; airbyte-philz migration</span>
+</div>
+
+</div>
+</body>
+</html>
