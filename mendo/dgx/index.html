@@ -85,7 +85,7 @@ em.q { color: #888; font-style: italic; }
 </div>
 
 <h2>The Short Version</h2>
-<p>Tonight's run automated the Mendocino Farms ordering test all the way from a fresh email through Olo's brand-new-customer signup, with a working Cloudflare bypass and a working SMS-to-email fallback. We were one step from completing an end-to-end test order — that step being "read the 6-digit verification code from the test mailbox" — when Google Workspace's automated-browser detection blocked the inbox login. The full test script is ready, the workaround is identified, and we have three viable paths to clear the block.</p>
+<p>Tonight's run automated the Mendocino Farms ordering test all the way from a fresh email through Olo's brand-new-customer signup, with a working Cloudflare bypass and a working SMS-to-email fallback. We were one step from completing an end-to-end test order — that step being "read the 6-digit verification code from the test mailbox" — when Google rejected the sign-in to the test account. Manual sign-in attempts were rejected too, so this isn't an automation problem; it's a security state on the test account that needs Workspace-side attention. The full test script is ready, and we have three concrete paths to clear the block.</p>
 
 <h2>What Was Delivered Tonight</h2>
 
@@ -123,33 +123,33 @@ em.q { color: #888; font-style: italic; }
 
 <div class="card block">
 <span class="tag">⚠ Blocker</span>
-<h3>Google Workspace blocks automated logins to the test mailbox</h3>
-<p>Olo emails the 6-digit verification code to the test account's mailbox at <code>@mendocinofarms.com</code>, which is a Google Workspace domain. To finish the test, the test framework needs to read that email automatically. When we tried to sign into Gmail through the same Chrome window the framework drives, Google's risk system flagged it as automation and rejected the login with <em class="q">"Couldn't sign you in. Google couldn't verify this account belongs to you."</em></p>
-<p>This is a known Google Workspace protection — it isn't a bug we can patch around in our code. It needs a Workspace-side answer.</p>
+<h3>Test mailbox sign-in is being rejected by Google</h3>
+<p>Olo emails the 6-digit verification code to the test account's mailbox at <code>@mendocinofarms.com</code>. To finish the order, we need to read that email — and right now nobody can sign in to read it. Google rejects the password with <em class="q">"Couldn't sign you in. Google couldn't verify this account belongs to you."</em></p>
+<p>This was confirmed manually as well, not just through the test framework — the same rejection happens when signing in by hand, so the issue isn't automation detection. It's a security state on the test account that Workspace IT needs to clear. Could be a stale trust on the account, an admin policy that doesn't recognize our network location, or the account's recovery options needing a refresh. None of those are things we can fix from our side without admin help.</p>
 </div>
 
 <h2>Three Ways To Clear The Block</h2>
 
 <div class="card next">
-<span class="tag">→ Recommended</span>
-<h3>1. Gmail API service account (Workspace admin, ~30 min)</h3>
-<p>The cleanest, most production-ready answer. Mendocino's Workspace administrator creates a service account with read-only access to the test mailbox. The driver fetches the latest Olo email through Google's official API — no UI login, no risk-system rejection, fully headless. This is the standard pattern for automated test rigs that need email codes. Rotates cleanly, audits cleanly, scales to as many test accounts as we want.</p>
+<span class="tag">→ Required first</span>
+<h3>1. Workspace IT clears the test account</h3>
+<p>The fastest unblock and a prerequisite for either of the other two options. Mendocino's Workspace administrator opens the admin console, locates <code>mendo1000_sparkfly@mendocinofarms.com</code> (and the surrounding test accounts), and clears whatever security state is rejecting the sign-in. Likely actions: reset the password, refresh recovery info, allow our login network in any conditional-access rules, and confirm the account isn't suspended or under additional verification holds. Once one successful manual sign-in goes through from our location, the account is "trusted" and the other options become available.</p>
 </div>
 
 <div class="card next">
-<span class="tag">→ Fast</span>
-<h3>2. Pre-warmed Chrome profile</h3>
-<p>You sign into Gmail manually one time, complete two-factor authentication, and we save that Chrome profile. Future test runs reuse the saved session, skipping login entirely. Simpler than option 1, but cookies expire periodically and need re-auth every few weeks.</p>
+<span class="tag">→ Best long-term</span>
+<h3>2. Gmail API service account</h3>
+<p>The production-ready answer once option 1 frees the account. The Workspace administrator creates a service account with read-only access to the test mailbox. The driver fetches the latest Olo email through Google's official API — no UI login required at run time, fully headless, audit-clean. Standard pattern for automated test rigs that need email codes. Scales cleanly to as many test accounts as Mendocino wants to add.</p>
 </div>
 
 <div class="card next">
-<span class="tag">→ Manual</span>
-<h3>3. Human-in-the-loop (immediate)</h3>
-<p>Tonight's path. Joey reads the code from the test mailbox by hand, types it into the driver, and the rest of the flow runs unattended. Works today with zero infrastructure changes, but requires a person available during each test run. Good for one-offs, not a fit for nightly automated runs.</p>
+<span class="tag">→ Lightweight alternative</span>
+<h3>3. Forward Olo emails to a reachable mailbox</h3>
+<p>Have Workspace IT set up a forwarding rule so any email from Olo to the test account is also delivered to a mailbox Joey already has access to. The test framework reads from there. Doesn't need a service account, doesn't need API setup — just a forwarding filter. Only catch is that the source mailbox still needs to be operational to send the forward, so option 1 is still the prerequisite.</p>
 </div>
 
 <h2>Recommendation</h2>
-<p>Start with option 3 to validate the rest of the flow end-to-end this week (one supervised run, full Flow 1 + Flow 2 + Flow 3). In parallel, request the Gmail API service account from Workspace IT — once that's live, the entire suite goes nightly with no human in the loop, results posted here at the same URL the next morning.</p>
+<p>Step one is option 1 — Workspace IT clears the account, we confirm a successful manual sign-in. With that done, the framework can finish a supervised end-to-end run this week (Flow 1 + Flow 2 + Flow 3 in one sitting). Step two is option 2 — once the account is healthy, the service-account integration is a half-day of work and the suite goes nightly, with results posted here at the same URL each morning.</p>
 
 <h2>Tonight's Receipts</h2>
 <ul>
