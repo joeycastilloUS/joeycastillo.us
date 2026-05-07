@@ -21,7 +21,13 @@ export async function onRequest(context) {
   const cookie = request.headers.get("cookie") || "";
   const m = /(?:^|;\s*)airbyte_gate_token=([0-9a-f]{64})/.exec(cookie);
   if (!m || m[1] !== REQUIRED_GATE_HASH) {
-    return new Response("Unauthorized -- enter password at /airbyte-migration/", { status: 401 });
+    return new Response(
+      "Unauthorized -- enter password at /airbyte-migration/\n\n(received cookie: " +
+      (cookie ? cookie.substring(0, 200) : "<none>") + ")",
+      {
+        status: 401,
+        headers: { "cache-control": "no-store, no-cache, must-revalidate" },
+      });
   }
 
   if (!env.GCP_SA_KEY) {
