@@ -4,8 +4,15 @@
   var TARGET = script.getAttribute('data-hash');
   var KEY = 'airbyte_gate_v1';
 
+  /* Cookie helper -- set on every gate-pass so CF Pages Functions can
+     verify auth server-side when proxying to live Cloud Run dashboards. */
+  function setCookie() {
+    document.cookie = 'airbyte_gate_token=' + TARGET +
+      '; Path=/; Max-Age=86400; SameSite=Strict; Secure';
+  }
+
   /* Fast path — session already valid */
-  if (sessionStorage.getItem(KEY) === TARGET) return;
+  if (sessionStorage.getItem(KEY) === TARGET) { setCookie(); return; }
 
   /* Block visibility immediately — no flash of content */
   document.documentElement.style.visibility = 'hidden';
@@ -49,6 +56,7 @@
       sha256(val).then(function (hash) {
         if (hash === TARGET) {
           sessionStorage.setItem(KEY, TARGET);
+          setCookie();
           overlay.classList.add('gate-hidden');
           setTimeout(function () { overlay.remove(); }, 350);
         } else {
