@@ -5,14 +5,34 @@
   var KEY = 'airbyte_gate_v1';
 
   /* Cookie helper -- set on every gate-pass so CF Pages Functions can
-     verify auth server-side when proxying to live Cloud Run dashboards. */
+     verify auth server-side when proxying to live Cloud Run dashboards.
+     SameSite=Lax (not Strict) so the cookie is sent on iframe loads of
+     same-origin proxied content. */
   function setCookie() {
     document.cookie = 'airbyte_gate_token=' + TARGET +
-      '; Path=/; Max-Age=86400; SameSite=Strict; Secure';
+      '; Path=/; Max-Age=86400; SameSite=Lax; Secure';
+  }
+
+  /* After gate passes (or fast-path skip), kick any iframes that were
+     deferred via data-gated-src so they only load with the cookie set. */
+  function loadGatedIframes() {
+    var els = document.querySelectorAll('iframe[data-gated-src]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (!el.src) el.src = el.getAttribute('data-gated-src');
+    }
   }
 
   /* Fast path — session already valid */
-  if (sessionStorage.getItem(KEY) === TARGET) { setCookie(); return; }
+  if (sessionStorage.getItem(KEY) === TARGET) {
+    setCookie();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadGatedIframes);
+    } else {
+      loadGatedIframes();
+    }
+    return;
+  }
 
   /* Block visibility immediately — no flash of content */
   document.documentElement.style.visibility = 'hidden';
@@ -57,6 +77,7 @@
         if (hash === TARGET) {
           sessionStorage.setItem(KEY, TARGET);
           setCookie();
+          loadGatedIframes();
           overlay.classList.add('gate-hidden');
           setTimeout(function () { overlay.remove(); }, 350);
         } else {
