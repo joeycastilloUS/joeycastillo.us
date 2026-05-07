@@ -69,8 +69,8 @@ export async function onRequest(context) {
   // etc. on absolute paths. Hosted under /airbyte-migration/parity-live/, those
   // hit Cloudflare's root, not our proxy. Rewrite HTML responses so the JS
   // calls the proxied path instead.
-  const ct = (respHeaders.get("content-type") || "").toLowerCase();
-  if (ct.includes("text/html")) {
+  const respCt = (respHeaders.get("content-type") || "").toLowerCase();
+  if (respCt.includes("text/html")) {
     let body = await resp.text();
     // Order matters: rewrite the more-specific paths first to avoid double-prefixing.
     body = body
