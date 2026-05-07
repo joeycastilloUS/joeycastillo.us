@@ -62,10 +62,37 @@ export async function onRequest(context) {
   });
 
   const resp = await fetch(upstreamReq);
-  // Pass through response with same status + body.
-  // Strip set-cookie (Cloud Run shouldn't be setting any anyway).
   const respHeaders = new Headers(resp.headers);
   respHeaders.delete("set-cookie");
+
+  // The dashboard HTML's JS does fetch('/dashboard/data'), fetch('/dashboard/stream/...'),
+  // etc. on absolute paths. Hosted under /airbyte-migration/parity-live/, those
+  // hit Cloudflare's root, not our proxy. Rewrite HTML responses so the JS
+  // calls the proxied path instead.
+  const ct = (respHeaders.get("content-type") || "").toLowerCase();
+  if (ct.includes("text/html")) {
+    let body = await resp.text();
+    // Order matters: rewrite the more-specific paths first to avoid double-prefixing.
+    body = body
+      .replaceAll("'/dashboard/", "'/airbyte-migration/parity-live/dashboard/")
+      .replaceAll('"/dashboard/', '"/airbyte-migration/parity-live/dashboard/')
+      .replaceAll("`/dashboard/", "`/airbyte-migration/parity-live/dashboard/")
+      .replaceAll("'/parity/", "'/airbyte-migration/parity-live/parity/")
+      .replaceAll('"/parity/', '"/airbyte-migration/parity-live/parity/')
+      .replaceAll("`/parity/", "`/airbyte-migration/parity-live/parity/")
+      .replaceAll("'/tick", "'/airbyte-migration/parity-live/tick")
+      .replaceAll('"/tick', '"/airbyte-migration/parity-live/tick')
+      .replaceAll("`/tick", "`/airbyte-migration/parity-live/tick");
+    respHeaders.set("content-length", String(new TextEncoder().encode(body).length));
+    respHeaders.delete("content-encoding"); // we returned plain text
+    return new Response(body, {
+      status: resp.status,
+      statusText: resp.statusText,
+      headers: respHeaders,
+    });
+  }
+
+  // JSON / non-HTML responses pass through unmodified.
   return new Response(resp.body, {
     status: resp.status,
     statusText: resp.statusText,
