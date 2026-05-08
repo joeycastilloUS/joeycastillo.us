@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Playbook &mdash; Snowflake Key-Pair Migration &mdash; Philz Coffee</title>
+<link rel="stylesheet" href="/airbyte-migration/gate.css">
+<script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
+nav .brand a{color:#6FC3DF;text-decoration:none}
+nav .meta{color:#666;font-size:12px}
+.container{max-width:880px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px;letter-spacing:-0.3px}
+.subtitle{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.modecrumb{display:inline-block;background:#6FC3DF;color:#0a0a0a;padding:4px 12px;border-radius:4px;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:18px}
+.intro{background:#1A1A1A;border-left:4px solid #6FC3DF;padding:16px 20px;margin:18px 0;border-radius:0 6px 6px 0;font-size:14px}
+.intro strong{color:#6FC3DF}
+.intro a{color:#6FC3DF}
+h2{color:#6FC3DF;font-size:20px;margin:36px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}
+h3{color:#fff;font-size:15px;margin:18px 0 6px}
+.step{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.step h3{margin:0 0 6px;color:#6FC3DF;font-size:15px;display:flex;align-items:flex-start;gap:10px}
+.step h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-size:13px;font-weight:700;flex-shrink:0}
+.step .who{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-left:8px}
+.who-joey{background:#1a2a3a;color:#6FC3DF}
+.who-wesley{background:#3a2a1a;color:#f0ad4e}
+.who-both{background:#1a3a2a;color:#5cb85c}
+.step .meta{color:#888;font-size:12px;margin-bottom:8px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas','Monaco',monospace;font-size:12px;color:#ccc;overflow-x:auto;white-space:pre-wrap;line-height:1.55}
+.expect{background:#0d1f15;border-left:3px solid #5cb85c;padding:8px 14px;margin:8px 0;font-size:12px;color:#bbe6c8;border-radius:0 4px 4px 0}
+.expect strong{color:#5cb85c}
+.iffail{background:#1f1410;border-left:3px solid #f0ad4e;padding:8px 14px;margin:8px 0;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}
+.iffail strong{color:#f0ad4e}
+code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#6FC3DF}
+.checkbox{display:inline-block;width:18px;height:18px;border:2px solid #6FC3DF;border-radius:3px;margin-right:8px;vertical-align:middle}
+ul{margin:6px 0 6px 22px}
+ol{margin:6px 0 6px 22px}
+li{font-size:13px;margin:4px 0}
+.preflight{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:18px 0}
+.preflight h3{margin-top:0}
+.preflight ul{list-style:none;margin-left:0}
+.preflight li{padding:4px 0;font-size:13px}
+.bigtime{background:linear-gradient(135deg,#0a1f24 0%,#1A1A1A 100%);border:1px solid #1f3540;border-radius:8px;padding:18px 24px;margin:18px 0;display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.bigtime .label{color:#888;text-transform:uppercase;letter-spacing:1px;font-size:11px}
+.bigtime .val{color:#6FC3DF;font-size:22px;font-weight:700}
+.modes-foot{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:32px 0 18px}
+.modefoot{background:#1A1A1A;border-radius:6px;padding:14px 18px;text-align:center}
+.modefoot.active{border:2px solid #6FC3DF}
+.modefoot a{color:#6FC3DF;text-decoration:none;font-weight:700;font-size:13px}
+.modefoot .desc{color:#888;font-size:11px;margin-top:4px}
+.footer{margin-top:40px;padding-top:14px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+.footer a{color:#6FC3DF;text-decoration:none}
+@media(max-width:680px){.modes-foot{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+<span class="brand"><a href="/airbyte-migration/">Airbyte Migration</a> / Snowflake Auth / Manual</span>
+<span class="meta">Philz Coffee &middot; acmedevUS</span>
+</nav>
+
+<div class="container">
+
+<span class="modecrumb">Mode 1 &middot; Manual</span>
+<h1>Snowflake Key-Pair Migration &mdash; Manual Playbook</h1>
+<p class="subtitle">Human runs every command. No AI. Audit-ready.</p>
+
+<div class="intro">
+<strong>Use this mode when:</strong> AI is unavailable, an audit observer is watching, you're running this procedure for the first time, or the change-management policy requires it. Same end state as the AI-assisted and TRON modes; just slower and fully manual. Refer to the <a href="/airbyte-migration/snowflake-keypair-master.html">master plan</a> for strategy and rollback details.
+</div>
+
+<div class="bigtime">
+<div><div class="label">Total active time</div><div class="val">~90 min</div></div>
+<div><div class="label">Wall-clock</div><div class="val">2&ndash;3 days</div></div>
+<div><div class="label">Wesley window</div><div class="val">~25 min</div></div>
+</div>
+
+<h2>Pre-flight</h2>
+<div class="preflight">
+<h3>Tools on Joey's laptop</h3>
+<ul>
+<li><span class="checkbox"></span> <code>openssl</code> (any recent version)</li>
+<li><span class="checkbox"></span> <code>gcloud</code> CLI authed: <code>gcloud auth list</code> shows <code>joey.castillo.acmedev@gmail.com</code> active</li>
+<li><span class="checkbox"></span> <code>snowsql</code> client installed (or use the Snowflake web UI)</li>
+<li><span class="checkbox"></span> Repo cloned: <code>git clone https://github.com/acmedevUS/airbyte-parity.git</code></li>
+<li><span class="checkbox"></span> .NET 8 SDK (only needed for Phase D)</li>
+</ul>
+<h3>Wesley's access</h3>
+<ul>
+<li><span class="checkbox"></span> Snowflake account with USERADMIN + SECURITYADMIN role membership</li>
+<li><span class="checkbox"></span> Reachable for ~25 min total across the 3 windows (B, E review, F review, G spot check, I cleanup)</li>
+</ul>
+<h3>Snowflake target verification</h3>
+<ul>
+<li><span class="checkbox"></span> Joey runs <code>SHOW GRANTS TO USER joey;</code> and notes snow-sync's actual write target DB.SCHEMA -- pastes it into the Phase B SQL placeholder before sending to Wesley</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase A &mdash; Generate keys</h2>
+
+<div class="step">
+<h3><span class="num">1</span> Create the keys directory <span class="who who-joey">Joey</span></h3>
+<div class="code-block">mkdir -p ~/.snowflake-keys
+chmod 700 ~/.snowflake-keys
+cd ~/.snowflake-keys</div>
+<div class="expect"><strong>Expect:</strong> directory exists, permissions 700.</div>
+</div>
+
+<div class="step">
+<h3><span class="num">2</span> Generate ACME_TOOLS_SVC keypair <span class="who who-joey">Joey</span></h3>
+<div class="code-block"># Pick a strong passphrase, save it to your password manager
+read -s -p "ACME_TOOLS_SVC passphrase: " P1; echo
+
+# Encrypted private key
+openssl genrsa 2048 \
+  | openssl pkcs8 -topk8 -v2 aes256 -inform PEM -passout pass:"$P1" \
+  -out acme_tools_svc.p8
+
+# Public key (PEM format -- this is what Wesley pastes into ALTER USER)
+openssl rsa -in acme_tools_svc.p8 -passin pass:"$P1" -pubout \
+  -out acme_tools_svc.pub
+
+cat acme_tools_svc.pub</div>
+<div class="expect"><strong>Expect:</strong> <code>-----BEGIN PUBLIC KEY-----</code> ... <code>-----END PUBLIC KEY-----</code> printed. Save the passphrase ($P1) to your password manager labeled "ACME_TOOLS_SVC keypair passphrase."</div>
+<div class="iffail"><strong>If openssl errors on aes256:</strong> use <code>aes-256-cbc</code> in older builds, or omit <code>-v2 aes256</code> for default cipher.</div>
+</div>
+
+<div class="step">
+<h3><span class="num">3</span> Generate CRUNCHTIME_USER refresh keypair <span class="who who-joey">Joey</span></h3>
+<div class="code-block">read -s -p "CRUNCHTIME_USER passphrase: " P2; echo
+
+openssl genrsa 2048 \
+  | openssl pkcs8 -topk8 -v2 aes256 -inform PEM -passout pass:"$P2" \
+  -out crunchtime_user.p8
+openssl rsa -in crunchtime_user.p8 -passin pass:"$P2" -pubout \
+  -out crunchtime_user.pub
+
+cat crunchtime_user.pub</div>
+<div class="expect"><strong>Expect:</strong> a second PEM block printed. Save P2 to password manager.</div>
+</div>
+
+<div class="step">
+<h3><span class="num">4</span> Verify both files exist and are readable <span class="who who-joey">Joey</span></h3>
+<div class="code-block">ls -la ~/.snowflake-keys/</div>
+<div class="expect"><strong>Expect:</strong> 4 files (<code>acme_tools_svc.p8</code> + <code>.pub</code>, <code>crunchtime_user.p8</code> + <code>.pub</code>), all <code>-rw-------</code>. <strong>Mark Phase A complete.</strong></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase B &mdash; Wesley runs the SQL block</h2>
+
+<div class="step">
+<h3><span class="num">5</span> Prepare the SQL block <span class="who who-joey">Joey</span></h3>
+<p>Open <code>be/plans/2026-05-08-0015-plan-acme-tools-svc-migration.html</code> Phase B (or copy from the master plan). Replace the two <code>&lt;... pub&gt;</code> placeholders with the contents of <code>acme_tools_svc.pub</code> and <code>crunchtime_user.pub</code> respectively. Replace <code>&lt;SNOW_SYNC_TARGET_DB&gt;</code> + <code>&lt;SCHEMA&gt;</code> with the actual target verified in pre-flight.</p>
+<p>Send the resulting SQL to Wesley via Slack DM (do <strong>not</strong> commit; the SQL itself is safe but the workflow stays text-only between you).</p>
+<div class="expect"><strong>Expect:</strong> SQL block ready, no <code>&lt;...&gt;</code> placeholders remaining.</div>
+</div>
+
+<div class="step">
+<h3><span class="num">6</span> Run the SQL <span class="who who-wesley">Wesley</span></h3>
+<p>In Snowflake web UI or snowsql, paste and run the block as <code>USERADMIN</code> + <code>SECURITYADMIN</code>.</p>
+<div class="expect"><strong>Expect:</strong> 0 errors. Each <code>CREATE USER</code> / <code>CREATE ROLE</code> / <code>GRANT</code> returns a confirmation row.</div>
+<div class="iffail"><strong>If "object already exists":</strong> a prior attempt left state. Run <code>DROP USER ACME_TOOLS_SVC; DROP ROLE ACME_TOOLS_READ_ROLE; DROP ROLE ACME_TOOLS_WRITE_ROLE;</code> and retry.</div>
+</div>
+
+<div class="step">
+<h3><span class="num">7</span> Smoke test from Joey's laptop <span class="who who-joey">Joey</span></h3>
+<div class="code-block">snowsql -a zn77432 -u ACME_TOOLS_SVC \
+  --private-key-path ~/.snowflake-keys/acme_tools_svc.p8 \
+  --private-key-passphrase "$P1" \
+  -q "SELECT current_user(), current_role()"</div>
+<div class="expect"><strong>Expect:</strong> <code>ACME_TOOLS_SVC | ACME_TOOLS_READ_ROLE</code>. <strong>Mark Phase B complete.</strong></div>
+<div class="iffail"><strong>If "JWT token is invalid":</strong> the <code>RSA_PUBLIC_KEY</code> on Snowflake doesn't match this private key. Re-run <code>cat acme_tools_svc.pub</code>, send to Wesley, ask him to re-run <code>ALTER USER ACME_TOOLS_SVC SET RSA_PUBLIC_KEY = '...'</code>.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase C &mdash; GCP Secret Manager</h2>
+
+<div class="step">
+<h3><span class="num">8</span> Upload to acmedev-platform-hq <span class="who who-joey">Joey</span></h3>
+<div class="code-block">P=acmedev-platform-hq
+
+cat ~/.snowflake-keys/acme_tools_svc.p8 \
+  | gcloud secrets create acme-tools-svc-private-key \
+  --project=$P --data-file=- --replication-policy=automatic
+
+echo -n "$P1" \
+  | gcloud secrets create acme-tools-svc-key-passphrase \
+  --project=$P --data-file=- --replication-policy=automatic
+
+echo -n "ACME_TOOLS_SVC" \
+  | gcloud secrets create acme-tools-svc-username \
+  --project=$P --data-file=- --replication-policy=automatic
+
+# Bind to airbyte-parity's compute SA
+SA=692654781984-compute@developer.gserviceaccount.com
+for s in acme-tools-svc-private-key acme-tools-svc-key-passphrase acme-tools-svc-username; do
+  gcloud secrets add-iam-policy-binding $s --project=$P \
+    --member="serviceAccount:$SA" --role=roles/secretmanager.secretAccessor
+done</div>
+<div class="expect"><strong>Expect:</strong> 3 secrets created, 3 IAM bindings added.</div>
+</div>
+
+<div class="step">
+<h3><span class="num">9</span> Upload to philz-crunchtime-383717 <span class="who who-joey">Joey</span></h3>
+<div class="code-block">P=philz-crunchtime-383717
+
+cat ~/.snowflake-keys/acme_tools_svc.p8 \
+  | gcloud secrets create acme-tools-svc-private-key --project=$P --data-file=- --replication-policy=automatic
+echo -n "$P1" | gcloud secrets create acme-tools-svc-key-passphrase --project=$P --data-file=-
+echo -n "ACME_TOOLS_SVC" | gcloud secrets create acme-tools-svc-username --project=$P --data-file=-
+
+# Refresh the existing CRUNCHTIME_USER key (new version)
+cat ~/.snowflake-keys/crunchtime_user.p8 \
+  | gcloud secrets versions add SNOWFLAKE_USER_PRIVATE_KEY --project=$P --data-file=-
+echo -n "$P2" \
+  | gcloud secrets versions add SNOWFLAKE_USER_PRIVATE_KEY_PASSPHRASE --project=$P --data-file=-
+
+# Identify snow-sync's runtime SA, bind the new ACME secrets
+SS_SA=$(gcloud run services describe snow-sync --project=$P --region=us-west2 \
+  --format="value(spec.template.spec.serviceAccountName)")
+echo "snow-sync SA: $SS_SA"
+for s in acme-tools-svc-private-key acme-tools-svc-key-passphrase acme-tools-svc-username; do
+  gcloud secrets add-iam-policy-binding $s --project=$P \
+    --member="serviceAccount:$SS_SA" --role=roles/secretmanager.secretAccessor
+done</div>
+<div class="expect"><strong>Expect:</strong> 3 new secrets, 1 new version on each existing CRUNCHTIME_USER secret, 3 IAM bindings. <strong>Mark Phase C complete.</strong></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase D &mdash; .NET driver supports key-pair</h2>
+
+<div class="step">
+<h3><span class="num">10</span> Edit <code>SnowflakeOptions.cs</code> <span class="who who-joey">Joey</span></h3>
+<p>Add 3 properties: <code>PrivateKeyFile</code>, <code>PrivateKeyPassphrase</code>, <code>Authenticator</code>. All optional. Default Authenticator empty (uses password path).</p>
+</div>
+
+<div class="step">
+<h3><span class="num">11</span> Edit <code>SnowflakeClient.cs</code> connection-string assembly <span class="who who-joey">Joey</span></h3>
+<p>If <code>Authenticator == "SNOWFLAKE_JWT"</code> and <code>PrivateKeyFile</code> is non-empty, build:</p>
+<div class="code-block">connStr = $"account={Account};user={User};role={Role};warehouse={Warehouse};" +
+          $"authenticator=SNOWFLAKE_JWT;private_key_file={PrivateKeyFile};" +
+          $"private_key_file_pwd={PrivateKeyPassphrase}";</div>
+<p>Else fall back to existing password assembly. Keep both paths.</p>
+</div>
+
+<div class="step">
+<h3><span class="num">12</span> Add 4 tests in <code>SnowflakeClientAuthTests.cs</code> <span class="who who-joey">Joey</span></h3>
+<ul>
+<li>Password path unchanged (regression test)</li>
+<li>JWT-with-passphrase path produces correct connection string</li>
+<li>JWT-without-passphrase path produces correct connection string</li>
+<li>Missing key file with JWT authenticator throws clear error</li>
+</ul>
+<div class="code-block">cd /c/airbyte-parity
+dotnet test AirbyteParity.Tests --filter "FullyQualifiedName~SnowflakeClientAuth"</div>
+<div class="expect"><strong>Expect:</strong> 4/4 new tests pass + existing 277 pass = 281/281. <strong>Mark Phase D complete.</strong></div>
+<div class="iffail"><strong>If existing tests break:</strong> the password assembly path was disturbed. Diff your changes; the password path must be untouched if Authenticator is unset.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase E &mdash; airbyte-parity cutover</h2>
+
+<div class="step">
+<h3><span class="num">13</span> Build + push container <span class="who who-joey">Joey</span></h3>
+<div class="code-block">cd /c/airbyte-parity
+gcloud builds submit --tag us-central1-docker.pkg.dev/acmedev-platform-hq/run/airbyte-parity:keypair</div>
+</div>
+
+<div class="step">
+<h3><span class="num">14</span> Deploy with new env + secret volume <span class="who who-joey">Joey</span></h3>
+<div class="code-block">gcloud run services update airbyte-parity \
+  --project=acmedev-platform-hq --region=us-central1 \
+  --image=us-central1-docker.pkg.dev/acmedev-platform-hq/run/airbyte-parity:keypair \
+  --add-volume=name=acme-keys,type=secret,secret=acme-tools-svc-private-key \
+  --add-volume-mount=volume=acme-keys,mount-path=/secrets \
+  --update-secrets=Snowflake__User=acme-tools-svc-username:latest \
+  --update-secrets=Snowflake__PrivateKeyPassphrase=acme-tools-svc-key-passphrase:latest \
+  --set-env-vars=Snowflake__PrivateKeyFile=/secrets/acme_tools_svc.p8 \
+  --set-env-vars=Snowflake__Authenticator=SNOWFLAKE_JWT \
+  --set-env-vars=Snowflake__Role=ACME_TOOLS_READ_ROLE</div>
+<p>(Keep <code>Snowflake__Password</code> bound for one rev as fallback. It'll be removed in Phase I.)</p>
+</div>
+
+<div class="step">
+<h3><span class="num">15</span> Smoke test <span class="who who-joey">Joey</span></h3>
+<div class="code-block">TOKEN=$(gcloud auth print-identity-token --project acmedev-platform-hq)
+PARITY=https://airbyte-parity-d5vc4tye3a-uc.a.run.app
+curl -X POST "$PARITY/tick?force=true&streams=NETSUITE.CUSTOM_INVENTORY" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Length: 0"</div>
+<div class="expect"><strong>Expect:</strong> 200. New rev (e.g., 25-xxx) active in Cloud Run. Logs show <code>current_user=ACME_TOOLS_SVC, current_role=ACME_TOOLS_READ_ROLE</code> on the next tick.</div>
+<div class="iffail"><strong>If 5xx:</strong> <code>gcloud run services logs read airbyte-parity --project=acmedev-platform-hq --region=us-central1 --limit=50</code>. Likely culprits: secret volume not mounted, key passphrase wrong, role not granted on Snowflake side. Rollback: <code>gcloud run services update-traffic airbyte-parity --to-revisions=&lt;prior&gt;=100</code>.</div>
+</div>
+
+<div class="step">
+<h3><span class="num">16</span> Wesley spot-check <span class="who who-wesley">Wesley</span></h3>
+<p>Wesley confirms in Snowflake QUERY_HISTORY:</p>
+<div class="code-block">SELECT user_name, role_name, query_text, start_time
+  FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY())
+ WHERE user_name = 'ACME_TOOLS_SVC' AND start_time &gt; DATEADD(hour, -1, CURRENT_TIMESTAMP())
+ ORDER BY start_time DESC LIMIT 10;</div>
+<div class="expect"><strong>Expect:</strong> queries from airbyte-parity show <code>USER_NAME=ACME_TOOLS_SVC</code>, <code>ROLE_NAME=ACME_TOOLS_READ_ROLE</code>. <strong>Wait 24h before Phase I cleanup. Mark Phase E complete.</strong></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase F &mdash; snow-sync cutover</h2>
+
+<div class="step">
+<h3><span class="num">17</span> Identify snow-sync's runtime + driver <span class="who who-joey">Joey</span></h3>
+<div class="code-block">gcloud run services describe snow-sync --project=philz-crunchtime-383717 --region=us-west2 \
+  --format="yaml(spec.template.spec.containers)" | head -100</div>
+<p>Note the image, the entrypoint, and which env vars the container reads. (Most likely Python with <code>snowflake-connector-python</code>.)</p>
+</div>
+
+<div class="step">
+<h3><span class="num">18</span> Update Cloud Run env <span class="who who-joey">Joey</span></h3>
+<div class="code-block">gcloud run services update snow-sync \
+  --project=philz-crunchtime-383717 --region=us-west2 \
+  --add-volume=name=acme-keys,type=secret,secret=acme-tools-svc-private-key \
+  --add-volume-mount=volume=acme-keys,mount-path=/secrets \
+  --update-secrets=SNOWFLAKE_USER=acme-tools-svc-username:latest \
+  --update-secrets=SNOWFLAKE_KEY_PASSPHRASE=acme-tools-svc-key-passphrase:latest \
+  --set-env-vars=SNOWFLAKE_PRIVATE_KEY_PATH=/secrets/acme_tools_svc.p8 \
+  --set-env-vars=SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT \
+  --set-env-vars=SNOWFLAKE_ROLE=ACME_TOOLS_WRITE_ROLE \
+  --remove-env-vars=SNOWFLAKE_PASSWORD \
+  --remove-env-vars=SNOWFLAKE_TARGET_USER_PEM_KEY_BASE_64</div>
+<p><strong>This step removes the plaintext password env immediately</strong> -- the literal value was already exposed by Cloud Run describe permissions. Don't keep a fallback that re-exposes it.</p>
+</div>
+
+<div class="step">
+<h3><span class="num">19</span> Trigger a snow-sync run + verify <span class="who who-joey">Joey</span> + <span class="who who-wesley">Wesley</span></h3>
+<p>Wait for the next scheduled run, or trigger manually if your snow-sync has a /run endpoint.</p>
+<p>Wesley verifies in QUERY_HISTORY (same query as step 16 but <code>role_name = 'ACME_TOOLS_WRITE_ROLE'</code>). Confirm INSERT/UPDATE statements landed in the target schema.</p>
+<div class="expect"><strong>Expect:</strong> snow-sync's next run completes successfully writing to its target. Logs clean. <strong>Mark Phase F complete.</strong></div>
+<div class="iffail"><strong>If write permission denied:</strong> the WRITE_ROLE grants in Phase B missed the actual target schema. Wesley adds the missing GRANT and you re-run.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase G &mdash; 3 crunchtime password services</h2>
+
+<div class="step">
+<h3><span class="num">20</span> Update each service <span class="who who-joey">Joey</span></h3>
+<p>For each of <code>crunchtime-gfspastry</code>, <code>crunchtime-goodtogo</code>, <code>crunchtime-lahearth</code>:</p>
+<div class="code-block">SVC=crunchtime-gfspastry  # repeat for goodtogo, lahearth
+gcloud run services update $SVC \
+  --project=philz-crunchtime-383717 --region=us-west2 \
+  --add-volume=name=ct-keys,type=secret,secret=SNOWFLAKE_USER_PRIVATE_KEY \
+  --add-volume-mount=volume=ct-keys,mount-path=/secrets \
+  --update-secrets=SNOWFLAKE_KEY_PASSPHRASE=SNOWFLAKE_USER_PRIVATE_KEY_PASSPHRASE:latest \
+  --set-env-vars=SNOWFLAKE_PRIVATE_KEY_PATH=/secrets/SNOWFLAKE_USER_PRIVATE_KEY \
+  --set-env-vars=SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT \
+  --remove-env-vars=SNOWFLAKE_PASSWORD</div>
+<p>(Keep <code>SNOWFLAKE_PASSWORD</code> for one rev only if the runtime requires it; these services use the same shape as their 5 sibling JWT services so a clean removal is fine.)</p>
+</div>
+
+<div class="step">
+<h3><span class="num">21</span> Watch the next cron tick + dashboard <span class="who who-joey">Joey</span></h3>
+<p>Each service has a Cloud Scheduler cron. Within 1-6 hours, the airbyte-parity dashboard should show clean L1 deltas for all three.</p>
+<div class="expect"><strong>Expect:</strong> 3 successful runs, 0 auth errors. <strong>Mark Phase G complete.</strong></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase H &mdash; Local .env</h2>
+
+<div class="step">
+<h3><span class="num">22</span> Update local <code>.env</code> <span class="who who-joey">Joey</span></h3>
+<div class="code-block">SNOWFLAKE_USER=ACME_TOOLS_SVC
+SNOWFLAKE_ROLE=ACME_TOOLS_WRITE_ROLE
+SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT
+SNOWFLAKE_PRIVATE_KEY_PATH=C:/Users/JosephCastillo/.snowflake-keys/acme_tools_svc.p8
+SNOWFLAKE_KEY_PASSPHRASE=&lt;P1 from Phase A&gt;
+# Remove SNOWFLAKE_PASSWORD line entirely</div>
+</div>
+
+<div class="step">
+<h3><span class="num">23</span> Update Python helpers <span class="who who-joey">Joey</span></h3>
+<p>In <code>scripts/_drift_explainer.py</code> and <code>scripts/audit_clone_freshness.py</code>: read the new env vars; pass <code>private_key=&lt;loaded p8 bytes&gt;</code> to <code>snowflake.connector.connect()</code> instead of <code>password=</code>. ~10 lines per script.</p>
+<div class="code-block">cd /c/airbyte_migration_tools
+python scripts/audit_clone_freshness.py</div>
+<div class="expect"><strong>Expect:</strong> runs to completion, no 2FA prompt on the phone. <strong>Mark Phase H complete.</strong></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase I &mdash; Cleanup (after 24-72h of clean runs)</h2>
+
+<div class="step">
+<h3><span class="num">24</span> Remove password env from migrated services <span class="who who-joey">Joey</span></h3>
+<div class="code-block">gcloud run services update airbyte-parity \
+  --project=acmedev-platform-hq --region=us-central1 \
+  --remove-env-vars=Snowflake__Password
+
+# crunchtime services (snow-sync already done in Phase F)
+for SVC in crunchtime-gfspastry crunchtime-goodtogo crunchtime-lahearth; do
+  gcloud run services update $SVC --project=philz-crunchtime-383717 --region=us-west2 \
+    --remove-env-vars=SNOWFLAKE_PASSWORD
+done</div>
+</div>
+
+<div class="step">
+<h3><span class="num">25</span> Remove leftover password env from hybrid services <span class="who who-joey">Joey</span></h3>
+<div class="code-block">for SVC in crunchtime-netsuite crunchtime-sales crunchtime-starterbakery netsuite-square-production; do
+  gcloud run services update $SVC --project=philz-crunchtime-383717 --region=us-west2 \
+    --remove-env-vars=SNOWFLAKE_PASSWORD
+done
+
+# starterbakery has an extra dangling literal
+gcloud run services update crunchtime-starterbakery --project=philz-crunchtime-383717 --region=us-west2 \
+  --remove-env-vars=SNOWFLAKE_USER_OLD</div>
+</div>
+
+<div class="step">
+<h3><span class="num">26</span> Snowflake-side password cleanup <span class="who who-wesley">Wesley</span></h3>
+<div class="code-block">ALTER USER PARITY_SVC SET PASSWORD = NULL;
+ALTER USER joey SET PASSWORD = NULL;  -- or rotate to ops-owned
+ALTER USER CRUNCHTIME_USER SET PASSWORD = NULL;
+-- After 30-day audit window: DROP USER PARITY_SVC;</div>
+<div class="expect"><strong>Expect:</strong> <code>SHOW USERS</code> shows <code>HAS_PASSWORD = false</code> for ACME_TOOLS_SVC, joey, CRUNCHTIME_USER. PARITY_SVC eventually dropped.</div>
+</div>
+
+<div class="step">
+<h3><span class="num">27</span> Delete legacy GCP secrets <span class="who who-joey">Joey</span></h3>
+<div class="code-block">gcloud secrets delete snowflake-password --project=acmedev-platform-hq --quiet
+gcloud secrets delete SNOW_SYNC_SNOWFLAKE_PASSWORD --project=philz-crunchtime-383717 --quiet
+gcloud secrets delete SNOWFLAKE_PASSWORD --project=philz-crunchtime-383717 --quiet</div>
+<div class="expect"><strong>Expect:</strong> 3 secrets deleted; <code>gcloud secrets list</code> per project no longer lists them. <strong>Mark Phase I complete.</strong></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Phase J &mdash; Runbook</h2>
+
+<div class="step">
+<h3><span class="num">28</span> Write <code>infra/snowflake/keypair-runbook.md</code> <span class="who who-joey">Joey</span></h3>
+<ul>
+<li>One-liner to rotate either key (re-run Phase A + Phase B + Phase C "versions add" steps for one user)</li>
+<li>One-liner to onboard a new service (mount existing secret + set 5 env vars)</li>
+<li>Annual rotation cadence + reminder (calendar event on May 1st)</li>
+<li>Pointer to this playbook + the AI-assisted + TRON variants</li>
+</ul>
+</div>
+
+<div class="step">
+<h3><span class="num">29</span> Update <code>CLAUDE.md</code> <span class="who who-joey">Joey</span></h3>
+<p>Add: "Snowflake auth is key-pair only. Service identities: ACME_TOOLS_SVC (internal tools), CRUNCHTIME_USER (crunchtime services), BRAZE_USER (braze stack). See infra/snowflake/keypair-runbook.md."</p>
+</div>
+
+<div class="step">
+<h3><span class="num">30</span> Commit + push <span class="who who-joey">Joey</span></h3>
+<div class="code-block">git -C /c/airbyte-parity add infra/snowflake/keypair-runbook.md CLAUDE.md
+git -C /c/airbyte-parity commit -m "Snowflake key-pair runbook + ACME_TOOLS_SVC consolidation done"
+git -C /c/airbyte-parity push</div>
+<div class="expect"><strong>Expect:</strong> commit + push successful. <strong>Migration complete.</strong></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Final acceptance</h2>
+<ul>
+<li><span class="checkbox"></span> All 6 services on JWT for &ge; 72 hours, no auth errors</li>
+<li><span class="checkbox"></span> <code>SHOW USERS</code> for ACME_TOOLS_SVC + CRUNCHTIME_USER shows <code>HAS_PASSWORD = false</code></li>
+<li><span class="checkbox"></span> Zero Cloud Run services bind any <code>SNOWFLAKE_PASSWORD</code> secret or env</li>
+<li><span class="checkbox"></span> airbyte-parity test count &ge; 281 (277 + 4 new)</li>
+<li><span class="checkbox"></span> Runbook merged + linked from CLAUDE.md</li>
+</ul>
+
+<div class="modes-foot">
+<div class="modefoot active">Manual<div class="desc">you are here</div></div>
+<div class="modefoot"><a href="/airbyte-migration/snowflake-keypair-assisted.html">AI-assisted &rarr;</a><div class="desc">AI proposes, you approve, AI executes</div></div>
+<div class="modefoot"><a href="/airbyte-migration/snowflake-keypair-tron.html">TRON &rarr;</a><div class="desc">fully autonomous + trace-on</div></div>
+</div>
+
+<div class="footer">
+<a href="/airbyte-migration/">&larr; Migration Status</a> &middot;
+<a href="/airbyte-migration/snowflake-keypair-master.html">Master plan</a> &middot;
+v0 &middot; r22 &middot; 2026-05-08 00:15
+</div>
+
+</div>
+</body>
+</html>

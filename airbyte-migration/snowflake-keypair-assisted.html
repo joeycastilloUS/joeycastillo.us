@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-Assisted Playbook &mdash; Snowflake Key-Pair Migration &mdash; Philz Coffee</title>
+<link rel="stylesheet" href="/airbyte-migration/gate.css">
+<script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #f0ad4e;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#f0ad4e;font-weight:700;font-size:18px}
+nav .brand a{color:#f0ad4e;text-decoration:none}
+nav .meta{color:#666;font-size:12px}
+.container{max-width:880px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px;letter-spacing:-0.3px}
+.subtitle{color:#f0ad4e;font-size:15px;margin-bottom:14px}
+.modecrumb{display:inline-block;background:#f0ad4e;color:#0a0a0a;padding:4px 12px;border-radius:4px;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:18px}
+.intro{background:#1A1A1A;border-left:4px solid #f0ad4e;padding:16px 20px;margin:18px 0;border-radius:0 6px 6px 0;font-size:14px}
+.intro strong{color:#f0ad4e}
+.intro a{color:#f0ad4e}
+h2{color:#f0ad4e;font-size:20px;margin:36px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}
+h3{color:#fff;font-size:15px;margin:18px 0 6px}
+.loop{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:18px 0}
+.loop ol{margin-left:22px}
+.loop li{font-size:14px;margin:8px 0}
+.loop strong{color:#f0ad4e}
+.gate{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #f0ad4e}
+.gate h3{margin:0 0 6px;color:#f0ad4e;font-size:15px;display:flex;align-items:flex-start;gap:10px}
+.gate h3 .num{display:inline-block;background:#f0ad4e;color:#111;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-size:13px;font-weight:700;flex-shrink:0}
+.gate .meta{color:#888;font-size:12px;margin-bottom:10px}
+.prompt{background:#0d1f15;border:1px solid #1f3d28;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas','Monaco',monospace;font-size:13px;color:#bbe6c8}
+.prompt::before{content:"you say:";display:block;color:#5cb85c;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.aishow{background:#1f1410;border:1px solid #3a2a1a;border-radius:4px;padding:12px 16px;margin:8px 0;font-size:13px}
+.aishow::before{content:"AI shows you:";display:block;color:#f0ad4e;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:700}
+.aishow ul{margin:6px 0 6px 22px;font-size:13px}
+.aishow code{background:#0a0a0a;padding:2px 6px;border-radius:3px;color:#f0ad4e}
+.approve{background:#0a1f24;border:1px solid #1f3540;border-radius:4px;padding:10px 14px;margin:6px 0;font-size:13px;color:#9fd6e8}
+.approve::before{content:"you reply:";display:block;color:#6FC3DF;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.verify{background:#0d1f15;border:1px solid #1f3d28;border-radius:4px;padding:10px 14px;margin:6px 0;font-size:13px;color:#bbe6c8}
+.verify::before{content:"AI verifies:";display:block;color:#5cb85c;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:700}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas','Monaco',monospace;font-size:12px;color:#ccc;overflow-x:auto;white-space:pre-wrap;line-height:1.55}
+code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#f0ad4e}
+.kill{background:#3d1f1f;border-left:4px solid #d9534f;padding:14px 18px;margin:18px 0;font-size:14px;color:#eee;border-radius:0 6px 6px 0}
+.kill strong{color:#d9534f}
+.kill .prompt{background:#1a0a0a;border-color:#3d1f1f;color:#e6a8a8}
+.kill .prompt::before{color:#d9534f}
+.bigtime{background:linear-gradient(135deg,#1f1a0a 0%,#1A1A1A 100%);border:1px solid #3a2a1a;border-radius:8px;padding:18px 24px;margin:18px 0;display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.bigtime .label{color:#888;text-transform:uppercase;letter-spacing:1px;font-size:11px}
+.bigtime .val{color:#f0ad4e;font-size:22px;font-weight:700}
+.modes-foot{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:32px 0 18px}
+.modefoot{background:#1A1A1A;border-radius:6px;padding:14px 18px;text-align:center}
+.modefoot.active{border:2px solid #f0ad4e}
+.modefoot a{color:#f0ad4e;text-decoration:none;font-weight:700;font-size:13px}
+.modefoot .desc{color:#888;font-size:11px;margin-top:4px}
+.footer{margin-top:40px;padding-top:14px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+.footer a{color:#f0ad4e;text-decoration:none}
+ul{margin:6px 0 6px 22px}
+li{font-size:13px;margin:4px 0}
+.who{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-left:8px}
+.who-joey{background:#1a2a3a;color:#6FC3DF}
+.who-wesley{background:#3a2a1a;color:#f0ad4e}
+@media(max-width:680px){.modes-foot{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+<span class="brand"><a href="/airbyte-migration/">Airbyte Migration</a> / Snowflake Auth / AI-Assisted</span>
+<span class="meta">Philz Coffee &middot; acmedevUS</span>
+</nav>
+
+<div class="container">
+
+<span class="modecrumb">Mode 2 &middot; AI-Assisted</span>
+<h1>Snowflake Key-Pair Migration &mdash; AI-Assisted Playbook</h1>
+<p class="subtitle">AI proposes. You approve. AI executes. You verify.</p>
+
+<div class="intro">
+<strong>Use this mode when:</strong> default. AI accelerates the work, human stays in the loop for every gcloud / snowsql / secret-mgr write. AI never executes without an explicit "go" at each gate. Same end state as the <a href="/airbyte-migration/snowflake-keypair-manual.html">manual</a> playbook; ~3x faster wall-clock.
+</div>
+
+<div class="bigtime">
+<div><div class="label">Total active time</div><div class="val">~30 min</div></div>
+<div><div class="label">Wall-clock</div><div class="val">2&ndash;3 days</div></div>
+<div><div class="label">Wesley window</div><div class="val">~25 min</div></div>
+</div>
+
+<h2>The loop</h2>
+<div class="loop">
+<p>Every phase of this migration runs as a four-step loop:</p>
+<ol>
+<li><strong>Propose</strong> &mdash; You type a one-line prompt. AI reads the master plan + this page, drafts the exact commands for one phase, surfaces the risk, and shows the rollback for that phase only. <em>No filesystem or cloud writes happen yet.</em></li>
+<li><strong>Approve</strong> &mdash; You reply <code>go</code> (or push back: <code>edit X</code>, <code>skip</code>, <code>kill</code>). AI never proceeds without an explicit go.</li>
+<li><strong>Execute</strong> &mdash; AI runs the commands. You see each tool call as it happens. AI does <em>not</em> chain into the next phase unprompted.</li>
+<li><strong>Verify</strong> &mdash; AI runs the acceptance check from the plan. If green, AI tells you the phase is complete and waits. If red, AI surfaces the failure and proposes a remediation -- you approve again.</li>
+</ol>
+<p>Repeat for the next phase. Loop ends when all 10 phases are green.</p>
+</div>
+
+<h2>Pre-flight</h2>
+<div class="gate">
+<h3><span class="num">0</span> Open the master plan + verify access</h3>
+<div class="prompt">~load airbyte-parity, then open the master plan</div>
+<div class="aishow">
+AI replies with:
+<ul>
+<li>Repo loaded confirmation (commit hash, branch, clean tree)</li>
+<li>Master plan opened in browser</li>
+<li>Pre-flight checklist read aloud (gcloud auth, snowsql, .NET 8, repo cloned)</li>
+<li>Wesley availability confirmed</li>
+</ul>
+</div>
+<div class="approve">go</div>
+</div>
+
+<h2>Phase A &mdash; Generate keys</h2>
+
+<div class="gate">
+<h3><span class="num">1</span> Propose key generation <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase A: generate ACME_TOOLS_SVC + CRUNCHTIME_USER keypairs</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>The 4 openssl commands it will run</li>
+<li>Output paths (<code>~/.snowflake-keys/{acme_tools_svc,crunchtime_user}.{p8,pub}</code>)</li>
+<li><strong>Risk:</strong> low (local-only, no network, no irreversible state)</li>
+<li><strong>Rollback:</strong> <code>rm -rf ~/.snowflake-keys</code></li>
+<li><strong>Passphrases:</strong> AI will <strong>NOT</strong> generate or store these. AI prompts you to type each passphrase at the openssl interactive prompt; you save them to your password manager. AI never sees them.</li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">After execution: 4 files exist with mode 0600, both .pub PEMs printed for visual confirmation.</div>
+</div>
+
+<h2>Phase B &mdash; Wesley's SQL block</h2>
+
+<div class="gate">
+<h3><span class="num">2</span> Prepare + send to Wesley <span class="who who-joey">Joey</span> + <span class="who who-wesley">Wesley</span></h3>
+<div class="prompt">~execute phase B: prep Wesley's SQL block</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>The full SQL block from the master plan with placeholders <strong>filled in</strong>:
+  <ul>
+  <li>Both .pub PEMs read from <code>~/.snowflake-keys/</code> and pasted in</li>
+  <li><code>&lt;SNOW_SYNC_TARGET_DB&gt;.&lt;SCHEMA&gt;</code> -- AI runs <code>SHOW GRANTS TO USER joey</code> to identify the target, displays for your confirmation</li>
+  </ul>
+</li>
+<li><strong>Action proposed:</strong> draft a Slack DM to Wesley containing the block + the line "Wesley: paste this in Snowflake web UI as USERADMIN+SECURITYADMIN, ~5 min."</li>
+<li><strong>What AI does NOT do:</strong> AI will not send the Slack DM itself. It drafts; you copy + send.</li>
+</ul>
+</div>
+<div class="approve">go (drafts the message; you send manually)</div>
+<div class="verify">After Wesley confirms execution: AI runs the smoke test (<code>snowsql ... SELECT current_user(), current_role()</code>) and confirms the response is <code>ACME_TOOLS_SVC | ACME_TOOLS_READ_ROLE</code>.</div>
+</div>
+
+<h2>Phase C &mdash; GCP Secret Manager</h2>
+
+<div class="gate">
+<h3><span class="num">3</span> Upload to acmedev-platform-hq <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase C step 1: upload to acmedev</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>3 <code>gcloud secrets create</code> commands (one per secret name)</li>
+<li>3 <code>gcloud secrets add-iam-policy-binding</code> commands (bind to airbyte-parity's compute SA)</li>
+<li><strong>Source values:</strong> AI reads <code>~/.snowflake-keys/acme_tools_svc.p8</code> from disk via <code>cat | gcloud secrets create --data-file=-</code> -- key bytes never enter AI's context. Same for the passphrase via interactive prompt.</li>
+<li><strong>Risk:</strong> medium (creates persistent GCP state). Reversible via <code>gcloud secrets delete</code>.</li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">3 secrets visible via <code>gcloud secrets list --project=acmedev-platform-hq | grep acme-tools</code>; each has 1 version. <code>gcloud secrets get-iam-policy</code> shows the SA bound on each.</div>
+</div>
+
+<div class="gate">
+<h3><span class="num">4</span> Upload to philz-crunchtime-383717 + refresh CRUNCHTIME_USER <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase C step 2: upload to philz-crunchtime + refresh CRUNCHTIME_USER key</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>3 <code>gcloud secrets create</code> for ACME_TOOLS_SVC trio</li>
+<li>2 <code>gcloud secrets versions add</code> for CRUNCHTIME_USER refresh</li>
+<li>3 IAM bindings to snow-sync's runtime SA (AI looks up the SA via describe first, displays for your confirmation)</li>
+<li><strong>Risk:</strong> medium. Existing JWT services (5 sibling crunchtime-*) keep using prior secret version until rotated -- safe.</li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">Secrets list updated; existing services still healthy (no redeploy yet); CRUNCHTIME_USER secret has +1 version.</div>
+</div>
+
+<h2>Phase D &mdash; .NET driver supports key-pair</h2>
+
+<div class="gate">
+<h3><span class="num">5</span> Edit + test <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase D: add JWT support to SnowflakeOptions + SnowflakeClient + 4 tests</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>Diff for <code>SnowflakeOptions.cs</code> (3 new properties, all optional)</li>
+<li>Diff for <code>SnowflakeClient.cs</code> connection-string assembly (if/else branch on Authenticator)</li>
+<li>Full content for <code>SnowflakeClientAuthTests.cs</code> (4 new tests)</li>
+<li><strong>Risk:</strong> low. Existing password path untouched if Authenticator is unset.</li>
+<li><strong>After your go, AI will:</strong> apply the edits, run <code>dotnet test --filter SnowflakeClientAuth</code>, then run the full suite.</li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">4/4 new tests pass + 277/277 existing tests pass = 281/281. AI shows the test run output.</div>
+</div>
+
+<h2>Phase E &mdash; airbyte-parity cutover</h2>
+
+<div class="gate">
+<h3><span class="num">6</span> Build + deploy + smoke test <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase E: build, deploy airbyte-parity with key-pair auth, smoke test</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li><code>gcloud builds submit</code> for the new image tag</li>
+<li><code>gcloud run services update airbyte-parity</code> with the full env / volume update (the Phase E command from the master plan)</li>
+<li><strong>Crucial:</strong> <code>Snowflake__Password</code> secret stays bound for one rev as fallback (line item visible in the diff)</li>
+<li><strong>Risk:</strong> medium-high. New rev on a production service. Mitigation: traffic stays at 100% on the new rev only after smoke test passes; rollback is one command.</li>
+<li><strong>Smoke test:</strong> <code>POST /tick?force=true&amp;streams=NETSUITE.CUSTOM_INVENTORY</code></li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">200 from /tick. New rev active. Logs show <code>current_user=ACME_TOOLS_SVC, current_role=ACME_TOOLS_READ_ROLE</code> on next cron tick (AI tails logs).</div>
+</div>
+
+<div class="gate">
+<h3><span class="num">7</span> Wesley spot-check <span class="who who-wesley">Wesley</span></h3>
+<div class="prompt">~execute phase E review: prep Wesley's QUERY_HISTORY check</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>The QUERY_HISTORY SELECT statement Wesley will run</li>
+<li>Drafts a Slack message: "Wesley: airbyte-parity is on the new key-pair. Can you run this in Snowflake (5 sec) and confirm USER_NAME=ACME_TOOLS_SVC?"</li>
+</ul>
+</div>
+<div class="approve">go (sends draft to your clipboard; you send to Wesley)</div>
+<div class="verify">After Wesley replies "looks good," AI marks Phase E green and pauses for the 24h soak window before Phase I.</div>
+</div>
+
+<h2>Phase F &mdash; snow-sync cutover</h2>
+
+<div class="gate">
+<h3><span class="num">8</span> Inspect + plan + execute <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase F: snow-sync to ACME_TOOLS_SVC + WRITE_ROLE, remove plaintext password env</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>Result of <code>describe snow-sync</code>: image, entrypoint, current env</li>
+<li>The <code>gcloud run services update</code> command -- includes <code>--remove-env-vars=SNOWFLAKE_PASSWORD,SNOWFLAKE_TARGET_USER_PEM_KEY_BASE_64</code> <strong>immediately</strong> (no fallback because the literal value was already exposed)</li>
+<li><strong>Risk:</strong> high. Removes the plaintext password env in one shot. If JWT fails, snow-sync errors on next run. Mitigation: Wesley standing by to spot-check; rollback is one command (re-add env from secret you create on the fly).</li>
+<li><strong>Pre-condition:</strong> AI confirms Wesley acknowledged the snow-sync rotation in advance</li>
+</ul>
+</div>
+<div class="approve">go (and confirm Wesley is online)</div>
+<div class="verify">Trigger or wait for next snow-sync run. AI watches logs + QUERY_HISTORY for INSERT/UPDATE landing in target schema. Both must come back clean within 1 cron tick.</div>
+</div>
+
+<h2>Phase G &mdash; 3 crunchtime password services</h2>
+
+<div class="gate">
+<h3><span class="num">9</span> Cutover all three in a single batch <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase G: gfspastry + goodtogo + lahearth on JWT</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>3 <code>gcloud run services update</code> commands (one per service, identical env shape)</li>
+<li><strong>Risk:</strong> low. Pattern proven by 5 sibling JWT services (procurement-inventory blueprint).</li>
+<li><strong>Verification window:</strong> 1-6 hours until each service's next cron tick</li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">Within 6 hours: airbyte-parity dashboard shows clean L1 deltas for all 3 streams. AI watches the dashboard and reports back.</div>
+</div>
+
+<h2>Phase H &mdash; Local .env</h2>
+
+<div class="gate">
+<h3><span class="num">10</span> Update local <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase H: update local .env + python helpers</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>Diff for <code>airbyte_migration_tools/.env</code> (5 line changes)</li>
+<li>Diffs for <code>scripts/_drift_explainer.py</code> + <code>scripts/audit_clone_freshness.py</code></li>
+<li><strong>Risk:</strong> none -- local-only.</li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">AI runs <code>python scripts/audit_clone_freshness.py</code>; expects no 2FA prompt + script completes.</div>
+</div>
+
+<h2>Phase I &mdash; Cleanup (after 24-72h soak)</h2>
+
+<div class="gate">
+<h3><span class="num">11</span> Remove password env from migrated + hybrid services <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase I step 1: remove SNOWFLAKE_PASSWORD env from 5 migrated + 4 hybrid services</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>9 <code>gcloud run services update --remove-env-vars</code> commands</li>
+<li><strong>Pre-condition check:</strong> AI confirms each migrated service has been on JWT for &ge; 24h without auth errors</li>
+<li><strong>Risk:</strong> medium. Removes the only fallback. Mitigation: redeploy prior rev if anything breaks.</li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">Each service redeployed. AI samples logs for 5 minutes per service to confirm no auth errors.</div>
+</div>
+
+<div class="gate">
+<h3><span class="num">12</span> Snowflake-side password cleanup <span class="who who-wesley">Wesley</span></h3>
+<div class="prompt">~execute phase I step 2: prep Wesley's password-null SQL</div>
+<div class="aishow">
+AI drafts the Slack message + SQL block (3 ALTER USER statements + optional DROP USER PARITY_SVC after 30-day window).
+</div>
+<div class="approve">go (sends to Wesley; he runs)</div>
+<div class="verify">AI runs <code>SHOW USERS</code> via service smoke test; confirms <code>HAS_PASSWORD = false</code>.</div>
+</div>
+
+<div class="gate">
+<h3><span class="num">13</span> Delete legacy GCP secrets <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase I step 3: delete legacy snowflake-password secrets</div>
+<div class="aishow">
+AI lists the 3 secrets to delete + cross-references that no current Cloud Run service binds them.
+</div>
+<div class="approve">go</div>
+<div class="verify"><code>gcloud secrets list</code> per project no longer lists the legacy names.</div>
+</div>
+
+<h2>Phase J &mdash; Runbook</h2>
+
+<div class="gate">
+<h3><span class="num">14</span> Write runbook + commit <span class="who who-joey">Joey</span></h3>
+<div class="prompt">~execute phase J: write keypair-runbook.md + update CLAUDE.md</div>
+<div class="aishow">
+AI shows:
+<ul>
+<li>Full content for <code>infra/snowflake/keypair-runbook.md</code> drafted from this playbook + the manual playbook</li>
+<li>Diff for <code>CLAUDE.md</code> adding the auth policy line</li>
+<li>Commit message + push command</li>
+</ul>
+</div>
+<div class="approve">go</div>
+<div class="verify">Files committed, push successful, runbook accessible.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Kill switch</h2>
+<div class="kill">
+<strong>At any gate, you can abort the chain:</strong>
+<div class="prompt">kill</div>
+or
+<div class="prompt">stop &mdash; rollback the last phase</div>
+<p>AI immediately stops proposing further phases. If <code>rollback</code> was requested, AI proposes the rollback step from the master plan for the most recent phase that introduced state changes (cloud or filesystem) and waits for your <code>go</code> on it.</p>
+<p>The chain never advances autonomously. Every phase is gated.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>What AI <em>never</em> does in this mode</h2>
+<ul>
+<li>Send messages to Wesley (or anyone) on its own</li>
+<li>Force-push or amend commits</li>
+<li>Drop a Snowflake user, role, or grant without your <code>go</code></li>
+<li>Delete a GCP secret without your <code>go</code></li>
+<li>Skip the verification step after an execute</li>
+<li>Chain to the next phase without a fresh prompt from you</li>
+<li>Read or transmit your passphrases (you type them at the openssl prompt; AI never sees them)</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>Trace level (lighter than TRON)</h2>
+<p>Each gate emits a single audit line to <code>be/otel.jsonl</code> with: phase, action, your approve/edit/skip/kill response, the resulting commit hash (if any). Enough to reconstruct what happened; not the full action-by-action trace TRON requires.</p>
+
+<div class="modes-foot">
+<div class="modefoot"><a href="/airbyte-migration/snowflake-keypair-manual.html">&larr; Manual</a><div class="desc">human runs every command</div></div>
+<div class="modefoot active">AI-Assisted<div class="desc">you are here</div></div>
+<div class="modefoot"><a href="/airbyte-migration/snowflake-keypair-tron.html">TRON &rarr;</a><div class="desc">fully autonomous + trace-on</div></div>
+</div>
+
+<div class="footer">
+<a href="/airbyte-migration/">&larr; Migration Status</a> &middot;
+<a href="/airbyte-migration/snowflake-keypair-master.html">Master plan</a> &middot;
+v0 &middot; r22 &middot; 2026-05-08 00:15
+</div>
+
+</div>
+</body>
+</html>

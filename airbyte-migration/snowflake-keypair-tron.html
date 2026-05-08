@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRON Playbook &mdash; Snowflake Key-Pair Migration &mdash; Philz Coffee</title>
+<link rel="stylesheet" href="/airbyte-migration/gate.css">
+<script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d0d0d;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #5cb85c;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#5cb85c;font-weight:700;font-size:18px;letter-spacing:1px}
+nav .brand a{color:#5cb85c;text-decoration:none}
+nav .meta{color:#666;font-size:12px}
+.container{max-width:880px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:32px;margin-bottom:4px;letter-spacing:-0.3px}
+.subtitle{color:#5cb85c;font-size:15px;margin-bottom:14px;font-family:'Consolas','Monaco',monospace}
+.modecrumb{display:inline-block;background:#5cb85c;color:#0a0a0a;padding:4px 12px;border-radius:4px;font-weight:700;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px;font-family:'Consolas',monospace}
+.intro{background:#0d1f15;border:1px solid #1f3d28;padding:16px 20px;margin:18px 0;border-radius:6px;font-size:14px}
+.intro strong{color:#5cb85c}
+.intro a{color:#5cb85c}
+h2{color:#5cb85c;font-size:20px;margin:36px 0 12px;border-bottom:1px solid #1f3d28;padding-bottom:6px;font-family:'Consolas',monospace;letter-spacing:1px;text-transform:uppercase}
+h3{color:#fff;font-size:15px;margin:18px 0 6px}
+.contract{background:#0d1f15;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #5cb85c}
+.contract h3{margin-top:0;color:#5cb85c;font-size:15px}
+.contract .meta{color:#5d8c5d;font-size:11px;margin-bottom:8px;font-family:'Consolas',monospace;text-transform:uppercase;letter-spacing:1px}
+.precondition{background:#1f1410;border:1px solid #3a2a1a;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #f0ad4e}
+.precondition h3{margin-top:0;color:#f0ad4e;font-size:15px}
+.precondition ul{margin:6px 0 6px 22px}
+.precondition li{font-size:13px;margin:5px 0;color:#e6cba0}
+.precondition li strong{color:#f0ad4e}
+.code-block{background:#000;border:1px solid #1f3d28;border-radius:4px;padding:14px 18px;margin:10px 0;font-family:'Consolas','Monaco',monospace;font-size:12px;color:#9fdf9f;overflow-x:auto;white-space:pre-wrap;line-height:1.6}
+.code-block.amber{border-color:#3a2a1a;color:#e6cba0}
+.code-block.red{border-color:#3d1f1f;color:#e6a8a8}
+code{background:#1A1A1A;padding:2px 6px;border-radius:3px;font-size:12px;color:#5cb85c}
+.kill{background:#3d1f1f;border:1px solid #4d2828;padding:18px 22px;margin:18px 0;font-size:14px;color:#eee;border-radius:6px}
+.kill strong{color:#d9534f;text-transform:uppercase;letter-spacing:1px;font-family:'Consolas',monospace}
+.kill .code-block{background:#0a0000;border-color:#4d2828;color:#e6a8a8}
+.bigtime{background:linear-gradient(135deg,#0d1f15 0%,#0a0a0a 100%);border:1px solid #1f3d28;border-radius:8px;padding:18px 24px;margin:18px 0;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-family:'Consolas',monospace}
+.bigtime .label{color:#5d8c5d;text-transform:uppercase;letter-spacing:2px;font-size:11px}
+.bigtime .val{color:#5cb85c;font-size:24px;font-weight:700}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+th{text-align:left;color:#5cb85c;border-bottom:2px solid #1f3d28;padding:9px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-family:'Consolas',monospace}
+td{padding:9px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+tr:hover{background:#0a1a10}
+ul{margin:6px 0 6px 22px}
+li{font-size:13px;margin:4px 0}
+ol{margin:6px 0 6px 22px}
+.modes-foot{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:32px 0 18px}
+.modefoot{background:#1A1A1A;border-radius:6px;padding:14px 18px;text-align:center}
+.modefoot.active{border:2px solid #5cb85c}
+.modefoot a{color:#5cb85c;text-decoration:none;font-weight:700;font-size:13px}
+.modefoot .desc{color:#888;font-size:11px;margin-top:4px}
+.footer{margin-top:40px;padding-top:14px;border-top:1px solid #1f3d28;font-size:12px;color:#5d8c5d;text-align:center;font-family:'Consolas',monospace;letter-spacing:1px}
+.footer a{color:#5cb85c;text-decoration:none}
+.gate-state{display:inline-block;padding:2px 9px;border-radius:11px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-family:'Consolas',monospace}
+.gate-armed{background:#3d2f1f;color:#f0ad4e}
+.gate-pass{background:#0d2818;color:#5cb85c}
+.gate-fail{background:#2d1010;color:#d9534f}
+.banner{background:#0d1f15;border:1px solid #1f3d28;color:#5cb85c;padding:12px 18px;border-radius:5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;font-size:12px;margin-bottom:24px;display:inline-block;font-family:'Consolas',monospace}
+@media(max-width:680px){.modes-foot{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+<span class="brand"><a href="/airbyte-migration/">Airbyte Migration</a> / Snowflake Auth / TRON</span>
+<span class="meta">Philz Coffee &middot; acmedevUS</span>
+</nav>
+
+<div class="container">
+
+<span class="modecrumb">Mode 3 &middot; TRON</span>
+<h1>Snowflake Key-Pair Migration &mdash; TRON Playbook</h1>
+<p class="subtitle">// fully autonomous &middot; trace-on &middot; one signal in, full chain reaction out</p>
+<span class="banner">Contract Required</span>
+
+<div class="intro">
+<strong>Use this mode when:</strong> the trace contract is satisfied, the kill switch is tested, the procedure is proven by manual or AI-assisted runs at least once, and the operator wants the migration to complete unattended with full forensic trail. <strong>Do NOT enter TRON until every pre-condition below is green.</strong> Same end state as <a href="/airbyte-migration/snowflake-keypair-manual.html">manual</a> and <a href="/airbyte-migration/snowflake-keypair-assisted.html">AI-assisted</a>; ~10x faster wall-clock; zero human touch during execution.
+</div>
+
+<div class="bigtime">
+<div><div class="label">Wall-clock</div><div class="val">2&ndash;3 hrs</div></div>
+<div><div class="label">Active human time</div><div class="val">&lt; 5 min</div></div>
+<div><div class="label">Wesley window</div><div class="val">async</div></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>// Trace contract</h2>
+<p>TRON is only safe with full traceability. Every action AI takes during the chain emits one structured event to a single append-only sink. The contract:</p>
+
+<div class="contract">
+<h3>Sink</h3>
+<div class="meta">where every event lands</div>
+<p>Append-only NDJSON file at <code>be/otel.jsonl</code>. Each line a single JSON object. Pre-existing in airbyte-parity (used by Be telemetry). Same file, additional events with <code>"channel": "tron"</code>.</p>
+</div>
+
+<div class="contract">
+<h3>Event shape</h3>
+<div class="meta">required fields per event</div>
+<div class="code-block">{
+  "channel": "tron",
+  "phase": "B",
+  "step": 6,
+  "action": "gcloud_secrets_create",
+  "args_redacted": {
+    "secret_name": "acme-tools-svc-private-key",
+    "project": "acmedev-platform-hq",
+    "data_file": "&lt;file&gt;:hash=sha256:a3f9...",
+    "passphrase": "&lt;redacted&gt;"
+  },
+  "actor": "claude-opus-4-7",
+  "started_ts": "2026-05-08T03:14:22.117Z",
+  "ended_ts":   "2026-05-08T03:14:23.842Z",
+  "duration_ms": 1725,
+  "result": "ok",
+  "diff": {
+    "before": "secret_does_not_exist",
+    "after":  "secret_exists_v1"
+  },
+  "next_action_planned": "gcloud_secrets_add_iam_policy_binding"
+}</div>
+<p>Secret values are <strong>never</strong> in the trace -- only sha256 hash + redaction marker.</p>
+</div>
+
+<div class="contract">
+<h3>Action coverage</h3>
+<div class="meta">what must emit an event</div>
+<ul>
+<li>Every <code>gcloud</code> invocation (secrets, run services, builds, IAM)</li>
+<li>Every <code>snowsql</code> / Snowflake REST call</li>
+<li>Every filesystem write (key file, .env, source code edit)</li>
+<li>Every <code>git</code> operation (add, commit, push)</li>
+<li>Every <code>dotnet</code> build/test invocation</li>
+<li>Every HTTP request to a Cloud Run service URL (smoke tests)</li>
+<li>Every read-only verification check (BEFORE the next action that depends on it)</li>
+</ul>
+<p>If AI cannot emit the event for an action, AI must not perform the action.</p>
+</div>
+
+<div class="contract">
+<h3>Audit query</h3>
+<div class="meta">how a human reads it after-the-fact</div>
+<div class="code-block">jq -c 'select(.channel == "tron")' be/otel.jsonl | jq -s '
+  group_by(.phase) | map({
+    phase: .[0].phase,
+    actions: length,
+    duration_total_s: (map(.duration_ms) | add) / 1000,
+    failures: map(select(.result != "ok")) | length,
+    last_action: (sort_by(.ended_ts) | last | .action)
+  })'</div>
+<p>One command, one summary per phase, one line of context per action. If the summary shows <code>failures &gt; 0</code> in any phase, audit drills into raw events.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>// Pre-conditions</h2>
+<p>Every gate below must be green before TRON arms. AI verifies each one and refuses to enter TRON if any fails.</p>
+
+<div class="precondition">
+<h3>1 &nbsp; Procedure proven <span class="gate-state gate-armed">arming</span></h3>
+<ul>
+<li><strong>Required:</strong> the manual <em>or</em> AI-assisted playbook has run end-to-end at least once on a non-production target (e.g., a test Snowflake user, or a sandbox Cloud Run project).</li>
+<li><strong>Verify:</strong> <code>be/otel.jsonl</code> contains a prior trace marked <code>"channel": "manual"</code> or <code>"channel": "assisted"</code> with all 10 phases <code>result: "ok"</code>.</li>
+<li><strong>If unsatisfied:</strong> run AI-assisted mode first. Refuse TRON.</li>
+</ul>
+</div>
+
+<div class="precondition">
+<h3>2 &nbsp; Sink writable + tail visible <span class="gate-state gate-armed">arming</span></h3>
+<ul>
+<li><strong>Required:</strong> <code>be/otel.jsonl</code> exists, is append-only, and a separate terminal can <code>tail -f</code> it.</li>
+<li><strong>Verify:</strong> AI writes a test event with <code>"action": "tron_preflight"</code> and confirms it appears in the tail.</li>
+<li><strong>If unsatisfied:</strong> create the file + ensure tail is open. Refuse TRON.</li>
+</ul>
+</div>
+
+<div class="precondition">
+<h3>3 &nbsp; Kill switch armed <span class="gate-state gate-armed">arming</span></h3>
+<ul>
+<li><strong>Required:</strong> file <code>~/.tron-kill</code> does not exist before start; creating it during execution causes AI to halt cleanly after the current phase. AI checks the file's existence between every phase.</li>
+<li><strong>Verify:</strong> AI starts a 30-second dry-run of the kill check (creating + reading + deleting <code>~/.tron-kill</code>) and emits a trace event for each.</li>
+<li><strong>If unsatisfied:</strong> dry-run failed. Refuse TRON.</li>
+</ul>
+</div>
+
+<div class="precondition">
+<h3>4 &nbsp; Wesley async-authorized <span class="gate-state gate-armed">arming</span></h3>
+<ul>
+<li><strong>Required:</strong> Wesley has approved the master plan AND has pre-authorized TRON to run his side of the chain unattended (Phase B SQL block, Phase E spot check, Phase F spot check, Phase G spot check, Phase I cleanup).</li>
+<li><strong>Verify:</strong> a signed approval message in Slack OR a token file at <code>~/.tron-wesley-ok</code> with timestamp &le; 24h old.</li>
+<li><strong>If unsatisfied:</strong> route to AI-assisted mode where each Wesley step is human-mediated. Refuse TRON.</li>
+</ul>
+</div>
+
+<div class="precondition">
+<h3>5 &nbsp; Resource bounds set <span class="gate-state gate-armed">arming</span></h3>
+<ul>
+<li><strong>Required:</strong> max-action-count, max-wall-clock, max-cost. AI declares these in the first trace event of the run.</li>
+<li><strong>Defaults:</strong> 200 actions, 4 hours, 0 incremental Cloud Run revs above the plan's 6.</li>
+<li><strong>If exceeded mid-run:</strong> AI halts and emits <code>"result": "halt_resource_bound"</code>. No new actions until human reviews.</li>
+</ul>
+</div>
+
+<div class="precondition">
+<h3>6 &nbsp; Rollback windows registered <span class="gate-state gate-armed">arming</span></h3>
+<ul>
+<li><strong>Required:</strong> for each phase that introduces persistent state (B, C, E, F, G, I), AI emits a "rollback registered" event before the phase begins, listing the exact reverse-command set.</li>
+<li><strong>Effect:</strong> if any phase fails or kill-switch fires, AI runs the registered rollback for the most recent persistent-state phase and halts.</li>
+<li><strong>If unsatisfied:</strong> rollback registration failed. Refuse TRON.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>// Activation</h2>
+<p>Once all 6 pre-conditions are green, the operator types one command:</p>
+<div class="code-block">~tron snowflake-keypair-migration</div>
+<p>AI replies with a final pre-flight summary: trace sink confirmed, kill switch armed, Wesley authorized, resource bounds, rollback windows registered, expected wall-clock, expected total events. Operator types <code>arm</code>. AI begins.</p>
+<p><strong>From this point forward, no further human input is required for normal completion.</strong> The operator may close the laptop, walk away, sleep. The chain runs.</p>
+
+<!-- ============================================================ -->
+<h2>// Chain</h2>
+<p>The 10 phases run in order, each fully traced. Inter-phase gates check kill-switch + previous-phase result + soak-window timer.</p>
+
+<table>
+<tr><th>Phase</th><th>Wall-clock</th><th>Trace events (typical)</th><th>Halt-on-fail</th></tr>
+<tr><td>A &mdash; Generate keys</td><td>~30 s</td><td>8 (4 openssl + 4 verify)</td><td>halt + remove keys dir</td></tr>
+<tr><td>B &mdash; Wesley SQL block</td><td>~2 min</td><td>6 (prep + send + verify smoke + 4 grants check)</td><td>halt + drop user/role</td></tr>
+<tr><td>C &mdash; GCP secrets</td><td>~2 min</td><td>14 (8 creates + 6 IAM bindings)</td><td>halt + delete created secrets</td></tr>
+<tr><td>D &mdash; .NET driver</td><td>~3 min</td><td>9 (3 edits + 1 build + 1 full test + 4 unit test outputs)</td><td>halt + revert commit</td></tr>
+<tr><td>E &mdash; airbyte-parity cutover</td><td>~5 min + 24 h soak</td><td>11 (build + deploy + smoke + 8 log/QH checks)</td><td>traffic to prior rev</td></tr>
+<tr><td>F &mdash; snow-sync cutover</td><td>~5 min + 1 cron tick</td><td>9 (describe + update + 7 verifies)</td><td>traffic to prior rev</td></tr>
+<tr><td>G &mdash; 3 crunchtime</td><td>~3 min + 6 h soak</td><td>12 (3&times;4 each)</td><td>traffic to prior rev per service</td></tr>
+<tr><td>H &mdash; Local .env</td><td>~1 min</td><td>4 (2 edits + 2 verify runs)</td><td>revert .env + scripts</td></tr>
+<tr><td>I &mdash; Cleanup</td><td>~5 min</td><td>17 (9 service updates + 3 ALTER USER + 3 secret deletes + 2 verifies)</td><td>halt + report; reverse with re-create</td></tr>
+<tr><td>J &mdash; Runbook</td><td>~2 min</td><td>5 (write + diff + commit + push + index update)</td><td>halt + revert commit</td></tr>
+</table>
+
+<p><strong>Expected total:</strong> ~95 trace events, ~25 minutes of active execution, ~30 hours wall-clock (the 24h soak after Phase E dominates).</p>
+
+<!-- ============================================================ -->
+<h2>// Kill switch</h2>
+<div class="kill">
+<strong>Halt the chain at any time:</strong>
+<div class="code-block red">touch ~/.tron-kill</div>
+<p>AI checks for this file between every phase boundary. On detection, AI:</p>
+<ol>
+<li>Emits a <code>"channel": "tron", "action": "kill_detected"</code> event</li>
+<li>Completes any partial action that's already in-flight (does not abort mid-write)</li>
+<li>Runs the registered rollback for the most recent persistent-state phase</li>
+<li>Emits a final <code>"action": "tron_halted", "result": "killed_by_operator"</code> event</li>
+<li>Stops</li>
+</ol>
+<p><strong>Maximum halt latency:</strong> the duration of one in-flight action (typically 1-30 seconds; never more than 2 minutes for a Cloud Run deploy).</p>
+<p>To resume: delete <code>~/.tron-kill</code> and re-arm with <code>~tron snowflake-keypair-migration --resume</code>. AI starts from the next phase after the last completed one.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>// Failure modes</h2>
+
+<table>
+<tr><th>Failure</th><th>Detection</th><th>Auto-response</th></tr>
+<tr><td>Phase action returns non-zero exit</td><td>Action's trace event has <code>result != "ok"</code></td><td>Halt + run registered rollback for the phase + emit <code>tron_halted</code></td></tr>
+<tr><td>Verification step fails (e.g., smoke test 5xx)</td><td>Verify event's <code>result != "ok"</code></td><td>Same as above</td></tr>
+<tr><td>Kill switch detected</td><td>File exists at phase boundary</td><td>Same as above + reason "killed_by_operator"</td></tr>
+<tr><td>Resource bound exceeded</td><td>Action count, wall-clock, or rev-count over declared cap</td><td>Halt + emit <code>halt_resource_bound</code> + <em>do not</em> run rollback automatically (let human assess)</td></tr>
+<tr><td>Trace sink write fails</td><td>I/O error on append</td><td>Halt immediately + retry sink for 60s + if still failing, emit <code>halt_sink_unavailable</code> via stderr only</td></tr>
+<tr><td>Network partition mid-Cloud-Run-update</td><td>gcloud returns timeout</td><td>Re-poll service status for 2 min; if rev N+1 didn't materialize, halt + rollback; if it did, proceed with verify</td></tr>
+<tr><td>Wesley side hasn't run yet (Phase B post-send)</td><td>Smoke test for ACME_TOOLS_SVC fails after 30 min</td><td>Halt + emit <code>halt_waiting_human</code>; alert via PushNotification (no rollback -- nothing to roll back yet)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>// Post-hoc audit</h2>
+<p>After completion (success or halt), the operator reads:</p>
+<div class="code-block">tail -200 be/otel.jsonl | jq -c 'select(.channel == "tron")' \
+  | jq -s 'group_by(.phase) | map({
+      phase: .[0].phase,
+      actions: length,
+      duration_s: (map(.duration_ms) | add / 1000),
+      failures: map(select(.result != "ok")) | length,
+      first_action_at: (sort_by(.started_ts) | first | .started_ts),
+      last_action_at:  (sort_by(.ended_ts)   | last  | .ended_ts)
+    })'</div>
+<p>One row per phase. Failures &gt; 0 anywhere = drill into raw events:</p>
+<div class="code-block">jq -c 'select(.channel == "tron" and .phase == "F" and .result != "ok")' be/otel.jsonl</div>
+<p>For audit-grade verification:</p>
+<ul>
+<li><strong>Cross-check Snowflake QUERY_HISTORY:</strong> every query AI ran via snowsql appears in QUERY_HISTORY with matching session timestamp + USER_NAME + ROLE_NAME.</li>
+<li><strong>Cross-check Cloud Run revision history:</strong> every <code>gcloud run services update</code> in the trace corresponds to one revision bump in <code>gcloud run revisions list</code>.</li>
+<li><strong>Cross-check git:</strong> every commit in the trace is in <code>git log</code> with the expected hash + message.</li>
+<li><strong>Cross-check GCP secrets:</strong> every <code>secrets create</code> event has a corresponding entry in <code>gcloud secrets list</code> (or, if Phase I ran, a corresponding delete event 24h+ later).</li>
+</ul>
+<p>If any cross-check disagrees with the trace, the trace is the canonical record -- the discrepancy is logged as an audit finding for human review. The trace cannot be retroactively edited (append-only file with restrictive permissions).</p>
+
+<!-- ============================================================ -->
+<h2>// What TRON <em>never</em> does</h2>
+<ul>
+<li>Run without all 6 pre-conditions green. Refuses to arm.</li>
+<li>Skip a registered rollback when halting after persistent state was created.</li>
+<li>Write a secret value into the trace. Hashes + redaction markers only.</li>
+<li>Continue past a phase where verification failed.</li>
+<li>Re-attempt a halted action automatically (idempotent retries during the same in-flight action are fine; cross-phase retry requires <code>--resume</code> from a human).</li>
+<li>Force-push, drop a Snowflake user, delete a GCP secret, or remove a Cloud Run env var that wasn't on the registered action list.</li>
+<li>Send messages to Wesley or any human (the trace is the message).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>// Honest readiness statement</h2>
+<div class="precondition" style="border-left-color:#d9534f;background:#1f1010;border-color:#3d1f1f">
+<h3 style="color:#d9534f">As of 2026-05-08 00:15: TRON not yet executable</h3>
+<ul>
+<li><strong>Pre-condition 1 (procedure proven):</strong> not yet -- this migration hasn't run end-to-end on any target. Pre-condition fails. Run AI-assisted mode first.</li>
+<li><strong>Pre-condition 2 (sink writable):</strong> <code>be/otel.jsonl</code> exists in airbyte-parity. Tail-able. <span class="gate-state gate-pass">pass</span></li>
+<li><strong>Pre-condition 3 (kill switch):</strong> not implemented as a polled file yet. Implementation lives in <code>be/tools/</code> if/when TRON is wired.</li>
+<li><strong>Pre-condition 4 (Wesley async):</strong> not solicited. Today's plan is "Awaiting Approval"; pre-approval for unattended TRON is a separate ask.</li>
+<li><strong>Pre-condition 5 (resource bounds):</strong> declared in this page; needs an enforcement layer in the chain runner.</li>
+<li><strong>Pre-condition 6 (rollback registration):</strong> rollbacks are documented per-phase; need to be encoded as machine-readable manifests.</li>
+</ul>
+<p style="margin-top:12px;color:#e6cba0;font-size:13px"><strong>Current path forward:</strong> run the AI-assisted mode end-to-end. Each gate emits a structured event. After completion, the trace satisfies pre-condition 1 for a future run, and the gaps in pre-conditions 3, 5, 6 become visible. Then build out the chain runner, register the rollback manifests, get Wesley's pre-auth, and arm TRON for the next migration of similar shape (e.g., a future user rotation).</p>
+</div>
+
+<div class="modes-foot">
+<div class="modefoot"><a href="/airbyte-migration/snowflake-keypair-manual.html">&larr; Manual</a><div class="desc">human runs every command</div></div>
+<div class="modefoot"><a href="/airbyte-migration/snowflake-keypair-assisted.html">&larr; AI-Assisted</a><div class="desc">propose / approve / execute / verify</div></div>
+<div class="modefoot active">TRON<div class="desc">you are here</div></div>
+</div>
+
+<div class="footer">
+<a href="/airbyte-migration/">&larr; Migration Status</a> &middot;
+<a href="/airbyte-migration/snowflake-keypair-master.html">Master plan</a> &middot;
+v0 &middot; r22 &middot; 2026-05-08 00:15
+</div>
+
+</div>
+</body>
+</html>
