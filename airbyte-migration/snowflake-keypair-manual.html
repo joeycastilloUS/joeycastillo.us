@@ -112,9 +112,9 @@ cd ~/.snowflake-keys</div>
 </div>
 
 <div class="step">
-<h3><span class="num">2</span> Generate ACMEDEV_TOOLS_SVC keypair <span class="who who-joey">Joey</span></h3>
+<h3><span class="num">2</span> Generate JOEY_BE keypair <span class="who who-joey">Joey</span></h3>
 <div class="code-block"># Pick a strong passphrase, save it to your password manager
-read -s -p "ACMEDEV_TOOLS_SVC passphrase: " P1; echo
+read -s -p "JOEY_BE passphrase: " P1; echo
 
 # Encrypted private key
 openssl genrsa 2048 \
@@ -126,7 +126,7 @@ openssl rsa -in acme_tools_svc.p8 -passin pass:"$P1" -pubout \
   -out acme_tools_svc.pub
 
 cat acme_tools_svc.pub</div>
-<div class="expect"><strong>Expect:</strong> <code>-----BEGIN PUBLIC KEY-----</code> ... <code>-----END PUBLIC KEY-----</code> printed. Save the passphrase ($P1) to your password manager labeled "ACMEDEV_TOOLS_SVC keypair passphrase."</div>
+<div class="expect"><strong>Expect:</strong> <code>-----BEGIN PUBLIC KEY-----</code> ... <code>-----END PUBLIC KEY-----</code> printed. Save the passphrase ($P1) to your password manager labeled "JOEY_BE keypair passphrase."</div>
 <div class="iffail"><strong>If openssl errors on aes256:</strong> use <code>aes-256-cbc</code> in older builds, or omit <code>-v2 aes256</code> for default cipher.</div>
 </div>
 
@@ -164,17 +164,17 @@ cat crunchtime_user.pub</div>
 <h3><span class="num">6</span> Run the SQL <span class="who who-wesley">Wesley</span></h3>
 <p>In Snowflake web UI or snowsql, paste and run the block as <code>USERADMIN</code> + <code>SECURITYADMIN</code>.</p>
 <div class="expect"><strong>Expect:</strong> 0 errors. Each <code>CREATE USER</code> / <code>CREATE ROLE</code> / <code>GRANT</code> returns a confirmation row.</div>
-<div class="iffail"><strong>If "object already exists":</strong> a prior attempt left state. Run <code>DROP USER ACMEDEV_TOOLS_SVC; DROP ROLE ACMEDEV_TOOLS_READ_ROLE; DROP ROLE ACMEDEV_TOOLS_WRITE_ROLE;</code> and retry.</div>
+<div class="iffail"><strong>If "object already exists":</strong> a prior attempt left state. Run <code>DROP USER JOEY_BE; DROP ROLE ACMEDEV_TOOLS_READ_ROLE; DROP ROLE ACMEDEV_TOOLS_WRITE_ROLE;</code> and retry.</div>
 </div>
 
 <div class="step">
 <h3><span class="num">7</span> Smoke test from Joey's laptop <span class="who who-joey">Joey</span></h3>
-<div class="code-block">snowsql -a zn77432 -u ACMEDEV_TOOLS_SVC \
+<div class="code-block">snowsql -a zn77432 -u JOEY_BE \
   --private-key-path ~/.snowflake-keys/acme_tools_svc.p8 \
   --private-key-passphrase "$P1" \
   -q "SELECT current_user(), current_role()"</div>
-<div class="expect"><strong>Expect:</strong> <code>ACMEDEV_TOOLS_SVC | ACMEDEV_TOOLS_READ_ROLE</code>. <strong>Mark Phase B complete.</strong></div>
-<div class="iffail"><strong>If "JWT token is invalid":</strong> the <code>RSA_PUBLIC_KEY</code> on Snowflake doesn't match this private key. Re-run <code>cat acme_tools_svc.pub</code>, send to Wesley, ask him to re-run <code>ALTER USER ACMEDEV_TOOLS_SVC SET RSA_PUBLIC_KEY = '...'</code>.</div>
+<div class="expect"><strong>Expect:</strong> <code>JOEY_BE | ACMEDEV_TOOLS_READ_ROLE</code>. <strong>Mark Phase B complete.</strong></div>
+<div class="iffail"><strong>If "JWT token is invalid":</strong> the <code>RSA_PUBLIC_KEY</code> on Snowflake doesn't match this private key. Re-run <code>cat acme_tools_svc.pub</code>, send to Wesley, ask him to re-run <code>ALTER USER JOEY_BE SET RSA_PUBLIC_KEY = '...'</code>.</div>
 </div>
 
 <!-- ============================================================ -->
@@ -192,7 +192,7 @@ echo -n "$P1" \
   | gcloud secrets create acmedev-tools-svc-key-passphrase \
   --project=$P --data-file=- --replication-policy=automatic
 
-echo -n "ACMEDEV_TOOLS_SVC" \
+echo -n "JOEY_BE" \
   | gcloud secrets create acmedev-tools-svc-username \
   --project=$P --data-file=- --replication-policy=automatic
 
@@ -212,7 +212,7 @@ done</div>
 cat ~/.snowflake-keys/acme_tools_svc.p8 \
   | gcloud secrets create acmedev-tools-svc-private-key --project=$P --data-file=- --replication-policy=automatic
 echo -n "$P1" | gcloud secrets create acmedev-tools-svc-key-passphrase --project=$P --data-file=-
-echo -n "ACMEDEV_TOOLS_SVC" | gcloud secrets create acmedev-tools-svc-username --project=$P --data-file=-
+echo -n "JOEY_BE" | gcloud secrets create acmedev-tools-svc-username --project=$P --data-file=-
 
 # Refresh the existing CRUNCHTIME_USER key (new version)
 cat ~/.snowflake-keys/crunchtime_user.p8 \
@@ -292,7 +292,7 @@ gcloud builds submit --tag us-central1-docker.pkg.dev/acmedev-platform-hq/run/ai
 PARITY=https://airbyte-parity-d5vc4tye3a-uc.a.run.app
 curl -X POST "$PARITY/tick?force=true&streams=NETSUITE.CUSTOM_INVENTORY" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Length: 0"</div>
-<div class="expect"><strong>Expect:</strong> 200. New rev (e.g., 25-xxx) active in Cloud Run. Logs show <code>current_user=ACMEDEV_TOOLS_SVC, current_role=ACMEDEV_TOOLS_READ_ROLE</code> on the next tick.</div>
+<div class="expect"><strong>Expect:</strong> 200. New rev (e.g., 25-xxx) active in Cloud Run. Logs show <code>current_user=JOEY_BE, current_role=ACMEDEV_TOOLS_READ_ROLE</code> on the next tick.</div>
 <div class="iffail"><strong>If 5xx:</strong> <code>gcloud run services logs read airbyte-parity --project=acmedev-platform-hq --region=us-central1 --limit=50</code>. Likely culprits: secret volume not mounted, key passphrase wrong, role not granted on Snowflake side. Rollback: <code>gcloud run services update-traffic airbyte-parity --to-revisions=&lt;prior&gt;=100</code>.</div>
 </div>
 
@@ -301,9 +301,9 @@ curl -X POST "$PARITY/tick?force=true&streams=NETSUITE.CUSTOM_INVENTORY" \
 <p>Wesley confirms in Snowflake QUERY_HISTORY:</p>
 <div class="code-block">SELECT user_name, role_name, query_text, start_time
   FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY())
- WHERE user_name = 'ACMEDEV_TOOLS_SVC' AND start_time &gt; DATEADD(hour, -1, CURRENT_TIMESTAMP())
+ WHERE user_name = 'JOEY_BE' AND start_time &gt; DATEADD(hour, -1, CURRENT_TIMESTAMP())
  ORDER BY start_time DESC LIMIT 10;</div>
-<div class="expect"><strong>Expect:</strong> queries from airbyte-parity show <code>USER_NAME=ACMEDEV_TOOLS_SVC</code>, <code>ROLE_NAME=ACMEDEV_TOOLS_READ_ROLE</code>. <strong>Wait 24h before Phase I cleanup. Mark Phase E complete.</strong></div>
+<div class="expect"><strong>Expect:</strong> queries from airbyte-parity show <code>USER_NAME=JOEY_BE</code>, <code>ROLE_NAME=ACMEDEV_TOOLS_READ_ROLE</code>. <strong>Wait 24h before Phase I cleanup. Mark Phase E complete.</strong></div>
 </div>
 
 <!-- ============================================================ -->
@@ -369,7 +369,7 @@ gcloud run services update $SVC \
 
 <div class="step">
 <h3><span class="num">22</span> Update local <code>.env</code> <span class="who who-joey">Joey</span></h3>
-<div class="code-block">SNOWFLAKE_USER=ACMEDEV_TOOLS_SVC
+<div class="code-block">SNOWFLAKE_USER=JOEY_BE
 SNOWFLAKE_ROLE=ACMEDEV_TOOLS_WRITE_ROLE
 SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT
 SNOWFLAKE_PRIVATE_KEY_PATH=C:/Users/JosephCastillo/.snowflake-keys/acme_tools_svc.p8
@@ -419,7 +419,7 @@ gcloud run services update crunchtime-starterbakery --project=philz-crunchtime-3
 ALTER USER joey SET PASSWORD = NULL;  -- or rotate to ops-owned
 ALTER USER CRUNCHTIME_USER SET PASSWORD = NULL;
 -- After 30-day audit window: DROP USER PARITY_SVC;</div>
-<div class="expect"><strong>Expect:</strong> <code>SHOW USERS</code> shows <code>HAS_PASSWORD = false</code> for ACMEDEV_TOOLS_SVC, joey, CRUNCHTIME_USER. PARITY_SVC eventually dropped.</div>
+<div class="expect"><strong>Expect:</strong> <code>SHOW USERS</code> shows <code>HAS_PASSWORD = false</code> for JOEY_BE, joey, CRUNCHTIME_USER. PARITY_SVC eventually dropped.</div>
 </div>
 
 <div class="step">
@@ -445,13 +445,13 @@ gcloud secrets delete SNOWFLAKE_PASSWORD --project=philz-crunchtime-383717 --qui
 
 <div class="step">
 <h3><span class="num">29</span> Update <code>CLAUDE.md</code> <span class="who who-joey">Joey</span></h3>
-<p>Add: "Snowflake auth is key-pair only. Service identities: ACMEDEV_TOOLS_SVC (internal tools), CRUNCHTIME_USER (crunchtime services), BRAZE_USER (braze stack). See infra/snowflake/keypair-runbook.md."</p>
+<p>Add: "Snowflake auth is key-pair only. Service identities: JOEY_BE (internal tools), CRUNCHTIME_USER (crunchtime services), BRAZE_USER (braze stack). See infra/snowflake/keypair-runbook.md."</p>
 </div>
 
 <div class="step">
 <h3><span class="num">30</span> Commit + push <span class="who who-joey">Joey</span></h3>
 <div class="code-block">git -C /c/airbyte-parity add infra/snowflake/keypair-runbook.md CLAUDE.md
-git -C /c/airbyte-parity commit -m "Snowflake key-pair runbook + ACMEDEV_TOOLS_SVC consolidation done"
+git -C /c/airbyte-parity commit -m "Snowflake key-pair runbook + JOEY_BE consolidation done"
 git -C /c/airbyte-parity push</div>
 <div class="expect"><strong>Expect:</strong> commit + push successful. <strong>Migration complete.</strong></div>
 </div>
@@ -460,7 +460,7 @@ git -C /c/airbyte-parity push</div>
 <h2>Final acceptance</h2>
 <ul>
 <li><span class="checkbox"></span> All 6 services on JWT for &ge; 72 hours, no auth errors</li>
-<li><span class="checkbox"></span> <code>SHOW USERS</code> for ACMEDEV_TOOLS_SVC + CRUNCHTIME_USER shows <code>HAS_PASSWORD = false</code></li>
+<li><span class="checkbox"></span> <code>SHOW USERS</code> for JOEY_BE + CRUNCHTIME_USER shows <code>HAS_PASSWORD = false</code></li>
 <li><span class="checkbox"></span> Zero Cloud Run services bind any <code>SNOWFLAKE_PASSWORD</code> secret or env</li>
 <li><span class="checkbox"></span> airbyte-parity test count &ge; 281 (277 + 4 new)</li>
 <li><span class="checkbox"></span> Runbook merged + linked from CLAUDE.md</li>
