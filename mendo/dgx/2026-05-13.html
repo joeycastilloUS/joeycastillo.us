@@ -195,16 +195,15 @@ code { background: #1a1a1a; color: #cfe6ee; padding: 1px 5px; border-radius: 3px
 
 <div class="callout">
   <span class="tag">&#9888; Defect 2 &mdash; new this session, in Olo's sign-up</span>
-  <h3>Olo throws two misleading errors before sign-up completes &mdash; both lie about the underlying state.</h3>
+  <h3>Olo says "Account was not created" on a valid 1st code &mdash; but the account is created.</h3>
   <ol>
-    <li>Enter <code>joey.castillo@</code> on Olo's Welcome screen &rarr; red toast: <strong>"Unable to look up User. Please try again."</strong> No "sign up?" prompt &mdash; just a confusing failure.</li>
-    <li>After retry, sign-up form appears. Fill Joey / Castillo / NANP-fictional phone. Click "Send code by email instead."</li>
+    <li>Sign-up form submitted (Joey / Castillo / NANP-fictional phone), "Send code by email instead" clicked.</li>
     <li>Olo emails 6-digit code &rarr; paste it verbatim &rarr; Olo returns <strong>both</strong> inline "Incorrect code. Please try again." AND red toast <strong>"Account was not created due to an issue"</strong>.</li>
     <li>Resend Code &rarr; 2nd code &rarr; completes cleanly.</li>
     <li>Olo welcome email arrives &mdash; timing lines up with the 1st code attempt. <strong>The account WAS created on the 1st try. UI lied.</strong></li>
     <li><strong>Control:</strong> wrong-PIN test on a separate verification returned a <em>different</em> error string. Confirms this is a distinct failure mode, not the wrong-code branch.</li>
   </ol>
-  <p>Two confusing errors back-to-back. Cosmetic on retry &mdash; real customers reading either toast literally will abandon. New-member funnel leaks at both points.</p>
+  <p>Cosmetic on retry &mdash; real customers reading the toast literally will abandon. New-member funnel leaks at the 1st-code step.</p>
 </div>
 
 <h2>Three Places To Look</h2>
@@ -255,12 +254,10 @@ code { background: #1a1a1a; color: #cfe6ee; padding: 1px 5px; border-radius: 3px
 <div class="test fail">
   <span class="mark fail">&#10007;</span>
   <div class="body">
-    <h3>Olo sign-up &mdash; two misleading errors before completion, account created anyway.</h3>
-    <p>The flow throws "Unable to look up User" on email entry, then "Account was not created" on a valid 1st code. Both are false &mdash; the account is created.</p>
+    <h3>Olo sign-up &mdash; 1st valid code rejected, account created anyway.</h3>
+    <p>Sequence + control confirm a distinct failure mode in Olo's sign-up state machine.</p>
     <details><summary>Detail</summary><div class="inner">
       <ol>
-        <li>Email entry &mdash; <code>joey.castillo@</code> &rarr; toast <em class="q">"Unable to look up User. Please try again."</em> with no "sign up?" branch surfaced.</li>
-        <li>After retry, sign-up form appears &rarr; Joey / Castillo / NANP phone &rarr; "Send code by email instead."</li>
         <li>1st code from email pasted &rarr; inline <em class="q">"Incorrect code."</em> + red toast <em class="q">"Account was not created due to an issue."</em></li>
         <li>Resend Code &rarr; 2nd code &rarr; completes cleanly.</li>
         <li>Welcome email arrives &mdash; "3 minutes ago" timing lines up with the 1st attempt. Account was created on the 1st try.</li>
@@ -314,14 +311,7 @@ code { background: #1a1a1a; color: #cfe6ee; padding: 1px 5px; border-radius: 3px
 
 <h3 style="color:#f44336;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.08em;margin:1.75rem 0 0.6rem;">Phase C &mdash; New alias <code style="font-size:0.95em;">joey.castillo@</code></h3>
 
-<details><summary>5 &middot; Email entry &mdash; toast: "Unable to look up User. Please try again."</summary><div class="inner">
-  <p>Olo's Welcome screen. Email field pre-filled with <code>joey.castillo@mendocinofarms.com</code>, Continue button below. Bottom toast:</p>
-  <p class="quote">"&#9888; Unable to look up User. Please try again."</p>
-  <img src="/mendo/dgx/assets/s3-alias-unable-to-lookup-user.png" alt="Olo Welcome screen titled 'Welcome — Enter your email to get started' with an Email (required) input pre-filled with joey.castillo@mendocinofarms.com, a dark blue Continue button, and a red bottom toast reading 'Unable to look up User. Please try again.' with a close button; Online-Tracking Opt Out Guide and Open Source Licenses links visible in the footer">
-  <p><strong>Context:</strong> 1st error in the alias flow. The new alias isn't in Olo's user table yet, but Olo's UI surfaces a confusing "Please try again" toast instead of a "Sign up?" branch. A real customer hits this and assumes their email was mistyped. After retry / continue, Olo eventually routes to the sign-up form.</p>
-</div></details>
-
-<details><summary>6 &middot; Code paste &mdash; "Incorrect code" + toast: "Account was not created due to an issue"</summary><div class="inner">
+<details><summary>5 &middot; Code paste &mdash; "Incorrect code" + toast: "Account was not created due to an issue"</summary><div class="inner">
   <p>After the sign-up form and "Send code by email instead", Olo's Account Sign In verification screen shows the alias email and the masked NANP phone <code>(***) ***-0101</code>. 1st verification code pasted from email. Both error surfaces fire simultaneously:</p>
   <ol>
     <li>Inline: <em class="q">"Incorrect code. Please try again."</em></li>
@@ -331,20 +321,20 @@ code { background: #1a1a1a; color: #cfe6ee; padding: 1px 5px; border-radius: 3px
   <p><strong>Context:</strong> 2nd confusing error in the same flow. The code was correct &mdash; verified by the Olo welcome email landing in the inbox shortly after. UI lied. Reproducible: a wrong-PIN control test (entered later) returned a <em>different</em> error string, confirming this is a distinct failure mode.</p>
 </div></details>
 
-<details><summary>7 &middot; Close-up of the inline "Incorrect code" error</summary><div class="inner">
+<details><summary>6 &middot; Close-up of the inline "Incorrect code" error</summary><div class="inner">
   <p>Zoomed crop of the form-level error and the "Send code by text instead" link below it:</p>
   <img src="/mendo/dgx/assets/s3-alias-incorrect-code-closeup.png" alt="Close-up of the Olo verification form's 'Enter the code sent to your email to finish signing in' text with Resend Code link, an empty Enter Code input, and 'Incorrect code. Please try again.' error message with 'Send code by text instead' link below">
   <p><strong>Context:</strong> Shows the inline error in isolation. Combined with the bottom toast in screenshot 6, the user sees two simultaneous failure messages even though the code was right. 2nd verification (Resend Code &rarr; new code) completed cleanly.</p>
 </div></details>
 
-<details><summary>8 &middot; Sparkfly widget on checkout &mdash; "No Rewards Available"</summary><div class="inner">
+<details><summary>7 &middot; Sparkfly widget on checkout &mdash; "No Rewards Available"</summary><div class="inner">
   <p>Checkout page on the newly-created alias account. Same Sparkfly widget position as screenshot 2:</p>
   <p class="quote">"Mendocino Farms - Sparkfly &mdash; No Rewards Available"</p>
   <img src="/mendo/dgx/assets/s3-alias-checkout-no-rewards.png" alt="Olo Checkout sidebar for the new alias account, showing a Credit Card section header and the 'Mendocino Farms - Sparkfly' panel reading 'No Rewards Available' with 'Submitting this order confirms that you accept all...' text below">
   <p><strong>Context:</strong> Surface 1 of 2 for Defect 1. Same widget, same vendor, opposite verdict from the existing account 26 minutes earlier.</p>
 </div></details>
 
-<details><summary>9 &middot; Account offers panel &mdash; "There are no offers at this Mendocino Farms location"</summary><div class="inner">
+<details><summary>8 &middot; Account offers panel &mdash; "There are no offers at this Mendocino Farms location"</summary><div class="inner">
   <p>Signed in as <code>joey.castillo@</code>, Lab Toast Demo Vendor selected, lab clock 4:44am:</p>
   <p class="quote">"There are no offers at this Mendocino Farms location. Sorry about that!"</p>
   <img src="/mendo/dgx/assets/s3-alias-store-no-offers.png" alt="Mendocino Farms store page with Lab Toast Demo Vendor selected, showing 'Pickup available 24 hours, It is currently 4:44am at Lab Toast Demo Vendor', Invite others and Start Group Order buttons, and a centered message 'There are no offers at this Mendocino Farms location. Sorry about that!'">
