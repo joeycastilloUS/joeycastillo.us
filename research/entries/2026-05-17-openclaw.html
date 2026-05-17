@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw — research — joeycastillo.us</title>
+<link rel="icon" type="image/svg+xml" href="/favicon-jc.svg">
+<style>
+  :root {
+    --ks-bg: #0a0a0a;
+    --ks-bg-deep: #000;
+    --ks-bg-raised: #131316;
+    --ks-bg-tint: #0B0F12;
+    --ks-accent: #6FC3DF;
+    --ks-accent-soft: #9DD9EE;
+    --ks-accent-glow: rgba(111, 195, 223, 0.06);
+    --ks-text: #e0e0e0;
+    --ks-text-soft: #bbb;
+    --ks-text-mute: #888;
+    --ks-text-dim: #555;
+    --ks-rule: #1a1a1a;
+    --ks-status-yes: #4caf50;
+    --ks-status-partial: #f5a623;
+    --ks-status-no: #f44336;
+    --ks-status-strong-yes: #22c55e;
+    --ks-s2: 8px; --ks-s3: 12px; --ks-s4: 16px; --ks-s5: 24px; --ks-s6: 32px; --ks-s7: 48px; --ks-s8: 64px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--ks-bg); color: var(--ks-text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.65; min-height: 100vh;
+  }
+  a { color: var(--ks-accent); text-decoration: none; border-bottom: 1px dotted rgba(111,195,223,0.35); }
+  a:hover { color: var(--ks-accent-soft); border-bottom-color: var(--ks-accent-soft); }
+
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 1.5rem;
+    padding: 0.75rem 1rem; background: var(--ks-bg);
+    border-bottom: 1px solid var(--ks-rule); z-index: 100; flex-wrap: wrap;
+  }
+  .nav a { color: var(--ks-text-mute); font-size: 0.8rem; border-bottom: none; transition: color 0.2s; }
+  .nav a:hover { color: var(--ks-accent); }
+  .nav a.current { color: var(--ks-accent); }
+
+  main { max-width: 800px; margin: 0 auto; padding: 5.5rem var(--ks-s5) var(--ks-s8); }
+
+  .crumbs {
+    color: var(--ks-text-dim); font-size: 0.75rem; letter-spacing: 0.15em;
+    text-transform: uppercase; margin-bottom: var(--ks-s3);
+  }
+  .crumbs a { color: var(--ks-text-mute); border-bottom: none; }
+  .crumbs a:hover { color: var(--ks-accent); }
+  .crumbs .sep { color: var(--ks-text-dim); margin: 0 var(--ks-s2); }
+
+  header { margin-bottom: var(--ks-s7); }
+  h1 {
+    font-size: 3rem; font-weight: 200; color: #fff;
+    letter-spacing: -0.02em; line-height: 1.05; margin-bottom: var(--ks-s2);
+  }
+  .subtitle { color: var(--ks-accent); font-size: 1.05rem; font-weight: 300; margin-bottom: var(--ks-s4); }
+  .meta-line {
+    color: var(--ks-text-dim); font-size: 0.8rem;
+    font-family: 'Cascadia Code', 'Consolas', monospace; letter-spacing: 0.05em;
+  }
+
+  h2 {
+    color: var(--ks-accent); font-size: 0.75rem; font-weight: 600;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    margin: var(--ks-s8) 0 var(--ks-s4); padding-bottom: var(--ks-s2);
+    border-bottom: 1px solid var(--ks-rule);
+  }
+  h3 { color: #fff; font-size: 1.05rem; font-weight: 500; margin: var(--ks-s5) 0 var(--ks-s2); }
+
+  p, li { color: var(--ks-text-soft); font-size: 0.93rem; line-height: 1.7; margin-bottom: var(--ks-s3); }
+  ul, ol { padding-left: var(--ks-s5); }
+  li { margin-bottom: var(--ks-s2); }
+  strong { color: #fff; font-weight: 600; }
+  em { color: var(--ks-accent-soft); font-style: italic; }
+
+  .tldr {
+    background: linear-gradient(180deg, var(--ks-accent-glow) 0%, transparent 100%);
+    border: 1px solid rgba(111,195,223,0.18);
+    border-left: 3px solid var(--ks-accent);
+    border-radius: 6px; padding: var(--ks-s5); margin: var(--ks-s5) 0;
+  }
+  .tldr .label {
+    color: var(--ks-accent); font-size: 0.7rem; letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: var(--ks-s2); font-weight: 700;
+  }
+  .tldr p { color: var(--ks-text); font-size: 1rem; line-height: 1.7; margin-bottom: var(--ks-s2); }
+  .tldr p:last-child { margin-bottom: 0; }
+
+  .non-tech {
+    background: rgba(245, 166, 35, 0.05);
+    border: 1px solid rgba(245, 166, 35, 0.2);
+    border-left: 3px solid var(--ks-status-partial);
+    border-radius: 6px; padding: var(--ks-s5); margin: var(--ks-s5) 0;
+  }
+  .non-tech .label {
+    color: var(--ks-status-partial); font-size: 0.7rem; letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: var(--ks-s2); font-weight: 700;
+  }
+  .non-tech .call {
+    color: #fff; font-size: 1.4rem; font-weight: 200;
+    line-height: 1.4; margin-bottom: var(--ks-s3);
+  }
+  .non-tech .call em { color: var(--ks-status-partial); font-style: normal; font-weight: 400; }
+  .non-tech p { color: var(--ks-text-soft); font-size: 0.92rem; }
+
+  .verdict-matrix {
+    display: grid; grid-template-columns: 2fr 1fr 4fr;
+    border: 1px solid var(--ks-rule); border-radius: 4px; overflow: hidden;
+    margin: var(--ks-s4) 0; font-size: 0.88rem;
+  }
+  .verdict-matrix .row { display: contents; }
+  .verdict-matrix .cell {
+    padding: var(--ks-s3) var(--ks-s4); border-bottom: 1px solid var(--ks-rule);
+    background: var(--ks-bg-raised);
+  }
+  .verdict-matrix .row:last-child .cell { border-bottom: none; }
+  .verdict-matrix .head {
+    color: var(--ks-accent); font-size: 0.7rem; letter-spacing: 0.15em;
+    text-transform: uppercase; font-weight: 700; background: var(--ks-bg-tint);
+  }
+  .verdict-matrix .lens-name { color: #fff; font-weight: 600; }
+  .verdict-matrix .vlabel {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; text-align: center; align-self: center;
+  }
+  .vlabel.partial { color: var(--ks-status-partial); }
+  .vlabel.no { color: var(--ks-status-no); }
+  .vlabel.strong-yes { color: var(--ks-status-strong-yes); }
+  .vlabel.active { color: var(--ks-accent); }
+  .vlabel.split { color: var(--ks-status-partial); }
+
+  .lens-detail {
+    background: var(--ks-bg-raised); border: 1px solid var(--ks-rule);
+    border-left: 3px solid var(--ks-accent); border-radius: 4px;
+    padding: var(--ks-s5); margin: var(--ks-s4) 0;
+  }
+  .lens-detail.partial { border-left-color: var(--ks-status-partial); }
+  .lens-detail.no { border-left-color: var(--ks-status-no); }
+  .lens-detail.strong-yes { border-left-color: var(--ks-status-strong-yes); }
+  .lens-detail.active { border-left-color: var(--ks-accent); }
+  .lens-detail .label {
+    color: var(--ks-text-dim); font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.7rem; letter-spacing: 0.1em; margin-bottom: var(--ks-s2);
+  }
+  .lens-detail .verdict {
+    font-size: 1.4rem; font-weight: 200; color: #fff; margin-bottom: var(--ks-s2);
+  }
+  .vtag {
+    display: inline-block; font-size: 0.65rem; letter-spacing: 0.15em;
+    text-transform: uppercase; font-weight: 700; padding: 3px 10px;
+    border-radius: 3px; vertical-align: middle; margin-left: var(--ks-s2);
+  }
+  .vtag.partial { background: rgba(245,166,35,0.12); color: var(--ks-status-partial); border: 1px solid rgba(245,166,35,0.35); }
+  .vtag.no { background: rgba(244,67,54,0.1); color: var(--ks-status-no); border: 1px solid rgba(244,67,54,0.35); }
+  .vtag.strong-yes { background: rgba(34,197,94,0.1); color: var(--ks-status-strong-yes); border: 1px solid rgba(34,197,94,0.35); }
+  .vtag.active { background: rgba(111,195,223,0.1); color: var(--ks-accent); border: 1px solid rgba(111,195,223,0.35); }
+  .vtag.split { background: rgba(245,166,35,0.12); color: var(--ks-status-partial); border: 1px solid rgba(245,166,35,0.35); }
+
+  .pantheon-extension {
+    background: linear-gradient(180deg, rgba(111,195,223,0.05) 0%, transparent 100%);
+    border: 1px solid rgba(111,195,223,0.25);
+    border-left: 4px solid var(--ks-accent);
+    border-radius: 6px; padding: var(--ks-s6); margin: var(--ks-s5) 0;
+  }
+  .pantheon-extension .label {
+    color: var(--ks-accent); font-size: 0.7rem; letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: var(--ks-s2); font-weight: 700;
+  }
+  .pantheon-extension h3 { color: #fff; font-size: 1.3rem; font-weight: 300; margin-bottom: var(--ks-s3); }
+  .pantheon-extension .swap-grid {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--ks-s3);
+    margin: var(--ks-s4) 0; font-size: 0.88rem;
+  }
+  .pantheon-extension .layer { color: var(--ks-text-dim); font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 4px; }
+  .pantheon-extension .from { background: var(--ks-bg-raised); border: 1px solid var(--ks-rule); border-radius: 4px; padding: var(--ks-s3); }
+  .pantheon-extension .arrow { display: flex; align-items: center; color: var(--ks-accent); font-size: 1.2rem; }
+  .pantheon-extension .to { background: rgba(111,195,223,0.08); border: 1px solid rgba(111,195,223,0.3); border-radius: 4px; padding: var(--ks-s3); }
+  .pantheon-extension .to strong { color: var(--ks-accent-soft); }
+
+  table { width: 100%; border-collapse: collapse; margin: var(--ks-s4) 0; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--ks-rule); vertical-align: top; }
+  th {
+    color: var(--ks-accent); font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.1em; font-weight: 700; background: var(--ks-bg-tint);
+  }
+  td .receipt-num { color: var(--ks-status-strong-yes); font-family: 'Cascadia Code', 'Consolas', monospace; font-weight: 600; }
+
+  .pattern {
+    background: var(--ks-bg-raised); border: 1px solid var(--ks-rule);
+    border-radius: 4px; padding: var(--ks-s4); margin: var(--ks-s3) 0;
+  }
+  .pattern h4 { color: #fff; font-size: 0.95rem; font-weight: 600; margin-bottom: var(--ks-s2); }
+  .pattern p { font-size: 0.85rem; line-height: 1.6; }
+
+  .anti {
+    background: rgba(244,67,54,0.04); border: 1px solid rgba(244,67,54,0.2);
+    border-left: 3px solid var(--ks-status-no); border-radius: 4px;
+    padding: var(--ks-s4); margin: var(--ks-s3) 0;
+  }
+  .anti h4 {
+    color: var(--ks-status-no); font-size: 0.85rem; font-weight: 600;
+    margin-bottom: var(--ks-s2); text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .anti p { font-size: 0.85rem; }
+  .anti .fix { color: var(--ks-accent-soft); font-style: italic; margin-top: var(--ks-s2); }
+
+  code {
+    background: var(--ks-bg-tint); color: var(--ks-accent);
+    padding: 2px 6px; border-radius: 3px; font-size: 0.85em;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+  }
+  pre {
+    background: var(--ks-bg-deep); color: var(--ks-text-soft);
+    padding: var(--ks-s4); border: 1px solid var(--ks-rule); border-radius: 4px;
+    overflow-x: auto; margin: var(--ks-s3) 0;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.82rem; line-height: 1.55;
+  }
+  blockquote {
+    border-left: 3px solid var(--ks-accent); padding-left: var(--ks-s4);
+    margin: var(--ks-s3) 0; color: var(--ks-text); font-style: italic; font-size: 0.95rem;
+  }
+  blockquote cite { display: block; color: var(--ks-text-mute); font-size: 0.78rem; font-style: normal; margin-top: var(--ks-s2); }
+
+  .sources {
+    background: var(--ks-bg-raised); border: 1px solid var(--ks-rule);
+    border-radius: 4px; padding: var(--ks-s5); margin: var(--ks-s4) 0;
+  }
+  .sources h4 {
+    color: var(--ks-accent); font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 0.15em; margin: var(--ks-s4) 0 var(--ks-s2);
+  }
+  .sources h4:first-child { margin-top: 0; }
+  .sources ul { list-style: none; padding-left: 0; }
+  .sources li { font-size: 0.8rem; margin-bottom: 4px; }
+
+  footer {
+    margin-top: var(--ks-s8); padding-top: var(--ks-s5);
+    border-top: 1px solid var(--ks-rule);
+    color: var(--ks-text-dim); font-size: 0.75rem; text-align: center;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+  }
+  footer a { color: var(--ks-text-mute); border-bottom: none; }
+  footer a:hover { color: var(--ks-accent); }
+
+  @media (max-width: 700px) {
+    h1 { font-size: 2.2rem; }
+    .verdict-matrix { grid-template-columns: 1fr; font-size: 0.85rem; }
+    .verdict-matrix .head { display: none; }
+    .verdict-matrix .cell { border-bottom: 1px solid var(--ks-rule); }
+    .pantheon-extension .swap-grid { grid-template-columns: 1fr; }
+    .pantheon-extension .arrow { transform: rotate(90deg); justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="https://joeycastillo.us">joeycastillo.us</a>
+  <a href="https://kastil-systems.com">kastil-systems.com</a>
+  <a href="https://ai-pantheon.ai">ai-pantheon.ai</a>
+  <a href="/metal">metal</a>
+  <a href="/research" class="current">research</a>
+  <a href="/meet">meet now</a>
+</nav>
+
+<main>
+
+  <div class="crumbs">
+    <a href="/research">research</a>
+    <span class="sep">/</span>
+    <a href="/research/entries/">entries</a>
+    <span class="sep">/</span>
+    <span>openclaw</span>
+  </div>
+
+  <header>
+    <h1>OpenClaw</h1>
+    <p class="subtitle">Open-source personal AI agent that lives in your chat apps. MIT, 373k stars, currently the most-starred project on GitHub.</p>
+    <p class="meta-line">2026-05-17 &middot; entry 01 &middot; candidate: <a href="https://openclaw.ai/">openclaw.ai</a> &middot; source: <a href="https://github.com/openclaw/openclaw">github.com/openclaw/openclaw</a></p>
+  </header>
+
+  <div class="non-tech">
+    <div class="label">Call it what it really is</div>
+    <p class="call">It's the AI <em>you text on WhatsApp</em> instead of opening another app.</p>
+    <p>Strip it to one line: <em>"text my assistant"</em> replaces <em>"open the app."</em> Memory, calendar, email, web, shell &mdash; those are what any executive assistant does. The trick isn't the skills, it's the interface: <strong>no app, no login, no new icon on your home screen.</strong> Just another contact in your phone you happen to text more than the human ones. The 🦞 "lobster way" branding is cute; the pitch underneath is "we removed the app."</p>
+    <p>Easier translation for a non-tech person: <em>"It's like hiring a remote personal assistant &mdash; except it's software, it lives on your laptop, and you contact it through WhatsApp like you would any human assistant."</em> That sentence sells it without saying "AI" once.</p>
+  </div>
+
+  <div class="tldr">
+    <div class="label">TL;DR (technical)</div>
+    <p>
+      MIT-licensed local-first agent runtime that bridges chat apps (WhatsApp, Telegram, Discord, Signal, iMessage, Slack, Teams, +15 more) to a "Gateway" daemon on your machine, which then talks to whatever LLM provider you bring a key for. <strong>373k stars; passed React; most-starred project on GitHub as of mid-2026.</strong>
+      Created by <a href="https://steipete.me">Peter Steinberger</a> (PSPDFKit founder), hired by <strong>OpenAI</strong> in Feb 2026. Project now community-maintained with corporate sponsors (OpenAI, GitHub, NVIDIA, Vercel). Default first-class provider has shifted from Claude to the native OpenAI Codex app-server runtime as of May 14, 2026; Claude Opus 4.7 is fully supported with 1M context default but no longer the primary path.
+    </p>
+    <p>
+      <strong>The verdict for Pantheon:</strong> reverse-engineer the architecture, roll our own as the consumer surface of Pantheon. The chat-app routing is the killer wedge &mdash; every messaging platform on earth becomes our install base, no app-store fight. Pantheon today is substrate without a consumer product; openclaw is consumer product without a substrate (calls 3rd-party LLMs). Building our own version fills both gaps simultaneously.
+    </p>
+  </div>
+
+  <h2>The Four Lenses</h2>
+
+  <div class="verdict-matrix">
+    <div class="row">
+      <div class="cell head">Lens</div>
+      <div class="cell head">Verdict</div>
+      <div class="cell head">One-liner</div>
+    </div>
+    <div class="row">
+      <div class="cell lens-name">01 &middot; Integrate</div>
+      <div class="cell vlabel partial">YES &mdash; as mobile remote</div>
+      <div class="cell">Cheap immediate win: openclaw on Telegram becomes the phone-side remote for our desktop Claude Code / metal-console sessions. The dominant 1% pattern is exactly this.</div>
+    </div>
+    <div class="row">
+      <div class="cell lens-name">02 &middot; Replace</div>
+      <div class="cell vlabel no">N/A</div>
+      <div class="cell">Nothing in our stack to replace. Unless framed as "replaces the hypothetical Pantheon mobile app we haven't built" &mdash; in which case yes, this architecture replaces ever needing one.</div>
+    </div>
+    <div class="row">
+      <div class="cell lens-name">03 &middot; Reverse-engineer</div>
+      <div class="cell vlabel strong-yes">STRONG YES</div>
+      <div class="cell">Headline verdict. MIT license + 373k-star, 50k-commit codebase + 4-month proof of product-market fit = the cheat code for building Pantheon's consumer surface.</div>
+    </div>
+    <div class="row">
+      <div class="cell lens-name">04 &middot; Dovetail</div>
+      <div class="cell vlabel active">ACTIVE &mdash; two paths</div>
+      <div class="cell">Path A (today): openclaw &harr; metal-console via Telegram for mobile remote. Path B (target): Pantheon-native fork using NOUS / IDS / biRT.</div>
+    </div>
+    <div class="row">
+      <div class="cell lens-name">∞ &middot; Roll our own?</div>
+      <div class="cell vlabel split">SPLIT</div>
+      <div class="cell">Chat-app plumbing: <strong>no</strong> (reverse the architecture, don't reinvent 20+ channel integrations). Pantheon-native brain + memory + runtime: <strong>yes</strong> (this is the differentiator). The shell from them, the soul from us.</div>
+    </div>
+  </div>
+
+  <div class="lens-detail partial">
+    <div class="label">LENS 01</div>
+    <div class="verdict">Integrate &mdash; as mobile remote <span class="vtag partial">Yes, today</span></div>
+    <p>
+      The most-cited 1% pattern in the openclaw community: <strong>two-machine split, phone is the surface, desktop is the substrate.</strong> @nateliason: <em>"Separate Claude subscription + Claw, managing Claude Code sessions"</em> (<a href="https://x.com/nateliason/status/2013725082850414592">source</a>). @php100: <em>"Autonomous Claude Code loops from my phone. 'fix tests' via Telegram"</em> (<a href="https://x.com/php100/status/2008791236526952790">source</a>). @conradsagewiz: <em>"I'm literally on my phone in a telegram chat and it's communicating with codex cli"</em> (<a href="https://x.com/conradsagewiz/status/2012954824631898300">source</a>).
+    </p>
+    <p>
+      For metal-console specifically, this is a <strong>1-day install with real value</strong>: <code>npm install -g openclaw@latest</code> on a Mac/Linux dev box, point it at Telegram, write a skill that calls into the Be tilde commands. Now Joey can text <code>~monitor kastil-systems</code> from his phone and get a status report back. <code>~b</code> a board item while walking the dog. Trigger <code>~ship</code> from the car.
+    </p>
+    <p>
+      Costs: one machine running the Gateway 24/7 (or Cloudflare-tunneled from a Pi, per <a href="https://x.com/AlbertMoral/status/2010288787885064227">@AlbertMoral</a>); the security discipline below (anti-patterns section &mdash; this is non-trivial); an LLM API key for the Gateway's own thinking (we already have one).
+    </p>
+    <p>
+      Caveat for short-term integration: the project just survived a "rough week" of degraded releases in April 2026 and is moving to an LTS track that hasn't shipped yet (<a href="https://openclaw.ai/blog/openclaw-rough-week">source</a>). Pin a known-good version (current 2026.5.14-beta.2 is reportedly stable per <a href="https://newreleases.io/project/github/openclaw/openclaw/release/v2026.5.14-beta.2">npm release notes</a>) and treat updates as a deliberate decision, not <code>npm update</code>.
+    </p>
+  </div>
+
+  <div class="lens-detail no">
+    <div class="label">LENS 02</div>
+    <div class="verdict">Replace <span class="vtag no">N/A</span></div>
+    <p>
+      Nothing in metal-console or Pantheon today is in openclaw's seat. metal-console is a developer-side discipline; openclaw is a consumer-side runtime. Different layer, different audience.
+    </p>
+    <p>
+      The interesting reframe: openclaw's architecture <strong>replaces a hypothetical Pantheon mobile app we haven't built yet</strong>. The conventional path for "Pantheon needs a consumer surface" is: design a mobile app, ship to App Store + Play Store, fight for install attribution, ship updates through review processes, ask users to download yet another icon. The openclaw architecture skips all of that &mdash; every chat app on earth becomes the install base. <strong>That's the replacement worth naming.</strong>
+    </p>
+  </div>
+
+  <div class="lens-detail strong-yes">
+    <div class="label">LENS 03</div>
+    <div class="verdict">Reverse-engineer <span class="vtag strong-yes">Strong yes</span></div>
+    <p>
+      This is the headline verdict. The combination is rare:
+    </p>
+    <ol>
+      <li><strong>MIT license</strong> &mdash; we can read, copy, adapt the architecture without legal friction.</li>
+      <li><strong>50,578 commits of battle-tested code</strong> &mdash; chat-app integration is integration hell (WhatsApp Business API tier, Telegram Bot API, Signal MTProto, iMessage shenanigans, Matrix federation, +15 more); they've eaten the hard part.</li>
+      <li><strong>4 months of proven product-market fit</strong> &mdash; the 1% patterns, the use cases, the anti-patterns are all <em>discovered</em>, not theoretical.</li>
+      <li><strong>Published security postmortems</strong> &mdash; their CVEs (CVE-2026-25253 / 25157 / 24763) and the "rough week" retros tell us where the architecture's load-bearing walls are.</li>
+      <li><strong>Public skill marketplace as a labeled hazard</strong> &mdash; Koi Security found <strong>341 malicious skills out of 2,857 audited</strong> on ClawHub (<a href="https://www.crowdstrike.com/en-us/blog/what-security-teams-need-to-know-about-openclaw-ai-super-agent/">source</a>). The Pantheon version doesn't repeat that mistake; we ship a curated skill set, not an open marketplace.</li>
+    </ol>
+    <p>
+      Reverse-engineering is mostly architectural. The valuable patterns to extract:
+    </p>
+    <ul>
+      <li>The <strong>Gateway daemon model</strong> &mdash; one local process holds memory, sessions, tool permissions, channel adapters. Clean separation from the LLM provider.</li>
+      <li>The <strong>channel-adapter pattern</strong> &mdash; pluggable surface per chat platform with a common message envelope. Don't reinvent it; copy the shape.</li>
+      <li>The <strong><code>SKILL.md</code> + supporting files</strong> contract for skills. Convergent with Anthropic's Skills 2.0; we can run both.</li>
+      <li>The <strong>per-channel <code>allowFrom</code> / <code>groupAllowFrom</code> allowlist</strong> for access control. Lifted directly.</li>
+      <li>The <strong>two-machine split philosophy</strong> &mdash; not a code thing, a deployment doctrine. Bake into our docs.</li>
+    </ul>
+  </div>
+
+  <div class="lens-detail active">
+    <div class="label">LENS 04</div>
+    <div class="verdict">Dovetail &mdash; two paths <span class="vtag active">Active</span></div>
+    <p>
+      <strong>Path A (this week, low risk):</strong> install openclaw as-is on a dev box; wire Telegram; write a <code>be-bridge</code> skill that dispatches Joey's tilde commands. Joey now has a mobile remote for metal-console. No Pantheon brand, no integration into kastilsystems.com &mdash; just a personal productivity tool. Throwaway-safe.
+    </p>
+    <p>
+      <strong>Path B (months, strategic):</strong> reverse-engineer the architecture into a Pantheon-native sibling, branded under the kastilsystems umbrella. See the Pantheon Extension Proposal below.
+    </p>
+    <p>
+      Both paths can run in parallel. Path A teaches us what works in Joey's hands daily; Path B builds the long-term consumer surface using those lessons.
+    </p>
+  </div>
+
+  <h2>The Pantheon Extension Proposal</h2>
+
+  <div class="pantheon-extension">
+    <div class="label">Proposal &mdash; consumer surface for Pantheon</div>
+    <h3>The shell from them, the soul from us.</h3>
+
+    <p>
+      Pantheon today is a substrate: NOUS (planned brain), IDS (intelligent data set), biRT (one-binary runtime), the Last Platform, the Last System, Full Metal. All pieces of infrastructure or methodology. <strong>No consumer surface.</strong> The kastilsystems.com home portfolio names 9 properties; not one of them is a thing a non-developer can use today.
+    </p>
+
+    <p>
+      openclaw proves a consumer surface that works: <strong>373k stars, 180k active users, every chat app on earth as the install base, no app-store fight.</strong> Building this from scratch would take a small team a year. Reverse-engineering it, swapping the substrate to Pantheon-native pieces, and shipping under our brand is a months-long project, not years.
+    </p>
+
+    <p>The layer-by-layer swap:</p>
+
+    <div class="swap-grid">
+      <div class="from">
+        <div class="layer">openclaw uses today</div>
+        <strong>Brain:</strong> Claude / OpenAI / Google / OpenRouter (BYO API key, 3rd-party LLM)
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="to">
+        <div class="layer">Pantheon version uses</div>
+        <strong>Brain:</strong> Start with Claude (we already use it, infra exists). Swap <strong>NOUS</strong> in when NOUS is production-grade.
+      </div>
+    </div>
+
+    <div class="swap-grid">
+      <div class="from">
+        <div class="layer">openclaw uses today</div>
+        <strong>Memory:</strong> Flat-file local persistence per user
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="to">
+        <div class="layer">Pantheon version uses</div>
+        <strong>Memory:</strong> <strong>IDS</strong> (Intelligent Data Set). Trusted data layer the rest of Pantheon also uses.
+      </div>
+    </div>
+
+    <div class="swap-grid">
+      <div class="from">
+        <div class="layer">openclaw uses today</div>
+        <strong>Runtime:</strong> Node 24 / npm / pnpm
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="to">
+        <div class="layer">Pantheon version uses</div>
+        <strong>Runtime:</strong> Node today, <strong>biRT</strong> long-term (one binary, no OS). Aligns with metal-console's bare-metal trajectory.
+      </div>
+    </div>
+
+    <div class="swap-grid">
+      <div class="from">
+        <div class="layer">openclaw uses today</div>
+        <strong>Skills:</strong> ClawHub open marketplace (341 malicious skills found in audit)
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="to">
+        <div class="layer">Pantheon version uses</div>
+        <strong>Skills:</strong> Curated set, signed by us. No public marketplace at launch. Closes the supply-chain hole openclaw is still trying to patch.
+      </div>
+    </div>
+
+    <div class="swap-grid">
+      <div class="from">
+        <div class="layer">openclaw uses today</div>
+        <strong>Brand:</strong> "Local + MIT + no walled garden"
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="to">
+        <div class="layer">Pantheon version uses</div>
+        <strong>Brand:</strong> "<em>You own you.</em>" Local + MIT + <strong>the AI itself is yours</strong> (eventually, via NOUS). Differentiator on the brain layer.
+      </div>
+    </div>
+
+    <h3>Scope discipline for v1</h3>
+    <ul>
+      <li><strong>Pick 3 channels, not 23.</strong> Telegram + Signal + iMessage. Telegram for the dev community, Signal for the privacy-conscious, iMessage for the mainstream US consumer. Add WhatsApp + Discord in v2.</li>
+      <li><strong>Pick 5 skills, not 60,000.</strong> Inbox, calendar, web research, file operations, the bridge to metal-console. Everything else is v2+.</li>
+      <li><strong>Don't fork.</strong> Studying their codebase under MIT &ne; inheriting their 3.4k open PRs and 3.5k open issues. Clean-room implement with their architecture as reference.</li>
+      <li><strong>Claude in slot one, NOUS swap deferred.</strong> NOUS doesn't exist at production grade. Building this on a dependency that doesn't ship is a non-starter.</li>
+      <li><strong>One naming candidate to surface for the design pass:</strong> <em>"Pantheon Touch"</em> &mdash; the surface you touch the Pantheon through. Or <em>"NOUS Touch"</em> once NOUS is in. Or, sticking to the family-strip naming pattern: <em>the-pantheon-line.com</em>. Naming is a <code>~design</code> question; the candidates above are first-draft.</li>
+    </ul>
+
+    <p>
+      <strong>Why now:</strong> openclaw's founder went to OpenAI. The project is community-maintained but the founder's center of gravity has moved. Native OpenAI Codex app-server is now the default first-class provider. There's a window where the Claude-aligned / privacy-aligned / "you own you" positioning is open and they're not aimed at it. We are.
+    </p>
+  </div>
+
+  <h2>Top use cases (from research)</h2>
+
+  <table>
+    <thead><tr><th>#</th><th>Use case</th><th>Why it wins</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>Personal chief-of-staff over WhatsApp / Telegram.</strong> Morning briefing (weather + calendar + news + email + tasks) delivered at 7am.</td><td>Chat-app surface beats every dashboard UI. Local memory survives across sessions.</td></tr>
+      <tr><td>2</td><td><strong>Phone-driven remote control of Claude Code / Codex sessions.</strong></td><td>The dominant 1% pattern. Most directly relevant to metal-console operators.</td></tr>
+      <tr><td>3</td><td><strong>Multi-agent "agent fleet" personal-OS setups.</strong> @jdrhyne runs 15+ agents across multiple machines.</td><td>One chat thread orchestrates many specialized workers.</td></tr>
+      <tr><td>4</td><td><strong>Voice-driven production-incident response.</strong> @georgedagg_ fixed a Railway deployment while walking.</td><td>Phone + voice = ops console without opening a laptop.</td></tr>
+      <tr><td>5</td><td><strong>Negotiation / commerce automation.</strong> @astuyve <span class="receipt-num">saved $4,200</span> on a car negotiation across multiple dealers.</td><td>Long-running outreach the human doesn't want to babysit.</td></tr>
+      <tr><td>6</td><td><strong>Smart-home / hardware orchestration.</strong> Garmin + SSH homelab + air purifier autonomous control.</td><td>The agent discovers device controls; user doesn't write integrations.</td></tr>
+      <tr><td>7</td><td><strong>Site migration from a phone.</strong> @davekiss migrated 18 Notion posts to Astro + moved DNS from mobile.</td><td>Mechanical work delegable; review is on-screen.</td></tr>
+      <tr><td>8</td><td><strong>Solo-founder business glue.</strong> @therno: <em>"It's running my company."</em></td><td>One chat reaches Gmail, GitHub, calendar, 1Password, deployment.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Top 1% patterns</h2>
+
+  <div class="pattern">
+    <h4>Two-machine split: phone surface, desktop substrate</h4>
+    <p>Run the Gateway on a desktop (or Pi + Cloudflare tunnel). Phone is purely a Telegram/WhatsApp client. The phone never runs the agent. <a href="https://x.com/AlbertMoral/status/2010288787885064227">@AlbertMoral source</a></p>
+  </div>
+
+  <div class="pattern">
+    <h4>OpenClaw as orchestrator, Claude Code / Codex as workers</h4>
+    <p>@nateliason wires a "Go" workflow that triggers parallel Codex agents for feature development. OpenClaw is the dispatcher; Claude Code / Codex / Conductor are the workers. <strong>This is the pattern most directly portable to metal-console.</strong></p>
+  </div>
+
+  <div class="pattern">
+    <h4>Self-improving agent skill installed by default</h4>
+    <p>The single most-downloaded ClawHub skill (~419k downloads). Writes errors, learnings, corrections into persistent memory so the agent doesn't repeat mistakes. Pattern equivalent: Be's <code>~wtf</code> + CLAUDE.md compounding.</p>
+  </div>
+
+  <div class="pattern">
+    <h4>Skill-Vetter chain before every install</h4>
+    <p>Run the "Skill Vetter" skill on every new third-party skill before install. Audits permissions, flags scope creep. The safety pattern that lets power users adopt new skills aggressively without paying the supply-chain tax. <a href="https://composio.dev/content/top-openclaw-skills">source</a></p>
+  </div>
+
+  <div class="pattern">
+    <h4>Two Claws collaborating in a shared chat group</h4>
+    <p>Two users have their OpenClaw instances jointly participating in a shared WhatsApp group. The multi-agent emergent behavior that people are now starting to design deliberately.</p>
+  </div>
+
+  <div class="pattern">
+    <h4>Long-context Claude as thinker, smaller models as workers</h4>
+    <p>Opus 4.7's 1M context is the default for that model in OpenClaw. Power users route research/synthesis to Claude and route shell/file/cron work to cheaper local models (MiniMax 2.5 is the favored local).</p>
+  </div>
+
+  <div class="pattern">
+    <h4>Voice + TTS round-trip for hands-free workflows</h4>
+    <p>@mirthtime: <em>"My @openclaw just called my phone and spoke to me with an aussie accent."</em> Eleven Labs Agent skill is the go-to for production-grade voice.</p>
+  </div>
+
+  <h2>Anti-patterns (heavy on security &mdash; this matters)</h2>
+
+  <div class="anti">
+    <h4>Installing ClawHub skills without vetting</h4>
+    <p>Koi Security's audit of 2,857 skills found <strong>341 malicious skills, 335 from a single coordinated "ClawHavoc" campaign</strong>. Composio's guide (hyperbolically): <em>"roughly 80% are garbage or outright malicious."</em></p>
+    <p class="fix"><strong>Pantheon version's answer:</strong> no open marketplace. Curated set, signed by us. Close the hole at the architectural level, not at the install-time-prompt level.</p>
+  </div>
+
+  <div class="anti">
+    <h4>Skills with &lt;100 installs and no published source</h4>
+    <p><em>"Of the 820+ malicious skills discovered, over 90% had fewer than 100 installs."</em> <a href="https://www.aimakers.co/blog/openclaw-skills-guide/">source</a></p>
+    <p class="fix">Same as above &mdash; if we don't ship the marketplace, we don't ship this risk.</p>
+  </div>
+
+  <div class="anti">
+    <h4>Exposing the Control UI with a public gatewayUrl</h4>
+    <p>CVE-2026-25253 (CVSS 8.8) leaked auth tokens via WebSocket URL query parameter. Patched in 2026.1.29. Two follow-on command-injection CVEs (25157, 24763) the same week. <a href="https://nordlayer.com/blog/openclaw-security-risks/">source</a></p>
+    <p class="fix">Never expose the Control UI to the public internet. Loopback or tunnel only.</p>
+  </div>
+
+  <div class="anti">
+    <h4>Giving it credit cards / payment authority without explicit approval flow</h4>
+    <p>@Hormold: <em>"My @openclaw accidentally started a fight with Lemonade Insurance because of wrong interpretation."</em></p>
+    <p class="fix">Per-tool approval gate on anything with money or contracts. Match Be's DoD discipline.</p>
+  </div>
+
+  <div class="anti">
+    <h4>Skipping LTS / running latest npm in production</h4>
+    <p>Apr 24 / Apr 29 2026 releases broke many installs &mdash; Gateways slowed, channels misbehaved, dependency loops appeared. <a href="https://openclaw.ai/blog/openclaw-rough-week">source</a></p>
+    <p class="fix">Pin a known-good version. Treat upgrades as deliberate decisions.</p>
+  </div>
+
+  <div class="anti">
+    <h4>Treating it like a chatbot</h4>
+    <p>Mehul Gupta: <em>"The deeper issue was that OpenClaw blurred the boundary between an assistant and a system operator."</em> Users who treat it like a chatbot get burned; users who treat it like sudo on a chat thread thrive.</p>
+    <p class="fix">In Be terms: treat agent prompts as commit-able commands, not chat. Match the discipline you'd give a human with shell access.</p>
+  </div>
+
+  <h2>Receipts</h2>
+
+  <table>
+    <thead><tr><th>Source</th><th>Outcome</th></tr></thead>
+    <tbody>
+      <tr><td>@astuyve</td><td><span class="receipt-num">$4,200 saved</span> automating multi-dealer car negotiation</td></tr>
+      <tr><td>@jdrhyne</td><td><span class="receipt-num">10,000 emails cleared</span> via Discord-driven fleet of 15+ agents; built a GA4 skill in <span class="receipt-num">20 min</span></td></tr>
+      <tr><td>@davekiss</td><td>Full site migration (<span class="receipt-num">18 posts Notion &rarr; Astro</span> + DNS) from a mobile device</td></tr>
+      <tr><td>@therno</td><td><em>"It's running my company."</em> <a href="https://x.com/therno/status/2014216984267780431">source</a></td></tr>
+      <tr><td>@pocarles</td><td><em>"Processed our entire source of truth via WhatsApp in minutes."</em></td></tr>
+      <tr><td>Karpathy</td><td>Public endorsement: <em>"Excellent reading thank you. Love oracle and Claw."</em> <a href="https://x.com/karpathy/status/2005692186470514904">source</a></td></tr>
+      <tr><td>OpenAI</td><td>Hired Steinberger <span class="receipt-num">Feb 15, 2026</span> off the back of OpenClaw. <a href="https://techcrunch.com/2026/02/15/openclaw-creator-peter-steinberger-joins-openai/">source</a></td></tr>
+      <tr><td>NVIDIA</td><td>Built <a href="https://www.nvidia.com/en-us/ai/nemoclaw/">NemoClaw</a> guardrails layer specifically branded for OpenClaw</td></tr>
+      <tr><td>Microsoft</td><td>Formal deployment guidance: <a href="https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/">"Running OpenClaw safely"</a></td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>What's NOT in receipts:</strong> independent productivity-multiplier studies; audited time-saved figures; enterprise reference customers. The "receipts" are individual-builder tweets and the project's own showcase. Treat as directional, not audited.</p>
+
+  <h2>Recent state (last 90 days)</h2>
+
+  <ul>
+    <li><strong>v2026.5.14-beta.2 current</strong> on the path to v2026.5.x stable. Native OpenAI Codex app-server runtime is now the default first-class path (May 14, 2026 blog post). <a href="https://openclaw.ai/blog/openai-models-in-openclaw-done-right">source</a></li>
+    <li><strong>Steinberger joined OpenAI Feb 15, 2026.</strong> Project community-maintained; corporate sponsors: OpenAI, GitHub, NVIDIA, Vercel, Blacksmith, Convex.</li>
+    <li><strong>Claude Opus 4.7 supported</strong> with 1M context default. Reference: <code>anthropic/claude-opus-4-7</code>. <a href="https://docs.openclaw.ai/providers/anthropic">source</a></li>
+    <li><strong>Three CVEs late Jan / early Feb:</strong> CVE-2026-25253 (CVSS 8.8 token leak), CVE-2026-25157, CVE-2026-24763. Patched in 2026.1.29.</li>
+    <li><strong>VirusTotal partnership for skill scanning</strong> announced Feb 7, 2026. <a href="https://openclaw.ai/blog/virustotal-partnership">source</a></li>
+    <li><strong>China restricted state / SOE / bank usage</strong> citing unauthorized data deletion and energy concerns. <a href="https://en.wikipedia.org/wiki/OpenClaw">source</a></li>
+    <li><strong>"Rough week" April 24/29 releases</strong> caused widespread degradation. LTS track announced as the response. Not shipped yet. <a href="https://openclaw.ai/blog/openclaw-rough-week">source</a></li>
+    <li><strong>Public security postmortem:</strong> <a href="https://openclaw.ai/blog/openclaw-security-in-public">"How OpenClaw Got Safer in Public"</a> (Apr 30) and <a href="https://openclaw.ai/blog/where-openclaw-security-is-heading">"Where OpenClaw Security Is Heading"</a> (May 15).</li>
+    <li><strong>ClawCon NYC meetup</strong> covered by The Verge. <a href="https://www.theverge.com/ai-artificial-intelligence/890517/openclaw-clawcon-meetup-nyc-open-source-ai">source</a></li>
+  </ul>
+
+  <h2>Sources</h2>
+  <div class="sources">
+
+    <h4>Primary (openclaw.ai)</h4>
+    <ul>
+      <li><a href="https://openclaw.ai/">openclaw.ai (home)</a></li>
+      <li><a href="https://github.com/openclaw/openclaw">github.com/openclaw/openclaw (main repo, MIT)</a> &mdash; 373k stars</li>
+      <li><a href="https://github.com/openclaw/clawhub">github.com/openclaw/clawhub (skill registry)</a></li>
+      <li><a href="https://docs.openclaw.ai">docs.openclaw.ai</a></li>
+      <li><a href="https://openclaw.ai/showcase">openclaw.ai/showcase</a></li>
+      <li><a href="https://openclaw.ai/integrations">openclaw.ai/integrations</a> &mdash; LLM provider list</li>
+      <li><a href="https://openclaw.ai/blog/introducing-openclaw">Introducing OpenClaw (Jan 29, 2026)</a></li>
+      <li><a href="https://openclaw.ai/blog/openai-models-in-openclaw-done-right">OpenAI Models in OpenClaw Done Right (May 14)</a></li>
+      <li><a href="https://openclaw.ai/blog/openclaw-rough-week">OpenClaw's Rough Week</a></li>
+      <li><a href="https://openclaw.ai/blog/where-openclaw-security-is-heading">Where OpenClaw Security Is Heading (May 15)</a></li>
+      <li><a href="https://openclaw.ai/blog/virustotal-partnership">VirusTotal Partnership (Feb 7)</a></li>
+    </ul>
+
+    <h4>Press &amp; analysis</h4>
+    <ul>
+      <li><a href="https://techcrunch.com/2026/02/15/openclaw-creator-peter-steinberger-joins-openai/">TechCrunch &mdash; Steinberger joins OpenAI</a></li>
+      <li><a href="https://www.businessinsider.com/sam-altman-hires-openclaw-creator-peter-steinberger-personal-ai-agents-2026-2">Business Insider &mdash; Altman hires Steinberger</a></li>
+      <li><a href="https://www.theverge.com/openai/630450/peter-steinberger-openclaw-openai">The Verge &mdash; Steinberger to OpenAI</a></li>
+      <li><a href="https://www.theverge.com/ai-artificial-intelligence/890517/openclaw-clawcon-meetup-nyc-open-source-ai">The Verge &mdash; ClawCon NYC</a></li>
+      <li><a href="https://www.kdnuggets.com/openclaw-explained-the-free-ai-agent-tool-going-viral-already-in-2026">KDnuggets &mdash; the viral 2026 explainer</a></li>
+    </ul>
+
+    <h4>Security</h4>
+    <ul>
+      <li><a href="https://www.crowdstrike.com/en-us/blog/what-security-teams-need-to-know-about-openclaw-ai-super-agent/">CrowdStrike &mdash; security teams' brief on OpenClaw</a></li>
+      <li><a href="https://nordlayer.com/blog/openclaw-security-risks/">NordLayer &mdash; CVE roundup</a></li>
+      <li><a href="https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/">Microsoft Security &mdash; running OpenClaw safely</a></li>
+      <li><a href="https://www.nvidia.com/en-us/ai/nemoclaw/">NVIDIA NemoClaw &mdash; safety guardrails</a></li>
+    </ul>
+
+    <h4>Community &amp; analysis</h4>
+    <ul>
+      <li><a href="https://composio.dev/content/top-openclaw-skills">Composio &mdash; top skills</a></li>
+      <li><a href="https://www.aimakers.co/blog/openclaw-skills-guide/">AImakers &mdash; skills guide</a></li>
+      <li><a href="https://medium.com/data-science-in-your-pocket/dont-use-openclaw-a6ea8645cfd4">Mehul Gupta &mdash; "Don't use OpenClaw" (the critique)</a></li>
+      <li><a href="https://thenewstack.io/anthropic-agent-sdk-confusion/">The New Stack &mdash; Anthropic clarification on OpenClaw + Claude</a></li>
+    </ul>
+
+    <h4>Selected primary-voice testimonials</h4>
+    <ul>
+      <li><a href="https://x.com/karpathy/status/2005692186470514904">Karpathy endorsement</a></li>
+      <li><a href="https://x.com/nateliason/status/2013725082850414592">@nateliason &mdash; remote Claude Code via Telegram</a></li>
+      <li><a href="https://x.com/php100/status/2008791236526952790">@php100 &mdash; autonomous Claude Code loops from phone</a></li>
+      <li><a href="https://x.com/AlbertMoral/status/2010288787885064227">@AlbertMoral &mdash; Pi + Cloudflare tunnel setup</a></li>
+      <li><a href="https://x.com/therno/status/2014216984267780431">@therno &mdash; "running my company"</a></li>
+    </ul>
+
+  </div>
+
+</main>
+
+<footer>
+  <a href="/research">&larr; research</a>
+  &nbsp;&middot;&nbsp;
+  <a href="https://github.com/joeycastilloUS/joeycastillo.us/tree/main/research/entries">source</a>
+  &nbsp;&middot;&nbsp;
+  entry 01 &middot; 2026-05-17
+</footer>
+
+</body>
+</html>
