@@ -283,7 +283,7 @@
   <header>
     <h1>OpenClaw</h1>
     <p class="subtitle">Open-source personal AI agent that lives in your chat apps. MIT, 373k stars, currently the most-starred project on GitHub.</p>
-    <p class="meta-line">2026-05-17 &middot; entry 01 &middot; candidate: <a href="https://openclaw.ai/">openclaw.ai</a> &middot; source: <a href="https://github.com/openclaw/openclaw">github.com/openclaw/openclaw</a></p>
+    <p class="meta-line">2026-05-17 &middot; updated 2026-05-18 (commit-history lessons section added) &middot; entry 01 &middot; candidate: <a href="https://openclaw.ai/">openclaw.ai</a> &middot; source: <a href="https://github.com/openclaw/openclaw">github.com/openclaw/openclaw</a></p>
   </header>
 
   <div class="non-tech">
@@ -549,6 +549,190 @@
     <p>@mirthtime: <em>"My @openclaw just called my phone and spoke to me with an aussie accent."</em> Eleven Labs Agent skill is the go-to for production-grade voice.</p>
   </div>
 
+  <h2>Lessons from their commit history (the cheat code)</h2>
+
+  <p style="color: var(--ks-text-mute); font-size: 0.82rem; font-style: italic;">
+    Section added 2026-05-18 from a mining pass over the repo (commits, GHSA advisories, open issues, 9 release notes spanning v2026.5.3 &rarr; v2026.5.16-beta.4) and the 5 published postmortems on openclaw.ai/blog. Every claim cites a commit SHA, PR number, issue number, or post URL. The goal: concrete mistakes their record proves we don't have to repeat.
+  </p>
+
+  <div class="tldr">
+    <div class="label">The headline finding</div>
+    <p>
+      <strong>The single most valuable artifact in their history is commit <code>f91de52f</code> &mdash; the SQLite mega-refactor &mdash; shipped and reverted within hours on 2026-05-13</strong> (revert: <code>694ca50e</code>). It's the architectural Rosetta stone. The destination state OpenClaw <em>wants</em> but cannot reach without a multi-year migration: SQLite for everything that isn't content, no flat-file config, no filesystem locator-by-path, sandbox VFS even for subagent attachments.
+    </p>
+    <p>
+      Every revert in their history is downstream of one root cause: <strong>two states-of-truth, racing each other</strong> (filesystem + memory, npm + ClawHub, bundled + plugin, resume-token + transcript-file). The implication for our Pantheon-native build is clean: <strong>we can be at OpenClaw's destination on day one because we don't have to migrate from anything.</strong> Pick one state-of-truth substrate per concern. SQLite for everything that isn't strictly content. Content (markdown, media) in content-addressable storage. No flat-file config. No locator-by-path. Everything is locator-by-id from r1.
+    </p>
+  </div>
+
+  <h3>The top 10 lessons</h3>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>Lesson</th><th>Evidence in their record</th><th>What we do differently the first time</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td><strong>Don't ship a half-split.</strong> Bundle-vs-plugin mid-migration is the worst place to be.</td>
+        <td><a href="https://openclaw.ai/blog/openclaw-rough-week">"Rough Week"</a> postmortem; <a href="https://github.com/openclaw/openclaw/releases/tag/v2026.5.12">v2026.5.12 release notes</a> finally externalize WhatsApp, Slack, Bedrock, Vertex, OpenShell cones.</td>
+        <td>Pick a side at v0: everything is a plugin <em>or</em> everything is bundled. Never two install paths live at the same time. Migration is a one-shot cut, not a multi-month half-state.</td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td><strong>Don't trigger an install side-effect from a UI selection.</strong></td>
+        <td>PR #78799 ("Install Codex plugin on OpenAI model selection") reverted hours later in PR #78878 (commit <code>3a901b5e</code>, 2026-05-07).</td>
+        <td>Model selection is metadata; installation is an action. They must never be the same gesture. Explicit <code>plugins install &lt;spec&gt;</code> with the doctor reporting missing deps via catalog-backed install hints.</td>
+      </tr>
+      <tr>
+        <td>03</td>
+        <td><strong>Marketplace trust is a hook, not a release-blocker.</strong></td>
+        <td>PR #81307 ("Check ClawHub trust before plugin installs") reverted 3 days later in PR #81363 (commit <code>6c92324c</code>, 2026-05-13). Trust signal lookup blocked installs that should have succeeded.</td>
+        <td>Scanning verdict is ONE signal in a multi-signal install decision, never a binary wedge. Ship a <code>--bypass-trust</code> operator flag with audit log from day one. UI for trust status only after the signal is reliable for &ge;30 days.</td>
+      </tr>
+      <tr>
+        <td>04</td>
+        <td><strong>SQLite-everywhere is right; mega-PR is wrong.</strong></td>
+        <td>Commit <code>f91de52f</code> (100-step megacommit) reverted within hours by <code>694ca50e</code> (2026-05-13). Two days later, <a href="https://openclaw.ai/blog/where-openclaw-security-is-heading">"Where OpenClaw Security Is Heading"</a> still lists SQLite as the destination.</td>
+        <td>Land at the destination on day one. No flat-file state to migrate from. If we inherit any, ship one subsystem per release with a doctor migrator that fails closed on partial state &mdash; never a 100-commit atomic flip.</td>
+      </tr>
+      <tr>
+        <td>05</td>
+        <td><strong>20+ GHSAs in 72 hours means your security process broke.</strong></td>
+        <td>Apr 21&ndash;24, 2026: 20+ advisories published (GHSA-r39h-4c2p-3jxp arbitrary code execution; GHSA-r6xh-pqhr-v4xh MCP loopback owner-context bug; GHSA-wppj-c6mr-83jj OpenShell FS bridge; +17 more). Response: <code>SECURITY.md</code> + GHSA &rarr; OpenGrep detector-rule pipeline (PR #69483, commit <code>6de9d71b</code>, 2026-04-30).</td>
+        <td>Day-zero: write <code>SECURITY.md</code> before the 2nd contributor. Every fixed vuln becomes a regression rule (Semgrep / OpenGrep / CodeQL). Build a triage harness for slop reports (curl saw 87% false-positive rate).</td>
+      </tr>
+      <tr>
+        <td>06</td>
+        <td><strong>Auto-restore of invalid config is a footgun.</strong></td>
+        <td><a href="https://github.com/openclaw/openclaw/releases/tag/v2026.5.3">v2026.5.3</a>: <em>"stop Gateway startup and hot reload from auto-restoring invalid config; invalid config now fails closed and <code>openclaw doctor --fix</code> owns last-known-good repair."</em></td>
+        <td>Fail closed on bad config from day one. Recovery is an explicit operator action (<code>doctor --fix</code>), never magic.</td>
+      </tr>
+      <tr>
+        <td>07</td>
+        <td><strong>Don't roll your own bind / path policy.</strong></td>
+        <td>Multi-revert area: commit <code>8db20c19</code> ("sandbox: block sensitive external bind sources") reverted in <code>14a779ee</code> (PR #59016, 2026-04-01). "fix(gateway): bound silent local pairing scopes" reverted in <code>1703bdca</code> (2026-04-05). Final form: centralized <code>fs-safe</code> library.</td>
+        <td>Centralized <code>fs-safe</code>-equivalent boundary library on day one. Every read/write forced through it. Impossible for plugin code to bypass.</td>
+      </tr>
+      <tr>
+        <td>08</td>
+        <td><strong>Assume the provider lies about its capabilities.</strong></td>
+        <td>Commit <code>b202ac2a</code> (2026-03-15) reverts PR #46500: <em>"Reverts. Breaks Ollama, LM Studio, TGI, LocalAI, Mistral API &mdash; these backends reject stream_options with 400/422."</em> Default-true for <code>supportsUsageInStreaming</code> broke 5 backends.</td>
+        <td>Capability detection per-endpoint, never per-endpoint-family. Default to the most-conservative option; opt in per verified endpoint. Maintain a versioned manifest of "what's known to work."</td>
+      </tr>
+      <tr>
+        <td>09</td>
+        <td><strong>"Restart" must not be a synonym for "resume."</strong></td>
+        <td><a href="https://github.com/openclaw/openclaw/issues/81003">Issue #81003</a> (open, 2026-05-16): 11 consecutive turns of byte-identical synthetic output (content sha256 <code>02df1d51...</code>), <code>input_tokens: 0</code>, <code>output_tokens: 0</code>, <code>model: "&lt;synthetic&gt;"</code>. Cause: <code>reason=restart</code> reused the same resume token; corrupted state replayed. Only <code>sessions.reset</code> recovered.</td>
+        <td>Two named primitives from r1: <code>session.resume</code> (same token, same state) vs <code>session.reset</code> (drop token, clean slate). UI surface AND CLI surface ship both buttons.</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><strong>Unbounded backup files = 2 GB/day footgun.</strong></td>
+        <td><a href="https://github.com/openclaw/openclaw/issues/80960">Issue #80960</a> (closed 2026-05-12): <code>repairSessionFileIfNeeded</code> wrote <code>*.bak-&lt;pid&gt;-&lt;timestamp&gt;</code> snapshots with <strong>no rotation, no max-count, no TTL, no dedup</strong>. Field observation: <span class="receipt-num">2,180 files / 2.1 GB in 25 hours</span> from one stuck session. Root cause: auth token invalidated &rarr; infinite repair loop. Fix: commit <code>e1d7ba59</code>.</td>
+        <td>Every retry loop has a counter, a cap, a cooldown. Every backup has a rotation policy declared at creation. Auth failure is a <strong>terminal</strong> condition for the session, not a retry signal.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>The architectural Rosetta stone</h3>
+
+  <div class="lens-detail strong-yes">
+    <div class="label">read this commit once</div>
+    <div class="verdict">commit <code>f91de52f</code> &mdash; the SQLite mega-refactor <span class="vtag strong-yes">Their destination, our day-one state</span></div>
+    <p>
+      The destination state OpenClaw is trying to reach has these properties, all of which they currently do NOT have and are paying for daily:
+    </p>
+    <ol>
+      <li><strong>No session state on the filesystem.</strong> Sessions, transcripts, cron, plugin state, auth profiles, model catalog, hermes secrets, device/push state, MSTeams learning, telegram message cache, TTS prefs, dreaming status, raw stream diagnostics, skill uploads, subagent attachments &mdash; <em>all</em> in SQLite, addressed by typed scopes.</li>
+      <li><strong>No transcript-locator-by-path anywhere.</strong> Sessions identified by ID; transcripts derived from session identity.</li>
+      <li><strong>No legacy file shims at runtime.</strong> All legacy paths gated behind <code>doctor</code> migration only.</li>
+      <li><strong>Sandbox VFS for subagent attachments.</strong> Even attachments are in a virtual filesystem, not real files.</li>
+    </ol>
+    <p>
+      The commit is a 100-step plan because OpenClaw spent two years building on JSONL files + flat JSON config and now has to dig out. Every revert in their history is downstream of <strong>"two states of truth, racing each other"</strong>: filesystem + memory, npm + ClawHub, bundled + plugin, resume-token + transcript-file.
+    </p>
+    <p>
+      <strong>What this means for the Pantheon-native build:</strong> pick ONE state-of-truth substrate per concern and never have two. SQLite for everything that isn't strictly content. Content (markdown, media) in content-addressable storage. No flat-file config &mdash; config goes in the same SQLite. No locator-by-path &mdash; everything is locator-by-id. We can be at OpenClaw's destination on day one because we don't have to migrate from anything.
+    </p>
+  </div>
+
+  <h3>Where greenfield wins (what they're still fighting)</h3>
+
+  <p>Open issues whose existence reveals systemic problems that their commit history shows they have NOT solved. Each one maps to a greenfield differentiator for the Pantheon version.</p>
+
+  <table>
+    <thead>
+      <tr><th>Issue</th><th>Symptom</th><th>Why it's still open</th><th>Greenfield answer</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://github.com/openclaw/openclaw/issues/71127">#71127</a> P1</td>
+        <td>Gateway detects stuck sessions but has no recovery action. Requires external process restart.</td>
+        <td>Detector and recoverer were never co-designed.</td>
+        <td>Every detector ships its recoverer in the same PR or doesn't merge.</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/openclaw/openclaw/issues/42213">#42213</a> P2</td>
+        <td>Control UI chat gets stuck busy; messages queue but never flush.</td>
+        <td>UI state and session state are independent state machines that diverge.</td>
+        <td>One state machine. UI is a projection.</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/openclaw/openclaw/issues/48810">#48810</a> P1 regression</td>
+        <td>Compaction creates orphan forks in <code>parentId</code> chain.</td>
+        <td>Compaction was bolted on after the parent-chain invariant was defined.</td>
+        <td>Define your transcript invariants before you build mutations. Every mutation passes the invariant or doesn't commit.</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/openclaw/openclaw/issues/48516">#48516</a> P1</td>
+        <td>Android-node WhatsApp notification &rarr; cross-session reply to wrong group.</td>
+        <td>No ingest-time dedup across pipes.</td>
+        <td>Single message-ID-based dedup at the ingest layer. Drop on any second arrival.</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/openclaw/openclaw/issues/81003">#81003</a></td>
+        <td><code>reason=restart</code> reuses resume token; stuck state persists across the "restart."</td>
+        <td>"Restart" and "reset" semantics were conflated.</td>
+        <td>Two named primitives: <code>session.resume</code> vs <code>session.reset</code>. Both surfaces ship both buttons.</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/openclaw/openclaw/issues/80374">#80374</a></td>
+        <td>Claude CLI session resume doesn't reload SOUL.md / IDENTITY.md.</td>
+        <td>Identity files were loaded at session creation, not session entry.</td>
+        <td>Identity files re-read on every session entry, not session creation.</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/openclaw/openclaw/issues/76042">#76042</a> P1</td>
+        <td>Install takes 2+ hours; was ~20 min.</td>
+        <td>No install-time regression test in CI.</td>
+        <td>Install time p95 is a CI metric; &gt;20% regression blocks release.</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/openclaw/openclaw/issues/81518">#81518</a></td>
+        <td>Discord DAVE encryption now mandatory; voice fails with <code>UnencryptedWhenPassthroughDisabled</code>.</td>
+        <td>No upstream-platform-mandate tracker.</td>
+        <td>Every adapter ships a "next 3 known platform breaking changes" tracking doc.</td>
+      </tr>
+      <tr>
+        <td>#82021, #82633, #83023, #83086, #81934, #81710, #81214</td>
+        <td>7 regressions filed within 72h of v2026.5.12 (model timeouts, Qwen tool calls vanished, image sanitization, max_tokens accounting, macOS multi-fail, heartbeat misses, subagent P1).</td>
+        <td>Mega-release strategy bundles too much change; the rough-week-recovery release shipped more regressions than it fixed.</td>
+        <td>Small, fast, betas with real users. Never ship a "fix-everything" release. Every fix gets its own beta cycle.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>The institutional lesson</h3>
+
+  <div class="anti" style="border-left-color: var(--ks-status-partial); background: rgba(245,166,35,0.04); border-color: rgba(245,166,35,0.2);">
+    <h4 style="color: var(--ks-status-partial);">Single-maintainer release is a vulnerability class</h4>
+    <p>
+      From the rough-week postmortem (Steinberger, verbatim): <em>"identified being 'too founder-driven' with excessive workload concentration on Peter Steinberger, prompting structural changes through the OpenClaw Foundation."</em> Dual-approval scripted/gated/signed releases are now the fix.
+    </p>
+    <p class="fix"><strong>For Pantheon version:</strong> build dual-signer + dual-approval release workflow <em>before</em> you need it. The founder's calendar is not a release engine. The CI is, with at least two human approvers, both of whom can ship without the other.</p>
+  </div>
+
   <h2>Anti-patterns (heavy on security &mdash; this matters)</h2>
 
   <div class="anti">
@@ -670,6 +854,16 @@
       <li><a href="https://x.com/php100/status/2008791236526952790">@php100 &mdash; autonomous Claude Code loops from phone</a></li>
       <li><a href="https://x.com/AlbertMoral/status/2010288787885064227">@AlbertMoral &mdash; Pi + Cloudflare tunnel setup</a></li>
       <li><a href="https://x.com/therno/status/2014216984267780431">@therno &mdash; "running my company"</a></li>
+    </ul>
+
+    <h4>Commit-history mining (lessons section)</h4>
+    <ul>
+      <li><strong>Release notes:</strong> <a href="https://github.com/openclaw/openclaw/releases/tag/v2026.5.12">v2026.5.12 (2026-05-14)</a>, <a href="https://github.com/openclaw/openclaw/releases/tag/v2026.5.7">v2026.5.7</a>, <a href="https://github.com/openclaw/openclaw/releases/tag/v2026.5.4">v2026.5.4</a>, <a href="https://github.com/openclaw/openclaw/releases/tag/v2026.5.3">v2026.5.3</a></li>
+      <li><strong>Revert commits:</strong> <code>694ca50e</code> (SQLite mega-revert, 2026-05-13); <code>6c92324c</code> (ClawHub trust check revert, PR #81363, 2026-05-13); <code>3a901b5e</code> (Codex plugin on model select revert, PR #78878, 2026-05-07); <code>b202ac2a</code> (streaming endpoint revert breaking Ollama/LM Studio/TGI/LocalAI/Mistral, 2026-03-15); <code>14a779ee</code> (sandbox bind sources revert, PR #59016, 2026-04-01); <code>1703bdca</code> (silent local pairing scopes revert, 2026-04-05)</li>
+      <li><strong>Original (later-reverted) commits:</strong> <code>f91de52f</code> (SQLite refactor); <code>87eb4500</code> (ClawHub trust check, PR #81307); <code>c8f3feca</code> (Codex plugin on model select, PR #78799); <code>8db20c19</code> (sandbox block bind sources, PR #56024); <code>7f1b159c</code> (gateway silent local pairing scopes)</li>
+      <li><strong>Fix commits:</strong> <code>e1d7ba59</code> (session-repair backup leak fix, 2026-05-12); <code>6de9d71b</code> (GHSA &rarr; OpenGrep detector-rule pipeline, PR #69483, 2026-04-30); <code>1803d16d</code> (single-use device bootstrap tokens, refs GHSA-63f5-hhc7-cx6p)</li>
+      <li><strong>Open issues cited:</strong> <a href="https://github.com/openclaw/openclaw/issues/71127">#71127</a>, <a href="https://github.com/openclaw/openclaw/issues/42213">#42213</a>, <a href="https://github.com/openclaw/openclaw/issues/48810">#48810</a>, <a href="https://github.com/openclaw/openclaw/issues/48516">#48516</a>, <a href="https://github.com/openclaw/openclaw/issues/81003">#81003</a>, <a href="https://github.com/openclaw/openclaw/issues/80374">#80374</a>, <a href="https://github.com/openclaw/openclaw/issues/80960">#80960</a> (closed), <a href="https://github.com/openclaw/openclaw/issues/76042">#76042</a>, <a href="https://github.com/openclaw/openclaw/issues/81518">#81518</a></li>
+      <li><strong>GHSA advisories (20 published 2026-04-21 to 04-24):</strong> high-severity included GHSA-r39h-4c2p-3jxp, GHSA-cwj3-vqpp-pmxr, GHSA-r6xh-pqhr-v4xh, GHSA-wppj-c6mr-83jj, GHSA-5h3g-6xhh-rg6p (listing via <code>gh api repos/openclaw/openclaw/security-advisories</code>)</li>
     </ul>
 
   </div>
