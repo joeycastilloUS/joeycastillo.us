@@ -47,6 +47,40 @@
 - {M5a tagline "Remember everything, forget nothing", add to, nous/memory/CLAUDE.md} · 3 · ~u~t ✅ (eaa5542)
 
 
+## Board ORG — Multi-org consolidation (31 pts · ACTIVE)
+
+> Source: ~refactor + ~p (2026-05-24 15:10) — see plans/2026-05-24-1510-refactor-plan-org-consolidation.html
+> Plan IDs prefixed AP- (ai-pantheon), JC- (joeycastilloUS), AD- (acmedevUS), C- (cords), P-N (phases).
+
+### Ready
+
+- {C-01, fix in, target-runtimes/gate_engine.c} · 1 · ~f~t — replace ai-pantheon.ai origin
+- {C-02, fix in, nous/intelligence/deploy_gcc.sh} · 1 · ~f~t — replace acmedev-platform-hq project
+- {C-03, fix in, nous/intelligence/INFRASTRUCTURE_INVENTORY.md + GCE_COVERAGE_MATRIX.md} · 1 · ~f~t
+- {C-04, fix in, metal/CLAUDE.md} · 1 · ~f~t — single-org framing
+- {C-05, fix in, metal/README.md} · 1 · ~f~t — install URL
+- {JC-02 stub, delete from, joeycastilloUS} · 1 · ~f — metal-console (already moved)
+- {JC-08 stub, delete from, joeycastilloUS} · 1 · ~f — kastil-systems (already moved)
+- {AP-25 pair, archive in, ai-pantheon} · 1 · ~f — pantheon-mail + pantheon-personal (empty)
+- {JC-04 metal.Be, archive in, joeycastilloUS} · 1 · ~f
+- {JC-07 metal-proposal, archive in, joeycastilloUS} · 1 · ~f
+- {AD-01 acmedevUS/a-d-d, archive in, acmedevUS} · 1 · ~f — duplicate of canonical
+- {AP-08..AP-24, P-3 moves+merges, designed for, kastil-systems} · 13 · ~d — needs Q-1..Q-5 answered
+- {P-4 verification + cleanup, test across, all kastil-systems repos} · 5 · ~t
+
+### In Progress
+
+### Done
+
+- {AP-01 nous-desktop fork, archive in, ai-pantheon} · 1 · ~f ✅ (this commit) — canonical at kastil-systems/tools/nous-desktop
+- {AP-02 cc, archive in, ai-pantheon} · 1 · ~f ✅ (this commit) — absorbed into nous/{store,crypt,reason}
+- {AP-03 pantheon-memory, archive in, ai-pantheon} · 1 · ~f ✅ (this commit) — absorbed into nous/memory/skill/store
+- {AP-04 pantheon-brain, archive in, ai-pantheon} · 1 · ~f ✅ (this commit) — absorbed into nous/intelligence + crypt
+- {AP-05 pantheon-mind, archive in, ai-pantheon} · 1 · ~f ✅ (this commit) — superseded by nous intelligence
+- {AP-06 pantheon-runtime-security, archive in, ai-pantheon} · 1 · ~f ✅ (this commit) — absorbed into target-runtimes
+- {AP-07 pantheon-mesh, archive in, ai-pantheon} · 1 · ~f ✅ (this commit) — empty stub
+
+
 ## Backlog (not yet sized into boards)
 
 - M4 root CLAUDE.md merge — DONE earlier (308ea1f) ✅
