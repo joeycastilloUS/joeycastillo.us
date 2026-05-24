@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~P: Build Fingerprint -- replace snapshot.py counts panel with column-pruned HASH_AGG parity</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}
+.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}
+.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}
+.phase .accept strong{color:#5cb85c}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~plan: Build Fingerprint</nav>
+
+<h1>Build Fingerprint &mdash; replace snapshot.py counts panel with column-pruned HASH_AGG parity</h1>
+<p class="sub">Five phases, 17 pts. Proves the design first, then folds it into the snapshot tool, then ships a Phase 2 fingerprint snapshot as visible proof.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> Execute the design at <code>be/designs/2026-05-24-0000-design-fingerprint-parity.html</code>. Replace <code>snapshot.py</code>'s current counts panel (cumulative or 24h-windowed -- both noisy) with a Fingerprint panel that runs column-pruned <code>HASH_AGG</code> per table, reports per-table <code>MATCH</code> / <code>DIFFER</code>, runs <code>EXCEPT COUNT(*)</code> only when fingerprints differ, and surfaces a single hero number: "X / 208 tables MATCH at line clone_time - 24h". Existing clone stands; no Time Travel; no edition upgrade.
+</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td>New helper module <code>scripts/_fingerprint.py</code> (business-column resolution + per-table fingerprint + EXCEPT magnitude). Replace <code>collect_counts</code> in <code>snapshot.py</code>. Replace counts panel render with Fingerprint panel render. Re-render snapshot template. Ship a Phase 2 post-cleanup snapshot under the new design. CLAUDE.md update in airbyte-parity.</td><td>Parity engine changes (Cloud Run / C# stays as-is). Re-clone (existing May 20 anchor is the reference). Edition upgrade. Other snapshot panels (freshness/clustering/schema/drift unchanged). Site index card rewording (existing card still applies).</td></tr>
+</table>
+
+<h2>Approach</h2>
+<ol style="font-size:14px;margin-left:22px">
+<li><b>Prove first.</b> Phase 1 is a standalone 40-line script that runs the proposed primitive across all 208 streams. No HTML, no integration. If &gt;90% return <code>MATCH</code>, the design holds and we proceed.</li>
+<li><b>Extract.</b> Phase 2 lifts the proven code into a small helper module with clean function boundaries.</li>
+<li><b>Integrate.</b> Phase 3 swaps the helper into <code>snapshot.py</code>, replaces the counts data structure and render function.</li>
+<li><b>Ship.</b> Phase 4 publishes a new Phase 2 snapshot under the new design as proof in production.</li>
+<li><b>Document.</b> Phase 5 updates CLAUDE.md so the next person knows what changed.</li>
+</ol>
+
+<h2>Pre-flight</h2>
+<div class="warn">
+<strong>Before Phase 1:</strong> verify <code>airbyte-parity</code> repo clean (<code>git status</code>). Verify <code>airbyte_migration_tools/.env</code> still has the new Airbyte IP from earlier today (we'll need <code>sf_connect()</code> to work for the proof). No need to touch joeycastillo.us until Phase 4.
+</div>
+
+<h2>Phases</h2>
+
+<div class="phase">
+<h3><span class="num">1</span> First Move proof &mdash; standalone parity sweep</h3>
+<div class="meta">~30 min. Write <code>scripts/_proof_fingerprint.py</code>. For each of 208 active streams: pull column list, strip <code>_AIRBYTE_*</code>/<code>_FIVETRAN_*</code>, run <code>HASH_AGG(biz_cols)</code> on AIRBYTE_DB and AIRBYTE_CLONE, print verdict. Optional 24h-before-clone cursor filter when stream has cursor. Tallies at end.</div>
+<div class="code-block"># expected output shape:
+# NETSUITE.CUSTOM_ITEM           MATCH    (fp=8393363139480235559) 4 cols
+# NETSUITE.CUSTOM_SALES_ORDER    DIFFER   prod_fp=...  clone_fp=...
+# ...
+# Tallies: MATCH=189  DIFFER=12  ERROR=4  SKIP=3   (208 total)</div>
+<div class="accept"><strong>Accept:</strong> Script runs to completion in &lt;5 min. Tallies print. <code>MATCH / total</code> &gt;= 90%. Any DIFFER tables are listed for inspection. If &lt;90% MATCH, halt and re-examine assumptions before proceeding to Phase 2.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">2</span> Extract helper module</h3>
+<div class="meta">~30 min. Lift the proven logic into <code>scripts/_fingerprint.py</code>. Four functions, clean signatures.</div>
+<div class="code-block">def business_columns(cur, db, schema, table, exclude_prefixes=('_AIRBYTE_', '_FIVETRAN_'))
+def fingerprint(cur, db, schema, table, biz_cols, cursor_filter=None)
+def except_count(cur, schema, table, biz_cols, cursor_filter=None)
+def fingerprint_pair(cur, schema, table, clone_time, buffer_hours=24)
+    # -&gt; {'verdict': 'MATCH'|'DIFFER'|'ERROR'|'SKIP',
+    #     'prod_fp': int, 'clone_fp': int,
+    #     'biz_cols': int, 'cursor': str|None,
+    #     'prod_only': int|None, 'clone_only': int|None}</div>
+<div class="accept"><strong>Accept:</strong> <code>from _fingerprint import fingerprint_pair; r = fingerprint_pair(cur, 'NETSUITE', 'CUSTOM_ITEM', clone_time)</code> returns the expected dict shape. Unit test: same call from snapshot.py and from the proof script produce identical results.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">3</span> Replace counts panel in snapshot.py</h3>
+<div class="meta">~45 min. Swap <code>collect_counts</code> for <code>collect_fingerprint</code> (calls <code>fingerprint_pair</code> per active stream). Update <code>render_html</code> counts-panel block to render the new shape: hero stat "X/Y MATCH", per-schema rollup table, per-table DIFFER table (only DIFFER rows, since MATCH is the boring path), errors table.</div>
+<div class="code-block">panels = {
+    "fingerprint": collect_fingerprint(cur, clone_time),   # was: "counts"
+    "freshness":   collect_freshness(cur),
+    "clustering":  collect_clustering(cur),
+    "schema":      collect_schema(cur),
+    "drift":       collect_drift(),
+}</div>
+<p style="font-size:13px">Index rebuild (<code>rebuild_site_index</code>) regex needs updating: currently matches "Row Delta" hero number; switch to match the new fingerprint hero (e.g. "MATCH" count).</p>
+<div class="accept"><strong>Accept:</strong> <code>python scripts/snapshot.py --phase 2 --label post-cleanup-fp --dry-run</code> prints fingerprint headline (MATCH/DIFFER tallies + window). All other panels unchanged. <code>--dry-run</code> finishes in &lt;5 min total.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">4</span> Ship Phase 2 fingerprint snapshot</h3>
+<div class="meta">~15 min. Run with <code>--publish</code>. Verify URL resolves. The visible proof of the new design.</div>
+<div class="code-block">cd C:\airbyte-parity
+python scripts/snapshot.py --phase 2 --label post-cleanup-fingerprint --publish</div>
+<div class="accept"><strong>Accept:</strong> URL live at <code>joeycastillo.us/airbyte-migration/snapshots/YYYY-MM-DD-HHMM-phase2-post-cleanup-fingerprint.html</code>. Index page rebuilt to include it. Hero shows "X/208 MATCH". Both repos pushed.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">5</span> CLAUDE.md update + delete proof script</h3>
+<div class="meta">~15 min. Document the change in <code>airbyte-parity/CLAUDE.md</code>'s Diff Snapshots section. Delete <code>scripts/_proof_fingerprint.py</code> -- it served its purpose; <code>_fingerprint.py</code> is the durable module. Update Be index.</div>
+<div class="accept"><strong>Accept:</strong> CLAUDE.md grep for "fingerprint" returns matches in the snapshot section. Proof script removed from repo. Final commit pushed.</div>
+</div>
+
+<h2>Sizing</h2>
+<table>
+<tr><th>Phase</th><th>Work</th><th>Size</th></tr>
+<tr><td>1</td><td>Standalone proof across 208 streams</td><td>3 pts</td></tr>
+<tr><td>2</td><td>Extract _fingerprint.py helper module</td><td>3 pts</td></tr>
+<tr><td>3</td><td>Replace counts panel in snapshot.py + render update + index regex</td><td>5 pts</td></tr>
+<tr><td>4</td><td>Publish Phase 2 fingerprint snapshot + verify URL</td><td>3 pts</td></tr>
+<tr><td>5</td><td>CLAUDE.md update + proof script cleanup + Be index</td><td>3 pts</td></tr>
+<tr><td colspan="2" style="text-align:right"><strong>Total</strong></td><td><strong>17 pts</strong></td></tr>
+</table>
+<p style="font-size:12px;color:#888;margin-top:6px">Fits one board (13-21 envelope). Critical path 1 -&gt; 2 -&gt; 3 -&gt; 4. Phase 5 parallelizable with 4.</p>
+
+<h2>Risks + mitigations</h2>
+<table>
+<tr><th>Risk</th><th>Mitigation</th></tr>
+<tr><td>Phase 1 proof shows &lt;90% MATCH -- design wrong</td><td>Halt at Phase 1 accept. Re-examine: bad cursor on certain streams, table-side schema drift that wasn't anticipated, etc. Possibly add an extra metadata prefix to the exclude list. Don't proceed to Phase 2 with broken signal.</td></tr>
+<tr><td>HASH_AGG slow on very large tables (ETHER.ORDERS 4B rows full-refresh, NetSuite custom_* tables)</td><td>HASH_AGG with column-pruned projection is still a full scan. ETHER.ORDERS may take 30-60s alone. If total proof runtime &gt; 10 min, add an opt-out skip list for the three biggest tables and document the gap. Most streams will be sub-second.</td></tr>
+<tr><td>Index rebuild regex breaks because hero stat shape changes</td><td>Update <code>rebuild_site_index</code> in Phase 3 alongside the panel render. Test on a fresh snapshot before pushing.</td></tr>
+<tr><td>Non-timestamp cursors error out (7 streams today)</td><td>Under the new design those tables get fingerprinted without a cursor filter (whole-table compare). They promote from "error" to MATCH or DIFFER. Should improve, not regress.</td></tr>
+<tr><td>Stream catalog out of date (new table on prod, not in catalog)</td><td>Same risk as today; the snapshot tool iterates over what the catalog lists. Could add a sanity check "tables on prod not in catalog" in a later board if it matters; not in scope here.</td></tr>
+</table>
+
+<h2>What this unlocks</h2>
+<ul>
+<li><b>One-glance parity verdict</b> per table on every snapshot, not a noisy aggregate row delta.</li>
+<li><b>Real signal:</b> any DIFFER becomes investigable instead of getting drowned in <code>_AIRBYTE_EMITTED_AT</code> churn.</li>
+<li><b>Phase 3 (V2 discovery) bracketing:</b> snapshot before V2 DDL, run DDL, snapshot after. Fingerprints of affected tables should change in predictable ways (new columns &rarr; new fingerprint). Diff is interpretable.</li>
+<li><b>Phase 4 (cron resume) tracking:</b> as new syncs land, fingerprints will change in business columns too -- this gives us a sharper read on "did the new sync land what we expected" than freshness gaps alone.</li>
+<li><b>Cheap to invoke.</b> Snapshot pass remains under 3 minutes; new panel adds maybe 1-2 minutes for 208 streams. Worth it for the signal jump.</li>
+</ul>
+
+<h2>Decisions inherited from the design (not re-litigated here)</h2>
+<ul>
+<li>Name: <code>fingerprint</code>. Panel called Fingerprint.</li>
+<li>Cursor filter default: on (when cursor exists). Buffer: 24h before clone_time.</li>
+<li>Magnitude qualifier: EXCEPT COUNT only on DIFFER.</li>
+<li>Column pruning: Python-side prefix check on INFORMATION_SCHEMA result.</li>
+<li>Re-clone: no.</li>
+<li>Counts panel: replaced, not added alongside.</li>
+</ul>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved to <code>be/plans/2026-05-24-0027-plan-fingerprint-build.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/plan-fingerprint-build.html</code></div>
+<div class="dod-item">&check; Be index updated</div>
+<div class="dod-item">&check; Both repos committed + pushed</div>
+<div class="dod-item">&check; Telemetry entry logged</div>
+<div class="dod-item">&check; 5 phases sized + accept criteria + risks + escape paths</div>
+<div class="dod-item">&check; Decisions inherited from ~d are listed (not re-debated)</div>
+<div class="dod-item">&check; First Move (Phase 1) is independently completable as a halt-and-reassess gate</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r66 &middot; 2026-05-24 00:27 &middot; ~p Build Fingerprint</div>
+</body></html>
