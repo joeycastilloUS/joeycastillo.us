@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cadence -- live drift heartbeat -- airbyte-migration</title>
+<link rel="stylesheet" href="/airbyte-migration/gate.css">
+<script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
+nav .meta{color:#666;font-size:12px;font-family:'Consolas',monospace}
+nav a{color:#6FC3DF;text-decoration:none}
+.container{max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:32px;margin-bottom:6px;letter-spacing:-0.5px}
+.subtitle{color:#6FC3DF;font-size:15px;margin-bottom:24px}
+h2{color:#6FC3DF;font-size:22px;margin:40px 0 14px;border-bottom:1px solid #333;padding-bottom:8px}
+h3{color:#fff;font-size:16px;margin:24px 0 8px}
+.hero{background:linear-gradient(135deg,#0a1f24 0%,#1A1A1A 100%);border-radius:12px;padding:24px 28px;margin-bottom:28px;border:1px solid #1f3540}
+.hero .label{color:#6FC3DF;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;font-weight:700}
+.summary-box{background:#1A1A1A;border-radius:10px;padding:22px;margin:18px 0;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.stat{text-align:center}
+.stat .num{font-size:28px;font-weight:700;color:#6FC3DF;display:block;font-variant-numeric:tabular-nums;letter-spacing:-0.5px}
+.stat .num.green{color:#5cb85c}
+.stat .num.yellow{color:#f0ad4e}
+.stat .num.red{color:#f06e6e}
+.stat .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.6px;margin-top:6px;font-weight:600}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:10px 12px;border-bottom:1px solid #1e1e1e;vertical-align:middle}
+tr:hover{background:#1A1A1A}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.ts{font-family:'Consolas',monospace;font-size:12px;color:#888}
+.pill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-variant-numeric:tabular-nums}
+.pill-100{background:#0d2818;color:#5cb85c}
+.pill-90{background:#0d2818;color:#5cb85c}
+.pill-80{background:#1f1f0a;color:#f0ad4e}
+.pill-70{background:#2a1414;color:#f06e6e}
+.pill-cold{background:#1a2438;color:#6FC3DF}
+.pill-warm{background:#1A1A1A;color:#888}
+code{background:#222;padding:2px 7px;border-radius:3px;font-size:12px;color:#6FC3DF}
+.callout{background:#0d2818;border-left:4px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 6px 6px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:4px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 6px 6px 0}
+.warn strong{color:#f0ad4e}
+.chart-box{background:#1A1A1A;border-radius:10px;padding:24px 28px;margin:18px 0}
+.chart-box h3{color:#6FC3DF;margin-top:0;font-size:14px;letter-spacing:0.5px;text-transform:uppercase}
+svg{width:100%;height:200px;display:block}
+ul{margin:8px 0 8px 24px}li{margin:5px 0;font-size:14px}
+.footer{margin-top:40px;padding-top:18px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+.cost-tile{background:#1A1A1A;border-radius:8px;padding:18px 24px;display:inline-block;margin:8px 8px 8px 0}
+.cost-tile .v{font-size:24px;color:#fff;font-weight:700;display:block;font-variant-numeric:tabular-nums}
+.cost-tile .l{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px}
+.diff-arrow{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;margin-right:4px}
+.diff-up{border-bottom:7px solid #5cb85c}
+.diff-down{border-top:7px solid #f06e6e}
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">cadence &middot; AIRBYTE_DB &harr; AIRBYTE_CLONE drift heartbeat</span>
+  <span class="meta">live data &middot; refreshes every 5 min</span>
+</nav>
+<div class="container">
+
+<h1>cadence -- live drift heartbeat</h1>
+<p class="subtitle">Column-pruned HASH_AGG fingerprint sweep across 208 active streams, every 5 minutes. Source: Cloud Run service <code>cadence</code> on acmedev-platform-hq. Storage: Firestore <code>cadence-snapshots</code>.</p>
+
+<div class="hero">
+<div class="label">Current state &middot; as of 2026-05-24 21:50:38 UTC</div>
+<div class="summary-box" style="margin-top:14px;background:none">
+  <div class="stat"><span class="num yellow">178 / 208</span><span class="label">Match (latest)</span></div>
+  <div class="stat"><span class="num yellow">85.6%</span><span class="label">Match %</span></div>
+  <div class="stat"><span class="num red">30</span><span class="label">Differ</span></div>
+  <div class="stat"><span class="num">16.7s</span><span class="label">Last Wall</span></div>
+  <div class="stat"><span class="num">5</span><span class="label">Sweeps So Far</span></div>
+</div>
+</div>
+
+<h2>Drift trajectory</h2>
+
+<div class="chart-box">
+<h3>Match count over time</h3>
+<svg viewBox="0 0 920 200" preserveAspectRatio="none">
+  <!-- background grid -->
+  <line x1="60" y1="170" x2="900" y2="170" stroke="#333" stroke-width="1"/>
+  <line x1="60" y1="20" x2="60" y2="170" stroke="#333" stroke-width="1"/>
+  <!-- y-axis labels -->
+  <text x="50" y="174" fill="#666" font-size="10" text-anchor="end" font-family="Consolas, monospace">170</text>
+  <text x="50" y="100" fill="#666" font-size="10" text-anchor="end" font-family="Consolas, monospace">189</text>
+  <text x="50" y="25" fill="#666" font-size="10" text-anchor="end" font-family="Consolas, monospace">208</text>
+  <text x="900" y="190" fill="#666" font-size="10" text-anchor="end" font-family="Consolas, monospace">21:50 UTC</text>
+  <text x="60" y="190" fill="#666" font-size="10" font-family="Consolas, monospace">21:31</text>
+  <!-- baseline line at 208 -->
+  <line x1="60" y1="20" x2="900" y2="20" stroke="#5cb85c" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  <text x="905" y="24" fill="#5cb85c" font-size="10" font-family="Consolas, monospace">208 baseline</text>
+  <!-- line + dots -->
+  <!-- Points: 21:31=205, 21:36=178, 21:40=178, 21:45=178, 21:50=178 -->
+  <!-- x: 60 to 900 = 840 wide / 4 intervals = 210 each; y: 208=20, 170=170 -> per-point: y = 170 - ((match-170)/38 * 150) -->
+  <polyline points="60,32 270,142 480,142 690,142 900,142" fill="none" stroke="#6FC3DF" stroke-width="2"/>
+  <circle cx="60"  cy="32"  r="5" fill="#5cb85c"/>
+  <circle cx="270" cy="142" r="5" fill="#f0ad4e"/>
+  <circle cx="480" cy="142" r="5" fill="#f0ad4e"/>
+  <circle cx="690" cy="142" r="5" fill="#f0ad4e"/>
+  <circle cx="900" cy="142" r="5" fill="#f0ad4e"/>
+  <!-- value labels above each point -->
+  <text x="60"  y="20" fill="#5cb85c" font-size="11" text-anchor="middle" font-weight="700">205</text>
+  <text x="270" y="132" fill="#f0ad4e" font-size="11" text-anchor="middle" font-weight="700">178</text>
+  <text x="480" y="132" fill="#f0ad4e" font-size="11" text-anchor="middle" font-weight="700">178</text>
+  <text x="690" y="132" fill="#f0ad4e" font-size="11" text-anchor="middle" font-weight="700">178</text>
+  <text x="900" y="132" fill="#f0ad4e" font-size="11" text-anchor="middle" font-weight="700">178</text>
+</svg>
+</div>
+
+<div class="warn">
+<strong>Key event:</strong> Sharp drop from 205 &rarr; 178 between 21:31 and 21:36 UTC. 27 streams shifted from MATCH to DIFFER in that 5-min window. Either (a) an Airbyte source sync run completed and bulk-UPSERTed across many streams, or (b) the first manual /tick caught a different cache state than the Scheduler-fired ticks that followed. Then perfectly stable at 178/208 for 15+ min &mdash; consistent with frozen-clone + no further bulk writes. <strong>This is exactly the kind of signal cadence is built to surface.</strong>
+</div>
+
+<h2>All sweeps (newest first)</h2>
+<table>
+<tr><th>UTC Time</th><th>Snapshot ID</th><th class='num'>Match / Total</th><th class='num'>Match %</th><th class='num'>Differ</th><th class='num'>Wall</th><th>Mode</th></tr>
+<tr><td class='ts'>21:50:38</td><td class='ts'>sweep-20260524T215022</td><td class='num'>178 / 208</td><td class='num'><span class='pill pill-80'>85.6%</span></td><td class='num'>30</td><td class='num'>16.7s</td><td><span class='pill pill-warm'>warm</span></td></tr>
+<tr><td class='ts'>21:45:40</td><td class='ts'>sweep-20260524T214524</td><td class='num'>178 / 208</td><td class='num'><span class='pill pill-80'>85.6%</span></td><td class='num'>30</td><td class='num'>15.6s</td><td><span class='pill pill-warm'>warm</span></td></tr>
+<tr><td class='ts'>21:40:44</td><td class='ts'>sweep-20260524T214028</td><td class='num'>178 / 208</td><td class='num'><span class='pill pill-80'>85.6%</span></td><td class='num'>30</td><td class='num'>16.7s</td><td><span class='pill pill-warm'>warm</span></td></tr>
+<tr><td class='ts'>21:36:28</td><td class='ts'>sweep-20260524T213500</td><td class='num'>178 / 208</td><td class='num'><span class='pill pill-80'>85.6%</span></td><td class='num'>30</td><td class='num'>87.6s</td><td><span class='pill pill-cold'>cold (Scheduler 1st)</span></td></tr>
+<tr><td class='ts'>21:31:15</td><td class='ts'>sweep-20260524T212914</td><td class='num'>205 / 208</td><td class='num'><span class='pill pill-90'>98.6%</span></td><td class='num'>3</td><td class='num'>121.3s</td><td><span class='pill pill-cold'>cold (manual)</span></td></tr>
+</table>
+
+<h2>Cost so far (live measurements)</h2>
+
+<div class="cost-tile">
+<span class="v">257.9s</span>
+<span class="l">Total compute time</span>
+</div>
+<div class="cost-tile">
+<span class="v">~0.072</span>
+<span class="l">Credits used</span>
+</div>
+<div class="cost-tile">
+<span class="v">~$0.25</span>
+<span class="l">$ spent (Enterprise @ $3.50)</span>
+</div>
+<div class="cost-tile">
+<span class="v">~16s</span>
+<span class="l">Avg warm sweep</span>
+</div>
+
+<div class="callout">
+<strong>Cost reality is even better than the v2 plan estimate.</strong> Warm-cache sweeps run in 15-17s, not 27s. At 5-min cadence: 16s &times; 288/day = 4,608s = 1.28 hours = 1.28 credits/day. At Enterprise ~$3.50/credit: <strong>~$4.50/day = ~$135/month</strong>. Way below the $420-500 v2 estimate. The Cloud Run cold-start tax (87-121s for the first sweep) doesn't recur because the WH stays warm at 5-min cadence (auto-suspend = 60s but next tick fires before suspend completes).
+</div>
+
+<h2>How to read the signal</h2>
+<ul>
+<li><b>MATCH count near 208</b> = clone and prod are aligned. Healthy frozen-clone state.</li>
+<li><b>MATCH count drops sharply</b> = an Airbyte sync run just landed on prod and bulk-UPSERTed many streams. The 205 &rarr; 178 jump = one such event.</li>
+<li><b>MATCH count slowly drifts down</b> over hours = steady prod writes accumulate while clone stays frozen. Expected when cron is frozen and prod is active.</li>
+<li><b>MATCH count climbs back up</b> = airbyte-philz cron has resumed and clone is catching up. Will signal the success of Phase 4 (cron resume) cleanly.</li>
+<li><b>Specific streams in DIFFER for long streaks</b> = those streams have ongoing prod changes the clone hasn't seen. Forensic candidates.</li>
+</ul>
+
+<h2>Architecture</h2>
+<table>
+<tr><th>Component</th><th>Location</th></tr>
+<tr><td>Cloud Run service <code>cadence</code></td><td><code>acmedev-platform-hq</code> us-central1</td></tr>
+<tr><td>Cloud Scheduler <code>cadence-tick-5m</code></td><td><code>*/5 * * * *</code> UTC</td></tr>
+<tr><td>Service account</td><td><code>cadence-svc@acmedev-platform-hq.iam</code></td></tr>
+<tr><td>Snowflake source/target</td><td><code>AIRBYTE_DB</code> + <code>AIRBYTE_CLONE</code> on ZN77432 (philzcoffee account)</td></tr>
+<tr><td>Snowflake warehouse</td><td><code>DEVELOPER_WH</code> (X-Small)</td></tr>
+<tr><td>Snowflake user</td><td><code>JOEY_BE</code> via JWT keypair</td></tr>
+<tr><td>Storage</td><td>Firestore <code>cadence-snapshots</code> on acmedev-platform-hq</td></tr>
+<tr><td>Repo</td><td><a href="https://github.com/acmedevUS/cadence" style="color:#6FC3DF">github.com/acmedevUS/cadence</a></td></tr>
+<tr><td>Plan v2</td><td><a href="/airbyte-migration/plan-cadence-microservice-v2.html" style="color:#6FC3DF">plan-cadence-microservice-v2.html</a></td></tr>
+</table>
+
+<h2>Open follow-ups</h2>
+<ul>
+<li><b>This page is a static snapshot.</b> Live cadence dashboard at <code>https://cadence-d5vc4tye3a-uc.a.run.app/dashboard</code> requires an identity token. Need IAP or gate.js wrap for browser access.</li>
+<li><b>Top-N DIFFER stream listing</b> &mdash; currently snapshot doc has tallies only. Could store per-stream verdicts in subcollection for forensic drill-down.</li>
+<li><b>Live cost telemetry</b> &mdash; QUERY_HISTORY_BY_SESSION doesn't exist on this account. Need INFORMATION_SCHEMA.QUERY_HISTORY with query_tag filter.</li>
+<li><b>Cursor-typed filtering</b> &mdash; whole-table HASH_AGG used (one non-timestamp cursor would kill the batched UNION ALL). Detecting + skipping cursor on non-ts columns would let us filter most streams.</li>
+</ul>
+
+<div class="footer">
+cadence &middot; Phase 4 done &middot; live since 2026-05-24 21:31 UTC<br>
+Generated 2026-05-24 22:00 UTC from Firestore snapshot of acmedev-platform-hq
+</div>
+
+</div>
+</body>
+</html>
