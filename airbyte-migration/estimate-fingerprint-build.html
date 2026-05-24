@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~E: Fingerprint Build sizing -- 5 items / 17 pts / one board</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.board{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.board h3{color:#6FC3DF;font-size:18px;margin-bottom:6px}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.item{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:6px 0;font-size:13px}
+.item .pts{display:inline-block;background:#6FC3DF;color:#111;padding:2px 8px;border-radius:3px;font-weight:700;margin-right:8px;min-width:30px;text-align:center}
+.item .cmd{display:inline-block;background:#222;color:#5cb85c;padding:2px 6px;border-radius:3px;font-size:11px;margin-left:8px;font-family:'Consolas',monospace}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~estimate: Fingerprint Build</nav>
+
+<h1>Sizing: Build Fingerprint</h1>
+<p class="sub">Plan: <code>be/plans/2026-05-24-0027-plan-fingerprint-build.html</code>. One board, 5 items, 17 pts. Fits 13-21 envelope with headroom.</p>
+<span class="banner">Estimate &mdash; Ready for ~b</span>
+
+<div class="lede">
+<strong>Approach:</strong> 5 items follow the plan phases 1:1. Item 1 (proof) is the gate -- if it fails, halt. Items 2-5 are mechanical given a passing Phase 1. Critical path is strict 1 -&gt; 2 -&gt; 3 -&gt; 4; Item 5 parallelizes with 4. Total fits one focused session, ~2-3 hours hands-on.
+</div>
+
+<h2>Sizing rationale</h2>
+<table>
+<tr><th>Mass of work</th><th>Sized at</th><th>Reasoning</th></tr>
+<tr><td>Standalone proof script (one file, ~40 lines, runs against 208 streams)</td><td>3 pts</td><td>Tight surface. The hard part is making sure the SQL doesn't break on edge-case column types -- handled by try/except per stream.</td></tr>
+<tr><td>Extract helper module (4 functions, ~80 lines, one file)</td><td>3 pts</td><td>Mechanical lift from the proof. Function boundaries are explicit in the design.</td></tr>
+<tr><td>Replace counts panel + render + index regex (touches snapshot.py + render_html + rebuild_site_index)</td><td>5 pts</td><td>Largest item. Multi-spot change. Has to keep all other panels working untouched.</td></tr>
+<tr><td>Publish Phase 2 fingerprint snapshot end-to-end</td><td>3 pts</td><td>One command. The test IS the publish. URL verification adds slight overhead.</td></tr>
+<tr><td>CLAUDE.md + cleanup + Be index</td><td>3 pts</td><td>Doc edit + file delete + index entry. Small but it's a real DoD finisher.</td></tr>
+<tr><td colspan="2" style="text-align:right"><strong>Total</strong></td><td><strong>17 pts</strong></td></tr>
+</table>
+
+<h2>Board 9 -- Build Fingerprint (17 pts)</h2>
+<div class="board">
+<h4 style="color:#5cb85c;margin-top:0">Ready</h4>
+<div class="item"><span class="pts">3</span>{standalone proof script scripts/_proof_fingerprint.py -- pull column list, strip _AIRBYTE_*/_FIVETRAN_*, HASH_AGG both DBs across 208 streams, tally MATCH/DIFFER; gate at &gt;=90% MATCH, add to, airbyte-parity/scripts/}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{helper module scripts/_fingerprint.py -- business_columns + fingerprint + except_count + fingerprint_pair functions extracted from proven proof code, add to, airbyte-parity/scripts/}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">5</span>{replace counts panel in snapshot.py with collect_fingerprint + render_fingerprint_panel + update rebuild_site_index regex for new hero stat shape, update in, scripts/snapshot.py}<span class="cmd">~u</span></div>
+<div class="item"><span class="pts">3</span>{publish Phase 2 fingerprint snapshot end-to-end -- hero X/208 MATCH; live at joeycastillo.us/airbyte-migration/snapshots/, test across, JOEY_BE keypair + both DBs}<span class="cmd">~t</span></div>
+<div class="item"><span class="pts">3</span>{CLAUDE.md Diff Snapshots section update for fingerprint approach + delete scripts/_proof_fingerprint.py + Be index Snapshots entry, update in, airbyte-parity/CLAUDE.md + index}<span class="cmd">~u</span></div>
+</div>
+
+<h2>Verb mapping</h2>
+<p style="font-size:13px;color:#888">"add to" -&gt; ~a (items 1, 2), "update in" -&gt; ~u (items 3, 5), "test across" -&gt; ~t (item 4).</p>
+
+<h2>Critical path</h2>
+<p style="font-size:13px">1 (proof) gates everything. 2 (helper) extracts from 1's code. 3 (panel) integrates 2. 4 (publish) ships proof of 3. 5 (docs) parallelizes with 4.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Board added to <code>be/board.md</code> as Board 9</div>
+<div class="dod-item">&check; All 5 items Ready</div>
+<div class="dod-item">&check; Total pts in 13-21 window (17 pts confirmed)</div>
+<div class="dod-item">&check; Sizing rationale documented</div>
+<div class="dod-item">&check; Estimate published at joeycastillo.us/airbyte-migration/estimate-fingerprint-build.html</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r68 &middot; 2026-05-24 00:44 &middot; ~e Fingerprint Build</div>
+</body></html>

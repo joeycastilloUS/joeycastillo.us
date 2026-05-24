@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~B Phase 3: Replace counts panel with Fingerprint in snapshot.py</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Phase 3: snapshot.py rewrite</nav>
+<h1>~B Phase 3 -- snapshot.py counts panel replaced with Fingerprint</h1>
+<p class="sub">Five edits to <code>scripts/snapshot.py</code>: import the helper, swap collect_counts &rarr; collect_fingerprint, swap hero stat, swap panel render, update <code>rebuild_site_index</code> regex. Other panels untouched. Dry-run validates.</p>
+<span class="banner">Build &mdash; Phase 3 Done</span>
+
+<div class="callout"><strong>Result:</strong> Single import of <code>fingerprint_pair</code>, new <code>collect_fingerprint(cur, clone_time)</code> walks active streams and returns headline + per-schema rollup + DIFFER list + ERROR list. Render emits "MATCH / Total" hero, per-schema rollup table, DIFFER detail table (magnitude column), ERROR table. Index regex now extracts <code>MATCH N/M</code> headline; falls back to legacy <code>Row Delta</code> for older snapshots.</div>
+
+<h2>Edits made</h2>
+<table>
+<tr><th>Spot</th><th>Change</th></tr>
+<tr><td>Imports</td><td><code>from _fingerprint import fingerprint_pair</code></td></tr>
+<tr><td><code>collect_counts</code> &rarr; <code>collect_fingerprint</code></td><td>New function calls <code>fingerprint_pair</code> per active stream with include_magnitude=True; returns <code>{rows, headline, differs, errors}</code>. Old <code>collect_counts</code> kept as deprecated stub.</td></tr>
+<tr><td><code>main()</code> panels dict</td><td><code>"fingerprint": collect_fingerprint(cur, clone_time)</code> (replaces <code>"counts"</code>)</td></tr>
+<tr><td>Hero stat (render_html)</td><td>From "Row Delta (filtered)" to "MATCH / Total" with percentage and color (green &ge;90%, gray &ge;60%, red &lt;60%)</td></tr>
+<tr><td>Panel render</td><td>Per-schema MATCH/DIFFER/ERROR/SKIP counts + MATCH%. Below: DIFFER detail table with cursor, filter mode, biz col count, magnitude. Below: ERROR list.</td></tr>
+<tr><td><code>rebuild_site_index</code> regex</td><td>Primary: <code>(\d+) / (\d+)</code> from Fingerprint hero. Fallback: legacy Row Delta regex. Index displays "MATCH N/M" for new snapshots.</td></tr>
+<tr><td>Index table header</td><td>"Row Delta" &rarr; "Headline"</td></tr>
+</table>
+
+<h2>Backward compat</h2>
+<ul>
+<li>Older snapshots (the 2 with the legacy counts panel) still index correctly via the fallback regex.</li>
+<li>Old <code>collect_counts</code> function preserved as a deprecated no-op stub; no external callers exist but the no-op guarantees no import-side breakage if Joey runs an older invocation pattern.</li>
+<li>Other four panels (freshness, clustering, schema, drift) untouched.</li>
+</ul>
+
+<h2>Dry-run validation</h2>
+<p style="font-size:13px"><code>python scripts/snapshot.py --phase 2 --label fingerprint-dryrun --dry-run</code> ran clean. Headlines block shows fingerprint as one of the five panels with MATCH/DIFFER/ERROR/SKIP tallies + match_pct + elapsed_sec. Other panels return data unchanged.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; scripts/snapshot.py updated: 1 import + 7 spots edited</div>
+<div class="dod-item">&check; Dry-run completes without error; headline includes fingerprint tallies</div>
+<div class="dod-item">&check; rebuild_site_index regex updated; legacy fallback preserved</div>
+<div class="dod-item">&check; Other 4 panels unchanged</div>
+<div class="dod-item">&check; Build report committed + published</div>
+<div class="dod-item">&check; Board 9 item 3 -&gt; Done</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r72 &middot; 2026-05-24 01:45 &middot; ~b Phase 3 snapshot.py rewrite</div>
+</body></html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~B Phase 2: Extract _fingerprint.py helper module</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Phase 2: extract helper</nav>
+<h1>~B Phase 2 -- <code>scripts/_fingerprint.py</code> helper module</h1>
+<p class="sub">Four-function module lifted from the Phase 1 proof. Clean signatures, graceful error handling, ready for Phase 3 integration into snapshot.py.</p>
+<span class="banner">Build &mdash; Phase 2 Done</span>
+
+<div class="callout"><strong>Result:</strong> 120-line module with <code>business_columns</code>, <code>fingerprint</code>, <code>except_count</code>, <code>fingerprint_pair</code>. Validated against 3 representative streams: SQUARE.SHIFTS (snapshot, MATCH), ECOMM.SPREE_ROLE_USERS (filtered, DIFFER with magnitude 0/1), graceful ERROR handling proven.</div>
+
+<h2>Function signatures</h2>
+<div class="code-block">def business_columns(cur, db, schema, table, exclude_prefixes=META_PREFIXES) -&gt; list[str]
+def fingerprint(cur, db, schema, table, biz_cols, where=None) -&gt; int
+def except_count(cur, schema, table, biz_cols, where=None) -&gt; tuple[int, int]
+def fingerprint_pair(cur, schema, table, cursor=None, clone_time=None,
+                     buffer_hours=24, include_magnitude=False) -&gt; dict</div>
+
+<h2>Returned shape of <code>fingerprint_pair</code></h2>
+<div class="code-block">{
+  'verdict':         'MATCH' | 'DIFFER' | 'ERROR' | 'SKIP',
+  'prod_fp':         int | None,
+  'clone_fp':        int | None,
+  'biz_cols_count':  int,
+  'cursor':          str | None,
+  'filter_mode':     'filtered' | 'whole-table' | 'fallback-non-ts' | None,
+  'prod_only':       int | None,    # only set if include_magnitude=True AND DIFFER
+  'clone_only':      int | None,
+  'error':           str | None,
+}</div>
+
+<h2>Smoke results (3 representative streams)</h2>
+<table>
+<tr><th>Stream</th><th>Cursor</th><th>Verdict</th><th>Filter mode</th><th>Magnitude</th></tr>
+<tr><td>SQUARE.SHIFTS</td><td>none (snapshot)</td><td style="color:#5cb85c">MATCH</td><td>whole-table</td><td>n/a (MATCH)</td></tr>
+<tr><td>ECOMM.SPREE_ROLE_USERS</td><td>UPDATED_AT</td><td style="color:#f06e6e">DIFFER</td><td>filtered (24h-before-clone)</td><td>prod_only=0, clone_only=1</td></tr>
+<tr><td>NETSUITE.CUSTOM_ITEM</td><td>(test passed wrong field)</td><td style="color:#f0ad4e">ERROR (graceful)</td><td>n/a</td><td>error captured in result dict</td></tr>
+</table>
+
+<h2>Design points realized</h2>
+<ul>
+<li><b>Cursor excluded from hash, kept in filter.</b> A row's cursor is the field most subject to UPSERT churn; hashing it would surface every cursor-only-change as DIFFER. We filter ON cursor to scope to settled rows, but don't include it in the hash.</li>
+<li><b>Cast fallback for non-timestamp cursors.</b> When a cursor is bigint <code>ID</code> or similar, <code>TO_TIMESTAMP</code> cast fails. The helper catches the specific error and falls back to whole-table comparison, marked <code>filter_mode='fallback-non-ts'</code> in the result.</li>
+<li><b>Magnitude on demand.</b> EXCEPT COUNT runs only when <code>include_magnitude=True</code> AND verdict is DIFFER. Keeps the default snapshot fast; opt in for forensic detail.</li>
+<li><b>Graceful errors.</b> Unrecoverable failures (missing column, permission, network) return <code>verdict='ERROR'</code> with the error string in <code>error</code>. Caller decides whether to retry, skip, or surface.</li>
+</ul>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; <code>scripts/_fingerprint.py</code> committed (120 lines, 4 functions)</div>
+<div class="dod-item">&check; Unit smoke on 3 representative streams: MATCH, DIFFER, ERROR paths all exercised</div>
+<div class="dod-item">&check; Build report committed and published</div>
+<div class="dod-item">&check; Board 9 item 2 -&gt; Done</div>
+<div class="dod-item">&check; Ready for Phase 3 (snapshot.py integration)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r71 &middot; 2026-05-24 01:30 &middot; ~b Phase 2 helper extraction</div>
+</body></html>
