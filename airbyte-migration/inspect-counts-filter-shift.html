@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~I: Shift the counts filter line back 24h -- no fresh clone needed</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}
+.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.diff{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:14px 18px;margin:12px 0;font-family:'Consolas',monospace;font-size:12px;line-height:1.7}
+.diff .del{color:#f06e6e;display:block}
+.diff .add{color:#5cb85c;display:block}
+.diff .ctx{color:#888;display:block}
+.timeline{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:16px 0;font-family:'Consolas',monospace;font-size:12px;line-height:1.9;color:#bbe6c8}
+.timeline .marker{color:#f0ad4e;font-weight:700}
+.timeline .ok{color:#5cb85c}
+.timeline .bad{color:#f06e6e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~inspect: shift counts filter line</nav>
+
+<h1>Shift the counts filter line back 24h -- no fresh clone needed</h1>
+<p class="sub">The line moves to <code>clone_time - 24h</code>. Anything newer than the line gets dropped from scope. Existing clone is the right reference; no Phase 1 re-do.</p>
+<span class="banner">Inspect &mdash; Two Questions Answered</span>
+
+<div class="lede">
+<strong>You asked two things:</strong> (1) shift the cutoff to 24h before clone, filter anything newer than the line out of scope; and (2) do we need to re-clone? <strong>Short answer:</strong> No re-clone. The existing AIRBYTE_CLONE created <code>2026-05-20 13:19:23 PDT</code> is exactly the right reference. The change is a one-line SQL swap: scope shifts from "rows in the 24h before clone" to "rows older than the 24h before clone". Both prod and clone should be identical in that older slice; any non-zero delta is real divergence, not in-flight noise.
+</div>
+
+<h2>Question 1: Do we need a fresh clone?</h2>
+<div class="callout">
+<strong>No.</strong> The existing clone <em>is</em> our reference point. Phase 1 already gave us a Snowflake CLONE database that captured prod's state atomically at <code>2026-05-20 13:19:23 PDT</code>. That timestamp is the <em>only</em> anchor we need. Shifting the line back 24h is a SQL filter change against the data we already have; the clone itself doesn't change.
+</div>
+
+<h3>Why a fresh clone wouldn't help</h3>
+<ul>
+<li>A new clone would just give us a new anchor at <em>today's</em> timestamp. We'd still need to subtract 24h to define the "stable" window, and we'd still be doing the same WHERE-clause analysis against the new pair.</li>
+<li>The clone we have is already free of "in-flight" risk: it captured prod atomically. Rows with cursor older than <code>clone_time - 24h</code> were definitely settled when the snapshot was taken.</li>
+<li>Re-cloning costs nothing meaningful (CLONE is metadata-only in Snowflake) but it would invalidate <em>this</em> snapshot's audit value -- we'd lose the diff line we just established. Better to keep the May 20 anchor and analyze it correctly.</li>
+</ul>
+
+<h2>Question 2: What changes about the filter</h2>
+
+<h3>Current behavior (cursor-windowed, in scope)</h3>
+<div class="diff">
+<span class="ctx">-- rows in the 24h window ENDING at clone_time</span>
+<span class="ctx">WHERE cursor &gt;= TO_TIMESTAMP('2026-05-19 13:19:23')</span>
+<span class="ctx">  AND cursor &lt;= TO_TIMESTAMP('2026-05-20 13:19:23')</span>
+</div>
+<p style="font-size:13px">This was useful (got us from -23M cumulative noise to -5,484 in-window signal) but it includes the very rows most likely to have shifted on prod via UPSERT after clone_time. The negative deltas in that window (ETHER.USERS -6,626, etc) are exactly that artifact.</p>
+
+<h3>New behavior (stable line, in scope = older than line)</h3>
+<div class="diff">
+<span class="del">- WHERE cursor &gt;= TO_TIMESTAMP('2026-05-19 13:19:23')</span>
+<span class="del">-   AND cursor &lt;= TO_TIMESTAMP('2026-05-20 13:19:23')</span>
+<span class="add">+ WHERE cursor &lt;= TO_TIMESTAMP('2026-05-19 13:19:23')   -- clone_time minus 24h</span>
+</div>
+<p style="font-size:13px">One line removed, one line shifted. The line is <code>clone_time - 24h</code>. Everything newer than the line is dropped. Prod and clone should match exactly in the surviving slice -- any non-zero delta is structural divergence, not freshness drift.</p>
+
+<h2>Why the new line is the right one</h2>
+
+<div class="timeline">
+prod cursor timeline (left = older, right = newer):
+<br><br>
+&nbsp;...===========================|=========|=========&gt;
+<br>
+&nbsp;...........  stable rows  ....|in-flight| post-clone
+<br>
+&nbsp;..............................|.........|
+<br>
+&nbsp;..............................<span class="marker">^</span>.........<span class="marker">^</span>
+<br>
+&nbsp;..............................<span class="marker">line</span>......<span class="marker">clone_time</span>
+<br>
+&nbsp;..............................<span class="ok">| SCOPE |</span>
+</div>
+
+<ul>
+<li><b>Stable rows (cursor &lt;= line):</b> These rows had their last cursor-bearing event more than 24h before clone_time. Vanishingly unlikely to UPSERT a backdated cursor in real life -- so prod and clone agree exactly. Delta = 0 expected.</li>
+<li><b>In-flight rows (line &lt; cursor &lt;= clone_time):</b> Captured by both prod and clone at clone_time, but prod has since updated some of them (cursor shifted forward to today). On prod these rows now live with cursor &gt; clone_time and don't appear in either window. On clone they still appear in the original 24h window. This is the source of the -5,484 we saw -- it's <em>real but it's drift caused by UPSERT</em>, not data loss.</li>
+<li><b>Post-clone rows (cursor &gt; clone_time):</b> Already excluded; only exist on prod.</li>
+</ul>
+
+<p style="font-size:13px">Joey's new line shifts the scope <em>left</em> -- away from in-flight territory -- so the comparison stops capturing UPSERT-induced shifts and focuses on rows that should be immutable from both sides' perspective.</p>
+
+<h2>Implementation -- two-line change</h2>
+<div class="code-block">def collect_counts(cur, clone_time):
+    ...
+    line = clone_time - timedelta(days=1)
+    line_s = line.strftime("%Y-%m-%d %H:%M:%S")
+    # was: WHERE cursor BETWEEN (line) AND clone_time
+    q_prod  = f'SELECT COUNT(*) FROM {PROD_DB}."{schema}"."{table}" '  \\
+              f'WHERE "{cursor}" &lt;= TO_TIMESTAMP(\\'{line_s}\\')'
+    q_clone = f'SELECT COUNT(*) FROM {CLONE_DB}."{schema}"."{table}" ' \\
+              f'WHERE "{cursor}" &lt;= TO_TIMESTAMP(\\'{line_s}\\')'</div>
+
+<p style="font-size:13px">Same window helper, just one comparison operator changed (<code>BETWEEN ... AND ...</code> &rarr; <code>&lt;=</code>) and a window-end removed. Headline labels in the panel become "Rows older than line" instead of "Rows in window".</p>
+
+<h2>Expected behavior after the shift</h2>
+<table>
+<tr><th>Stream type</th><th>Expected delta</th><th>Reading</th></tr>
+<tr><td>Transactional (incremental_dedup, append-only)</td><td><b>0</b></td><td>Clean. Any non-zero is real divergence -- worth investigating.</td></tr>
+<tr><td>UPSERT-heavy (ETHER.USERS, ECOMM.SPREE_ORDERS)</td><td><b>0</b></td><td>UPSERTs of older records would show here. Rare but possible if back-office tooling rewrites old cursors.</td></tr>
+<tr><td>Full-refresh / overwrite (DOORDASH, UBEREATS custom_*)</td><td>varies</td><td>Each full-refresh sync truncates and replaces. Clone has whatever the last pre-clone sync loaded; prod has whatever the most recent sync loaded. Cursor in those streams reflects business-event timestamps, not load timestamps, so both sides may show the same business dates but different row counts if the source set shrank/grew. Treat as informational, not pass/fail.</td></tr>
+<tr><td>Snapshot mode (no cursor field)</td><td><b>N/A</b></td><td>Skipped. Same as today's panel.</td></tr>
+<tr><td>Non-timestamp cursor (bigint ID, string)</td><td><b>error</b></td><td>Currently 7 streams. The TO_TIMESTAMP comparison fails. Could special-case to compare row ranges by ID instead, or keep error-marked.</td></tr>
+</table>
+
+<h2>Cost + performance</h2>
+<div class="warn">
+<strong>Watch out:</strong> the new query has no <em>upper</em> bound on cursor, so Snowflake will scan from beginning-of-time up to the line. For streams that go back years (ETHER.ORDERS 7+ years of UPDATED_AT), that's a full table scan. Today's windowed query was fast because BETWEEN is a tight range. The new query will probably run 2-3x slower per stream.
+</div>
+
+<p style="font-size:13px"><b>Mitigation if needed:</b> add a far-back lower bound (e.g., <code>cursor BETWEEN '2024-01-01' AND line</code>). For Philz's data ages that's effectively the whole history minus the in-flight 24h, but Snowflake's pruner will use clustering keys on cursor when they exist. We'll measure after the first run and add a bound only if it hurts.</p>
+
+<h2>Open Questions</h2>
+<ul>
+<li><b>How wide does the "in-flight" buffer want to be?</b> 24h is your call. If we ever see UPSERTs of records older than 24h on certain streams, we'd need to extend the buffer (48h, 7d). Track in the snapshot panel as "buffer used: 24h" so the choice is visible.</li>
+<li><b>Should we also surface "in-flight rows on clone" as a sub-metric?</b> Count of rows where <code>cursor BETWEEN line AND clone_time</code> on the clone side -- represents the volume of activity in the 24h buffer that we're deliberately not comparing. Useful context: "X rows were in flight at clone time; this is how busy prod was that day".</li>
+<li><b>Do we need to backfill old snapshots with the new filter?</b> The two snapshots already published (post-cleanup, post-cleanup-filtered) used different filter logic. They stay as historical records of their own filter choice; the new one is the first with the shifted line. Consider linking from the snapshots index that explains the filter evolution -- but probably not worth the effort.</li>
+<li><b>Edge case: non-timestamp cursors.</b> 7 streams error out today. <code>_AB_SOURCE_FILE_LAST_MODIFIED</code> for COMTRADE is one. Whether to extend cursor parsing or keep them as errors is a separate small follow-up.</li>
+</ul>
+
+<h2>Recommendation</h2>
+<ol style="font-size:14px;margin-left:22px">
+<li>Apply the two-line filter change to <code>scripts/snapshot.py</code> <code>collect_counts</code>.</li>
+<li>Re-run: <code>python scripts/snapshot.py --phase 2 --label post-cleanup-stable-line --publish</code>.</li>
+<li>Check the delta: if &lt; 100 across all schemas, the line is correctly placed and we have our stable baseline. If &gt;&gt; 100, dig into top-drifters to see whether (a) buffer needs to be wider, or (b) clone actually did lose data.</li>
+<li>If query runtime &gt; 5 min, add a far-back lower bound (e.g., <code>cursor &gt;= '2024-01-01'</code>).</li>
+</ol>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Inspect report saved to <code>be/inspects/2026-05-23-2348-inspect-counts-filter-shift.html</code></div>
+<div class="dod-item">&check; Published copy at <code>joeycastillo.us/airbyte-migration/inspect-counts-filter-shift.html</code></div>
+<div class="dod-item">&check; Be index updated</div>
+<div class="dod-item">&check; Both repos committed + pushed</div>
+<div class="dod-item">&check; Telemetry entry logged with commit hash</div>
+<div class="dod-item">&check; Two questions answered directly: no re-clone, one-line filter shift</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r62 &middot; 2026-05-23 23:48 &middot; ~i counts filter shift &middot; commit 368ccc1</div>
+</body></html>
