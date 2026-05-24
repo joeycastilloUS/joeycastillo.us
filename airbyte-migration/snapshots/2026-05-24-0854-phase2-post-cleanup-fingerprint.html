@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snapshot Phase 2 post-cleanup-fingerprint -- airbyte-migration</title>
+
+<style>*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.7}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
+nav .meta{color:#666;font-size:12px}
+nav a{color:#6FC3DF;text-decoration:none}
+.container{max-width:860px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:6px;letter-spacing:-0.5px}
+.subtitle{color:#6FC3DF;font-size:15px;margin-bottom:24px}
+.hero{background:linear-gradient(135deg,#1A1A1A 0%,#0a1f24 100%);border-radius:12px;padding:22px 26px;margin-bottom:28px;border:1px solid #1f3540}
+.hero strong{color:#6FC3DF;font-size:12px;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:8px}
+.summary-box{background:#1A1A1A;border-radius:8px;padding:22px;margin:18px 0;display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.stat{text-align:center}
+.stat .num{font-size:28px;font-weight:700;color:#6FC3DF;display:block;font-variant-numeric:tabular-nums}
+.stat .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+h2{color:#6FC3DF;font-size:20px;margin:32px 0 12px;border-bottom:1px solid #333;padding-bottom:8px}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px 10px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+tr:hover{background:#1A1A1A}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.panel{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:18px 0;border-left:3px solid #6FC3DF}
+.panel.na{border-left-color:#666;opacity:0.7}
+.panel h3{color:#6FC3DF;margin:0 0 6px;font-size:16px}
+.panel .meta{color:#888;font-size:12px;margin-bottom:10px}
+.delta-neg{color:#f06e6e}.delta-pos{color:#5cb85c}.delta-zero{color:#888}
+.status{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px}
+.status-fresh{background:#0d2818;color:#5cb85c}
+.status-stale{background:#2a1414;color:#f06e6e}
+.status-snapshot{background:#1f1f0a;color:#f0ad4e}
+.status-empty,.status-error{background:#222;color:#888}
+code{background:#222;padding:2px 7px;border-radius:3px;font-size:11px;color:#6FC3DF}
+.footer{margin-top:36px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+a{color:#6FC3DF;text-decoration:none}a:hover{text-decoration:underline}
+.gate-note{background:#0d2818;border-left:3px solid #5cb85c;padding:10px 14px;border-radius:0 4px 4px 0;margin:14px 0;color:#bbe6c8;font-size:12px}
+@media(max-width:600px){.summary-box{grid-template-columns:repeat(2,1fr)}.stat .num{font-size:22px}}</style>
+</head>
+<body>
+<nav>
+  <span class="brand"><a href="/airbyte-migration/">Airbyte Migration</a> &middot; Snapshots</span>
+  <span class="meta">2026-05-24 08:54 UTC</span>
+</nav>
+<div class="container">
+  <h1>Phase 2 &middot; Post-clone cleanup</h1>
+  <p class="subtitle">Label: <code>post-cleanup-fingerprint</code> &middot; snapshot ID <code>2026-05-24-0854-phase2-post-cleanup-fingerprint</code></p>
+  <div class="hero">
+    <strong>AIRBYTE_DB &harr; AIRBYTE_CLONE -- five-dimensional snapshot</strong>
+    Five panels capture the state of the clone-rebuild procedure at this point in time.
+    Total collection time: 348.3s. <a href="/airbyte-migration/snapshots/">All snapshots &rarr;</a>
+  </div>
+  
+    <div class="summary-box">
+      <div class="stat"><span class="num delta-zero">128 / 208</span><span class="label">Fingerprint MATCH (61.5%)</span></div>
+      <div class="stat"><span class="num">50.1d</span><span class="label">Max Gap</span></div>
+      <div class="stat"><span class="num">503</span><span class="label">Leftover Cluster Keys</span></div>
+      <div class="stat"><span class="num">0</span><span class="label">Schema-Drifted Streams</span></div>
+      <div class="stat"><span class="num">—</span><span class="label">Drift Engine Streams</span></div>
+    </div>
+    
+  <h2>Panels</h2>
+  
+        <div class="panel">
+          <h3>1. Fingerprint (column-pruned HASH_AGG parity)</h3>
+          <div class="meta">Per-stream HASH_AGG(biz_cols) on AIRBYTE_DB vs AIRBYTE_CLONE. Cursor col excluded from hash; filtered by <code>WHERE cursor &lt;= 2026-05-19 13:19:23</code> (clone_time - 24h) when cursor is timestamp; whole-table when not. EXCEPT magnitude on DIFFER only. 262.12s. <b>128 MATCH / 80 DIFFER / 0 ERROR / 0 SKIP across 208 active streams (61.5%)</b>.</div>
+          <table>
+            <tr><th>Schema</th><th class='num'>MATCH</th><th class='num'>DIFFER</th><th class='num'>ERROR</th><th class='num'>SKIP</th><th class='num'>Total</th><th class='num'>MATCH %</th></tr>
+            <tr><td>ETHER</td><td class='num'>32</td><td class='num delta-neg'>31</td><td class='num'>0</td><td class='num'>0</td><td class='num'>63</td><td class='num'>50.8%</td></tr>
+<tr><td>ECOMM</td><td class='num'>87</td><td class='num delta-neg'>20</td><td class='num'>0</td><td class='num'>0</td><td class='num'>107</td><td class='num'>81.3%</td></tr>
+<tr><td>PAYTRONIX</td><td class='num'>0</td><td class='num delta-neg'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>10</td><td class='num'>0.0%</td></tr>
+<tr><td>SQUARE</td><td class='num'>5</td><td class='num delta-neg'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>11</td><td class='num'>45.5%</td></tr>
+<tr><td>GREENHOUSE</td><td class='num'>0</td><td class='num delta-neg'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>5</td><td class='num'>0.0%</td></tr>
+<tr><td>NETSUITE</td><td class='num'>1</td><td class='num delta-neg'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>6</td><td class='num'>16.7%</td></tr>
+<tr><td>DOORDASH</td><td class='num'>1</td><td class='num delta-neg'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>3</td><td class='num'>33.3%</td></tr>
+<tr><td>UBEREATS</td><td class='num'>0</td><td class='num delta-neg'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td><td class='num'>0.0%</td></tr>
+<tr><td>COMTRADE</td><td class='num'>1</td><td class='num delta-neg'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td><td class='num'>100.0%</td></tr>
+<tr><td>CROPSTER</td><td class='num'>1</td><td class='num delta-neg'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td><td class='num'>100.0%</td></tr>
+          </table>
+          
+            <h4 style="color:#f06e6e;margin:18px 0 6px;font-size:13px">DIFFER streams (magnitude = EXCEPT counts on filtered window)</h4>
+            <table>
+              <tr><th>Stream</th><th>Cursor</th><th>Filter mode</th><th class='num'>Cols</th><th>Magnitude</th></tr>
+              <tr><td>ECOMM.ETHER_AUTHENTICATION_TOKENS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>5</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SCHEMA_MIGRATIONS</td><td><code>&mdash;</code></td><td>whole-table</td><td class='num'>1</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_INVENTORY_UNITS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>10</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_LINE_ITEMS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>20</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_OAUTH_ACCESS_TOKENS</td><td><code>CREATED_AT</code></td><td>filtered</td><td class='num'>10</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_ORDERS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>41</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_PAYMENTS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>19</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_PRODUCTS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>20</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_PROMOTION_RULES</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>8</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_ROLE_USERS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>4</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_SHIPMENTS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>20</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_SHIPPING_RATES</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>7</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_STATE_CHANGES</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>8</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_STOCK_ITEMS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>9</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_SUB_LITE_SUBSCRIPTION_SPREE_VARIANTS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>8</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_SUB_LITE_SUBSCRIPTIONS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>20</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_TAXONOMIES</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>7</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_TAXONS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>17</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_USERS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>36</td><td>&mdash;</td></tr>
+<tr><td>ECOMM.SPREE_VARIANTS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>20</td><td>&mdash;</td></tr>
+<tr><td>GREENHOUSE.APPLICATIONS</td><td><code>APPLIED_AT</code></td><td>filtered</td><td class='num'>18</td><td>&mdash;</td></tr>
+<tr><td>GREENHOUSE.CANDIDATES</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>23</td><td>&mdash;</td></tr>
+<tr><td>GREENHOUSE.JOBS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>17</td><td>&mdash;</td></tr>
+<tr><td>GREENHOUSE.INTERVIEWS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>12</td><td>&mdash;</td></tr>
+<tr><td>GREENHOUSE.OFFERS</td><td><code>UPDATED_AT</code></td><td>filtered</td><td class='num'>13</td><td>&mdash;</td></tr>
+<tr><td>NETSUITE.CUSTOM_INVENTORY</td><td><code>&mdash;</code></td><td>whole-table</td><td class='num'>18</td><td>&mdash;</td></tr>
+<tr><td>NETSUITE.CUSTOM_SALES_ORDER</td><td><code>LASTMODIFIEDDATE</code></td><td>filtered</td><td class='num'>17</td><td>&mdash;</td></tr>
+<tr><td>NETSUITE.CUSTOM_PRODUCTION</td><td><code>LASTMODIFIEDDATE</code></td><td>filtered</td><td class='num'>18</td><td>&mdash;</td></tr>
+<tr><td>NETSUITE.CUSTOM_WHOLESALE</td><td><code>&mdash;</code></td><td>whole-table</td><td class='num'>15</td><td>&mdash;</td></tr>
+<tr><td>NETSUITE.CUSTOM_FULFILLMENTITEM</td><td><code>LASTMODIFIEDDATE</code></td><td>filtered</td><td class='num'>19</td><td>&mdash;</td></tr>
+            </table><p style='color:#888;font-size:12px;margin-top:6px'>Top 30 of 50 total DIFFER streams.</p>
+            
+          
+        </div>
+        
+  
+        <div class="panel">
+          <h3>2. Freshness</h3>
+          <div class="meta">Per-stream MAX(cursor) gap -- 46.75s -- 208 streams audited: 65 stale >1d, 74 fresh, 31 snapshot (no cursor), 24 empty, 14 errors</div>
+          
+            <table>
+              <tr><th>Stream</th><th>Cursor</th><th class='num'>Gap Days</th><th>Status</th></tr>
+              <tr><td>ECOMM.SPREE_PROMOTION_RULES</td><td><code>UPDATED_AT</code></td><td class='num'>50.10</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ECOMM.SPREE_PROMOTION_RULE_USERS</td><td><code>UPDATED_AT</code></td><td class='num'>50.10</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ECOMM.SPREE_ROLE_USERS</td><td><code>UPDATED_AT</code></td><td class='num'>22.90</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.PROMOTIONS_V2</td><td><code>UPDATED_AT</code></td><td class='num'>12.80</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.PRINTERS</td><td><code>UPDATED_AT</code></td><td class='num'>10.79</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.CARTS</td><td><code>UPDATED_AT</code></td><td class='num'>3.54</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.USERS</td><td><code>UPDATED_AT</code></td><td class='num'>3.54</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.INVENTORY</td><td><code>UPDATED_AT</code></td><td class='num'>3.53</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.NOTIFICATION_DEVICES</td><td><code>UPDATED_AT</code></td><td class='num'>3.53</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.GIFT_CARDS</td><td><code>UPDATED_AT</code></td><td class='num'>3.51</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.FAVORITES</td><td><code>UPDATED_AT</code></td><td class='num'>3.43</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.PAYMENT_SOURCES</td><td><code>UPDATED_AT</code></td><td class='num'>3.38</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.STORE_ATTRIBUTE_VALUE_DISABLED</td><td><code>UPDATED_AT</code></td><td class='num'>3.37</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.RESERVATIONS</td><td><code>UPDATED_AT</code></td><td class='num'>3.36</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.SALES_LINE_ITEMS_ALL</td><td><code>UPDATED_AT</code></td><td class='num'>3.36</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.SALES_LINE_ITEMS_ATTRIBUTES</td><td><code>UPDATED_AT</code></td><td class='num'>3.36</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.SALES_LINE_ITEMS_BEVERAGE</td><td><code>UPDATED_AT</code></td><td class='num'>3.36</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.TRANSACTIONS_V3</td><td><code>CREATED_AT</code></td><td class='num'>3.36</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ECOMM.SPREE_PRODUCTS</td><td><code>UPDATED_AT</code></td><td class='num'>3.35</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ECOMM.SPREE_STOCK_ITEMS</td><td><code>UPDATED_AT</code></td><td class='num'>3.35</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ECOMM.SPREE_TAXONOMIES</td><td><code>UPDATED_AT</code></td><td class='num'>3.35</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ECOMM.SPREE_TAXONS</td><td><code>UPDATED_AT</code></td><td class='num'>3.35</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ECOMM.SPREE_VARIANTS</td><td><code>UPDATED_AT</code></td><td class='num'>3.35</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.ORDERS</td><td><code>UPDATED_AT</code></td><td class='num'>3.35</td><td><span class='status status-stale'>stale</span></td></tr>
+<tr><td>ETHER.ORDER_PRODUCTS</td><td><code>UPDATED_AT</code></td><td class='num'>3.35</td><td><span class='status status-stale'>stale</span></td></tr>
+            </table>
+            
+        </div>
+        
+  
+    <div class="panel">
+      <h3>3. Clustering Keys</h3>
+      <div class="meta">Clone-side clustering -- 7.94s -- 504 total clustered tables, 503 are leftover _AIRBYTE_* keys across 6 schemas</div>
+      <table>
+        <tr><th>Schema</th><th class='num'>Clustered Tables</th><th class='num'>Leftover _AIRBYTE_* Keys</th></tr>
+        <tr><td>STAGING</td><td class='num'>214</td><td class='num'>214</td></tr>
+<tr><td>SQUARE_HISTORICAL</td><td class='num'>124</td><td class='num'>123</td></tr>
+<tr><td>SQUARE_2023_2024</td><td class='num'>116</td><td class='num'>116</td></tr>
+<tr><td>CRUNCHTIME</td><td class='num'>47</td><td class='num'>47</td></tr>
+<tr><td>UBEREATS_DEV3</td><td class='num'>2</td><td class='num'>2</td></tr>
+<tr><td>SUPPLYCHAIN</td><td class='num'>1</td><td class='num'>1</td></tr>
+      </table>
+    </div>
+    
+  
+        <div class="panel">
+          <h3>4. Schema</h3>
+          <div class="meta">Per-stream column-set diff via INFORMATION_SCHEMA.COLUMNS -- 31.48s -- 208 streams audited, 0 drifted (100.0% clean)</div>
+          <p style='color:#5cb85c;font-size:13px'>All audited streams have matching column sets.</p>
+        </div>
+        
+  
+        <div class="panel na">
+          <h3>5. Drift Verdicts (live engine)</h3>
+          <div class="meta">N/A -- [WinError 2] The system cannot find the file specified. Live dashboard: <a href='https://airbyte-parity-d5vc4tye3a-uc.a.run.app/dashboard' target='_blank'>open here</a>.</div>
+        </div>
+        
+  <div class="footer">
+    Generated by <code>airbyte-parity/scripts/snapshot.py --phase 2 --label post-cleanup-fingerprint</code><br>
+    2026-05-24 08:54 UTC &middot; snapshot 2026-05-24-0854-phase2-post-cleanup-fingerprint
+  </div>
+</div>
+</body>
+</html>
