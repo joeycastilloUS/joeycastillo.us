@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~p v3 GCP VMs — DNS-integrated, node/relay only, 3-nous.net aware</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .status-banner { background: var(--amber); color: #000; padding: 6px 24px; text-align: center; font-weight: 700; letter-spacing: 2px; font-size: 11px; }
+  .container { max-width: 1080px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 18px 0 6px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 22px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  pre { background: #0A0A0A; padding: 12px 16px; border-radius: 4px; color: #ddd; font-size: 11.5px; font-family: 'Consolas', monospace; white-space: pre; overflow-x: auto; margin: 10px 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.path { font-family: 'Consolas', monospace; font-size: 11.5px; }
+  td.old { color: var(--red); font-family: 'Consolas', monospace; text-decoration: line-through; opacity: 0.7; }
+  td.new { color: var(--green); font-family: 'Consolas', monospace; font-weight: 700; }
+  td.hw { color: var(--purple); font-family: 'Consolas', monospace; font-size: 11px; }
+  td.term { color: var(--t3); font-weight: 700; }
+  td.run { color: var(--green); font-weight: 700; }
+  .supersedes { background: #2A1010; border: 2px solid var(--red); padding: 12px 18px; margin: 14px 0; font-size: 13.5px; }
+  .supersedes b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .pick { background: #0F1F0F; border: 2px solid var(--green); padding: 14px 20px; margin: 12px 0; }
+  .pick h3 { color: var(--green); margin: 0 0 8px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .phase { background: var(--surface); border-left: 4px solid var(--accent); padding: 16px 22px; margin: 14px 0; }
+  .phase h3 { margin-top: 0; color: var(--accent); }
+  .phase .exit { color: var(--green); margin-top: 10px; font-size: 12px; }
+  .phase .exit::before { content: "✓ Exit: "; color: var(--green); font-weight: 700; }
+  .unknowns { background: #1f1a0f; border-left: 4px solid var(--amber); padding: 14px 18px; margin: 12px 0; }
+  .unknowns h3 { color: var(--amber); margin-top: 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .revisit { background: #0F1A1F; border-left: 4px solid var(--green); padding: 14px 18px; margin: 12px 0; }
+  .revisit h3 { color: var(--green); margin-top: 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .constraint { padding: 5px 0; border-bottom: 1px solid var(--surface2); font-size: 13px; }
+  .constraint:last-child { border-bottom: none; }
+  .constraint b { color: var(--accent); }
+  .decision-box { background: var(--surface); border: 2px solid var(--purple); padding: 14px 20px; margin: 12px 0; }
+  .decision-box h3 { color: var(--purple); margin: 0 0 8px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 24px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 20px; border-top: 1px solid #222; margin-top: 32px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~p v3 GCP VMs · DNS-integrated</span></nav>
+<div class="status-banner">PLAN — AWAITING APPROVAL</div>
+<div class="container">
+
+<h1>~p v3 — rename + migrate + DNS-integrated.</h1>
+<p class="sub">Roles collapse to two: node or relay. DNS architecture found and documented — <code>kastil-systems/a-d-d/nous/comms/skill/relay/DNS_DISCOVERY.md</code>. 3-nous.net is the authoritative domain, Cloudflare-hosted. Self-announce on boot. Migration leverages this for clean cutover.</p>
+
+<div class="supersedes">
+<b>Supersedes</b>
+v2 (<code>2026-05-23-0932-p-gcp-vms-rename-migrate-v2.html</code>) used three role labels (nous-elite / prime / relay). Joey's reframe: <em>"remove the role from the nous from the name. instead just name it relay or node. also we use 3-nous.net as the fqdn for a lot of dyn routing find it."</em> v3 collapses to two roles (node + relay) and integrates the DNS-discovery architecture from the relay skill.
+</div>
+
+<div class="links">Trail: <a href="2026-05-23-0932-p-gcp-vms-rename-migrate-v2.html">v2 (superseded)</a> · <a href="2026-05-23-0017-i-gcp-vms-acme-to-kastil.html">v1 (superseded)</a></div>
+
+<h2>1. What the DNS a-d-d says (found and read)</h2>
+
+<p>Location: <code>kastil-systems/a-d-d/nous/comms/skill/relay/</code> — three files:</p>
+<ul>
+  <li><code>CLAUDE.md</code> — relay skill spec (Trust Model, Boot Sequence, Gate Port :8443, Protocol, Session, DNS Records)</li>
+  <li><code>DNS_DISCOVERY.md</code> — the implementation diagram (boot flow + 5-min refresh + Cloudflare API + SPKI pin + signature verify)</li>
+  <li><code>TRIPLES.md</code> — the triple-store records this skill writes</li>
+</ul>
+
+<h3>The architecture in 9 facts</h3>
+
+<ol>
+  <li><strong>Domain:</strong> <code>3-nous.net</code> (Cloudflare-authoritative DNS, not GCP DNS)</li>
+  <li><strong>Trust root:</strong> ONE operator Ed25519 public key, compiled into binaries. Nothing else trusted by default.</li>
+  <li><strong>Roles:</strong> exactly two in the protocol — <code>"prime"</code> and <code>"relay"</code> (ASCII strings signed into <code>node.cert</code>).</li>
+  <li><strong>Discovery records:</strong> <code>_prime.3-nous.net</code> and <code>_relay.3-nous.net</code> — TXT records.</li>
+  <li><strong>TXT format:</strong> <code>"p=&lt;ip&gt;:&lt;port&gt; k=&lt;pubkey-64hex&gt; s=&lt;sig-128hex&gt;"</code> (prime). <code>"r=..."</code> (relay).</li>
+  <li><strong>Per-node identity:</strong> three files — <code>node.key</code> (private Ed25519), <code>node.pub</code> (public), <code>node.cert</code> (operator's signature over <code>node.pub || role</code>).</li>
+  <li><strong>Self-announce:</strong> on boot, the node hits <code>POST /zones/&lt;id&gt;/dns_records</code> on Cloudflare API. Auth = bearer from <code>/var/nous/cf.token</code> (chmod 600). Pinned via <code>cf_pin.h</code> (GTS WE1 intermediate SHA-256 SPKI).</li>
+  <li><strong>Refresh:</strong> every 5 minutes — re-query DNS, re-verify sigs, refresh peer triples. Stale peers expire naturally.</li>
+  <li><strong>Multi-instance friendly:</strong> multiple TXT records under the same name are allowed. Read side filters by signature validity. Old + new can coexist during cutover.</li>
+</ol>
+
+<h2>2. The renaming — node + relay only</h2>
+
+<p>Joey: <em>"name it relay or node."</em> The protocol uses <code>"prime"</code> and <code>"relay"</code> as the cert role strings. There's a decision to make below; v3's <strong>working assumption</strong> is that VM NAMES use "node"/"relay" while the PROTOCOL ROLES stay "prime"/"relay" (no protocol change — just operational naming).</p>
+
+<div class="decision-box">
+<h3>Open decision — "node" in VM names vs "prime" in protocol</h3>
+<p>Two options:</p>
+<ul>
+  <li><strong>(A) Operational rename only.</strong> VM names use <code>node-*</code> but the <code>node.cert</code> role string stays <code>"prime"</code>, DNS records stay <code>_prime.3-nous.net</code>. Zero protocol change. <strong>Recommended for v3 execution.</strong> The VM name is a GCP/OS identity; the protocol role is separate.</li>
+  <li><strong>(B) Full rename — protocol too.</strong> Update relay/CLAUDE.md, relay code, DNS records, certs, and rebuild all binaries to use <code>"node"</code> instead of <code>"prime"</code>. Bigger change. New DNS record: <code>_node.3-nous.net</code>. Requires re-signing every cert.</li>
+</ul>
+<p><strong>Recommendation:</strong> (A) for this migration. If you want (B), it's a separate plan — it's a protocol change, not a VM rename.</p>
+</div>
+
+<h2>3. The 5 final names (v3, node/relay only)</h2>
+
+<p>Pattern: <code>&lt;role&gt;-&lt;machine-class&gt;-&lt;nic-type&gt;-&lt;gcp-zone&gt;-&lt;city&gt;</code></p>
+
+<table>
+<thead><tr><th style="width:18%;">Was (Acme)</th><th style="width:6%;">Status</th><th>Becomes (kastil-systems)</th><th style="width:12%;">HW upgrade</th></tr></thead>
+<tbody>
+<tr>
+  <td class="old">nous-elite-us</td>
+  <td class="term">TERMINATED</td>
+  <td class="new">node-c2-standard-8-gvnic-us-east4-a-ashburn</td>
+  <td class="hw" style="color:var(--green);">→ gvnic<br>→ pd-ssd</td>
+</tr>
+<tr>
+  <td class="old">prime-asia-southeast1-a-singapore</td>
+  <td class="run">RUNNING</td>
+  <td class="new">node-e2-micro-virtio-asia-southeast1-a-singapore</td>
+  <td class="hw">unchanged</td>
+</tr>
+<tr>
+  <td class="old">prime-us-west4-a-las-vegas</td>
+  <td class="run">RUNNING</td>
+  <td class="new">node-e2-micro-virtio-us-west4-a-las-vegas</td>
+  <td class="hw">unchanged</td>
+</tr>
+<tr>
+  <td class="old">relay-asia-east2-a-hong-kong</td>
+  <td class="run">RUNNING</td>
+  <td class="new">relay-e2-micro-virtio-asia-east2-a-hong-kong</td>
+  <td class="hw">unchanged</td>
+</tr>
+<tr>
+  <td class="old">relay-us-west2-a-los-angeles</td>
+  <td class="run">RUNNING</td>
+  <td class="new">relay-e2-micro-virtio-us-west2-a-los-angeles</td>
+  <td class="hw">unchanged</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Length sanity:</strong> longest = <code>node-c2-standard-8-gvnic-us-east4-a-ashburn</code> = 43 chars. GCP 63-char limit, fine.</p>
+
+<p><strong>What "node" buys:</strong> Joey's "elite" tier was a c2-standard-8. His "prime" tier is e2-micro. Same protocol role under the hood (<code>"prime"</code> per the cert string). Calling them all <code>node-*</code> in the VM name lets you tell which is which by the machine class — <code>c2-standard-8</code> says "heavy/compute" without needing a separate role label. The role distinction collapses into the machine type, which is more honest.</p>
+
+<h2>4. The DNS migration story (this is the GOOD news)</h2>
+
+<p>Because <code>3-nous.net</code> is Cloudflare-hosted (not GCP-bound) and the protocol uses self-announce with signature verification, the migration has a clean overlap pattern:</p>
+
+<pre>BEFORE MIGRATION:
+  _prime.3-nous.net  TXT  "p=&lt;old-ip-singapore&gt;:8080 k=... s=..."
+  _prime.3-nous.net  TXT  "p=&lt;old-ip-las-vegas&gt;:8080 k=... s=..."
+  _relay.3-nous.net  TXT  "r=&lt;old-ip-hong-kong&gt;:8080 k=... s=..."
+  _relay.3-nous.net  TXT  "r=&lt;old-ip-los-angeles&gt;:8080 k=... s=..."
+
+DURING CUTOVER (new VM boots, announces self, old still running):
+  _prime.3-nous.net  TXT  "p=&lt;old-ip-singapore&gt;:8080 k=... s=..."   ← old
+  _prime.3-nous.net  TXT  "p=&lt;NEW-ip-singapore&gt;:8080 k=... s=..."   ← new
+  ...
+  Discovery on the consumer side finds BOTH, verifies BOTH (same operator key
+  signed both certs), tries both, uses whichever responds. Multi-instance.
+
+AFTER CUTOVER (old VM stopped, manually delete old TXT record):
+  _prime.3-nous.net  TXT  "p=&lt;NEW-ip-singapore&gt;:8080 k=... s=..."
+  ...</pre>
+
+<p>No DNS downtime. No "switch the DNS at midnight" panic. The protocol was DESIGNED for this — primes come and go dynamically per the relay/CLAUDE.md spec (boot sequence step 6 — "Primes come and go dynamically").</p>
+
+<h2>5. Per-VM materials (what each new VM needs)</h2>
+
+<p>This is the part v2 missed. Each new VM needs the following on first boot:</p>
+
+<table>
+<thead><tr><th>Material</th><th>Where it lives</th><th>How to provision</th></tr></thead>
+<tbody>
+<tr><td><code>node.key</code> (32 B Ed25519 private)</td><td>On the VM (file path per code)</td><td>Generate fresh OR carry forward from the old VM (snapshot includes it if previously installed)</td></tr>
+<tr><td><code>node.pub</code> (32 B Ed25519 public)</td><td>On the VM</td><td>Derived from node.key — generated when key is generated</td></tr>
+<tr><td><code>node.cert</code> (64 B signature)</td><td>On the VM</td><td><strong>Operator signs</strong>: <code>ed25519_sign(operator_privkey, node.pub || role)</code> where role is "prime" or "relay". This is a one-time provisioning step per VM.</td></tr>
+<tr><td><code>/var/nous/cf.token</code> (chmod 600)</td><td>On the VM</td><td>Cloudflare API token, scoped: Zone → DNS → Edit on 3-nous.net. Can be same token across all VMs (or per-VM if Joey wants tighter isolation).</td></tr>
+<tr><td><code>NOUS_EXTERNAL_IP</code> env var</td><td>VM systemd env / shell profile</td><td>If unset, code falls back to 169.254 metadata server (works on GCE). Recommended: leave unset, let metadata work.</td></tr>
+<tr><td><code>NOUS_CF_ZONE_ID</code> env var</td><td>VM systemd env / shell profile</td><td>If unset, code does GET /zones?name=3-nous.net. Recommended: set it explicitly to avoid a startup HTTP call.</td></tr>
+<tr><td>Operator Ed25519 PUBLIC key</td><td>Compiled into the binary</td><td>Already baked into existing builds. No per-VM action needed.</td></tr>
+</tbody>
+</table>
+
+<p><strong>Two paths for node.key/node.pub/node.cert:</strong></p>
+<ol>
+  <li><strong>Carry forward (easier):</strong> Snapshot the old VM disk → boot new VM → existing node.* files are already present. No re-provisioning needed. Same identity continues, just at a new IP.</li>
+  <li><strong>Fresh provision (cleaner):</strong> Boot new VM blank → generate fresh node.key/node.pub on the VM → operator signs node.cert offline → push back to the VM. Cleaner audit trail, but requires the operator-signing step. Use this if you suspect compromise of an old node.key.</li>
+</ol>
+
+<p>Default for this migration: <strong>carry forward.</strong> Snapshot-based migration brings the identity files with the disk. No re-signing needed unless we want it for hygiene.</p>
+
+<h2>6. Approach</h2>
+
+<p>Snapshot the source disk in <code>acmedev-platform-hq</code> → cross-project image into <code>kastil-systems</code> → boot new VM with new name + HW upgrades + same identity files → new VM self-announces to DNS → both old and new appear under <code>_prime.3-nous.net</code> (or <code>_relay.3-nous.net</code>) for ~5 minutes → stop old VM → manually delete old TXT record from Cloudflare → done.</p>
+
+<h2>7. Phases</h2>
+
+<div class="phase">
+<h3>Phase 0 — Pre-flight (one-time)</h3>
+<ol>
+  <li>Enable Compute Engine API on kastil-systems: <code>gcloud services enable compute.googleapis.com --project=kastil-systems</code></li>
+  <li>Verify billing attached to kastil-systems</li>
+  <li>Confirm/create VPC + subnets matching the old setup OR accept default auto-mode VPC</li>
+  <li>Replicate firewall rules from acmedev-platform-hq (ports 22 SSH, 8080 wire, 8443 gate)</li>
+  <li>Cross-project IAM: kastil-systems default Compute SA needs <code>roles/compute.imageUser</code> on the snapshots</li>
+  <li>Verify the Cloudflare API token at <code>/var/nous/cf.token</code> on the OLD VMs is still valid (smoke test: cat the file, hit the CF API with curl). If valid, will be carried forward by snapshot.</li>
+  <li>Inventory current TXT records: <code>dig TXT _prime.3-nous.net</code> + <code>dig TXT _relay.3-nous.net</code> — save the current state for diff after cutover.</li>
+</ol>
+<p class="exit">Compute API enabled, billing, firewall rules, IAM, current DNS state captured.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 1 — node-c2-standard-8-gvnic-us-east4-a-ashburn (was nous-elite-us)</h3>
+<p>TERMINATED state. No traffic, no DNS impact. Use this to validate the recipe + HW upgrades.</p>
+<ol>
+  <li>Snapshot <code>nous-elite-us</code> disk (50 GB pd-standard, us-east4-a)</li>
+  <li>Create image in kastil-systems from snapshot</li>
+  <li>Boot new VM:
+  <pre>gcloud compute instances create node-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems --zone=us-east4-a \
+    --machine-type=c2-standard-8 \
+    --network-interface=nic-type=GVNIC,subnet=default \
+    --create-disk=image=&lt;image-name&gt;,image-project=kastil-systems,boot=yes,type=pd-ssd,size=50</pre>
+  </li>
+  <li>SSH verify: <code>uname -a; ip link show; ls -la /var/nous/</code></li>
+  <li>Confirm node.key/.pub/.cert and cf.token exist (carried over from snapshot)</li>
+  <li>If nous-elite has a workload pattern, decide: start it or leave terminated</li>
+</ol>
+<p class="exit">node-c2-standard-8-gvnic in kastil-systems, gVNIC + pd-SSD upgraded, recipe validated.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 2 — relay-e2-micro-virtio-asia-east2-a-hong-kong</h3>
+<p>First relay. Its pair (relay-lax) carries Asia/global traffic during migration.</p>
+<ol>
+  <li>Snapshot <code>relay-asia-east2-a-hong-kong</code> (10 GB)</li>
+  <li>Create image + boot in kastil-systems as <code>relay-e2-micro-virtio-asia-east2-a-hong-kong</code>, asia-east2-a</li>
+  <li>On boot, new VM calls <code>dns_announce_self()</code>: pushes a NEW TXT record to <code>_relay.3-nous.net</code> via Cloudflare API. Old TXT record still exists from old VM.</li>
+  <li>Verify the new VM is serving (curl <code>http://&lt;new-ip&gt;:8080/...</code> or whatever relay health endpoint exists)</li>
+  <li>Verify <code>dig TXT _relay.3-nous.net</code> now shows 3 records: relay-lax (unchanged), old hong-kong, new hong-kong</li>
+  <li>Wait 5+ minutes for consumer-side refresh cycles to pick up the new record</li>
+  <li>Stop the OLD <code>relay-asia-east2-a-hong-kong</code> VM in acmedev-platform-hq. Don't delete yet.</li>
+  <li>Wait for the next consumer refresh cycle (5 min). Stale TXT record from old VM will expire from the consumer's view BUT the record still exists in Cloudflare until manually deleted.</li>
+  <li>Manually delete the OLD TXT record from Cloudflare DNS (UI or API):
+  <pre>curl -X DELETE "https://api.cloudflare.com/client/v4/zones/&lt;zone-id&gt;/dns_records/&lt;old-record-id&gt;" \
+    -H "Authorization: Bearer &lt;cf-token&gt;"</pre>
+  </li>
+  <li>Monitor for 24h. If stable, delete the old VM in acmedev-platform-hq.</li>
+</ol>
+<p class="exit">relay-hkg moved + DNS overlap resolved. Stale TXT cleaned up.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 3 — relay-e2-micro-virtio-us-west2-a-los-angeles</h3>
+<p>Same pattern as Phase 2 for relay-lax.</p>
+<p class="exit">Both relays migrated. _relay.3-nous.net contains only the 2 new TXT records.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 4 — node-e2-micro-virtio-asia-southeast1-a-singapore (was prime-singapore)</h3>
+<p>First "prime"-role node migrating. The node.cert still signs the role string "prime" (operational rename only — see open decision). DNS record stays under <code>_prime.3-nous.net</code>.</p>
+<p>Otherwise: same snapshot → image → boot → self-announce → wait → stop old → clean stale TXT.</p>
+<p class="exit">prime-sin migrated. _prime.3-nous.net has 1 old + 1 new TXT for this slot, then cleaned to just new.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 5 — node-e2-micro-virtio-us-west4-a-las-vegas (was prime-las-vegas)</h3>
+<p>Final VM. Same pattern.</p>
+<p class="exit">All 5 VMs migrated. acmedev-platform-hq compute fleet stopped + ready for cleanup. Cloudflare DNS has 4 active TXT records (2 prime, 2 relay), all pointing at kastil-systems VMs.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 6 — cleanup (after 1-week rollback window)</h3>
+<ol>
+  <li>Delete the 5 stopped VMs in acmedev-platform-hq</li>
+  <li>Delete migration snapshots (keep one cold-backup set if desired)</li>
+  <li>Audit Cloudflare DNS: confirm only 4 TXT records under <code>_prime.3-nous.net</code> + <code>_relay.3-nous.net</code>, all signed by current node.pubs</li>
+  <li>If using the Open Decision (A) — operational name only — done.</li>
+  <li>If using Open Decision (B) — protocol rename — separate plan to update relay code + cert strings.</li>
+</ol>
+<p class="exit">Old fleet gone. DNS clean. Audit-of-all reports updated.</p>
+</div>
+
+<h2>8. Constraints</h2>
+
+<div class="constraint"><b>Snapshot-based migration is forced.</b> GCP cannot lift-and-shift VMs across projects.</div>
+<div class="constraint"><b>DNS coexistence is by design.</b> Multiple TXT records per subname (<code>_prime.3-nous.net</code>) are EXPECTED — relay reads BOTH old and new and tries both during cutover.</div>
+<div class="constraint"><b>Cloudflare manages 3-nous.net.</b> Not GCP DNS. The DNS migration is independent of the GCP project move. The cf.token is what binds VMs to DNS write access.</div>
+<div class="constraint"><b>node.cert is operator-signed.</b> If we regenerate keys (instead of carrying forward), the operator must sign new certs. This requires the operator's Ed25519 PRIVATE key — which should be air-gapped per the Trust Model. Carry-forward path avoids this.</div>
+<div class="constraint"><b>SPKI pin matters.</b> <code>cf_pin.h</code> compiled into the binary pins the Cloudflare API cert. If Cloudflare rotates their intermediate cert, ALL nodes need rebuilt binaries. Not a migration concern but worth noting.</div>
+<div class="constraint"><b>Manual DNS cleanup.</b> Cloudflare doesn't auto-expire stale TXT records on cutover — must delete via API after the old VM stops. This is the only manual coordination step.</div>
+<div class="constraint"><b>v1 hypothesis.</b> Per kernel rule 6 — if any phase reveals something we didn't anticipate, v4 of this plan corrects.</div>
+
+<div class="unknowns">
+<h3>Unknowns to resolve before Phase 0</h3>
+<ol>
+  <li><strong>Operational rename or protocol rename?</strong> Decision (A) vs (B). Recommend (A).</li>
+  <li><strong>Carry-forward identities or fresh-generate?</strong> Default carry-forward. Switch to fresh-generate if any node.key compromise is suspected.</li>
+  <li><strong>Why is nous-elite TERMINATED?</strong> If it's been off for weeks, is the workload retired? Or is it cost-saved between runs?</li>
+  <li><strong>Cloudflare API token rotation.</strong> Same token on all VMs, or per-VM? Carry-forward keeps whatever's currently on the old disks.</li>
+  <li><strong>NOUS_CF_ZONE_ID</strong> currently set as env var on the VMs, or letting code do the GET /zones lookup? Either works.</li>
+  <li><strong>VPC choice.</strong> Auto-mode default vs custom VPC with explicit subnets matching old IPs (10.148/16 etc.).</li>
+  <li><strong>External IPs.</strong> Currently ephemeral on the old VMs? Or static reserved? If static, those need to be released from acmedev-platform-hq and reserved in kastil-systems if you want to keep them.</li>
+  <li><strong>Does <code>3-nous.net</code> have other records besides <code>_prime</code> and <code>_relay</code>?</strong> e.g. A records for users, MX records for mail, root TXT? Capture full zone state before migration.</li>
+</ol>
+</div>
+
+<div class="revisit">
+<h3>When To Revisit (v4 triggers)</h3>
+<ul>
+  <li>Phase 1 (nous-elite) fails to boot — image issue, NIC upgrade incompatibility, missing carry-forward files</li>
+  <li>DNS self-announce on the new VM fails (cf.token expired? SPKI pin mismatch?)</li>
+  <li>Multi-record TXT confuses the relay code (unlikely — spec says supported)</li>
+  <li>Joey decides Decision (B) — protocol rename. Triggers a v4 protocol-change plan.</li>
+  <li>Any cross-project GCP gotcha not in the recipe (image storage location, IAM propagation delay, etc.)</li>
+</ul>
+</div>
+
+<h2>9. Execution-ready commands for Phase 1</h2>
+
+<pre># 0. Enable Compute API on destination
+gcloud services enable compute.googleapis.com --project=kastil-systems
+
+# 1. Snapshot the source disk
+gcloud config set project acmedev-platform-hq
+gcloud compute disks snapshot nous-elite-us \
+    --zone=us-east4-a \
+    --snapshot-names=node-c2s8-snap-2026-05-23
+
+# 2. Create image in destination project
+gcloud compute images create node-c2s8-img-2026-05-23 \
+    --project=kastil-systems \
+    --source-snapshot=projects/acmedev-platform-hq/global/snapshots/node-c2s8-snap-2026-05-23 \
+    --storage-location=us
+
+# 3. Boot the new VM with new name + HW upgrades
+gcloud compute instances create node-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems \
+    --zone=us-east4-a \
+    --machine-type=c2-standard-8 \
+    --network-interface=nic-type=GVNIC,subnet=default \
+    --create-disk=image=node-c2s8-img-2026-05-23,image-project=kastil-systems,boot=yes,type=pd-ssd,size=50
+
+# 4. Verify
+gcloud compute ssh node-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems --zone=us-east4-a \
+    --command='hostname; uname -a; ip link show; ls -la /var/nous/'
+
+# Rollback (if needed)
+gcloud compute instances delete node-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems --zone=us-east4-a --quiet
+gcloud compute images delete node-c2s8-img-2026-05-23 --project=kastil-systems --quiet</pre>
+
+<h2>Next step</h2>
+<p>Resolve the open decision (A operational rename vs B protocol rename). Then approve. Then Phase 0 + Phase 1 are 4 commands above plus verify. nous-elite is zero-risk since TERMINATED.</p>
+
+<footer>v0 · r35 · 2026-05-23 · ~p v3 GCP VMs · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

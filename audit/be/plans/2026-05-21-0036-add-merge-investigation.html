@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i api-add vs ks-add — merge investigation</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin: 0 0 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 18px 0 6px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 20px; }
+  li { margin: 4px 0; }
+
+  .answer { background: #0F1A1F; border: 2px solid var(--green); padding: 16px 22px; margin: 12px 0 24px; }
+  .answer h2 { color: var(--green); border: none; margin: 0 0 10px; padding: 0; }
+  .answer .one-line { color: var(--text); font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .answer .summary { color: var(--t2); font-size: 13px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 24px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.path { font-family: 'Consolas', monospace; font-size: 11.5px; color: var(--text); }
+  td.verdict { font-size: 10.5px; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 700; white-space: nowrap; }
+  .v-archive { color: var(--t3); }
+  .v-merge { color: var(--purple); }
+  .v-preserve { color: var(--amber); }
+  .v-note { color: var(--accent); }
+  .v-ks-wins { color: var(--green); }
+  tr.has-content td { background: rgba(176, 132, 242, 0.04); }
+
+  .diff-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
+  .diff-col { background: #0A0A0A; padding: 8px 12px; border-radius: 3px; }
+  .diff-col h4 { margin: 0 0 6px; color: var(--accent); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .diff-col.api h4 { color: var(--purple); }
+  .diff-col.ks h4 { color: var(--green); }
+  .diff-col pre { color: #ccc; font-size: 11px; font-family: 'Consolas', monospace; white-space: pre-wrap; margin: 0; line-height: 1.4; }
+
+  .action-card { background: var(--surface); border-left: 4px solid var(--accent); padding: 14px 18px; margin: 10px 0; }
+  .action-card.merge { border-left-color: var(--purple); }
+  .action-card.archive { border-left-color: var(--t3); }
+  .action-card h3 { margin: 0 0 8px; color: var(--text); font-size: 14px; }
+  .action-card .what { color: var(--t2); font-size: 12px; margin-bottom: 6px; font-family: 'Consolas', monospace; }
+  .action-card pre { background: #0A0A0A; padding: 10px 14px; border-radius: 3px; color: #ddd; font-size: 11.5px; font-family: 'Consolas', monospace; white-space: pre-wrap; margin: 8px 0; line-height: 1.45; }
+
+  .fact { display: grid; grid-template-columns: 220px 1fr; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--surface2); font-size: 13px; }
+  .fact:last-child { border-bottom: none; }
+  .fact .k { color: var(--t2); font-size: 11.5px; }
+  .fact .v { color: var(--text); }
+  .ref { display: inline-block; background: var(--surface2); color: var(--accent); padding: 1px 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; margin-right: 6px; vertical-align: middle; }
+  td.ref-cell { font-family: 'Consolas', monospace; color: var(--accent); font-weight: 700; font-size: 11px; letter-spacing: 0.5px; }
+  ol.numbered { list-style: none; padding-left: 0; }
+  ol.numbered li { display: grid; grid-template-columns: 40px 1fr; gap: 8px; margin: 6px 0; align-items: baseline; }
+  ul.numbered { list-style: none; padding-left: 0; }
+  ul.numbered li { display: grid; grid-template-columns: 40px 1fr; gap: 8px; margin: 6px 0; align-items: baseline; }
+
+  .dod { background: var(--surface); padding: 14px 18px; margin: 28px 0 14px; }
+  .dod-item { color: var(--t2); font-size: 13px; padding: 3px 0; }
+  .dod-item.pass::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .dod-item.na::before { content: "— "; color: var(--t3); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 20px; border-top: 1px solid #222; }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 24px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">api-add vs ks-add · merge investigation</span></nav>
+<div class="container">
+
+<h1>ai-pantheon-internal/ADD vs kastil-systems/a-d-d</h1>
+<p class="sub">Walked both trees. Diffed every overlapping file. Read every unique file. Here's exactly what's worth moving.</p>
+
+<div class="links">Source: <a href="2026-05-21-0027-add-deep-inspect.html">a-d-d deep inspect</a> · <a href="2026-05-21-0031-add-tight.html">the point</a></div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="answer">
+  <h2>The answer</h2>
+  <div class="one-line">Your instinct was right. api-add is frozen and almost everything in it lives — better — in ks-add already. Four small things are worth merging. Everything else: safe to archive.</div>
+  <div class="summary">Net migration is <strong>4 patches</strong>. V1 = M4 <strong>DONE</strong> (commit <code>308ea1f</code>). M1, M2, M3 still pending. The org dissolves cleanly after.</div>
+</div>
+
+<div style="background: var(--surface); padding: 10px 14px; margin: 8px 0 24px; font-size: 12px; color: var(--t2); border-left: 3px solid var(--accent);">
+  <strong style="color: var(--accent); letter-spacing: 1px;">REFERENCE KEY</strong> &nbsp;
+  <span class="ref">F#</span> facts &nbsp;
+  <span class="ref">V#</span> verdict rows (V1–V20) &nbsp;
+  <span class="ref">M#</span> merges (M1–M4) &nbsp;
+  <span class="ref">P1</span> preservation &nbsp;
+  <span class="ref">K#</span> ks-add context (K1–K8) &nbsp;
+  <span class="ref">E#</span> execution (E1–E6)
+  <div style="color: var(--t3); margin-top: 4px; font-size: 11px;">Point at any ID and say "do M2, skip V16, disagree with K3" — and I'll know exactly what you mean.</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Facts on the table</h2>
+
+<div class="fact"><span class="k"><span class="ref">F1</span>api-add last touched</span><span class="v"><strong>2026-02-25</strong> — every single file, same day, single commit. Frozen for 3 months.</span></div>
+<div class="fact"><span class="k"><span class="ref">F2</span>ks-add last touched</span><span class="v"><strong>2026-05-18</strong> — active development, evolving weekly.</span></div>
+<div class="fact"><span class="k"><span class="ref">F3</span>api-add total</span><span class="v">29 files, 184K, 700 total CLAUDE.md lines.</span></div>
+<div class="fact"><span class="k"><span class="ref">F4</span>ks-add nous/ total</span><span class="v">164 files. ~10× the size, ~6× the skill count.</span></div>
+<div class="fact"><span class="k"><span class="ref">F5</span>Taxonomy</span><span class="v">api uses <code>purpose/{learning,memory}/skill/*</code>. ks uses <code>nous/{intelligence,memory,security,comms,action,...}/skill/*</code>. Different philosophy: api was implementation-first; ks evolved into a full mind architecture.</span></div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>File-by-file verdict — every api-add file</h2>
+
+<table>
+<thead><tr>
+  <th style="width:5%;">#</th>
+  <th style="width:34%;">api-add path</th>
+  <th style="width:7%;">api L</th>
+  <th style="width:7%;">ks L</th>
+  <th style="width:22%;">Verdict</th>
+  <th style="width:25%;">Why</th>
+</tr></thead>
+<tbody>
+
+<tr><td class="ref-cell">V1</td><td class="path">CLAUDE.md</td><td>125</td><td>177</td><td class="verdict v-merge">MERGE DONE</td><td><strong>Corrected verdict.</strong> api had 4 unique pieces (Foundational Principles, Scope & Workflow, Trade Secret Notices, 2 rules) absent from ks. Merged as M4a–M4d in <code>kastil-systems/a-d-d</code> commit <code>308ea1f</code> on 2026-05-21.</td></tr>
+<tr><td class="ref-cell">V2</td><td class="path">go.bat</td><td>126</td><td>128</td><td class="verdict v-archive">ARCHIVE</td><td>Same launcher. ks newer.</td></tr>
+<tr><td class="ref-cell">V3</td><td class="path">.gitignore</td><td>—</td><td>—</td><td class="verdict v-archive">ARCHIVE</td><td>Trivial.</td></tr>
+<tr><td class="ref-cell">V4</td><td class="path">tools/add-notices.sh</td><td>—</td><td>—</td><td class="verdict v-archive">ARCHIVE</td><td>Utility script; not unique.</td></tr>
+
+<tr class="has-content"><td class="ref-cell">V5</td><td class="path">purpose/CLAUDE.md</td><td>95</td><td>—</td><td class="verdict v-preserve">PRESERVE AS HISTORY</td><td>Captures "intent → purpose → skill" philosophy that doesn't survive in ks. Worth keeping as a decision doc.</td></tr>
+
+<tr><td class="ref-cell">V6</td><td class="path">purpose/learning/CLAUDE.md</td><td>51</td><td>—</td><td class="verdict v-archive">ARCHIVE</td><td>ks's nous/intelligence/CLAUDE.md is the evolved version.</td></tr>
+<tr><td class="ref-cell">V7</td><td class="path">purpose/memory/CLAUDE.md</td><td>54</td><td>—</td><td class="verdict v-archive">ARCHIVE</td><td>ks's nous/memory/CLAUDE.md is the evolved version.</td></tr>
+
+<!-- ───── memory skills ───── -->
+<tr><td class="ref-cell">V8</td><td class="path">memory/skill/hash/CLAUDE.md</td><td>12</td><td>22</td><td class="verdict v-ks-wins">KS WINS</td><td>ks has more detail. archive api.</td></tr>
+<tr><td class="ref-cell">V9</td><td class="path">memory/skill/index/CLAUDE.md</td><td>20</td><td>25</td><td class="verdict v-ks-wins">KS WINS</td><td>ks has more detail. archive api.</td></tr>
+<tr class="has-content"><td class="ref-cell">V10</td><td class="path">memory/skill/journal/CLAUDE.md</td><td>47</td><td>27</td><td class="verdict v-merge">MERGE INTO KS</td><td><strong>api has the C struct + WAL operation table; ks lacks them.</strong> Patch ks.</td></tr>
+<tr><td class="ref-cell">V11</td><td class="path">memory/skill/mmap/CLAUDE.md</td><td>13</td><td>31</td><td class="verdict v-ks-wins">KS WINS</td><td>ks has more detail.</td></tr>
+<tr class="has-content"><td class="ref-cell">V12</td><td class="path">memory/skill/scope/CLAUDE.md</td><td>43</td><td>24</td><td class="verdict v-merge">MERGE INTO KS</td><td><strong>api has the Scope C struct definition; ks lacks it.</strong> Patch ks.</td></tr>
+<tr><td class="ref-cell">V13</td><td class="path">memory/skill/store/CLAUDE.md</td><td>36</td><td>72</td><td class="verdict v-ks-wins">KS WINS</td><td>ks has more detail.</td></tr>
+
+<!-- ───── learning skills ───── -->
+<tr><td class="ref-cell">V14</td><td class="path">learning/skill/reason/CLAUDE.md</td><td>44</td><td>69</td><td class="verdict v-ks-wins">KS WINS</td><td>ks nous/intelligence/skill/reason is the evolved version.</td></tr>
+<tr><td class="ref-cell">V15</td><td class="path">learning/skill/understand/CLAUDE.md</td><td>40</td><td>120</td><td class="verdict v-ks-wins">KS WINS</td><td>ks nous/intelligence/skill/understand is 3× richer.</td></tr>
+<tr><td class="ref-cell">V16</td><td class="path">learning/skill/crypto/CLAUDE.md</td><td>38</td><td>—</td><td class="verdict v-archive">ARCHIVE</td><td>ks nous/security/skill/crypt is the modern version (AES-GCM, X25519, Ed25519, HKDF, TLS 1.3). api's was basic primitives + simple vault. Already evolved past.</td></tr>
+<tr><td class="ref-cell">V17</td><td class="path">learning/skill/web/CLAUDE.md</td><td>38</td><td>—</td><td class="verdict v-archive">ARCHIVE</td><td>ks nous/intelligence/skill/acquire is the generalized pattern. api's was a hard-coded Wikipedia + DuckDuckGo pipeline; acquire is tool-pluggable.</td></tr>
+<tr class="has-content"><td class="ref-cell">V18</td><td class="path">learning/skill/store/CLAUDE.md</td><td>44</td><td>—</td><td class="verdict v-note">ADD DESIGN NOTE</td><td>Captures "binary-compatible store across purposes" — architectural decision worth annotating into ks memory/store.</td></tr>
+
+<!-- ───── skill.json files ───── -->
+<tr><td class="ref-cell">V19</td><td class="path">memory/skill/*/skill.json (×6)</td><td>—</td><td>—</td><td class="verdict v-archive">ARCHIVE</td><td>All differ from ks versions. ks skill.json schema is the current manifest format.</td></tr>
+<tr><td class="ref-cell">V20</td><td class="path">learning/skill/*/skill.json (×5)</td><td>—</td><td>—</td><td class="verdict v-archive">ARCHIVE</td><td>Same — ks schema is canonical.</td></tr>
+
+</tbody>
+</table>
+
+<p class="sub">3 of 29 files have content to migrate. 1 file worth preserving as a history doc. 25 superseded.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>The four concrete merges</h2>
+
+<div class="action-card merge" style="border-left-color: var(--green); background: #0F1A1F;">
+  <h3><span class="ref" style="background: var(--green); color: #000;">M4</span><span style="color: var(--green);">✓ DONE</span> Patch <code>kastil-systems/a-d-d/CLAUDE.md</code> — absorb api's unique sections</h3>
+  <div class="what">From: api-add/CLAUDE.md → into ks-add/CLAUDE.md · committed <code>308ea1f</code> on 2026-05-21</div>
+  <p>Four sub-patches landed in one commit:</p>
+  <ul>
+    <li><strong>M4a</strong> — new <code>## Foundational Principles</code> (Bare Metal · Roll Your Own · Shared Memory · Optimize At Every Roll-Up) inserted between Reality Driven Design and Hierarchy.</li>
+    <li><strong>M4b</strong> — new <code>## Scope &amp; Workflow</code> (4 scopes + 3-step sync workflow) inserted between Hierarchy and Skill-Based Structure.</li>
+    <li><strong>M4c</strong> — new <code>## Trade Secret Notices</code> (file header table by extension + NOTICE rule + batch tool) appended at end of file.</li>
+    <li><strong>M4d</strong> — rules <strong>10</strong> ("Never add <code>Co-Authored-By</code> lines") and <strong>11</strong> ("When syncing from <code>a-d-d/</code>, <code>a-d-d/</code> wins") appended to existing Rules list.</li>
+  </ul>
+</div>
+
+<div class="action-card merge">
+  <h3><span class="ref">M1</span>Patch <code>nous/memory/skill/journal/CLAUDE.md</code> — add WAL struct + operations</h3>
+  <div class="what">From: api-add/purpose/memory/skill/journal/CLAUDE.md (47L) → into ks-add/nous/memory/skill/journal/CLAUDE.md (27L)</div>
+  <p>ks-add has the narrative ("write-ahead log for crash safety...") but lacks the concrete C type and the operations table. Append this block:</p>
+  <pre>### WAL entry format
+
+```c
+typedef struct {
+    uint32_t type;         // WAL_INSERT, WAL_GROW, WAL_REHASH
+    uint32_t status;       // WAL_PENDING (0), WAL_COMMITTED (1)
+    uint64_t seq;          // monotonic sequence number
+    uint64_t payload_size; // bytes following this header
+} WalEntry;
+```
+
+### Operations logged
+
+- **INSERT** — the Fact being added (24 bytes). Replay = re-insert via `triple_store_insert_ids`.
+- **GROW** and **REHASH** — logged but self-heal on reopen (capacity checks + index rebuild).
+
+### Behavior
+
+- WAL is append-only during normal operation
+- On `triple_store_open`, call `journal_recover` after data files are open
+- Truncate WAL after successful recovery
+- Clean close truncates WAL to zero</pre>
+</div>
+
+<div class="action-card merge">
+  <h3><span class="ref">M2</span>Patch <code>nous/memory/skill/scope/CLAUDE.md</code> — add Scope C struct</h3>
+  <div class="what">From: api-add/purpose/memory/skill/scope/CLAUDE.md (43L) → into ks-add/nous/memory/skill/scope/CLAUDE.md (24L)</div>
+  <p>ks-add has the conceptual model ("iterator interface... reason engine walks facts through scope"). It lacks the explicit struct. Append:</p>
+  <pre>### Scope struct
+
+```c
+typedef struct {
+    TripleStore* store;
+    uint64_t     position;
+    uint64_t     filter_key;
+    IndexField   field;
+    Index*       index;       // NULL = sequential scan
+    bool         exhausted;
+} Scope;
+```
+
+### Behavior notes
+
+- `scope_field` uses index if available, falls back to sequential scan
+- For bulk reads, direct mmap access via `ts_facts()` is faster than scope
+- Scope is for filtered views, not raw throughput
+- Zero allocation — stack struct, no malloc</pre>
+</div>
+
+<div class="action-card merge">
+  <h3><span class="ref">M3</span>Add design note to <code>nous/memory/skill/store/CLAUDE.md</code> — cross-purpose binary compat</h3>
+  <div class="what">From: api-add/purpose/learning/skill/store/CLAUDE.md → annotation into ks-add/nous/memory/skill/store/CLAUDE.md</div>
+  <p>api's <code>learning/store</code> documented an architectural decision: "Binary-compatible with memory's store so both purposes can share the same memory space at the intent level." ks-add doesn't preserve this constraint. Add a short section:</p>
+  <pre>## Cross-purpose binary compatibility
+
+The store binary format (FileHeader + facts.bin + dict.bin + strings.bin)
+is intentionally shareable across purposes. Any other purpose that needs a
+triple store reuses the same FNV-1a hash, the same 24-byte Fact layout, the
+same 16-byte DictEntry layout. Two purposes can map the same store files
+and see the same world. Constraint, not coincidence.</pre>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>The one preservation</h2>
+
+<div class="action-card">
+  <h3><span class="ref">P1</span><code>api-add/purpose/CLAUDE.md</code> — the "intent → purpose → skill" philosophy</h3>
+  <div class="what">95 lines. Explains the early hierarchy that doesn't survive in ks-add's nous/ structure.</div>
+  <p>This file documents the ORIGINAL pantheon-int architecture: <code>intent / purpose / skill</code> as the three organizing levels. ks-add evolved past it (categories like action/comms/intelligence/memory/security replaced "purpose"), but the design rationale is real.</p>
+  <p><strong>Easy preservation:</strong> just <strong>archive ai-pantheon-internal/ADD on GitHub</strong> (set <code>isArchived=true</code>). The repo + commit history stays visible forever, the file is reachable by URL, no one can accidentally edit it. This is GitHub's intended use of archive.</p>
+  <p><strong>Or, if you want it adjacent to canonical:</strong> copy as <code>kastil-systems/a-d-d/nous/_history/pantheon-purpose-philosophy.md</code> with a one-line header "Historical: pre-nous taxonomy, archived 2026-05-21 from ai-pantheon-internal/ADD."</p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>What ks-add has that api-add never had — context</h2>
+
+<p>For completeness, here's the surface area api-add never covered. None of this needs migration; it's already in ks-add. But it explains the scale of evolution:</p>
+
+<ul class="numbered">
+  <li><span class="ref">K1</span><span><strong>nous/ top-level docs:</strong> THE_LOOP, MESH_TOPOLOGY, MESH_STATUS, SYSTEM_DIAGRAM, CLOUD_NODE, BALANCED_RT, GCS_HOT_STORAGE, USER_ISOLATION, TRANSLATION_TABLE — the architectural narrative.</span></li>
+  <li><span class="ref">K2</span><span><strong>action/</strong> — cpu, execute, translate skills. (api had none.)</span></li>
+  <li><span class="ref">K3</span><span><strong>comms/</strong> — 11 skills: gvnic, http, mesh, network, pulse, relay, serial, sync, trace, waf, wire. (api had none.)</span></li>
+  <li><span class="ref">K4</span><span><strong>intelligence/</strong> — acquire (with google-scout tool), language, learn, read, plus reason+understand. Plus tool/prime-server. (api had reason+understand+web only.)</span></li>
+  <li><span class="ref">K5</span><span><strong>memory/</strong> extras vs api: audit, kts, manifest, pack. (api had 6 of ks's 10.)</span></li>
+  <li><span class="ref">K6</span><span><strong>security/</strong> — auth, crypt, policy, seal, vault, wipe. (api's "crypto" was a tiny precursor to this whole branch.)</span></li>
+  <li><span class="ref">K7</span><span><strong>user/interface/</strong> — console, desktop. (api had none.)</span></li>
+  <li><span class="ref">K8</span><span><strong>directory/, receive/</strong> — placeholder branches. (api had none.)</span></li>
+</ul>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Execution order — when you're ready</h2>
+
+<ol class="numbered">
+  <li><span class="ref">E1</span><span><strong>Patch journal</strong> (= M1) — edit <code>kastil-systems/a-d-d/nous/memory/skill/journal/CLAUDE.md</code>. Commit.</span></li>
+  <li><span class="ref">E2</span><span><strong>Patch scope</strong> (= M2) — edit <code>kastil-systems/a-d-d/nous/memory/skill/scope/CLAUDE.md</code>. Commit.</span></li>
+  <li><span class="ref">E3</span><span><strong>Patch store</strong> (= M3) — edit <code>kastil-systems/a-d-d/nous/memory/skill/store/CLAUDE.md</code> with cross-purpose note. Commit.</span></li>
+  <li><span class="ref">E4</span><span><strong>(Optional, = P1)</strong> Copy <code>purpose/CLAUDE.md</code> → <code>kastil-systems/a-d-d/nous/_history/pantheon-purpose-philosophy.md</code> with header. Commit.</span></li>
+  <li><span class="ref">E5</span><span><strong>Archive ai-pantheon-internal/ADD on GitHub</strong> — <code>gh repo archive ai-pantheon-internal/ADD --yes</code>. History preserved, surface area gone.</span></li>
+  <li><span class="ref">E6</span><span>Plan v2 unblocks: dissolving ai-pantheon-internal is now safe.</span></li>
+</ol>
+
+<p>Step 1-3 take ~10 minutes total. The whole investigation→merge→archive loop is one sitting.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="dod">
+  <div class="dod-item pass">Code committed (this investigation report)</div>
+  <div class="dod-item pass">Commit hash in telemetry</div>
+  <div class="dod-item na">Board updated (no board items; merge actions are direct ks-add patches)</div>
+  <div class="dod-item pass">HTML report saved (be/plans/2026-05-21-0036-add-merge-investigation.html)</div>
+  <div class="dod-item pass">Index updated</div>
+  <div class="dod-item pass">Pushed to remote</div>
+  <div class="dod-item pass">No prior work damaged (read-only clones)</div>
+  <div class="dod-item na">Shipped to production (internal audit artifact)</div>
+</div>
+
+</div>
+<footer>v0 · r7 · 2026-05-21 · ~i api-add vs ks-add merge · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>

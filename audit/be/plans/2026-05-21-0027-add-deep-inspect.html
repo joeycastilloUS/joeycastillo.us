@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i a-d-d deep dive — what each variant actually contains</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; line-height: 1.6; }
+  nav { position: sticky; top:0; background:#000; border-bottom: 2px solid var(--accent); padding: 12px 24px; z-index: 100; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 18px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { color: var(--accent); font-size: 28px; margin: 0 0 4px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 28px; }
+  h2 { color: var(--accent); font-size: 18px; margin-top: 44px; border-bottom: 1px solid var(--surface2); padding-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+  h3 { color: var(--text); font-size: 16px; margin-top: 24px; }
+  p { color: #ccc; margin: 10px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  ul, ol { color: #ccc; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .reframe { background: #0F1A1F; border: 1px solid var(--accent); padding: 18px 24px; margin: 16px 0 28px; }
+  .reframe h3 { margin-top: 0; color: var(--accent); }
+  .urgent { background: #2A1010; border: 2px solid var(--red); padding: 16px 22px; margin: 18px 0; }
+  .urgent h3 { color: var(--red); margin-top: 0; text-transform: uppercase; letter-spacing: 1px; font-size: 14px; }
+  .repo-card { background: var(--surface); border-left: 4px solid var(--accent); padding: 16px 22px; margin: 14px 0; }
+  .repo-card.canonical { border-left-color: var(--green); }
+  .repo-card.unique { border-left-color: var(--purple); }
+  .repo-card.template { border-left-color: var(--amber); }
+  .repo-card.stale { border-left-color: var(--t3); }
+  .repo-card.misnamed { border-left-color: var(--red); }
+  .repo-card h3 { margin-top: 0; color: var(--text); display: flex; justify-content: space-between; align-items: baseline; font-size: 16px; }
+  .repo-card h3 .role { color: var(--accent); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
+  .repo-card .meta { color: var(--t3); font-size: 12px; font-family: 'Consolas', monospace; margin-bottom: 8px; }
+  .repo-card .verdict { color: var(--text); font-weight: 600; margin: 10px 0; padding: 8px 12px; background: var(--surface2); border-radius: 4px; font-size: 13px; }
+  .tree { background: #0A0A0A; color: var(--text); padding: 10px 16px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 12px; white-space: pre; margin: 8px 0; line-height: 1.4; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 13px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 8px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.yes { color: var(--green); text-align: center; }
+  td.no { color: var(--t3); text-align: center; }
+  td.uniq { color: var(--purple); text-align: center; font-weight: 700; }
+  .topic { background: var(--surface); border-left: 4px solid var(--accent); padding: 16px 22px; margin: 14px 0; }
+  .topic.action-keep { border-left-color: var(--green); }
+  .topic.action-move { border-left-color: var(--purple); }
+  .topic.action-rename { border-left-color: var(--amber); }
+  .topic.action-redirect { border-left-color: var(--t3); }
+  .topic h3 { margin-top: 0; color: var(--accent); font-size: 15px; }
+  .topic .lives-in { color: var(--t2); font-size: 12px; margin-bottom: 8px; font-family: 'Consolas', monospace; }
+  .topic .should-be { color: var(--green); font-size: 13px; margin-top: 8px; font-weight: 600; }
+  .topic .should-be::before { content: "→ Should live in: "; color: var(--accent); }
+  .decision { background: #0F1A1F; border-left: 4px solid var(--green); padding: 14px 20px; margin: 12px 0; }
+  .decision h3 { color: var(--green); margin-top: 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .dod { background: var(--surface); padding: 16px 20px; margin: 32px 0 16px; }
+  .dod-item { color: var(--t2); font-size: 13px; padding: 3px 0; }
+  .dod-item.pass::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .dod-item.na::before { content: "— "; color: var(--t3); }
+  footer { color: var(--t3); font-size: 11px; text-align: center; padding: 24px; border-top: 1px solid var(--surface2); }
+  .links { background: var(--surface); padding: 10px 16px; margin: 12px 0 28px; font-size: 13px; }
+  .links a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i · a-d-d deep dive</span></nav>
+<div class="container">
+
+<h1>a-d-d isn't six copies. It's four different things wearing the same name.</h1>
+<p class="sub">Shallow-cloned all 6 variants. Walked the trees. Read the headers. Here's what's actually in each, grouped by what it really is — so you can decide topic by topic.</p>
+
+<div class="links">
+  Source: <a href="2026-05-20-0132-audit-of-all-orgs.html">~i audit</a> · <a href="2026-05-20-1037-plan-reorg-orgs.html">~p reorg v1</a> · <a href="../builds/2026-05-20-2047-reorg-before-after.html">~b before/after</a>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="reframe">
+<h3>Reframe: the audit got the symptom right but the disease wrong.</h3>
+<p>The first audit said: <em>"a-d-d exists in 6 places, that's drift."</em> Reading the actual content changes the picture. There are <strong>four distinct roles</strong> across the 6 repos, and the real problem isn't duplication — it's that <strong>they all share a single name.</strong></p>
+<ol>
+  <li><strong>The methodology source</strong> — kastil-systems/a-d-d (kASTIL-branded rules + NOUS architecture + target devices)</li>
+  <li><strong>The teaching/template surface</strong> — joeycastilloUS/a-d-d-guidance (verbose &lt;PROJECT&gt;-templated GLOBAL.md, PRIMER, CHANGELOG, docs.html)</li>
+  <li><strong>Per-context instantiations</strong> — acmedevUS/a-d-d (real Acme business architecture: Pampanga mesh, off-grid plans) and ai-pantheon-internal/ADD (real Pantheon NOUS purpose-learning + purpose-memory architecture)</li>
+  <li><strong>Empty starter shells</strong> — Life-Water/a-d-d (5 files, placeholders), acmedevUS/a-d-d-template (already archived)</li>
+</ol>
+<p>None of these should be deleted or "redirected" the same way. The work is to rename three of them — because <code>a-d-d</code> as a name belongs to ONE thing (the methodology), not to <em>"any folder organized in the a-d-d shape."</em></p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>The six variants — what's actually inside</h2>
+
+<div class="repo-card canonical">
+  <h3>1. kastil-systems/a-d-d <span class="role">METHODOLOGY SOURCE</span></h3>
+  <div class="meta">last commit: 2026-05-18 23:58 · 207 files · 2.3M · Batchfile primary</div>
+  <div class="tree">a-d-d/
+├── CLAUDE.md           (177 lines — "kASTIL SYSTEMS INC. — Code Organization Rules")
+│                       Lead idea: "The Universal Principle: Everything is Triple"
+├── GLOBAL.md           (220 lines — "kASTIL SYSTEMS INC. — Global Rules")
+│                       The kastil-branded canonical methodology
+├── NOTICE              (license/trade-secret notice)
+├── go.bat              (128 lines — launcher)
+├── print_diagram.ps1   (PowerShell diagram helper)
+├── nous/               (164 files — the NOUS AI architecture)
+│   ├── action/skill/
+│   ├── comms/skill/
+│   ├── directory/
+│   ├── intelligence/{skill,tool}/
+│   ├── memory/skill/
+│   ├── receive/
+│   ├── security/skill/
+│   └── user/interface/
+└── tgt/                (38 files — target devices)
+    ├── console/win/
+    ├── phone/{itel-a50c, research, tecno-spark-slim}/
+    └── rt/             (runtime)</div>
+  <div class="verdict">This isn't just methodology — it's methodology PLUS a living NOUS architecture PLUS target hardware specs, all in one repo. By far the densest of the 6.</div>
+</div>
+
+<div class="repo-card misnamed">
+  <h3>2. acmedevUS/a-d-d <span class="role">MISNAMED — IT'S ACME ARCHITECTURE</span></h3>
+  <div class="meta">last commit: 2026-03-11 12:25 · 60 files · 722K · Batchfile</div>
+  <div class="tree">a-d-d/
+├── CLAUDE.md           (143 lines — "Acme Dev — Global Rules")
+├── NOTICE              ("Property of Acme Dev LLC")
+├── go.bat              (112 lines)
+├── (NO GLOBAL.md)      ← methodology not present
+├── platform/
+│   ├── business-model.txt
+│   ├── elevator-pitch.txt
+│   ├── executive-proposal.txt
+│   ├── mesh-monetization-engine.txt
+│   ├── mesh-network/
+│   │   ├── community-wifi-charging.txt
+│   │   ├── network-architecture.txt
+│   │   ├── pampanga-deployment-map.txt
+│   │   ├── pampanga-precision-plan.txt
+│   │   ├── urban-edge-model.txt
+│   │   └── skill/{app, dashboard, gateway, relay}/
+│   └── off-grid/
+│       ├── guidebook-deploy-teardown.txt
+│       ├── guidebook-prewire-install.txt
+│       ├── prewire.txt, solar-summary.txt, waste-system.txt, water-system.txt
+│       └── topo-deploy.txt, topo-prewire.txt
+└── tools/
+    └── airbyte-dispatch/  (a full skill tree: bridge, buf, dock, http, json, net, pg, rest, snow, sync)</div>
+  <div class="verdict">This is <strong>real Acme business architecture</strong> — Pampanga mesh-network rollout, off-grid utilities plans, airbyte-dispatch tooling. It uses the a-d-d FOLDER STRUCTURE but contains zero methodology. The name "a-d-d" is the bug. Rename it to <code>acme-architecture</code> or similar.</div>
+</div>
+
+<div class="repo-card unique">
+  <h3>3. ai-pantheon-internal/ADD <span class="role">UNIQUE — PANTHEON NOUS ARCHITECTURE</span></h3>
+  <div class="meta">last commit: 2026-02-25 05:13 · 29 files · 184K · Shell</div>
+  <div class="tree">ADD/
+├── CLAUDE.md           (125 lines — "Pantheon — Global Rules")
+├── go.bat              (126 lines)
+├── (NO GLOBAL.md)
+├── purpose/
+│   ├── learning/       ("Autonomous knowledge acquisition. Triple store + Wikipedia + DuckDuckGo")
+│   │   └── skill/{crypto, reason, store, understand, web}/
+│   ├── memory/
+│   │   └── skill/{hash, index, journal, mmap, scope, store}/
+└── tools/
+    └── add-notices.sh</div>
+  <div class="verdict">This is <strong>the original Pantheon NOUS Sovereign Brain architecture</strong> — purpose-learning + purpose-memory, with full skill trees. Last touched Feb 25 but it's not "stale scaffold" — it's the source-of-design for ai-pantheon-internal/purpose-learning and purpose-memory C codebases that exist as separate repos in the same org. <strong>This content exists nowhere else.</strong></div>
+</div>
+
+<div class="repo-card unique">
+  <h3>4. joeycastilloUS/a-d-d-guidance <span class="role">TEACHING / DOCS SURFACE</span></h3>
+  <div class="meta">last commit: 2026-05-10 15:48 · 11 files · 348K · HTML primary</div>
+  <div class="tree">a-d-d-guidance/
+├── CLAUDE.md           (136 lines)
+├── GLOBAL.md           (880 lines — LONGEST GLOBAL.md. &lt;PROJECT&gt;-templated.)
+│                       Titled: "ADD — Claude Code Edition. AI-agnostic methodology."
+├── NOTICE
+├── README.md           (210 lines)
+├── PRIMER.md           (112 lines — "You design the architecture. The AI builds the code.")
+├── CHANGELOG.md        (189 lines — version history of the methodology itself)
+├── docs.html           (1032 lines — full HTML docs site, "ADD — Architecture Driven Development — Claude Code Edition")
+├── go.bat, go.sh       (cross-platform launchers)
+└── user/
+    └── pantheon-0.md   (an example user/project file)</div>
+  <div class="verdict">This is the <strong>verbose, teaching-oriented, &lt;PROJECT&gt;-templated edition</strong>. It's what a newcomer should land on. Its GLOBAL.md is 4× the length of the canonical because it includes explanations, examples, AI-agnostic framing. Has CHANGELOG (the only one with version history) and docs.html (the only HTML doc site). Lives in personal org — wrong place; this is org-level teaching content.</div>
+</div>
+
+<div class="repo-card template">
+  <h3>5. acmedevUS/a-d-d-template <span class="role">ARCHIVED STARTER</span></h3>
+  <div class="meta">last commit: 2026-03-19 23:01 · 7 files · 180K · Batchfile · ARCHIVED</div>
+  <div class="tree">a-d-d-template/
+├── CLAUDE.md           (130 lines)
+├── GLOBAL.md           (520 lines — &lt;PROJECT&gt;-templated, "single source of truth" language)
+├── NOTICE, README.md
+├── go.bat              (391 lines — the LONGEST launcher)
+└── go.sh               (428 lines — Mac/Linux companion)</div>
+  <div class="verdict">Already archived (<code>isArchived=true</code>). The "starter scaffold" version with both go.bat and go.sh. Mostly superseded by jc-add-guidance, which carries the same intent further. Leave archived.</div>
+</div>
+
+<div class="repo-card stale">
+  <h3>6. Life-Water/a-d-d <span class="role">STALE STARTER SHELL</span></h3>
+  <div class="meta">last commit: 2026-03-19 03:33 · 5 files · 131K · Batchfile</div>
+  <div class="tree">a-d-d/
+├── CLAUDE.md           (54 lines — TINY, mostly placeholders)
+├── GLOBAL.md           (112 lines — &lt;OWNER&gt; / &lt;PROJECT&gt; placeholders still in)
+├── NOTICE              (still references &lt;OWNER&gt;)
+├── README.md           (190 lines — setup instructions for filling in placeholders)
+└── go.bat              (339 lines)</div>
+  <div class="verdict">5 files. Nothing was filled in after the initial scaffold. The &lt;OWNER&gt; and &lt;PROJECT&gt; placeholders are still literal. Either populate (Life-Water product work hasn't started) or archive.</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Which file lives in which repo — matrix</h2>
+
+<table>
+<thead><tr>
+  <th>File / Folder</th>
+  <th>ks-add</th>
+  <th>acme-add</th>
+  <th>acme-tpl</th>
+  <th>lw-add</th>
+  <th>api-add</th>
+  <th>jc-guide</th>
+</tr></thead>
+<tbody>
+<tr><td>CLAUDE.md (root)</td><td class="yes">✓ 177L</td><td class="yes">✓ 143L</td><td class="yes">✓ 130L</td><td class="yes">✓ 54L</td><td class="yes">✓ 125L</td><td class="yes">✓ 136L</td></tr>
+<tr><td>GLOBAL.md</td><td class="yes">✓ 220L</td><td class="no">—</td><td class="yes">✓ 520L</td><td class="yes">✓ 112L</td><td class="no">—</td><td class="uniq">✓ 880L</td></tr>
+<tr><td>NOTICE</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td></tr>
+<tr><td>README.md</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td></tr>
+<tr><td>go.bat (launcher)</td><td class="yes">✓ 128L</td><td class="yes">✓ 112L</td><td class="yes">✓ 391L</td><td class="yes">✓ 339L</td><td class="yes">✓ 126L</td><td class="yes">✓</td></tr>
+<tr><td>go.sh (Mac/Linux)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓ 428L</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+<tr><td>PRIMER.md</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="uniq">✓</td></tr>
+<tr><td>CHANGELOG.md</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="uniq">✓</td></tr>
+<tr><td>docs.html (HTML site)</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="uniq">✓ 1032L</td></tr>
+<tr><td>nous/ (NOUS arch)</td><td class="uniq">✓ 164 files</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+<tr><td>tgt/ (target devices)</td><td class="uniq">✓ 38 files</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+<tr><td>purpose/learning/ (NOUS sovereign brain)</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="uniq">✓</td><td class="no">—</td></tr>
+<tr><td>purpose/memory/ (NOUS triple store)</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="uniq">✓</td><td class="no">—</td></tr>
+<tr><td>platform/ (Pampanga mesh + off-grid)</td><td class="no">—</td><td class="uniq">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+<tr><td>tools/airbyte-dispatch/</td><td class="no">—</td><td class="uniq">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+<tr><td>print_diagram.ps1</td><td class="uniq">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+</tbody>
+</table>
+
+<p class="sub"><span style="color:var(--purple)">✓ purple</span> = unique to that repo, content lives nowhere else. <span style="color:var(--green)">✓ green</span> = common file shared across variants.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="urgent">
+<h3>Urgent — plan v1 has a data-loss risk</h3>
+<p>Plan v1 (Phase 2) says: <em>"transfer ai-pantheon-internal/purpose-learning and purpose-memory to kastil-systems, then dissolve the org."</em> Those are <strong>C codebases</strong> — implementation. The <strong>ARCHITECTURE</strong> for them lives in <code>ai-pantheon-internal/ADD</code> under <code>purpose/learning/</code> and <code>purpose/memory/</code>. That repo wasn't in the Phase 2 transfer list.</p>
+<p><strong>If ai-pantheon-internal dissolves before <code>ADD</code> moves, the original Pantheon NOUS architecture leaves with it.</strong> The C code survives in the new home; the design that birthed it doesn't.</p>
+<p><strong>Action:</strong> Plan v2 must add a row: <em>"merge ai-pantheon-internal/ADD/purpose/ into kastil-systems/a-d-d/nous/ (or new repo kastil-systems/nous-architecture) BEFORE org dissolution."</em> This is a v2 trigger per the plan's "When To Revisit" section.</p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>The seven topics, grouped — and where each should live</h2>
+
+<div class="topic action-keep">
+  <h3>Topic A — Methodology (the rules: GLOBAL.md, root CLAUDE.md, NOTICE)</h3>
+  <div class="lives-in">Today: ks-add (220L), acme-tpl (520L), lw-add (112L), jc-guide (880L). FOUR slightly different versions. acme-add and api-add omit it entirely.</div>
+  <p>The 880L version in <code>jc-guide</code> reads as the EXPLANATORY EDITION ("ADD is a methodology for AI-driven development. The process is AI-agnostic — swap the engine, keep the architecture."). The 220L version in <code>ks-add</code> reads as the OPERATIONAL EDITION ("kASTIL SYSTEMS INC. — Global Rules"). They aren't competing — they're audiences.</p>
+  <div class="should-be"><code>kastil-systems/a-d-d</code> keeps the operational/canonical edition. Educational edition becomes <code>kastil-systems/a-d-d/docs/</code> sub-folder OR a separate published site at <code>joeycastillo.us/add</code>.</div>
+</div>
+
+<div class="topic action-keep">
+  <h3>Topic B — NOUS architecture (the AI brain design)</h3>
+  <div class="lives-in">Today: ks-add/nous/{action,comms,directory,intelligence,memory,receive,security,user} — 164 files. Plus duplicate-but-different content in api-add/purpose/{learning,memory}.</div>
+  <p>Two views of the same brain. <code>ks-add/nous</code> uses categories (action, comms, directory, intelligence, memory, receive, security, user-interface). <code>api-add/purpose</code> uses purpose categories (learning, memory). Either the api-add content is a stale prior taxonomy, or it's a separate dimension. Need a side-by-side read before merging.</p>
+  <div class="should-be"><code>kastil-systems/a-d-d/nous/</code> (status quo) — but pull <code>api-add/purpose/</code> content in via a documented merge BEFORE ai-pantheon-internal dissolves. Alternative: spin <code>kastil-systems/nous-architecture</code> as its own repo if nous deserves first-class status independent of methodology.</div>
+</div>
+
+<div class="topic action-move">
+  <h3>Topic C — Target devices (hardware specs)</h3>
+  <div class="lives-in">Today: ks-add/tgt/{console/win, phone/itel-a50c, phone/research, phone/tecno-spark-slim, rt} — 38 files.</div>
+  <p>Specs for physical/runtime targets — Windows console, two phone models, a research bucket, a runtime layer. This is reference material, not methodology. <code>kastil-systems/target-runtimes</code> already exists as a repo (per audit) — that's the obvious home.</p>
+  <div class="should-be"><code>kastil-systems/target-runtimes/</code> (already exists) — move <code>ks-add/tgt/</code> there. Reduces a-d-d to pure methodology + nous.</div>
+</div>
+
+<div class="topic action-keep">
+  <h3>Topic D — Teaching/learning surface (PRIMER, CHANGELOG, docs.html, the explanatory GLOBAL.md)</h3>
+  <div class="lives-in">Today: joeycastilloUS/a-d-d-guidance (jc-guide). Unique content.</div>
+  <p>PRIMER ("You design the architecture. The AI builds the code."), CHANGELOG (methodology version history — only place version history exists), docs.html (1032-line published HTML edition), the 880-line explanatory GLOBAL.md, and a sample user file (pantheon-0.md).</p>
+  <p>This is org-level org-agnostic content. It lives in joeycastilloUS (personal) but it's really kastil-systems output OR public-facing teaching.</p>
+  <div class="should-be"><code>kastil-systems/a-d-d/docs/</code> sub-folder (keeps it adjacent to canonical) OR a new <code>kastil-systems/a-d-d-docs</code> if you want a separate publishable site. Don't leave it in personal org.</div>
+</div>
+
+<div class="topic action-rename">
+  <h3>Topic E — Acme business architecture (Pampanga mesh, off-grid, airbyte-dispatch)</h3>
+  <div class="lives-in">Today: acmedevUS/a-d-d — 60 files of REAL business content (community wifi charging, urban edge model, pampanga deployment maps, off-grid waste/water/solar plans, airbyte-dispatch skill trees).</div>
+  <p>This is NOT a duplicate of methodology. It's <strong>Acme's instance of architecture content</strong>, structured a-d-d-style. The repo name is the bug. Calling it "a-d-d" implies it's another copy of the methodology, when it's actually Acme's product architecture.</p>
+  <div class="should-be"><code>acmedevUS/acme-architecture</code> or <code>acmedevUS/pampanga-platform</code> (rename) — keep content intact, kill the misleading name.</div>
+</div>
+
+<div class="topic action-rename">
+  <h3>Topic F — Pantheon NOUS architecture (purpose/learning, purpose/memory)</h3>
+  <div class="lives-in">Today: ai-pantheon-internal/ADD — 29 files. Sovereign Brain architecture: skills under purpose/learning (crypto, reason, store, understand, web) and purpose/memory (hash, index, journal, mmap, scope, store).</div>
+  <p>Original Pantheon design content. Pairs with ai-pantheon-internal/purpose-learning (C) and purpose-memory (C). Lives in a soon-to-be-dissolved org per plan v1 — see urgent box above.</p>
+  <div class="should-be">Merged into <code>kastil-systems/a-d-d/nous/</code> as the canonical NOUS design, OR split into <code>kastil-systems/nous-architecture</code>. EITHER WAY: move BEFORE the org collapses.</div>
+</div>
+
+<div class="topic action-redirect">
+  <h3>Topic G — Empty starter shells (placeholder &lt;OWNER&gt; / &lt;PROJECT&gt; not filled)</h3>
+  <div class="lives-in">Today: Life-Water/a-d-d (5 files, placeholders intact) and acmedevUS/a-d-d-template (archived).</div>
+  <p>These were scaffolded with intent to instantiate, but the instantiation never happened. The template version (acme-tpl) is already archived correctly. Life-Water's is just sitting there with &lt;OWNER&gt; still literal.</p>
+  <div class="should-be">Life-Water/a-d-d → archive OR populate when lifewater.io product work starts. acmedevUS/a-d-d-template → leave archived. Both: no impact on canonical.</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>The decision matrix — what Joey calls, repo by repo</h2>
+
+<table>
+<thead><tr><th>Repo</th><th>Role today</th><th>Recommended action</th><th>Blocks what?</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>kastil-systems/a-d-d</code></td>
+  <td>Operational methodology + NOUS arch + target devices</td>
+  <td><strong>KEEP as canonical.</strong> Pull in api-add/purpose. Optionally split tgt/ to target-runtimes and docs to a-d-d/docs.</td>
+  <td>Nothing — this stays.</td>
+</tr>
+<tr>
+  <td><code>acmedevUS/a-d-d</code></td>
+  <td>Acme business architecture (misnamed)</td>
+  <td><strong>RENAME</strong> to <code>acmedevUS/acme-architecture</code>. Content stays. Name stops lying.</td>
+  <td>Blocks acmedev decontamination (plan Phase 2).</td>
+</tr>
+<tr>
+  <td><code>acmedevUS/a-d-d-template</code></td>
+  <td>Archived starter</td>
+  <td><strong>LEAVE ARCHIVED.</strong> No action.</td>
+  <td>Nothing.</td>
+</tr>
+<tr>
+  <td><code>Life-Water/a-d-d</code></td>
+  <td>Empty placeholder shell</td>
+  <td><strong>ARCHIVE</strong> for now. Or populate when LifeWater product work starts.</td>
+  <td>Nothing.</td>
+</tr>
+<tr>
+  <td><code>ai-pantheon-internal/ADD</code></td>
+  <td>Unique Pantheon NOUS architecture</td>
+  <td><strong>MIGRATE</strong> content into <code>kastil-systems/a-d-d/nous/</code> (or new <code>kastil-systems/nous-architecture</code>) BEFORE org dissolution. Then archive.</td>
+  <td><strong>BLOCKS</strong> plan Phase 2 org dissolution. Plan v2 required.</td>
+</tr>
+<tr>
+  <td><code>joeycastilloUS/a-d-d-guidance</code></td>
+  <td>Teaching surface — verbose docs, PRIMER, CHANGELOG, docs.html</td>
+  <td><strong>MOVE</strong> to <code>kastil-systems/a-d-d/docs/</code> (sub-folder) OR <code>kastil-systems/a-d-d-docs</code> (separate repo for publishable site).</td>
+  <td>Affects what you publish at joeycastillo.us/add.</td>
+</tr>
+</tbody>
+</table>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="decision">
+<h3>Four decisions Joey needs to make before plan v2</h3>
+<ol>
+  <li><strong>Does NOUS architecture stay inside a-d-d, or get its own repo?</strong>
+    <br>Option A: <code>kastil-systems/a-d-d/nous/</code> (status quo, plus api-add content merged in)
+    <br>Option B: <code>kastil-systems/nous-architecture</code> as a peer repo to a-d-d
+    <br>(Pick A if methodology + nous travel together. Pick B if nous deserves to be loadable standalone.)</li>
+  <li><strong>Do target-runtime device specs (tgt/) move out of a-d-d?</strong>
+    <br>Option A: stay in <code>kastil-systems/a-d-d/tgt/</code>
+    <br>Option B: move to <code>kastil-systems/target-runtimes</code> (which already exists)</li>
+  <li><strong>Teaching surface — sub-folder or separate repo?</strong>
+    <br>Option A: <code>kastil-systems/a-d-d/docs/</code> (one repo, easier to keep in sync)
+    <br>Option B: <code>kastil-systems/a-d-d-docs</code> as its own publishable site repo</li>
+  <li><strong>What name does the Acme architecture get?</strong>
+    <br>Candidates: <code>acme-architecture</code>, <code>pampanga-platform</code>, <code>acme-platform</code>, <code>acme-add</code> (keep prefix but kill the dash collision)</li>
+</ol>
+<p>Once these four are decided, plan v2 writes itself.</p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="dod">
+  <h3 style="color: var(--accent); margin-top:0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase;">Definition of Done</h3>
+  <div class="dod-item pass">Code committed (this deep-inspect report)</div>
+  <div class="dod-item pass">Commit hash in telemetry</div>
+  <div class="dod-item na">Board updated (~e converts decisions to items after plan v2)</div>
+  <div class="dod-item pass">HTML report saved (be/plans/2026-05-21-0027-add-deep-inspect.html)</div>
+  <div class="dod-item pass">Index updated</div>
+  <div class="dod-item pass">Pushed to remote</div>
+  <div class="dod-item pass">No prior work damaged (read-only clones, sources untouched)</div>
+  <div class="dod-item na">Shipped to production (audit-internal)</div>
+</div>
+
+</div>
+<footer>v0 · r5 · 2026-05-21 · ~i a-d-d deep · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>

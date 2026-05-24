@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~p Gemini key migration → kastil-systems (also unblocks VM billing)</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .status-banner { background: var(--amber); color: #000; padding: 6px 24px; text-align: center; font-weight: 700; letter-spacing: 2px; font-size: 11px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 28px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 14px 0 6px; }
+  p { color: #ccc; margin: 6px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 22px; margin: 6px 0; }
+  li { margin: 3px 0; }
+  pre { background: #0A0A0A; padding: 12px 16px; border-radius: 4px; color: #ddd; font-size: 11.5px; font-family: 'Consolas', monospace; white-space: pre; overflow-x: auto; margin: 8px 0; line-height: 1.5; }
+  .phase { background: var(--surface); border-left: 4px solid var(--accent); padding: 14px 20px; margin: 12px 0; }
+  .phase h3 { margin-top: 0; color: var(--accent); font-size: 15px; }
+  .phase .why { color: var(--t2); font-size: 12px; font-style: italic; margin-bottom: 6px; }
+  .phase .exit { color: var(--green); margin-top: 8px; font-size: 12px; }
+  .phase .exit::before { content: "✓ Exit: "; color: var(--green); font-weight: 700; }
+  .unknowns { background: #1f1a0f; border-left: 4px solid var(--amber); padding: 12px 18px; margin: 10px 0; }
+  .unknowns h3 { color: var(--amber); margin: 0 0 6px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .revisit { background: #0F1A1F; border-left: 4px solid var(--green); padding: 12px 18px; margin: 10px 0; }
+  .revisit h3 { color: var(--green); margin: 0 0 6px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .constraint { padding: 4px 0; border-bottom: 1px solid var(--surface2); font-size: 13px; }
+  .constraint:last-child { border-bottom: none; }
+  .constraint b { color: var(--accent); }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 18px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~p Gemini key migration</span></nav>
+<div class="status-banner">PLAN — AWAITING APPROVAL</div>
+<div class="container">
+
+<h1>~p Move the Gemini key from the orphan to kastil-systems.</h1>
+<p class="sub">Two birds: get Gemini working as a real NOUS provider, AND free the billing slot that's blocking the VM migration. Same plan covers both.</p>
+
+<div class="links">Trail: <a href="2026-05-23-1755-i-gemini-in-nous.html">~i Gemini in NOUS</a> · <a href="2026-05-23-0952-p-gcp-vms-rename-migrate-v4.html">~p VM migration v4 (blocked on billing)</a></div>
+
+<h2>Intent</h2>
+
+<p>Joey wants Gemini available in NOUS, billed under kastil-systems instead of an orphan default project he never knew existed. Today: the orphan project (<code>gen-lang-client-0031500671</code>) holds his old API key, has Generative Language API enabled, and consumes one of 5 billing slots. The 5-slot ceiling is what's blocking the entire VM migration plan v4.</p>
+
+<p>This plan does both: provisions Gemini correctly in kastil-systems AND clears the slot. End state: kastil-systems hosts the API key, nous-desktop reads it from <code>users.dat</code>, the orphan project's billing is detached, kastil-systems can be attached to billing → VM migration unblocks.</p>
+
+<h2>Scope</h2>
+
+<h3>In scope</h3>
+<ul>
+  <li>Enable Generative Language API on kastil-systems</li>
+  <li>Create a fresh Gemini API key scoped to kastil-systems (via AI Studio web UI)</li>
+  <li>Install the key in <code>C:\kastil-tools\nous-desktop\users.dat</code> as <code>[user:joey] GEMINI_API_KEY=...</code></li>
+  <li>Restart nous-desktop, verify "1 paid (user key)" in the banner</li>
+  <li>Smoke-test at least one Gemini variant via the cockpit</li>
+  <li>Revoke the orphan project's old AI Studio key</li>
+  <li>Detach billing from the orphan project (frees the slot)</li>
+  <li>Attach billing to kastil-systems (the unblock)</li>
+</ul>
+
+<h3>Out of scope</h3>
+<ul>
+  <li>Code changes to nous-desktop — already wired, just needs the key</li>
+  <li>Adding Gemini to <code>nous_keys_builtin.h</code> as the compiled-in fallback (separate decision; default plan = users.dat only)</li>
+  <li>Multi-user setup (Scotty's key, etc.) — same pattern, add later</li>
+  <li>Vertex AI migration (kept on AI Studio endpoint per existing serve.c config)</li>
+  <li>Deleting the orphan project entirely — just detaching billing is enough for this plan; full deletion is a separate decision</li>
+  <li>VM migration (v4) — this plan UNBLOCKS that one, doesn't execute it</li>
+</ul>
+
+<h2>Approach</h2>
+
+<p>Sequential. Each step depends on the previous. No parallelism opportunity. Total time start-to-finish: ~30 minutes if everything cooperates (most of it is browser clicks at aistudio.google.com).</p>
+
+<h2>Phases</h2>
+
+<div class="phase">
+<h3>Phase 1 — Create the new Gemini API key in kastil-systems (web UI)</h3>
+<div class="why">Has to happen first. The whole plan revolves around this key existing.</div>
+<ol>
+  <li>Open <a href="https://aistudio.google.com/app/apikey">https://aistudio.google.com/app/apikey</a></li>
+  <li>Log in as the operator (joey.castillo.acmedev@gmail.com per gcloud auth)</li>
+  <li>Click "Create API key"</li>
+  <li>In the project dropdown, select <code>kastil-systems</code>. Google enables Generative Language API automatically on the chosen project (or, if it can't enable due to no billing, this step fails — see Phase 0).</li>
+  <li>Copy the generated key (format: <code>AIzaSy...</code>, ~40 chars)</li>
+  <li>Don't paste it anywhere yet — keep on clipboard for Phase 2</li>
+</ol>
+<p class="exit">A new Gemini API key exists, scoped to kastil-systems. (If this fails because of no billing on kastil-systems, see Phase 0 immediately below — this is the chicken-and-egg case.)</p>
+</div>
+
+<div class="phase">
+<h3>Phase 0 — IF Phase 1 fails due to billing (the chicken-and-egg case)</h3>
+<div class="why">AI Studio key creation requires the destination project to have Generative Language API enabled, which requires billing. kastil-systems has neither. The orphan project is using one of the 5 slots. Need to detach orphan billing FIRST → then attach to kastil-systems → then Phase 1 succeeds.</div>
+<p>Ordering becomes:</p>
+<ol>
+  <li>Detach billing from orphan: <code>gcloud billing projects unlink gen-lang-client-0031500671</code></li>
+  <li>Attach kastil-systems to billing: <code>gcloud billing projects link kastil-systems --billing-account=018FA8-39FA2B-18CB6E</code></li>
+  <li>Enable Generative Language API: <code>gcloud services enable generativelanguage.googleapis.com --project=kastil-systems</code></li>
+  <li>Now retry Phase 1 — AI Studio will let you create the key under kastil-systems</li>
+</ol>
+<p><strong>Side effect (good):</strong> the orphan's existing API key keeps working temporarily because it lives at the Google-side API, not the local project. But its quota may drop to free-tier limits without billing. Plan accordingly — if you have active Gemini calls right now, hold off until the new key is wired in Phase 2.</p>
+<p class="exit">Billing landed on kastil-systems, API enabled, Phase 1 can succeed.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 2 — Install the key in users.dat</h3>
+<div class="why">nous-desktop reads users.dat next to the binary on launch. INI format.</div>
+<ol>
+  <li>Open <code>C:\kastil-tools\nous-desktop\users.dat</code> in a text editor (create if missing)</li>
+  <li>Add:
+  <pre>[user:joey]
+GEMINI_API_KEY=AIzaSy...(paste here)...</pre>
+  </li>
+  <li>Save. Permissions: tighten to user-only read if on a shared machine.</li>
+</ol>
+<p class="exit">users.dat exists with Joey's Gemini key in the [user:joey] section.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 3 — Restart nous-desktop and verify</h3>
+<div class="why">Banner change confirms the key is loaded.</div>
+<ol>
+  <li>Stop the running nous-desktop: <code>Get-Process nous-desktop | Stop-Process -Force</code></li>
+  <li>Restart: <code>Set-Location C:\kastil-tools\nous-desktop; .\nous-desktop.exe</code> (or in background as before with stdout/stderr capture)</li>
+  <li>Read the new stderr banner — should now show <code>providers: 0 free (builtin), 1 paid (user key)</code></li>
+  <li>If still shows "0 paid": something's wrong with users.dat. Common: wrong file path, wrong section name, no newline at end.</li>
+</ol>
+<p class="exit">Banner confirms 1 paid key loaded. Gemini is now reachable.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 4 — Smoke test via the cockpit</h3>
+<div class="why">Don't trust the banner. Make an actual call.</div>
+<ol>
+  <li>Open <a href="http://localhost:5050">http://localhost:5050</a> in browser</li>
+  <li>From the AI provider dropdown, select <code>gemini-flash</code> (cheapest variant, $0.15/$0.60 per Mtok)</li>
+  <li>Send a one-line test prompt: "Reply with the word OK and nothing else."</li>
+  <li>Confirm response. Check Cloudflare/AI Studio dashboard later to confirm the call hit kastil-systems' quota, not the orphan's.</li>
+</ol>
+<p class="exit">Gemini responds. The Director can now use Gemini as an available AI.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 5 — Revoke the old key + complete the billing flip</h3>
+<div class="why">Old key revoked → orphan project's API has nothing to bill. Detach billing → frees a slot. (If Phase 0 was taken, billing is already detached — this phase just revokes the key.)</div>
+<ol>
+  <li>Go back to <a href="https://aistudio.google.com/app/apikey">aistudio.google.com/app/apikey</a></li>
+  <li>Find the OLD key (the one tied to gen-lang-client-0031500671) — delete it</li>
+  <li>If Phase 0 was NOT taken (i.e., billing was already free for kastil-systems somehow), execute the detach now:
+  <pre>gcloud billing projects unlink gen-lang-client-0031500671
+gcloud billing projects link kastil-systems --billing-account=018FA8-39FA2B-18CB6E</pre>
+  </li>
+  <li>Verify: <code>gcloud billing projects list --billing-account=018FA8-39FA2B-18CB6E</code> should now show kastil-systems among the 5 billed projects, and gen-lang-client-0031500671 should be absent.</li>
+</ol>
+<p class="exit">Old key gone. Orphan billing detached. kastil-systems on billing. The VM migration plan (v4) is now unblocked.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 6 — (optional) close the orphan project</h3>
+<div class="why">Cleanup. Orphan is now empty (zero billable resources). Closing it removes a dead container from the project list.</div>
+<ol>
+  <li>Decide: keep it (in case a forgotten dependency surfaces) or delete it</li>
+  <li>If delete: <code>gcloud projects delete gen-lang-client-0031500671</code> (Google holds the project for 30 days before permanent deletion — fully recoverable in that window)</li>
+</ol>
+<p class="exit">No more orphan in the project list (or it's queued for 30-day deletion).</p>
+</div>
+
+<h2>Constraints</h2>
+
+<div class="constraint"><b>AI Studio key creation is web-only.</b> No gcloud CLI for it. The browser step is mandatory in Phase 1.</div>
+<div class="constraint"><b>Phase 0 is conditional.</b> If you DON'T want to detach orphan billing FIRST, Phase 1 may fail (depends on whether AI Studio can auto-enable the API without billing on the new project). If it fails, fall back to Phase 0 ordering.</div>
+<div class="constraint"><b>users.dat lives next to the binary.</b> Cross-platform. If nous-desktop ever moves to a system-wide install path, users.dat may need to follow.</div>
+<div class="constraint"><b>Key is plaintext in users.dat.</b> No encryption at rest. Protect via filesystem permissions or move to a secret manager later.</div>
+<div class="constraint"><b>One key, four variants.</b> All 4 Gemini models share GEMINI_API_KEY — you don't need 4 keys.</div>
+<div class="constraint"><b>v1 hypothesis.</b> Per kernel rule 6 — if any phase reveals something unexpected (AI Studio behavior change, Generative Language API quirks), v2 of this plan corrects.</div>
+
+<div class="unknowns">
+<h3>Unknowns</h3>
+<ol>
+  <li>Does AI Studio enforce billing at key-creation time, or only at API-call time? Determines whether Phase 0 is mandatory or just a fallback.</li>
+  <li>Quota inheritance — does the new key under kastil-systems start with default Gemini free-tier quota, or does it pick up paid-tier limits immediately?</li>
+  <li>If Phase 0 detaches orphan billing, does the orphan's old key immediately revert to free-tier limits, or is there a grace period?</li>
+  <li>Is anything else using the orphan project's key? (Joey forgot it existed, but worth a grep across other tools/repos.)</li>
+  <li>Should users.dat be checked into git or gitignored? Default: gitignored — it holds secrets.</li>
+</ol>
+</div>
+
+<div class="revisit">
+<h3>When To Revisit (v2 triggers)</h3>
+<ul>
+  <li>Phase 1 fails for a reason other than billing — AI Studio UI changed, project picker missing, etc.</li>
+  <li>Banner doesn't show "1 paid (user key)" after Phase 3 — users.dat path or format wrong</li>
+  <li>Gemini call returns 401/403 — key wasn't actually scoped right, or kastil-systems doesn't have the API enabled, or paid tier not activated</li>
+  <li>Detaching orphan billing breaks something Joey forgot about (a script, an old project) — rollback by reattaching</li>
+  <li>Multi-user case — Scotty joins NOUS, needs his own [user:scotty] section in users.dat</li>
+</ul>
+</div>
+
+<h2>Next step</h2>
+<p>Approve. Then start Phase 1 (open aistudio.google.com). If it fails on billing, fall through to Phase 0 first. Total time: ~30 min.</p>
+
+<footer>v0 · r38 · 2026-05-23 · ~p Gemini key migration · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

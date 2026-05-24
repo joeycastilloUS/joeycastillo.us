@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The system, end to end — no SDK, no IO Bus, just nous extended</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background:#111; color:#E0E0E0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.5; }
+  nav { background:#000; border-bottom:2px solid #6FC3DF; padding:10px 24px; }
+  .brand { color:#6FC3DF; font-weight:700; letter-spacing:3px; font-size:16px; }
+  .brand-sub { color:#666; font-size:11px; letter-spacing:1px; margin-left:12px; }
+  .container { max-width:1100px; margin:0 auto; padding:28px 24px 60px; }
+  h1 { color:#6FC3DF; font-size:28px; margin:0 0 4px; }
+  .sub { color:#999; font-size:14px; margin-bottom:24px; }
+  h2 { color:#6FC3DF; font-size:13px; letter-spacing:2px; text-transform:uppercase; margin:28px 0 12px; border-bottom:1px solid #222; padding-bottom:5px; }
+
+  .correction { background:#2A1010; border:2px solid #ef4444; padding:14px 22px; margin:14px 0 24px; font-size:14px; }
+  .correction b { color:#ef4444; text-transform:uppercase; letter-spacing:1px; font-size:11px; display:block; margin-bottom:6px; }
+
+  .schematic { font-family:'Consolas','Courier New',monospace; font-size:13px; line-height:1.45; color:#E0E0E0; white-space:pre; padding:20px 26px; background:#0A0A0A; border:1px solid #222; border-radius:6px; overflow-x:auto; }
+  .label-intent  { color:#FFD54F; font-weight:700; }
+  .label-purpose { color:#6FC3DF; font-weight:700; }
+  .label-skill   { color:#B084F2; }
+  .label-tool    { color:#4CAF50; }
+  .label-mem     { color:#EF5350; }
+  .label-new     { color:#FFA726; }
+  .arrow         { color:#666; }
+  .desc          { color:#999; font-style:italic; }
+  .keyword       { font-weight:700; color:#E0E0E0; }
+
+  .glossary { background:#1A1A1A; padding:14px 20px; margin:14px 0; border-radius:6px; font-size:13px; }
+  .glossary table { width:100%; border-collapse:collapse; }
+  .glossary td { padding:6px 10px; border-bottom:1px solid #222; vertical-align:top; }
+  .glossary td:first-child { color:#6FC3DF; font-family:'Consolas',monospace; font-weight:700; white-space:nowrap; }
+
+  .one-liner { background:#0F1F0F; border-left:4px solid #4CAF50; padding:14px 20px; margin:16px 0; font-size:14px; }
+  .one-liner .l { color:#4CAF50; font-size:10.5px; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
+  .one-liner .v { color:#E0E0E0; font-weight:600; }
+
+  footer { color:#555; font-size:10.5px; text-align:center; padding:20px; border-top:1px solid #222; margin-top:32px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · the system, end to end</span></nav>
+<div class="container">
+
+<h1>The system, end to end.</h1>
+<p class="sub">Not an SDK other things consume. The whole Pantheon, organized as one nous tree. The "IO Bus" responsibilities distributed into nous tools where they actually belong.</p>
+
+<div class="correction">
+<b>Correction</b>
+The IO Bus design (v1 and v2) treated this as <strong>an SDK other tools consume</strong> — library + CLI, link from outside. Joey's reframe: <em>"I actually don't want an SDK I want an end to end system that makes sense library organization wise."</em> The system already has a library taxonomy — <code>nous/&lt;purpose&gt;/skill/&lt;skill&gt;/</code> and <code>nous/&lt;purpose&gt;/tool/&lt;tool&gt;/</code>. The "IO Bus" responsibilities don't need their own corner; they fit into the existing nous structure as new tools under existing purposes. No new layer, no SDK boundary, no library to publish — just extending nous appropriately.
+</div>
+
+<div class="one-liner">
+<div class="l">What the system actually is</div>
+<div class="v">One nous tree. The intent is "serve Joey." The purposes are memory, intelligence, user, security, comms, action — all already in the taxonomy. The "IO Bus" responsibilities split across nous/memory/tool/, nous/intelligence/tool/, and nous/user/tool/ as new tools alongside existing skills. Operator binaries (metal, metal-console, metal-desktop) compose tools and skills from this tree. AI integrations are themselves tools INSIDE nous. Nothing outside the tree.</div>
+</div>
+
+<h2>The system, drawn as nous</h2>
+
+<pre class="schematic">
+<span class="label-intent">nous/                                  ← the brain · the whole Pantheon</span>
+<span class="label-intent">│</span>
+<span class="label-intent">├── intent: serve the operator</span>
+<span class="label-intent">│</span>
+<span class="label-purpose">├── memory/                          ← the architecture record (IDS)</span>
+<span class="label-purpose">│   ├── skill/                        already vendored in metal/src/sdk/nous/</span>
+<span class="label-skill">│   │   ├── store/                    triple store · facts.bin · dict.bin</span>
+<span class="label-skill">│   │   ├── journal/                  WAL crash safety</span>
+<span class="label-skill">│   │   ├── scope/                    filtered iteration</span>
+<span class="label-skill">│   │   ├── index/                    O(1) lookup</span>
+<span class="label-skill">│   │   ├── hash/                     FNV-1a + SHA-256</span>
+<span class="label-skill">│   │   ├── mmap/                     POSIX + Windows</span>
+<span class="label-skill">│   │   ├── pack/                     binary packing</span>
+<span class="label-skill">│   │   ├── kts/                      volatile RAM working-set (boots from store)</span>
+<span class="label-skill">│   │   └── audit/                    immutable hash-chained log</span>
+<span class="label-purpose">│   └── tool/</span>
+<span class="label-new">│       ├── shell/                    ← NEW · operator's CLI into the store</span>
+<span class="label-new">│       │                              (this is what the "io_bus" CLI becomes)</span>
+<span class="label-new">│       └── mirror/                   ← NEW · file-mirror sync to/from state files</span>
+<span class="label-new">│                                      (telemetry.json ↔ triples, etc.)</span>
+<span class="label-intent">│</span>
+<span class="label-purpose">├── intelligence/                     ← AI bridges live here</span>
+<span class="label-purpose">│   ├── skill/                        already in canonical</span>
+<span class="label-skill">│   │   ├── understand/               NLP decoder</span>
+<span class="label-skill">│   │   ├── reason/                   query orchestration</span>
+<span class="label-skill">│   │   ├── acquire/                  web learning (scouts + Playwright)</span>
+<span class="label-skill">│   │   ├── language/                 dialect framework</span>
+<span class="label-skill">│   │   ├── learn/                    curation engine</span>
+<span class="label-skill">│   │   └── read/                     parse/digest external content</span>
+<span class="label-purpose">│   └── tool/</span>
+<span class="label-skill">│       ├── prime-server/             already specced</span>
+<span class="label-new">│       ├── claude-code-bridge/       ← NEW · renderer + newborn↔mother for Claude</span>
+<span class="label-new">│       └── perplexity-bridge/        ← NEW · renderer + handshake for Perplexity</span>
+<span class="label-intent">│                                      (more AI bridges = more tools here)</span>
+<span class="label-purpose">├── user/                             ← operator surfaces (the consoles)</span>
+<span class="label-purpose">│   ├── interface/                    vendored in metal today</span>
+<span class="label-skill">│   │   ├── console/                  CLI surface (metal binary)</span>
+<span class="label-skill">│   │   └── desktop/                  browser cockpit (localhost:5050)</span>
+<span class="label-purpose">│   ├── skill/</span>
+<span class="label-skill">│   │   ├── self/                     sovereign identity</span>
+<span class="label-skill">│   │   └── qr/                       QR codes for cross-device</span>
+<span class="label-purpose">│   └── tool/</span>
+<span class="label-new">│       └── voice/                    ← FUTURE · whatever Joey wants next</span>
+<span class="label-intent">│</span>
+<span class="label-purpose">├── security/                         ← signed-IDS, vault, TLS 1.3</span>
+<span class="label-purpose">│   └── skill/</span>
+<span class="label-skill">│       ├── crypt/                    AES-GCM, X25519, Ed25519, HKDF, TLS 1.3</span>
+<span class="label-skill">│       ├── vault/                    encrypted secrets</span>
+<span class="label-skill">│       ├── seal/                     mutual integrity lock</span>
+<span class="label-skill">│       ├── auth/                     TOTP authentication</span>
+<span class="label-skill">│       ├── policy/                   access rules</span>
+<span class="label-skill">│       └── wipe/                     secure deletion</span>
+<span class="label-intent">│</span>
+<span class="label-purpose">├── comms/                            ← cross-host sync (future)</span>
+<span class="label-purpose">│   └── skill/                        already vendored</span>
+<span class="label-skill">│       ├── mesh/  · gvnic/  · relay/</span>
+<span class="label-skill">│       ├── http/  · sync/   · dns/</span>
+<span class="label-skill">│       └── pulse/ · trace/  · waf/   · wire/  · serial/</span>
+<span class="label-intent">│</span>
+<span class="label-purpose">├── action/                           ← executing decisions</span>
+<span class="label-purpose">│   └── skill/</span>
+<span class="label-skill">│       ├── cpu/                      hardware ops</span>
+<span class="label-skill">│       ├── execute/                  run external commands</span>
+<span class="label-skill">│       └── translate/                cross-dialect translation</span>
+<span class="label-intent">│</span>
+<span class="label-purpose">├── directory/                        ← system-wide registry (future)</span>
+<span class="label-intent">│</span>
+<span class="label-purpose">└── receive/                          ← inbound from external (future)</span>
+</pre>
+
+<h2>The operator binaries compose tools and skills from nous</h2>
+
+<pre class="schematic"><span class="keyword">metal</span>            <span class="desc">operator's primary CLI</span>
+                 links: user/interface/console + memory/tool/shell + intelligence/tool/claude-code-bridge
+
+<span class="keyword">metal-console</span>    <span class="desc">planning + tilde-command surface (this very project)</span>
+                 links: user/interface/desktop + memory/skill/store + memory/tool/mirror
+
+<span class="keyword">metal-desktop</span>    <span class="desc">browser cockpit on localhost:5050</span>
+                 links: user/interface/desktop + memory/tool/shell + intelligence/tool/perplexity-bridge
+
+<span class="keyword">tlt</span>              <span class="desc">The Last Test runtime (already shipping)</span>
+                 links: memory/skill/{store,index,journal,hash,mmap,scope} + security/skill/crypt
+
+<span class="keyword">test_self</span>        <span class="desc">sovereign identity smoke test (already shipping)</span>
+                 links: user/skill/self + security/skill/{vault,crypt}
+
+<span class="desc">Each binary = main() + a Makefile + a list of skill/tool source files to compile in.
+Same pattern as tlt and test_self in metal/Makefile today (lines 52-59, 119-127).
+No SDK published. No library to import. Just shared source compiled per binary.</span>
+</pre>
+
+<h2>Where the old "IO Bus" responsibilities live now</h2>
+
+<div class="glossary">
+<table>
+<tr><td>v1/v2 io_bus_open/close</td><td>Just <code>triple_store_open/close</code> from <code>nous/memory/skill/store</code>. Already exists. No wrapper needed.</td></tr>
+<tr><td>v1/v2 io_bus_bootstrap (newborn↔mother)</td><td><code>nous/intelligence/tool/&lt;ai-bridge&gt;/bootstrap.c</code> — each AI bridge implements its own handshake. Claude bridge ≠ Perplexity bridge.</td></tr>
+<tr><td>v1/v2 io_bus_scope_*</td><td><code>nous/memory/skill/scope</code> already exists. Add a <code>scope_open_named()</code> entry point if needed.</td></tr>
+<tr><td>v1/v2 io_bus renderer table</td><td>Each AI bridge IS the renderer. <code>nous/intelligence/tool/claude-code-bridge/render.c</code>, <code>nous/intelligence/tool/perplexity-bridge/render.c</code>. No central table — each bridge owns its format.</td></tr>
+<tr><td>v1/v2 file-mirror sync</td><td><code>nous/memory/tool/mirror/</code> — new tool. Reads/writes JSON↔triples. Path F survives intact.</td></tr>
+<tr><td>v1/v2 io_bus CLI</td><td><code>nous/memory/tool/shell/</code> — new tool. CLI verbs for assert/query/scope. The "operator's shell into memory."</td></tr>
+<tr><td>v1/v2 user alerts</td><td>Per-bridge concern. <code>nous/intelligence/tool/claude-code-bridge/alert.c</code>. Each AI surface owns presentation.</td></tr>
+<tr><td>v1/v2 the "bus" idea</td><td>Dissolves. There's no bus — there are tools inside nous that operator binaries link. The "bus" was an SDK metaphor that didn't fit.</td></tr>
+</table>
+</div>
+
+<h2>What changes vs. v2 of the IO Bus design</h2>
+
+<pre class="schematic"><span class="keyword">DROPPED</span>
+  ✗ libio_bus.a as a publishable library
+  ✗ io_bus.h as a separate header for external consumers
+  ✗ The "IO Bus" name as a layer or product
+  ✗ The notion that other tools "link the IO Bus"
+  ✗ A central <code>_store/io_bus/</code> directory
+
+<span class="keyword">KEPT (relocated into nous)</span>
+  ✓ The triple-shaped data model (already in nous/memory/skill/store)
+  ✓ The newborn↔mother bootstrap pattern (now per-AI-bridge)
+  ✓ Scope management (extends existing nous/memory/skill/scope)
+  ✓ Multiple AI-convention renderers (each is a separate intelligence/tool/)
+  ✓ File-mirror migration (now nous/memory/tool/mirror/)
+  ✓ Pure C constraint
+  ✓ User alerts (per-bridge)
+
+<span class="keyword">ADDED CLARITY</span>
+  ✓ Operator binaries (metal, metal-console, metal-desktop, ...) are FIRST-CLASS.
+    They're not "consumers of an SDK" — they're compositions of nous tools.
+  ✓ AI integrations are FIRST-CLASS members of nous (intelligence/tool/&lt;ai&gt;-bridge/).
+    Not external clients. Internal tools.
+  ✓ Every responsibility maps to an existing or new nous folder.
+    No new top-level concepts. The taxonomy holds.
+</pre>
+
+<h2>The library organization, said straight</h2>
+
+<div class="one-liner">
+<div class="l">Library organization</div>
+<div class="v">There's <strong>one</strong> source tree: <code>nous/</code>. It already exists in kastil-systems/a-d-d (canonical) and is vendored into metal/src/sdk/nous/. The tree is organized as <code>nous/&lt;purpose&gt;/&lt;skill OR tool&gt;/&lt;name&gt;/</code>. Skills are reusable C libraries; tools are small binaries built from skills. Operator binaries (metal, metal-console, metal-desktop) compose this source per-binary via their Makefile. <strong>That's the library organization.</strong> No SDK, no external API surface, no "io_bus." Just nous, extended where it needs to be.</div>
+</div>
+
+<h2>Smallest concrete next move (replaces v2's First Move)</h2>
+
+<pre class="schematic">1. Pick ONE of the new nous tools to scaffold first.
+   Candidate: <span class="label-new">nous/memory/tool/shell/</span>
+   Why: it's the operator's CLI into the IDS. Used by every console.
+   Without it, no other tool is testable end-to-end.
+
+2. Create the folder structure in kastil-systems/a-d-d/nous/memory/tool/shell/
+   Files: CLAUDE.md (architecture spec) · skill.json (manifest) · tests/
+
+3. The CODE (the .c/.h source) lives in metal/src/sdk/nous/memory/tool/shell/
+   following the existing vendoring pattern (per kernel: a-d-d holds architecture,
+   code repos hold implementation).
+
+4. metal/Makefile gets a new target: <span class="label-new">shell</span>
+   Source list: src/sdk/nous/memory/tool/shell/main.c
+              + src/sdk/nous/memory/skill/{store,index,hash,journal,mmap,scope}/*.c
+   Same pattern as tlt target (Makefile L52-59).
+
+5. Build: <code>make shell</code>. Test: <code>./shell assert "test" "is" "working"</code>.
+   Then: <code>./shell query "test" "*" "*"</code>.
+
+6. After shell works: scaffold <span class="label-new">nous/memory/tool/mirror/</span>
+   (file-mirror sync for telemetry.json, per the v2 design's Path F).
+
+7. After mirror works: scaffold <span class="label-new">nous/intelligence/tool/claude-code-bridge/</span>
+   This is the renderer that turns triples into CLAUDE.md output.
+
+Each step = one tool, one Makefile target, one test. Compose, don't pile.</pre>
+
+<footer>v0 · r31 · 2026-05-22 · the system, end to end · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

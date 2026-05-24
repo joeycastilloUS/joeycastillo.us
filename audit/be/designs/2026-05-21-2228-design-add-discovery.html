@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — ADD Anchor + Registry</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  .container { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 16px; margin: 20px 0 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  ul, ol { margin: 8px 0 8px 22px; }
+  li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; }
+  pre code { background: none; padding: 0; color: #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .unreversible { color: #ef4444; font-weight: 600; }
+  .links { background: #1A1A1A; padding: 10px 14px; margin: 12px 0; font-size: 13px; border-radius: 6px; }
+  .links a { color: #6FC3DF; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~d — ADD Anchor + Registry</span>
+</nav>
+<div class="container">
+
+<h1>Design — ADD Anchor + Registry</h1>
+<p style="color:#999;">Make a-d-d discoverable to any AI or system that runs <code>~design</code>, <code>~inspect</code>, or any tilde — without guessing.</p>
+
+<div class="links">Trail: <a href="../plans/2026-05-21-2222-add-identity-and-consolidation.html">~i identity + consolidation</a> · <a href="../plans/2026-05-21-2158-final-scan.html">~i final scan</a></div>
+
+<h2>1. Subject + Intent</h2>
+<div class="section">
+  <p><strong>Subject:</strong> A two-part mechanism (a per-repo <em>Anchor</em> file plus a centralized <em>Registry</em>) that lets any AI or system reliably answer "Is this a-d-d? Where does all a-d-d for this org live?"</p>
+  <p><strong>Intent:</strong> Joey's framing — <em>"the 'a' in a-d-d is the HOW for the driver for the intent of the owner/operator"</em>. The HOW must be reachable. Today an AI running <code>~design</code> or <code>~inspect</code> has to <em>infer</em> what's a-d-d via file signatures and out-of-band knowledge. That's how V1, V5, and V13 verdicts went wrong — surface-level guesses. If a-d-d is the architectural ground truth, every agent should be able to <em>find</em> it the same way <code>git</code> finds <code>.git</code> — by walking up the tree to a marker, then following the marker to the canonical source of truth, then reading the registry that lists every other a-d-d-shaped artifact across the org. No inference. No drift between what one AI thinks is canonical and what another AI thinks. The owner/operator's intent travels with the architecture, and the architecture is one query away.</p>
+</div>
+
+<h2>2. Discovery</h2>
+<div class="section">
+  <p><strong>Landscape today.</strong> 6 a-d-d-shaped repos exist across 4 orgs (see V18 ~i report). Identification works via file signatures (<code>skill.json</code> next to <code>CLAUDE.md</code>, hierarchical <code>intent/purpose/skill</code> paths, root <code>GLOBAL.md</code>+<code>NOTICE</code> pair). But these are <em>conventions</em>, not <em>declarations</em>. An AI reading a fresh repo cold can derive "this looks a-d-d-shaped" — it can't confirm "this IS the canonical / this is a scaffold / this is historical." No machine-readable assertion exists.</p>
+  <p><strong>Existing shape.</strong> Kernel CLAUDE.md (post-M4 merge) declares <code>kastil-systems/a-d-d/GLOBAL.md</code> as the methodology source. That's <em>one</em> pointer at <em>one</em> file. It doesn't enumerate the rest of the footprint (the 5 other a-d-d-shaped repos), doesn't distinguish scaffolded copies from sources, doesn't track historical archives. The audit work just done filled this gap manually — but it'll drift again the moment a new a-d-d-shaped folder appears in a code repo and no one updates the kernel.</p>
+  <p><strong>Joey's gut lean.</strong> Something declarative + indexable. Like <code>.git</code> for git, <code>.npmrc</code> for npm — a sentinel that any tool can find by walking parents, plus an org-level index of all the sentinels so a top-down sweep is possible. The owner/operator's intent should be the root, the registry should make the HOW discoverable, and any AI should land at "I know what's a-d-d and where it lives" within seconds of starting work.</p>
+  <p><strong>What's missing in plain words.</strong></p>
+  <ol>
+    <li>A per-repo <em>declaration</em>: this repo is a-d-d (and what role it plays).</li>
+    <li>A per-org <em>inventory</em>: here are all the a-d-d declarations across the org footprint.</li>
+    <li>A <em>discovery trail</em>: any AI starting work knows to look at X, which points to Y, which lists Z.</li>
+  </ol>
+</div>
+
+<h2>3. Naming Pass</h2>
+<div class="section">
+  <table>
+  <thead><tr><th>Candidate</th><th>Precision</th><th>Gut</th></tr></thead>
+  <tbody>
+  <tr><td><strong>ADD Anchor + Registry</strong></td><td>Two components named for what they do. Anchor fixes position per repo; Registry is the org-level index. Symmetric.</td><td>Concrete. Clear. Won't rot.</td></tr>
+  <tr><td>ADD Beacon</td><td>Broadcast metaphor. Each repo "emits" identity; agents "listen." Implies active signaling that isn't really the mechanism (static files, not pub/sub).</td><td>Sounds clever, slightly inaccurate.</td></tr>
+  <tr><td>ADD Manifest</td><td>Schema-centric — names the file but not the system around it. Doesn't cover the registry side.</td><td>Half a name.</td></tr>
+  <tr><td>ADD Compass</td><td>Direction-finding metaphor. Good evocation, but "compass" suggests one user with one compass; this is multi-AI, multi-org.</td><td>Pretty, fuzzy.</td></tr>
+  <tr><td>ADD Locator</td><td>Functional — what it does. But generic, sounds like a UI feature.</td><td>Bland.</td></tr>
+  <tr><td>ADD Sentinel</td><td>Watcher metaphor. Implies enforcement, which isn't the mechanism (no daemon — static files).</td><td>Over-promises.</td></tr>
+  </tbody>
+  </table>
+  <p><strong>Winner: ADD Anchor + Registry.</strong> Two-component name reflects the two-component mechanism. "Anchor" because each repo's marker file fixes that repo's identity and role in space (like <code>.git</code> does for a git repo). "Registry" because the central index is the standard term for a list-of-things. Symmetric, precise, no metaphor stretch.</p>
+</div>
+
+<h2>4. Shape</h2>
+<div class="section">
+  <p><strong>Two artifacts. One trail.</strong></p>
+
+  <h3>Artifact 1 — The Anchor</h3>
+  <p>A small JSON file named <code>.add.json</code> at the root of every a-d-d-shaped repo. Schema:</p>
+  <pre><code>{
+  "schema": 1,
+  "role": "canonical" | "scaffold" | "historical" | "teaching" | "code-tree-copy",
+  "canonical": "kastil-systems/a-d-d",
+  "intent": "&lt;one-line statement of what this repo's a-d-d serves&gt;",
+  "owner": "&lt;person or org responsible&gt;",
+  "upstream_commit": "&lt;sha&gt; or null",
+  "notes": "&lt;free text&gt;"
+}</code></pre>
+  <p>One required field that does the heavy lifting: <code>role</code>. Tells any AI immediately what this repo IS in the ADD hierarchy.</p>
+  <ul>
+    <li><code>canonical</code> — the source of truth. Exactly ONE repo across all orgs has this. (Today: <code>kastil-systems/a-d-d</code>.)</li>
+    <li><code>scaffold</code> — starter/template variant. Spawns new project a-d-d folders.</li>
+    <li><code>historical</code> — archived design content preserved for reference. Never edited.</li>
+    <li><code>teaching</code> — explanatory/docs surface. Newcomer-facing.</li>
+    <li><code>code-tree-copy</code> — scaffolded into a product code repo, synced from canonical. Per the kernel rule, canonical wins on conflict.</li>
+  </ul>
+
+  <h3>Artifact 2 — The Registry</h3>
+  <p>A single markdown file at <code>kastil-systems/a-d-d/REGISTRY.md</code> listing every known a-d-d repo across all orgs the operator manages. Schema (markdown table, human-readable, machine-greppable):</p>
+  <pre><code>| Repo                              | Role        | Status     | Intent                                           | Notes              |
+|-----------------------------------|-------------|------------|--------------------------------------------------|--------------------|
+| kastil-systems/a-d-d              | canonical   | active     | kASTIL methodology + nous architecture           | THE source         |
+| acmedevUS/acme-architecture       | scaffold    | active     | Acme business architecture (renamed from a-d-d)  | per cleanup C2     |
+| ai-pantheon-internal/ADD          | historical  | archived   | Pre-merge Pantheon NOUS design                   | merged 2026-05-21  |
+| joeycastilloUS/a-d-d-guidance     | teaching    | active     | Newcomer docs + PRIMER + CHANGELOG               | per cleanup C4     |
+| Life-Water/a-d-d                  | scaffold    | empty      | LifeWater product architecture (not started)     | per cleanup C3     |</code></pre>
+  <p>This file is the org-wide truth. <code>gh api</code>-fetchable. Generated initially by hand, kept current by either: a manual edit when a new a-d-d repo appears, OR a periodic script that runs <code>gh search repos --topic=add</code> and reconciles.</p>
+
+  <h3>The Discovery Trail (how an AI reaches both artifacts)</h3>
+  <ol>
+    <li><strong>Entry point.</strong> Any tilde command starts by reading the kernel <code>CLAUDE.md</code> (already happens). Kernel CLAUDE.md gets one new section: <code>## Canonical ADD</code> declaring the canonical repo path and the registry URL.</li>
+    <li><strong>From kernel to canonical.</strong> Agent fetches <code>kastil-systems/a-d-d/REGISTRY.md</code> via <code>gh api repos/kastil-systems/a-d-d/contents/REGISTRY.md --jq .content | base64 -d</code>. One API call. Cached for the session.</li>
+    <li><strong>From canonical to local repos.</strong> If the agent is operating IN a repo, walks up the tree looking for <code>.add.json</code>. Found = this is an a-d-d-shaped repo, role declared. Not found = this is a regular project/code repo, treat as such.</li>
+    <li><strong>Cross-org discovery.</strong> When an agent needs to know "where else is this concept defined?", it consults the in-memory registry from step 2. No new searches.</li>
+  </ol>
+
+  <h3>Out of scope</h3>
+  <ul>
+    <li><strong>Not a runtime daemon.</strong> No live service. Static files only.</li>
+    <li><strong>Not enforcement.</strong> Doesn't prevent drift; surfaces it. If someone creates a misnamed a-d-d-shaped repo without an Anchor, it stays invisible to the system until the Registry is updated.</li>
+    <li><strong>Not auto-migration.</strong> Scaffold and code-tree-copy roles describe state; they don't sync themselves. Sync is the existing manual <code>go.bat</code> + "canonical wins" rule from the kernel.</li>
+    <li><strong>Not a replacement for skill.json.</strong> The Anchor is repo-level; skill.json is file-level. Both stay.</li>
+  </ul>
+</div>
+
+<h2>5. Choices + Consequences</h2>
+<div class="section">
+
+  <table>
+  <thead><tr><th>Fork</th><th>Option A</th><th>Option B</th><th>2nd-order consequence</th><th>3rd-order consequence</th><th>Pick</th></tr></thead>
+  <tbody>
+  <tr>
+    <td><strong>Anchor format</strong></td>
+    <td><code>.add.json</code> (structured JSON)</td>
+    <td><code>.add</code> plain text key:value</td>
+    <td>JSON: any language can parse. Plain text: needs custom parser or grep.</td>
+    <td>JSON enables schema validation later; plain text invites freeform drift.</td>
+    <td><strong>A.</strong> JSON. Standard, schema-able, future-safe.</td>
+  </tr>
+  <tr>
+    <td><strong>Registry location</strong></td>
+    <td>Inside canonical: <code>kastil-systems/a-d-d/REGISTRY.md</code></td>
+    <td>Separate repo: <code>kastil-systems/a-d-d-registry</code></td>
+    <td>Inside canonical: one fetch covers methodology + registry. Separate: clean separation but extra repo to maintain.</td>
+    <td>Inside canonical: registry is always at the same hash as the canonical it points to (versioned together). Separate: registry can drift from canonical's version.</td>
+    <td><strong>A.</strong> Inside canonical. One repo, one fetch, versioned together.</td>
+  </tr>
+  <tr>
+    <td><strong>Registry maintenance</strong></td>
+    <td>Manual (humans edit on add/rename)</td>
+    <td>Auto-populated via <code>gh search repos --topic=add</code></td>
+    <td>Manual: drifts when humans forget. Auto: misses repos without the topic tag, but always finds the tagged ones.</td>
+    <td>Hybrid (auto-detect + human-verify) catches both failure modes.</td>
+    <td><strong>Hybrid.</strong> Auto-detect candidates from <code>topic=add</code>; human curates roles + status.</td>
+  </tr>
+  <tr>
+    <td><strong>GitHub-level marker</strong></td>
+    <td>GitHub topic <code>add</code> per repo</td>
+    <td>Naming convention only (<code>*-a-d-d</code>, <code>*-ADD</code>)</td>
+    <td>Topic: searchable across orgs in one query. Naming: visible but can't query.</td>
+    <td>Both is cheap and orthogonal — keep naming for humans, add topic for tooling.</td>
+    <td><strong>Both.</strong> Topic for tooling, naming for humans.</td>
+  </tr>
+  <tr>
+    <td><strong>Agent discovery path</strong></td>
+    <td>Kernel CLAUDE.md declares canonical + registry path</td>
+    <td>Well-known DNS record (<code>_add.kastil.dev</code> TXT)</td>
+    <td>Kernel: agents already read it on every session; zero extra config. DNS: requires DNS plumbing, adds an external dependency.</td>
+    <td>Kernel works without internet; DNS requires it. The kernel path also versions with the codebase.</td>
+    <td><strong>A.</strong> Kernel CLAUDE.md. Stay bare-metal; no external services.</td>
+  </tr>
+  </tbody>
+  </table>
+
+</div>
+
+<h2>6. Escape Routes</h2>
+<div class="section">
+  <table>
+  <thead><tr><th>Load-bearing choice</th><th>What if it's wrong?</th><th>How to back out</th><th>Reversible?</th></tr></thead>
+  <tbody>
+  <tr>
+    <td><code>.add.json</code> at repo root (Anchor format)</td>
+    <td>JSON parsing turns out brittle in some edge case (BOM, encoding, etc.); OR a different format becomes more useful.</td>
+    <td>Schema version <code>1</code> means we can ship <code>schema: 2</code> with a new format and dual-read for a period. Tools fall back gracefully on unknown schema.</td>
+    <td><span class="pass">Yes — versioning baked in.</span></td>
+  </tr>
+  <tr>
+    <td>Registry inside canonical repo</td>
+    <td>Canonical repo grows too large (currently 467KB, no near-term concern); OR registry needs faster updates than the methodology repo supports.</td>
+    <td>Spin <code>kastil-systems/a-d-d-registry</code> as a separate repo. Old REGISTRY.md becomes a one-line redirect. Anchors don't change (they point at <code>canonical</code> = repo slug, not at registry).</td>
+    <td><span class="pass">Yes — easy split.</span></td>
+  </tr>
+  <tr>
+    <td>GitHub topic <code>add</code></td>
+    <td>GitHub deprecates topics, or they get used by an unrelated community for something else.</td>
+    <td>Rename to <code>kastil-add</code> or <code>add-architecture</code>. Update all repos' topics + the auto-populate script. Naming convention <code>*-a-d-d</code> still works as the fallback identifier.</td>
+    <td><span class="pass">Yes — rename is bulk-scriptable.</span></td>
+  </tr>
+  <tr>
+    <td>Hybrid auto-populate</td>
+    <td>The auto-populate script breaks or produces noise (false positives).</td>
+    <td>Disable the script; registry stays as the last good manual version. No agent depends on the script — they depend on the file.</td>
+    <td><span class="pass">Yes — script is additive, never load-bearing.</span></td>
+  </tr>
+  <tr>
+    <td>Kernel CLAUDE.md as discovery entry point</td>
+    <td>Kernel doc grows so long that the canonical pointer gets lost in noise.</td>
+    <td>Split out a <code>be/docs/discovery.md</code> referenced from kernel. Agents read both. <span class="warn">Mildly painful</span> because every agent's startup sequence has to learn the new path.</td>
+    <td><span class="warn">Yes, with friction.</span></td>
+  </tr>
+  </tbody>
+  </table>
+  <p>No load-bearing choice is unreversible. Every component is a static file in git. Worst case: rip out, redo. The cost of being wrong is one short cleanup, not a system rewrite.</p>
+</div>
+
+<h2>7. Pure Metal Test</h2>
+<div class="section">
+  <p>Dependencies and their character:</p>
+  <table>
+  <thead><tr><th>Dependency</th><th>Load-bearing?</th><th>Replaceable?</th><th>Notes</th></tr></thead>
+  <tbody>
+  <tr><td><code>git</code> (file storage, history)</td><td><span class="pass">Load-bearing</span></td><td>No (foundational)</td><td>Already the whole stack's foundation. Zero new dep.</td></tr>
+  <tr><td><code>gh</code> CLI (API access)</td><td><span class="warn">Load-bearing for cross-org queries</span></td><td>Yes — raw <code>curl https://api.github.com/...</code> works too.</td><td>Used for: <code>gh search repos --topic=add</code>, <code>gh api repos/.../contents/REGISTRY.md</code>.</td></tr>
+  <tr><td>GitHub topics feature</td><td><span class="warn">Load-bearing for auto-populate</span></td><td>Yes — fall back to naming convention only.</td><td>If GitHub kills topics, registry survives (just stops auto-populating).</td></tr>
+  <tr><td>JSON parser (in any language reading <code>.add.json</code>)</td><td><span class="pass">Load-bearing</span></td><td>No (universal — every language has one).</td><td>Standard library in every language we use.</td></tr>
+  <tr><td>Markdown rendering (for human reading of REGISTRY.md)</td><td>No</td><td>Yes</td><td>Cosmetic. Machine reads raw text; humans read rendered.</td></tr>
+  <tr><td>kernel CLAUDE.md</td><td><span class="pass">Load-bearing</span></td><td>Yes — can move declaration elsewhere.</td><td>Already exists and is read by every agent.</td></tr>
+  </tbody>
+  </table>
+  <p><strong>Verdict.</strong> Zero new infrastructure. The whole design is static files in git plus existing <code>gh</code> tooling. Pure metal. Survives loss of any external service (GitHub topics, the auto-populate script, registry-as-separate-repo) by gracefully degrading to "just read the canonical Anchor + walk REGISTRY.md by hand."</p>
+</div>
+
+<h2>8. First Move</h2>
+<div class="section">
+  <p><strong>The smallest concrete step that proves this design is real:</strong></p>
+  <ol>
+    <li>Write <code>.add.json</code> at <code>kastil-systems/a-d-d/</code> root, declaring it canonical:
+      <pre><code>{
+  "schema": 1,
+  "role": "canonical",
+  "canonical": "kastil-systems/a-d-d",
+  "intent": "kASTIL SYSTEMS Architecture-Driven Development — methodology + NOUS architecture + target hardware specs",
+  "owner": "Joseph M. Castillo",
+  "upstream_commit": null,
+  "notes": "Source of truth for ADD across all orgs. See REGISTRY.md for footprint."
+}</code></pre>
+    </li>
+    <li>Write <code>REGISTRY.md</code> at <code>kastil-systems/a-d-d/</code> root, seeded with the 6 known a-d-d repos discovered in the audit (V18 ~i report).</li>
+    <li>Tag <code>kastil-systems/a-d-d</code> with the GitHub topic <code>add</code> via <code>gh repo edit kastil-systems/a-d-d --add-topic add</code>.</li>
+    <li>Add a 4-line <code>## Canonical ADD</code> section to the kernel CLAUDE.md (in <code>metal-console</code>) declaring: canonical repo = <code>kastil-systems/a-d-d</code>, registry path = <code>REGISTRY.md</code>, anchor file convention = <code>.add.json</code>.</li>
+    <li>Verify: from a fresh shell, run <code>gh search repos --topic=add --json fullName,description</code>. <code>kastil-systems/a-d-d</code> appears. Then <code>gh api repos/kastil-systems/a-d-d/contents/.add.json --jq '.content' | base64 -d | jq</code>. Should print the Anchor as parsed JSON. <strong>If both work: the design is real.</strong></li>
+  </ol>
+  <p>Total work: ~30 minutes. Three new files (<code>.add.json</code>, <code>REGISTRY.md</code>, kernel patch). One <code>gh repo edit</code>. One verification fetch. After this First Move lands, scaling to the other 5 a-d-d repos is mechanical — each gets its own <code>.add.json</code> with the appropriate <code>role</code>, then gets registered.</p>
+</div>
+
+<h2>Definition of Done</h2>
+<div class="section">
+  <ul>
+    <li><span class="pass">✓</span> Code committed (this design)</li>
+    <li><span class="pass">✓</span> Commit hash in telemetry</li>
+    <li>— Board updated (First Move will queue ~b items)</li>
+    <li><span class="pass">✓</span> HTML report saved (be/designs/2026-05-21-2228-design-add-discovery.html)</li>
+    <li><span class="pass">✓</span> Index updated</li>
+    <li><span class="pass">✓</span> Pushed to remote</li>
+    <li><span class="pass">✓</span> No prior work damaged</li>
+    <li>— Shipped to production (audit-internal artifact)</li>
+  </ul>
+</div>
+
+</div>
+<footer>v0 · r23 · 2026-05-21 · ~d ADD Anchor + Registry · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>

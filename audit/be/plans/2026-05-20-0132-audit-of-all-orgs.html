@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i audit-of-all — Joey's GitHub footprint, full sweep</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; line-height: 1.6; }
+  nav { position: sticky; top:0; background:#000; border-bottom: 2px solid var(--accent); padding: 12px 24px; z-index: 100; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 18px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { color: var(--accent); font-size: 30px; margin: 0 0 4px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 28px; }
+  h2 { color: var(--accent); font-size: 20px; margin-top: 44px; border-bottom: 1px solid var(--surface2); padding-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+  h3 { color: var(--text); font-size: 16px; margin-top: 24px; }
+  h4 { color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin: 18px 0 6px; }
+  p { color: #ccc; margin: 8px 0; }
+  ul, ol { color: #ccc; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .pill { display: inline-block; background: var(--surface); color: var(--accent); padding: 2px 8px; border-radius: 10px; font-size: 11px; letter-spacing: 1px; margin-right: 6px; }
+  .pill.red { color: var(--red); border: 1px solid #4a1f1f; }
+  .pill.amber { color: var(--amber); border: 1px solid #4a3a1f; }
+  .pill.green { color: var(--green); border: 1px solid #1f4a2a; }
+  .pill.muted { color: var(--t3); border: 1px solid #2a2a2a; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 13px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  tr:hover td { background: var(--surface); }
+  .count { color: var(--accent); font-weight: 700; font-size: 22px; }
+  .org-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+  .org-card { background: var(--surface); border-left: 3px solid var(--accent); padding: 12px 14px; }
+  .org-card.empty { border-left-color: var(--t3); }
+  .org-card.client { border-left-color: var(--amber); }
+  .org-card.problem { border-left-color: var(--red); }
+  .org-card h3 { margin: 0 0 4px; color: var(--text); font-size: 15px; }
+  .org-card .meta { color: var(--t2); font-size: 11px; }
+  .finding { background: var(--surface); border-left: 3px solid var(--red); padding: 14px 18px; margin: 14px 0; }
+  .finding.amber { border-left-color: var(--amber); }
+  .finding.green { border-left-color: var(--green); }
+  .finding h3 { margin-top: 0; color: var(--accent); font-size: 15px; }
+  .move { background: #0F1A1F; border: 1px solid #2A4A5A; padding: 10px 14px; margin: 8px 0; font-family: 'Consolas', monospace; font-size: 13px; }
+  .move .from { color: var(--red); }
+  .move .to { color: var(--green); }
+  .move .why { color: var(--t2); display: block; font-style: italic; margin-top: 4px; font-size: 11px; font-family: 'Helvetica Neue', sans-serif; }
+  .dod { background: var(--surface); padding: 16px 20px; margin: 32px 0 16px; }
+  .dod-item { color: var(--t2); font-size: 13px; padding: 3px 0; }
+  .dod-item.pass::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .dod-item.na::before { content: "— "; color: var(--t3); }
+  footer { color: var(--t3); font-size: 11px; text-align: center; padding: 24px; border-top: 1px solid var(--surface2); }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i</span></nav>
+<div class="container">
+
+<h1>The Pantheon, as it actually lives on GitHub.</h1>
+<p class="sub">Full sweep across 9 orgs. 127 repos. From metal console's point of view: where it's tight, where it's drifted, where it needs to move.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>What It Is</h2>
+<p>Joey asked: "tell me what's misorganized — I can't plan giant workloads when everything is all over the place." This is the answer.</p>
+
+<p>Scope: every GitHub org Joey belongs to. Personal account + every org membership <code>gh api user/orgs</code> returns. No assumptions, no skipping. The audit re-runs by typing <code>~i</code> in this repo — each run is a fresh dated artifact in <code>be/plans/</code>, so drift is visible over time.</p>
+
+<p>This first run found <strong>9 orgs you mentioned 4. 5 you didn't.</strong> That gap is the headline.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Structure — All 9 Orgs</h2>
+
+<div class="org-grid">
+  <div class="org-card"><h3>joeycastilloUS <span class="pill">19</span></h3><div class="meta">Personal account. Mixed bag — kernel-adjacent, personal sites, archive, experiments. Heaviest org by mental load even if not by count.</div></div>
+  <div class="org-card"><h3>kastil-systems <span class="pill">10</span></h3><div class="meta">The systems org. <code>a-d-d</code> (canonical), <code>nous</code>, <code>the-last-platform</code>, <code>metal-console</code> (C). The kernel layer.</div></div>
+  <div class="org-card"><h3>ai-pantheon <span class="pill">28</span></h3><div class="meta">Largest org. Most repos created on a single day (2026-02-22) and never touched again. Parking lot. The brand surface lives here but so does a lot of dead scaffold.</div></div>
+  <div class="org-card"><h3>ai-pantheon-internal <span class="pill">6</span></h3><div class="meta">Mostly Feb 2026 timestamps. <code>purpose-learning</code>, <code>purpose-memory</code>, <code>ADD</code> (yes, another one). Unclear why it exists separately from ai-pantheon.</div></div>
+  <div class="org-card client"><h3>acmedevUS <span class="pill">17</span></h3><div class="meta">Acme Dev LLC commercial work — BUT contaminated. Holds <code>ai-pantheon</code>, <code>claude-run-storyline</code>, <code>employee-validator</code> (Philz!), <code>crew-check-api</code> (Philz!), <code>a-d-d</code> (another copy).</div></div>
+  <div class="org-card client"><h3>philzcoffee <span class="pill">38</span></h3><div class="meta">Real client org. Deep history (2020-2026). Largest by repo count. Clean separation from the Pantheon work — this one's healthy.</div></div>
+  <div class="org-card client"><h3>Mendocino-Farms <span class="pill">8</span></h3><div class="meta">Real client org. Overwatch + RAD + NetSuite. Clean. <code>common_csharp</code> copy exists here too (intentional — per-client shared libs).</div></div>
+  <div class="org-card client"><h3>Life-Water <span class="pill">1</span></h3><div class="meta">Holds one repo: <code>a-d-d</code>. That's it. lifewater.io product work should live here but doesn't yet.</div></div>
+  <div class="org-card empty"><h3>Province-Light-Foundation <span class="pill muted">0</span></h3><div class="meta">Empty org. No repos, no description visible. Existence-without-intent.</div></div>
+</div>
+
+<p class="sub"><strong>Total: 127 repos.</strong> Of those, ~30 haven't been touched in 90+ days. ~15 are duplicates or near-duplicates of repos in other orgs.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>The Stack — Intent → Purpose → What</h2>
+
+<p><strong>Intent.</strong> Be able to type <code>~l &lt;name&gt;</code> and have it land where you expect. Today you can't — too many names mean too many things, and the same name means different things in different orgs.</p>
+
+<p><strong>Purpose.</strong> Org = audience contract, not bucket. Each org should answer one question: <em>who is this for?</em></p>
+
+<p><strong>What it should look like (proposed):</strong></p>
+
+<table>
+<thead><tr><th>Org</th><th>Audience</th><th>What lives here</th></tr></thead>
+<tbody>
+<tr><td><code>kastil-systems</code></td><td>The systems builder (you)</td><td>The kernel: a-d-d, nous, metal-console-runtime, the-last-*, assembly, cc, target-runtimes. Bare metal, methodology, source of truth.</td></tr>
+<tr><td><code>ai-pantheon</code></td><td>The world (brand surface)</td><td>Public face: ai-pantheon.ai, integrity/safety/identity (the public trio), customer-facing platform.</td></tr>
+<tr><td><code>joeycastilloUS</code></td><td>Joey-the-person</td><td>joeycastillo.us, personal experiments, billiards-tracker, norman. Things Joey would say "this is me" about — not "this is kastil systems."</td></tr>
+<tr><td><code>acmedevUS</code></td><td>Acme Dev LLC (commercial)</td><td>airbyte-*, valorpro, bahalaka. NOT Pantheon brand work. NOT Philz client work.</td></tr>
+<tr><td><code>philzcoffee</code></td><td>Philz Coffee (client)</td><td>All Philz work. Healthy today.</td></tr>
+<tr><td><code>Mendocino-Farms</code></td><td>Mendo Farms (client)</td><td>All Mendo work. Healthy today.</td></tr>
+<tr><td><code>Life-Water</code></td><td>Life-Water (client)</td><td>lifewater.io product. Needs population.</td></tr>
+<tr><td><code>ai-pantheon-internal</code></td><td>?</td><td>Open question — see Findings. Probably collapse into kastil-systems.</td></tr>
+<tr><td><code>Province-Light-Foundation</code></td><td>?</td><td>Open question — populate or delete.</td></tr>
+</tbody>
+</table>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Patterns Found</h2>
+
+<div class="finding">
+  <h3><span class="pill red">DRIFT</span> a-d-d exists in SIX places — your "single source of truth" isn't single</h3>
+  <p>CLAUDE.md (kernel) declares <code>kastil-systems/a-d-d/GLOBAL.md</code> as the methodology source. Reality:</p>
+  <ul>
+    <li><code>kastil-systems/a-d-d</code> — declared canonical (Batchfile, 2026-05-19)</li>
+    <li><code>acmedevUS/a-d-d</code> — description literally says "single source of truth" (Batchfile, 2026-03-11)</li>
+    <li><code>acmedevUS/a-d-d-template</code> — archived</li>
+    <li><code>Life-Water/a-d-d</code> — Batchfile, 2026-03-18</li>
+    <li><code>ai-pantheon-internal/ADD</code> — Shell, 2026-02-24, capitalized</li>
+    <li><code>joeycastilloUS/a-d-d-guidance</code> — HTML, 2026-05-10</li>
+  </ul>
+  <p>This is the #1 risk to your "load from metal and work anywhere" goal. Six copies means six diverging methodologies. The one with the most recent push isn't automatically right.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="pill red">DRIFT</span> metal-console exists in TWO orgs with TWO different primary languages</h3>
+  <ul>
+    <li><code>joeycastilloUS/metal-console</code> — HTML, 2026-05-19. The operator console (this repo).</li>
+    <li><code>kastil-systems/metal-console</code> — C, 2026-05-18. Different codebase entirely.</li>
+  </ul>
+  <p>Both active. Both nameless (no description). One is presumably the runtime (C); the other is the operator surface (HTML). When you say "metal" in conversation, you don't know which you mean — and neither does anyone reading the org list.</p>
+</div>
+
+<div class="finding amber">
+  <h3><span class="pill amber">CONTAMINATION</span> acmedevUS holds repos that don't belong to Acme</h3>
+  <p>acmedevUS is supposed to be Acme Dev LLC commercial work. It currently also holds:</p>
+  <ul>
+    <li><code>ai-pantheon</code> — Pantheon brand, wrong org</li>
+    <li><code>claude-run-storyline</code> — Pantheon product, wrong org</li>
+    <li><code>employee-validator</code> — "Crew Check ... PWA for Philz Coffee" — wrong org</li>
+    <li><code>crew-check-api</code> — "Crew Check API ... Philz Coffee" — wrong org</li>
+    <li><code>claudius-maximus</code> — unclear, probably Pantheon</li>
+    <li><code>a-d-d</code> — kastil-systems methodology, wrong org</li>
+  </ul>
+  <p>Pattern: Acme used to be where everything started. It's still where the residue lives. The split happened, the move didn't.</p>
+</div>
+
+<div class="finding amber">
+  <h3><span class="pill amber">PARKING LOT</span> ai-pantheon was mass-created and mostly abandoned</h3>
+  <p>28 repos in ai-pantheon. <strong>21 of them have a last-push date of 2026-02-22</strong> — the same day. That's a create-spree, not active development. Names like <code>pantheon-mesh</code>, <code>pantheon-mail</code>, <code>pantheon-personal</code>, <code>pantheon-worker-alpha/beta/gamma</code> — empty placeholders.</p>
+  <p>The Pantheon thinking is real (it's in the kernel doc), but the GitHub structure froze at sketch stage. Decision needed: fold the live work back to a small set (maybe <code>pantheon-platform</code>, <code>pantheon-web</code>, the public trio) and archive the rest, or accept the scaffold and revive it deliberately.</p>
+</div>
+
+<div class="finding amber">
+  <h3><span class="pill amber">NAMING</span> joeycastilloUS has FIVE "metal-*" things that aren't clearly distinguished</h3>
+  <ul>
+    <li><code>metal-console</code> — the operator console (this kernel)</li>
+    <li><code>metal-desktop</code> — described, clear ("browser-based cockpit on localhost:5050")</li>
+    <li><code>ai-metal</code> — no description</li>
+    <li><code>metal-proposal</code> — no description</li>
+    <li><code>metal.Be</code> — Shell language, no description</li>
+  </ul>
+  <p>Two more confusables: <code>joeycastilloUS/kastil-systems</code> (a repo named after the org) and <code>joeycastilloUS/kASTIL</code>. Both empty descriptions. Reading the names cold, you can't tell which is which.</p>
+</div>
+
+<div class="finding amber">
+  <h3><span class="pill amber">DUPLICATION</span> overwatch_app, playwright_reports, common_csharp exist in multiple orgs</h3>
+  <ul>
+    <li><code>common_csharp</code> in acmedevUS, philzcoffee, Mendocino-Farms — probably intentional (per-client shared libs), confirm.</li>
+    <li><code>overwatch_app</code> in acmedevUS AND Mendocino-Farms — likely one is a fork or stale duplicate.</li>
+    <li><code>playwright_reports</code> in acmedevUS AND philzcoffee — same question.</li>
+  </ul>
+</div>
+
+<div class="finding amber">
+  <h3><span class="pill amber">CONVENTION</span> "the-last-*" naming is half-applied</h3>
+  <p>kastil-systems has <code>the-last-platform</code>, <code>the-last-pos</code> (hyphenated) — and <code>thelastfamily</code> (no hyphens). Small thing. Drift-shaped.</p>
+</div>
+
+<div class="finding green">
+  <h3><span class="pill green">HEALTHY</span> philzcoffee, Mendocino-Farms — leave them alone</h3>
+  <p>Client orgs are the cleanest part of your footprint. Real names, real history, real activity. They're a model for how the rest could look.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="pill red">EXISTENCE-WITHOUT-INTENT</span> Province-Light-Foundation</h3>
+  <p>Org exists, contains zero repos. Either it was a placeholder for an initiative that never started, or it's the home of a real thing that hasn't been created yet. Today it adds cognitive load with no upside.</p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Recommended Moves — In Priority Order</h2>
+
+<p>These are recommendations, not destructive actions. Joey decides what moves and when. The audit re-runs after each move to confirm cleanup.</p>
+
+<div class="move">
+  <span class="from">[1] PICK ONE a-d-d.</span> Declare <code>kastil-systems/a-d-d</code> canonical (matches CLAUDE.md). Replace the README in the other 5 with a one-line redirect to it. Optionally archive the dead ones.
+  <span class="why">Cost: 1 hour. Payoff: stops methodology drift dead.</span>
+</div>
+
+<div class="move">
+  <span class="from">[2] RENAME ONE metal-console.</span> Suggest: keep <code>joeycastilloUS/metal-console</code> as the operator surface (it's where this kernel lives). Rename <code>kastil-systems/metal-console</code> → <code>kastil-systems/metal-runtime</code> or <code>kastil-systems/metal-core</code> (whatever the C codebase actually is).
+  <span class="why">Cost: rename + push. Payoff: "metal-console" means one thing again.</span>
+</div>
+
+<div class="move">
+  <span class="to">[3] MOVE Philz repos out of acmedevUS.</span> Transfer <code>employee-validator</code> and <code>crew-check-api</code> to <code>philzcoffee</code> where the rest of the Crew Check work lives.
+  <span class="why">Cost: 2 transfers via gh. Payoff: client work in client org. Audit-clean.</span>
+</div>
+
+<div class="move">
+  <span class="to">[4] MOVE Pantheon repos out of acmedevUS.</span> Transfer <code>ai-pantheon</code>, <code>claude-run-storyline</code>, <code>claudius-maximus</code> to <code>ai-pantheon</code> org. Archive or transfer <code>acmedevUS/a-d-d</code>.
+  <span class="why">Cost: 3-4 transfers. Payoff: acmedevUS = Acme work, full stop.</span>
+</div>
+
+<div class="move">
+  <span class="from">[5] DECIDE ai-pantheon-internal's fate.</span> Either declare its audience (private R&amp;D before public exposure?) or fold its 6 repos into <code>kastil-systems</code> (kernel work) or <code>ai-pantheon</code> (Pantheon work). Today it reads as accidental.
+  <span class="why">Cost: 1 conversation with yourself. Payoff: one less mystery org.</span>
+</div>
+
+<div class="move">
+  <span class="from">[6] PRUNE the ai-pantheon Feb-22 scaffold.</span> Of the 21 repos last touched 2026-02-22, decide for each: (a) keep + revive, (b) archive in place, (c) consolidate into a parent repo. Recommendation: archive everything you haven't revisited in 90 days unless it's part of an active plan.
+  <span class="why">Cost: 1 hour scanning. Payoff: drops ai-pantheon from 28 repos to ~7 real ones.</span>
+</div>
+
+<div class="move">
+  <span class="from">[7] CLARIFY or COLLAPSE joeycastilloUS's metal-* / kASTIL repos.</span> Pick which of <code>ai-metal</code>, <code>metal-proposal</code>, <code>metal.Be</code>, <code>kastil-systems</code>, <code>kASTIL</code> are real vs. abandoned. Add 1-line descriptions to all survivors. Archive the rest.
+  <span class="why">Cost: 30 minutes. Payoff: scanning the org list tells you the truth.</span>
+</div>
+
+<div class="move">
+  <span class="to">[8] RESOLVE Province-Light-Foundation.</span> Either give it a charter (which initiative? which audience?) or delete the empty org.
+  <span class="why">Cost: 1 decision. Payoff: 9 orgs → 8 orgs (or 9 orgs with intent).</span>
+</div>
+
+<div class="move">
+  <span class="to">[9] RENAME thelastfamily → the-last-family.</span> Consistency with <code>the-last-platform</code>, <code>the-last-pos</code>.
+  <span class="why">Cost: 30 seconds. Payoff: the convention holds.</span>
+</div>
+
+<div class="move">
+  <span class="to">[10] ADD descriptions to EVERY active repo.</span> 80%+ of joeycastilloUS and kastil-systems repos have no description. One line each. That's the single biggest "loadable from metal" win — <code>~list</code> becomes self-documenting.
+  <span class="why">Cost: 1-2 hours one-time. Payoff: every future audit reads itself.</span>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Open Questions</h2>
+
+<ol>
+  <li>What is <code>joeycastilloUS/norman</code>? Named for Norman Campbell (the Javelin-era voice in CLAUDE.md quotes)? A person-tracker? An archive?</li>
+  <li>What's the difference between <code>joeycastilloUS/kastil-systems</code> (a repo) and the <code>kastil-systems</code> org? Why does the repo exist?</li>
+  <li>Is <code>ai-pantheon-internal</code> meant to be private dev preceding ai-pantheon public exposure, or is it accidental?</li>
+  <li><code>joeycastilloUS/legacy</code> — should it be archived (set <code>isArchived=true</code> on the repo) rather than sitting in the active list?</li>
+  <li>What is <code>ai-pantheon/knowledge-archive</code> vs <code>ai-pantheon/conversation-archive</code> — both Python, both last touched 2026-02-22? One repo's worth of data in two places?</li>
+  <li>The public trio (<code>integrity</code>, <code>safety</code>, <code>identity</code>) in ai-pantheon — is this a coordinated launch surface or three half-shipped exposures?</li>
+  <li><code>kastil-systems/old-root</code> — archive candidate?</li>
+  <li>Province-Light-Foundation — was this meant to be Joey's philanthropy / foundation arm? Or an org someone else created and added you to?</li>
+</ol>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>How to use this audit</h2>
+
+<p>Two ways:</p>
+<ol>
+  <li><strong>Make the moves yourself</strong> — work through the 10 recommended moves above in order. Each one is small. The whole list is a weekend.</li>
+  <li><strong>Convert to boards</strong> — run <code>~e</code> on this report and the recommended moves become Fibonacci-sized board items in <code>be/board.md</code>. Then <code>~b</code> pulls them one at a time. That's the "load from metal and work on anything" pattern Joey wanted.</li>
+</ol>
+
+<p>Either way, re-run <code>~i</code> in this repo after each pass. The audit is the discipline — every move shows up in the next report.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="dod">
+  <h3 style="color: var(--accent); margin-top:0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase;">Definition of Done</h3>
+  <div class="dod-item pass">Code committed (~new scaffold + this report)</div>
+  <div class="dod-item pass">Commit hash in telemetry (this run logs it)</div>
+  <div class="dod-item na">Board updated (no board items yet — ~e converts findings to items)</div>
+  <div class="dod-item pass">HTML report saved (this file, be/plans/2026-05-20-0132-audit-of-all-orgs.html)</div>
+  <div class="dod-item pass">Index updated (be/index.html lists this plan)</div>
+  <div class="dod-item pass">Pushed to remote (joeycastilloUS/audit-of-all)</div>
+  <div class="dod-item pass">No prior work damaged (new repo, no prior work)</div>
+  <div class="dod-item na">Shipped to production (no deployable surface yet — audit is internal until ~dev-refresh)</div>
+</div>
+
+</div>
+<footer>v0 · r2 · 2026-05-20 · ~i audit-of-all · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~p v2 GCP VMs — hardware-layer naming + migration to kastil-systems</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .status-banner { background: var(--amber); color: #000; padding: 6px 24px; text-align: center; font-weight: 700; letter-spacing: 2px; font-size: 11px; }
+  .container { max-width: 1080px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 18px 0 6px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 22px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  pre { background: #0A0A0A; padding: 12px 16px; border-radius: 4px; color: #ddd; font-size: 11.5px; font-family: 'Consolas', monospace; white-space: pre; overflow-x: auto; margin: 10px 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.path { font-family: 'Consolas', monospace; font-size: 11.5px; }
+  td.old { color: var(--red); font-family: 'Consolas', monospace; text-decoration: line-through; opacity: 0.7; }
+  td.new { color: var(--green); font-family: 'Consolas', monospace; font-weight: 700; }
+  td.hw { color: var(--purple); font-family: 'Consolas', monospace; font-size: 11px; }
+  td.run { color: var(--green); font-weight: 700; }
+  td.term { color: var(--t3); font-weight: 700; }
+  .supersedes { background: #2A1010; border: 2px solid var(--red); padding: 12px 18px; margin: 14px 0; font-size: 13.5px; }
+  .supersedes b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .pick { background: #0F1F0F; border: 2px solid var(--green); padding: 14px 20px; margin: 12px 0; }
+  .pick h3 { color: var(--green); margin: 0 0 8px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .phase { background: var(--surface); border-left: 4px solid var(--accent); padding: 16px 22px; margin: 14px 0; }
+  .phase h3 { margin-top: 0; color: var(--accent); }
+  .phase .exit { color: var(--green); margin-top: 10px; font-size: 12px; }
+  .phase .exit::before { content: "✓ Exit: "; color: var(--green); font-weight: 700; }
+  .unknowns { background: #1f1a0f; border-left: 4px solid var(--amber); padding: 14px 18px; margin: 12px 0; }
+  .unknowns h3 { color: var(--amber); margin-top: 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .revisit { background: #0F1A1F; border-left: 4px solid var(--green); padding: 14px 18px; margin: 12px 0; }
+  .revisit h3 { color: var(--green); margin-top: 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .constraint { padding: 5px 0; border-bottom: 1px solid var(--surface2); font-size: 13px; }
+  .constraint:last-child { border-bottom: none; }
+  .constraint b { color: var(--accent); }
+  .upgrade { background: var(--surface); border-left: 4px solid var(--purple); padding: 12px 18px; margin: 8px 0; }
+  .upgrade h3 { color: var(--purple); margin: 0 0 4px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 24px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 20px; border-top: 1px solid #222; margin-top: 32px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~p v2 GCP VMs · hardware-layer naming</span></nav>
+<div class="status-banner">PLAN — AWAITING APPROVAL</div>
+<div class="container">
+
+<h1>~p v2 — rename + migrate 5 VMs to kastil-systems.</h1>
+<p class="sub">Joey wants the hardware layer visible in the name itself: machine class + NIC type + GCP zone + city. v2 also embeds upgrade opportunities found during the inspection (NIC + disk).</p>
+
+<div class="supersedes">
+<b>Supersedes</b>
+v1 (the airport-code proposal, <code>2026-05-23-0017-i-gcp-vms-acme-to-kastil.html</code>) optimized for short names. v2 corrects course on Joey's reframe: <em>"I want computer class and network card type, that is big for me as i target the hardware layer, i also want the gcp 'us-west-4-a-las-vegas' I like that too."</em> The hardware layer travels in the name. Airport-code is dropped; full GCP zone + city stays.
+</div>
+
+<div class="links">Trail: <a href="2026-05-23-0017-i-gcp-vms-acme-to-kastil.html">v1 (superseded)</a> · <a href="2026-05-22-1530-i-nous-desktop.html">~i nous-desktop</a></div>
+
+<h2>1. Intent</h2>
+
+<p>Joey is building bare metal. He thinks at the hardware layer. The names of the machines should expose that layer — not hide it behind cute abbreviations. When he reads <code>nous-elite-c2-standard-8-gvnic-us-east4-a-ashburn</code> he knows: it's the elite role, it's an 8-vCPU compute-optimized node, it has a gVNIC for high-throughput networking, it lives in us-east4-a (Ashburn, Virginia). No lookup needed. That's the win. v1 traded all that for 9-char airport codes; v1 was wrong about the trade.</p>
+
+<p>End state: 5 VMs in <code>kastil-systems</code> project. Names carry their hardware spec. Source project (<code>acmedev-platform-hq</code>) shut down or emptied of these workloads. Cutover safe — paired roles (2× prime, 2× relay) protect against single-VM downtime during migration.</p>
+
+<h2>2. The naming convention</h2>
+
+<div class="pick">
+<h3>Final pattern</h3>
+<pre><span style="color:var(--text);font-weight:700;">&lt;role&gt;-&lt;machine-class&gt;-&lt;nic-type&gt;-&lt;gcp-zone&gt;-&lt;city&gt;</span>
+
+Where:
+  &lt;role&gt;          = nous-elite · prime · relay (functional purpose)
+  &lt;machine-class&gt; = e2-micro · c2-standard-8 · n2-standard-4 · ...
+  &lt;nic-type&gt;      = virtio · gvnic · idpf  (or whatever GCP supports)
+  &lt;gcp-zone&gt;      = us-west4-a · asia-southeast1-a · ... (full GCP zone)
+  &lt;city&gt;          = singapore · las-vegas · hong-kong · ... (hyphenated, lowercase)</pre>
+<p>Hyphens are the only punctuation GCP allows in VM names. Max length 63 chars. All proposed names below: 42-49 chars. Plenty of room.</p>
+</div>
+
+<h2>3. The 5 final names (with current hardware + recommended hardware on rebuild)</h2>
+
+<table>
+<thead><tr><th style="width:18%;">Was</th><th style="width:8%;">Status</th><th>Becomes (rebuild target)</th><th style="width:14%;">Today's HW</th><th style="width:14%;">v2 target HW</th></tr></thead>
+<tbody>
+<tr>
+  <td class="old">nous-elite-us</td>
+  <td class="term">TERMINATED</td>
+  <td class="new">nous-elite-c2-standard-8-gvnic-us-east4-a-ashburn</td>
+  <td class="hw">c2-standard-8<br>virtio (default)<br>pd-standard 50 GB</td>
+  <td class="hw" style="color:var(--green);">c2-standard-8<br><strong>gvnic</strong><br><strong>pd-ssd</strong> 50 GB</td>
+</tr>
+<tr>
+  <td class="old">prime-asia-southeast1-a-singapore</td>
+  <td class="run">RUNNING</td>
+  <td class="new">prime-e2-micro-virtio-asia-southeast1-a-singapore</td>
+  <td class="hw">e2-micro<br>virtio (default)<br>pd-standard 20 GB</td>
+  <td class="hw">e2-micro<br>virtio<br>pd-standard 20 GB</td>
+</tr>
+<tr>
+  <td class="old">prime-us-west4-a-las-vegas</td>
+  <td class="run">RUNNING</td>
+  <td class="new">prime-e2-micro-virtio-us-west4-a-las-vegas</td>
+  <td class="hw">e2-micro<br>virtio (default)<br>pd-standard 20 GB</td>
+  <td class="hw">e2-micro<br>virtio<br>pd-standard 20 GB</td>
+</tr>
+<tr>
+  <td class="old">relay-asia-east2-a-hong-kong</td>
+  <td class="run">RUNNING</td>
+  <td class="new">relay-e2-micro-virtio-asia-east2-a-hong-kong</td>
+  <td class="hw">e2-micro<br>virtio (default)<br>pd-standard 10 GB</td>
+  <td class="hw">e2-micro<br>virtio<br>pd-standard 10 GB</td>
+</tr>
+<tr>
+  <td class="old">relay-us-west2-a-los-angeles</td>
+  <td class="run">RUNNING</td>
+  <td class="new">relay-e2-micro-virtio-us-west2-a-los-angeles</td>
+  <td class="hw">e2-micro<br>virtio (default)<br>pd-standard 10 GB</td>
+  <td class="hw">e2-micro<br>virtio<br>pd-standard 10 GB</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Length sanity:</strong> longest name = <code>nous-elite-c2-standard-8-gvnic-us-east4-a-ashburn</code> = 48 chars. GCP limit 63. Fine.</p>
+
+<h2>4. Hardware upgrades discovered during inspection</h2>
+
+<div class="upgrade">
+<h3>Upgrade 1 — nous-elite gets gVNIC (the NIC type matters for compute-optimized)</h3>
+<p>Today the c2-standard-8 runs default <code>VIRTIO_NET</code>. gVNIC is Google's higher-throughput NIC, recommended for c2/n2/c3 tiers, required to hit max network throughput. On rebuild: <code>--network-interface=nic-type=GVNIC</code>. The name reflects this — <code>...-gvnic-...</code>.</p>
+<p>This is why v2's name format includes NIC type. The hardware choice is invisible from the v1 name; visible from the v2 name.</p>
+</div>
+
+<div class="upgrade">
+<h3>Upgrade 2 — nous-elite gets pd-ssd disk (currently HDD-backed)</h3>
+<p>Today nous-elite runs on <code>pd-standard</code> — HDD-backed persistent disk, slowest tier. A compute-optimized 8-vCPU box on HDD is silly; the disk is the bottleneck for anything I/O-heavy. On rebuild: <code>--boot-disk-type=pd-ssd</code>. Disk type doesn't go in the name (it's mutable and would explode length), but the rebuild captures it.</p>
+<p>Cost note: pd-ssd is ~3-4× pd-standard per GB. For 50 GB that's ~$10/mo vs ~$3/mo. Cheap to upgrade.</p>
+</div>
+
+<div class="upgrade">
+<h3>Upgrade 3 — optional: prime/relay also move to gVNIC</h3>
+<p>e2-micro does support gVNIC. Default is virtio for backward compat. If Joey wants uniformity (everything on gvnic) AND/OR wants future-proofing for traffic growth, switch the 4 small nodes too. Names would shift: <code>prime-e2-micro-gvnic-us-west4-a-las-vegas</code>.</p>
+<p><strong>Open decision:</strong> uniform gvnic everywhere, or only on nous-elite where it actually matters?</p>
+</div>
+
+<h2>5. Scope</h2>
+
+<h3>In scope</h3>
+<ul>
+  <li>Snapshot each VM's boot disk in <code>acmedev-platform-hq</code></li>
+  <li>Create cross-project images / disks in <code>kastil-systems</code></li>
+  <li>Boot 5 new VMs in <code>kastil-systems</code> with the new names + upgraded NIC/disk where applicable</li>
+  <li>Verify each new VM serves before retiring the old</li>
+  <li>DNS / config cutover for any hostname pointing at the old IPs</li>
+  <li>Stop + delete old VMs in <code>acmedev-platform-hq</code> (with rollback window)</li>
+</ul>
+
+<h3>Out of scope</h3>
+<ul>
+  <li>Code changes to the nous prime/relay binaries (those stay as-is — same OS, same software, just moved)</li>
+  <li>Architectural changes to the prime/relay protocol (NTRP0001 wire stays as-is)</li>
+  <li>Acme Platform project shutdown (separate decision; this plan only empties the VMs)</li>
+  <li>Adding new VMs in other regions (future; this plan moves existing fleet only)</li>
+</ul>
+
+<h2>6. Approach</h2>
+
+<p><strong>Snapshot + rebuild</strong>, not lift-and-shift (GCP doesn't support cross-project VM moves directly). For each VM: snapshot disk → create image cross-project → boot new VM in destination → verify → cut over DNS → retire old.</p>
+
+<p>The new VMs are NOT identical clones — they get the renaming AND any HW upgrades selected. So this isn't a forklift; it's a controlled rebuild with upgrades.</p>
+
+<h2>7. Phases</h2>
+
+<div class="phase">
+<h3>Phase 0 — Pre-flight (one-time)</h3>
+<ol>
+  <li>Enable Compute Engine API on kastil-systems: <code>gcloud services enable compute.googleapis.com --project=kastil-systems</code></li>
+  <li>Verify kastil-systems has a billing account attached</li>
+  <li>Confirm VPC / subnet setup in kastil-systems (default auto-mode VPC should work; if Joey wants custom VPC, create first)</li>
+  <li>Set up cross-project IAM: kastil-systems default Compute SA needs <code>roles/compute.imageUser</code> on acmedev-platform-hq images</li>
+  <li>Inventory: capture exact hostnames pointing at current external IPs (if any). DNS will need updates.</li>
+  <li>Identify any GCS buckets / Secret Manager secrets / IAM bindings the prime/relay code reads from in acmedev-platform-hq. Grant cross-project access OR plan to mirror those into kastil-systems.</li>
+</ol>
+<p class="exit">Compute API enabled, billing attached, IAM clear, dependencies inventoried.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 1 — nous-elite (the safest start)</h3>
+<p>TERMINATED state means zero impact. Use this VM to prove the recipe.</p>
+<ol>
+  <li>Snapshot <code>nous-elite-us</code> disk (50 GB pd-standard) in acmedev-platform-hq, us-east4-a</li>
+  <li>Create image in kastil-systems from the snapshot</li>
+  <li>Boot new VM:
+    <pre>gcloud compute instances create nous-elite-c2-standard-8-gvnic-us-east4-a-ashburn \
+  --project=kastil-systems \
+  --zone=us-east4-a \
+  --machine-type=c2-standard-8 \
+  --network-interface=nic-type=GVNIC \
+  --create-disk=image=nous-elite-img-2026-05-23,boot=yes,type=pd-ssd,size=50</pre>
+  </li>
+  <li>SSH in, verify the boot. Don't start any nous workload until confirmed reachable.</li>
+  <li>If nous-elite has a known role to verify (compute job, batch processing), trigger a smoke test.</li>
+</ol>
+<p class="exit">nous-elite is alive in kastil-systems on gVNIC + pd-SSD. Recipe validated.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 2 — first relay (relay-hkg)</h3>
+<p>One of the 2 relays. If migration breaks one, the other (relay-lax) still serves Asia.</p>
+<ol>
+  <li>Snapshot <code>relay-asia-east2-a-hong-kong</code> (10 GB pd-standard)</li>
+  <li>Create image + boot in kastil-systems as <code>relay-e2-micro-virtio-asia-east2-a-hong-kong</code>, asia-east2-a</li>
+  <li>Verify the relay serves (curl whatever port the relay protocol uses)</li>
+  <li>Update DNS / nous-desktop config to point at the new internal IP (or external IP if assigned)</li>
+  <li>Stop the OLD VM. Don't delete yet (keep rollback window).</li>
+  <li>Monitor for ~24h. If stable, delete old.</li>
+</ol>
+<p class="exit">Asia-east relay live in kastil-systems. Old VM stopped. Rollback window open.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 3 — second relay (relay-lax)</h3>
+<p>Same recipe as Phase 2 for <code>relay-us-west2-a-los-angeles</code>.</p>
+<p class="exit">Both relays live in kastil-systems.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 4 — first prime (prime-sin)</h3>
+<p>Same pattern. prime-asia-southeast1-a-singapore → prime-e2-micro-virtio-asia-southeast1-a-singapore in kastil-systems.</p>
+<p class="exit">First prime live in kastil-systems.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 5 — second prime (prime-las)</h3>
+<p>Final VM. prime-us-west4-a-las-vegas → prime-e2-micro-virtio-us-west4-a-las-vegas in kastil-systems.</p>
+<p class="exit">All 5 VMs live in kastil-systems. acmedev-platform-hq compute fleet empty (except retained-but-stopped originals for rollback window).</p>
+</div>
+
+<div class="phase">
+<h3>Phase 6 — cleanup (after 1-week rollback window)</h3>
+<ol>
+  <li>Delete the 5 stopped VMs in acmedev-platform-hq</li>
+  <li>Delete the snapshots used for migration (can keep one set of "last-known-good" snapshots as cold backup)</li>
+  <li>Update audit-of-all reports to reflect the new fleet</li>
+  <li>Consider next step: does acmedev-platform-hq still hold other workloads, or can the project go through proper shutdown?</li>
+</ol>
+<p class="exit">Migration complete. Old project clean. Fleet documented in kastil-systems.</p>
+</div>
+
+<h2>8. Constraints</h2>
+
+<div class="constraint"><b>GCP VMs are project-scoped.</b> Cannot lift-and-shift between projects. Snapshot + rebuild is the only path. Plan reflects this.</div>
+<div class="constraint"><b>VM names: 63-char max</b>, lowercase alphanumeric + hyphens, must start with a letter. All 5 proposed names fit (42-49 chars).</div>
+<div class="constraint"><b>Paired roles protect uptime.</b> 2× prime, 2× relay. Migrate one at a time within each pair — the other carries traffic.</div>
+<div class="constraint"><b>nous-elite first.</b> TERMINATED = no traffic. Use to validate the recipe before touching live nodes.</div>
+<div class="constraint"><b>Keep originals stopped (not deleted) for ~1 week</b> after each cutover. Rollback is "start the old, update DNS back."</div>
+<div class="constraint"><b>Hardware upgrades happen on rebuild only.</b> Don't modify the in-place VMs in acmedev-platform-hq during migration; the original stays as a known-good rollback target.</div>
+<div class="constraint"><b>External IPs change.</b> Unless static IPs are explicitly reserved and re-attached, each new VM gets a new ephemeral external IP. DNS must update.</div>
+<div class="constraint"><b>v1 hypothesis.</b> Per kernel rule 6 — if any phase reveals something we didn't anticipate (e.g. boot fails after rebuild, NIC upgrade breaks something), v2 of this plan corrects.</div>
+
+<div class="unknowns">
+<h3>Unknowns (the things we should answer before Phase 0)</h3>
+<ol>
+  <li><strong>Why is nous-elite TERMINATED?</strong> Cost-save between jobs? Workload retired? Failure? Affects whether to migrate-and-start, migrate-and-leave-terminated, or skip entirely.</li>
+  <li><strong>What DNS / config currently points at these VMs?</strong> relay.3-nous.net? prime.3-nous.net? Static external IPs reserved? Need this map before Phase 0.</li>
+  <li><strong>Are there GCS buckets / Secret Manager secrets the VMs read from in acmedev-platform-hq?</strong> Cross-project IAM grants needed if they stay; mirroring needed if they move.</li>
+  <li><strong>VPC choice on kastil-systems.</strong> Default auto-mode VPC (one subnet per region, /20)? Or custom VPC with explicit subnets matching the old setup (10.148/16, 10.150/16, etc.)?</li>
+  <li><strong>Firewall rules.</strong> What ports do prime / relay / nous-elite serve on? SSH (22) plus NTRP0001 wire-protocol port, presumably. Replicate from acmedev-platform-hq.</li>
+  <li><strong>gVNIC on all VMs, or only nous-elite?</strong> Decision point — uniformity vs. don't-fix-what-isn't-broken on the e2-micros.</li>
+  <li><strong>Boot timing for migrated nous-elite.</strong> Should it stay TERMINATED post-migration (matching today's state) or start fresh in kastil-systems?</li>
+</ol>
+</div>
+
+<div class="revisit">
+<h3>When To Revisit (v2 triggers)</h3>
+<ul>
+  <li>Phase 1 fails to boot — image incompatibility, IAM gap, NIC upgrade problem. v2 narrows the recipe.</li>
+  <li>The recipe works on nous-elite but breaks on a live VM (e2-micros differ in some subtle way). v2 adds per-VM tweaks.</li>
+  <li>DNS cutover causes user-visible disruption longer than expected. v2 adds blue-green pattern (run both old + new in parallel briefly).</li>
+  <li>Any GCP API quirk discovered (image sharing perms, snapshot replication regions, etc.) that wasn't anticipated.</li>
+  <li>Joey decides during execution: "I want all gVNIC" → Phase 2-5 pivot. Or "actually I want different machine classes for some." → re-plan.</li>
+</ul>
+</div>
+
+<h2>9. The execution-ready command set (for Phase 1)</h2>
+
+<pre># 0. Pre-flight
+gcloud services enable compute.googleapis.com --project=kastil-systems
+gcloud compute networks list --project=kastil-systems  # confirm VPC exists
+
+# 1. Snapshot in source project
+gcloud config set project acmedev-platform-hq
+gcloud compute disks snapshot nous-elite-us \
+    --zone=us-east4-a \
+    --snapshot-names=nous-elite-snap-2026-05-23
+
+# 2. Create image cross-project (image lives in kastil-systems)
+gcloud compute images create nous-elite-img-2026-05-23 \
+    --project=kastil-systems \
+    --source-snapshot=projects/acmedev-platform-hq/global/snapshots/nous-elite-snap-2026-05-23 \
+    --storage-location=us
+
+# 3. Boot the new VM in kastil-systems with new name + HW upgrades
+gcloud compute instances create nous-elite-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems \
+    --zone=us-east4-a \
+    --machine-type=c2-standard-8 \
+    --network-interface=nic-type=GVNIC,subnet=default \
+    --create-disk=image=nous-elite-img-2026-05-23,image-project=kastil-systems,boot=yes,type=pd-ssd,size=50
+
+# 4. SSH verify
+gcloud compute ssh nous-elite-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems --zone=us-east4-a --command='hostname; uname -a; ip link show'
+
+# 5. (Optional, after smoke test) start any nous workload that should run there
+
+# Rollback if needed: delete the new VM + image, the old one is still in acmedev-platform-hq
+gcloud compute instances delete nous-elite-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems --zone=us-east4-a --quiet
+gcloud compute images delete nous-elite-img-2026-05-23 \
+    --project=kastil-systems --quiet</pre>
+
+<h2>Next step</h2>
+<p>Approve this plan (or modify the open decisions: gvnic-everywhere y/n, nous-elite-start-after-migration y/n, DNS inventory). Then <code>~e</code> to size into board items, OR just execute Phase 0 + Phase 1 manually since nous-elite is zero-risk.</p>
+
+<footer>v0 · r34 · 2026-05-23 · ~p v2 GCP VMs · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

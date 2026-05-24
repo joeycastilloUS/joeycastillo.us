@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~p reorg — from 127 misorganized repos to loadable-from-metal</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; line-height: 1.65; }
+  nav { position: sticky; top:0; background:#000; border-bottom: 2px solid var(--accent); padding: 12px 24px; z-index: 100; display: flex; align-items: center; justify-content: space-between; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 18px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .status-banner { background: var(--amber); color: #000; padding: 8px 24px; text-align: center; font-weight: 700; letter-spacing: 2px; font-size: 12px; }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { color: var(--accent); font-size: 30px; margin: 0 0 4px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 28px; }
+  h2 { color: var(--accent); font-size: 20px; margin-top: 44px; border-bottom: 1px solid var(--surface2); padding-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+  h3 { color: var(--text); font-size: 16px; margin-top: 24px; }
+  p { color: #ccc; margin: 10px 0; }
+  ul, ol { color: #ccc; padding-left: 22px; }
+  li { margin: 6px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  blockquote { border-left: 3px solid var(--accent); padding: 8px 18px; margin: 16px 0; color: var(--text); background: var(--surface); font-style: italic; }
+  .phase { background: var(--surface); border-left: 4px solid var(--accent); padding: 20px 24px; margin: 18px 0; }
+  .phase h3 { color: var(--accent); margin-top: 0; font-size: 17px; letter-spacing: 1px; text-transform: uppercase; }
+  .phase .goal { color: var(--text); font-weight: 600; margin: 4px 0 12px; }
+  .phase ul { margin: 8px 0; }
+  .phase .exit { color: var(--green); margin-top: 12px; font-size: 13px; }
+  .phase .exit::before { content: "✓ Exit: "; color: var(--green); font-weight: 700; }
+  .unknowns { background: #1f1a0f; border-left: 4px solid var(--amber); padding: 16px 22px; margin: 16px 0; }
+  .unknowns h3 { color: var(--amber); margin-top: 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .revisit { background: #0F1A1F; border-left: 4px solid var(--green); padding: 16px 22px; margin: 16px 0; }
+  .revisit h3 { color: var(--green); margin-top: 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .constraint { padding: 6px 0; border-bottom: 1px solid var(--surface2); }
+  .constraint:last-child { border-bottom: none; }
+  .constraint b { color: var(--accent); }
+  .dod { background: var(--surface); padding: 16px 20px; margin: 32px 0 16px; }
+  .dod-item { color: var(--t2); font-size: 13px; padding: 3px 0; }
+  .dod-item.pass::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .dod-item.na::before { content: "— "; color: var(--t3); }
+  footer { color: var(--t3); font-size: 11px; text-align: center; padding: 24px; border-top: 1px solid var(--surface2); }
+  .links { background: var(--surface); padding: 10px 16px; margin: 12px 0 28px; font-size: 13px; }
+  .links a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav>
+  <span><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~p · v1</span></span>
+</nav>
+<div class="status-banner">PLAN — AWAITING APPROVAL</div>
+<div class="container">
+
+<h1>Get from 127 misorganized repos to loadable-from-metal.</h1>
+<p class="sub">A plan, not a list. Sequenced so each phase makes the next one cheaper. v1 hypothesis — revision is the default, not the exception.</p>
+
+<div class="links">
+  Source: <a href="2026-05-20-0132-audit-of-all-orgs.html">~i audit (2026-05-20 01:32)</a> · 9 orgs · 127 repos · 10 findings
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Intent</h2>
+
+<p>Joey said it: <em>"I can't plan giant workloads when everything is kind of all over the place."</em> That's a structural problem, not a tooling problem. The audit named the structure. This plan fixes it.</p>
+
+<p>Concrete end-state: when Joey types <code>~l &lt;name&gt;</code> in metal console, the result lands where his head expected. Today, half the names are ambiguous (which <code>metal-console</code>? which <code>a-d-d</code>?) and the other half live in the wrong org (Philz repos in Acme, Pantheon repos in Acme).</p>
+
+<p>The win condition is measurable: a re-run of <code>~i</code> at the end of this plan finds <strong>zero red findings</strong>. Amber and informational findings are fine — they're the next plan's problem. Red is "you can't even trust the structure."</p>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Scope</h2>
+
+<h3>In scope</h3>
+<ul>
+  <li>Repo transfers across orgs (using <code>gh repo edit --visibility-or-transfer</code>; history preserved)</li>
+  <li>Repo renames (collision fixes — primarily the two <code>metal-console</code>s)</li>
+  <li>Repo archives (<code>isArchived=true</code>) for dead scaffold</li>
+  <li>One-line org charter READMEs (so each org's purpose is visible from the org page)</li>
+  <li>One-line descriptions added to every active repo</li>
+  <li>Declaration of canonical methodology source (<code>kastil-systems/a-d-d</code>)</li>
+  <li>Redirect-only READMEs in non-canonical a-d-d copies</li>
+  <li>Re-running <code>~i</code> after each phase to verify drift drops</li>
+</ul>
+
+<h3>Out of scope</h3>
+<ul>
+  <li>Refactoring code inside any repo (organizational, not implementation, work)</li>
+  <li>Building anything new (lifewater.io product, audit's <code>/audit</code> public surface) — those are downstream</li>
+  <li>Pruning the ai-pantheon Feb-22 scaffold beyond Joey's per-repo decision (audit recommends; Joey calls)</li>
+  <li>Defining Province-Light-Foundation's charter (one decision, not a plan)</li>
+  <li>Deciding ai-pantheon-internal's fate beyond a single fork-in-the-road</li>
+  <li>Touching the healthy orgs: <code>philzcoffee</code>, <code>Mendocino-Farms</code> (leave them alone)</li>
+</ul>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Approach</h2>
+
+<h3>Intent → Purpose → What</h3>
+
+<p><strong>Intent.</strong> Make the org list self-describing. The first time someone (including Joey six months from now) opens GitHub and looks at the org list, they should know what each org is for without reading any repo.</p>
+
+<p><strong>Purpose.</strong> Org = audience contract. One question per org: <em>who is this for?</em> Repos that don't fit the audience get moved. Once the audience contract holds, <code>~l</code> becomes trivially correct because the name + org pair is unambiguous.</p>
+
+<p><strong>What.</strong> Four phases. Each one re-runs the audit at the end and proves it dropped a finding. Stop-the-bleeding first, then move, then prune, then document. The order matters — moving before declaring canonical creates ambiguity at higher stakes.</p>
+
+<blockquote>The audit is the discipline. Every phase ends with a green re-run or the phase isn't done.</blockquote>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Phases</h2>
+
+<div class="phase">
+  <h3>Phase 1 — Stop The Bleeding</h3>
+  <div class="goal">Goal: declare what's true. Before anything moves, the canonical truth has to be named.</div>
+  <ul>
+    <li>Declare <code>kastil-systems/a-d-d</code> as the canonical methodology source. Add a one-line README header: "Canonical. The five other copies are mirrors or archives — see audit-of-all for the list."</li>
+    <li>Replace the README in the 5 non-canonical a-d-d copies with a redirect: "This is a stale mirror. Source of truth: kastil-systems/a-d-d." No code changes yet — just the README so anyone landing there sees the redirect.</li>
+    <li>Rename one of the two <code>metal-console</code> repos. Decision: probe the contents of both first (Phase 0 of this phase — a 5-minute read). Likely outcome: <code>kastil-systems/metal-console</code> → <code>kastil-systems/metal-runtime</code> (since it's C), <code>joeycastilloUS/metal-console</code> keeps the name (it's the operator surface where this kernel lives).</li>
+    <li>Write a one-line org charter README in each of the 9 orgs. Format: "<org-name> — &lt;audience&gt;. &lt;What lives here.&gt;" Example for kastil-systems: "The systems org. Kernel, methodology, runtimes. Source of truth for a-d-d."</li>
+  </ul>
+  <p class="exit">Re-run <code>~i</code>. Finding #1 (a-d-d six places) and Finding #2 (metal-console twice) drop from red to green. Findings about org charters drop entirely.</p>
+</div>
+
+<div class="phase">
+  <h3>Phase 2 — Move Work to Where It Belongs</h3>
+  <div class="goal">Goal: every active repo lives in the org whose audience it serves.</div>
+  <ul>
+    <li>Transfer <code>acmedevUS/employee-validator</code> → <code>philzcoffee</code> (it's literally a Philz PWA per its description)</li>
+    <li>Transfer <code>acmedevUS/crew-check-api</code> → <code>philzcoffee</code> (Philz API, same series)</li>
+    <li>Transfer <code>acmedevUS/ai-pantheon</code> → <code>ai-pantheon</code> org (check for name collision first — there's already an <code>ai-pantheon/ai-pantheon.ai</code>, so this might land as <code>ai-pantheon/storyline</code> or similar after rename)</li>
+    <li>Transfer <code>acmedevUS/claude-run-storyline</code> → <code>ai-pantheon</code> (paired with <code>ai-pantheon/claude-run-web</code>)</li>
+    <li>Transfer <code>acmedevUS/claudius-maximus</code> → <code>ai-pantheon</code> (or archive if dead — check first)</li>
+    <li>Decide <code>ai-pantheon-internal</code>'s fate in one sitting: either (a) declare it "private staging before public" and write that charter, or (b) transfer its 6 repos to <code>kastil-systems</code> (kernel work) or <code>ai-pantheon</code> (Pantheon work), then delete the org. <strong>Recommendation: option (b)</strong> — accidental orgs add cognitive load forever.</li>
+    <li>Verify each transfer with a fetch — <code>gh repo view &lt;new-location&gt;</code> succeeds, old location 404s or redirects.</li>
+  </ul>
+  <p class="exit">Re-run <code>~i</code>. Finding #3 (acmedevUS contamination) drops. Finding #5 (ai-pantheon-internal's fate) drops. acmedevUS now contains only Acme Dev LLC commercial work.</p>
+</div>
+
+<div class="phase">
+  <h3>Phase 3 — Prune</h3>
+  <div class="goal">Goal: archive everything dead. Reduce noise so the active repos stand out.</div>
+  <ul>
+    <li>Triage the 21 ai-pantheon repos last touched 2026-02-22. For each: (a) archive in place (sets <code>isArchived=true</code>, preserves history, removes from active list), (b) keep + revive (commit something, even if it's just a README declaring intent), or (c) merge into a parent repo. Default: archive. The kernel doc has the Pantheon architecture — the GitHub repos can be archive-of-intent without being active dev surfaces.</li>
+    <li>Resolve <code>joeycastilloUS</code>'s confusable repos: <code>kASTIL</code>, <code>kastil-systems</code> (the repo named after the org), <code>ai-metal</code>, <code>metal-proposal</code>, <code>metal.Be</code>. For each: add a 1-line description if real, archive if not. Stop the "5 things named metal-something" problem at its source.</li>
+    <li>Archive <code>joeycastilloUS/legacy</code> explicitly (set <code>isArchived=true</code>). The name says it's archive; the GitHub flag should match.</li>
+    <li>Resolve Province-Light-Foundation: either populate (charter + first repo) or delete the org. One decision.</li>
+    <li>Archive <code>kastil-systems/old-root</code> if confirmed dead.</li>
+  </ul>
+  <p class="exit">Re-run <code>~i</code>. ai-pantheon drops from 28 active repos to ~7. joeycastilloUS's metal-* cluster collapses. Province-Light-Foundation either has charter or is gone.</p>
+</div>
+
+<div class="phase">
+  <h3>Phase 4 — Document &amp; Convention</h3>
+  <div class="goal">Goal: every active repo is self-describing. Conventions hold.</div>
+  <ul>
+    <li>Add a 1-line description to every active repo that lacks one (today: most of <code>kastil-systems</code>, much of <code>joeycastilloUS</code>). Use <code>gh repo edit &lt;repo&gt; --description "&lt;one-liner&gt;"</code>. Batchable.</li>
+    <li>Rename <code>kastil-systems/thelastfamily</code> → <code>kastil-systems/the-last-family</code>. Hyphens match the convention.</li>
+    <li>If any repos in transferred state lost their CI/CD or deploy.json reference, fix it.</li>
+    <li>Update kernel <code>CLAUDE.md</code> (in this metal console repo) if any canonical paths changed (e.g. <code>kastil-systems/metal-console</code> → <code>kastil-systems/metal-runtime</code> in the AI Pantheon section).</li>
+    <li>Final <code>~i</code> audit run. Confirm zero red findings.</li>
+  </ul>
+  <p class="exit">Re-run <code>~i</code>. <strong>Zero red findings.</strong> Every active repo has a description. Type <code>~l &lt;random name&gt;</code> — it lands where you expect. Plan succeeded.</p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Constraints</h2>
+
+<div class="constraint"><b>No destructive deletes.</b> Archives only (<code>isArchived=true</code>) for any repo Joey isn't 100% sure about. Archive is reversible; delete isn't. <code>gh repo delete</code> is forbidden during this plan unless Joey explicitly types the command himself.</div>
+<div class="constraint"><b>Canonical declaration precedes movement.</b> Phase 1 must complete before Phase 2 begins. Moving work while the source of truth is ambiguous makes the ambiguity portable.</div>
+<div class="constraint"><b>Use gh transfer, not delete-and-recreate.</b> Transfers preserve stars, issues, PRs, and the GitHub history. Delete-and-recreate loses all of it.</div>
+<div class="constraint"><b>Healthy orgs untouched.</b> philzcoffee and Mendocino-Farms have working structures. Don't fix what isn't broken just because other orgs need work.</div>
+<div class="constraint"><b>Each phase re-runs the audit.</b> The next phase doesn't start until the prior <code>~i</code> shows the expected drop. Discipline holds the plan.</div>
+<div class="constraint"><b>Joey decides per-move.</b> The plan sequences. Joey approves each transfer/archive before it executes. Be never deletes or transfers a repo autonomously.</div>
+<div class="constraint"><b>v1 is a hypothesis.</b> Per kernel rule 6: this plan is wrong in ways we don't know yet. v2 ships when v1 meets evidence it didn't anticipate (see When To Revisit).</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="unknowns">
+<h3>Unknowns</h3>
+<ol>
+  <li><strong>Which <code>metal-console</code> codebase is which?</strong> joeycastilloUS one is HTML (operator surface, almost certainly). kastil-systems one is C (runtime?). Until both are opened, the rename direction is a hypothesis. Phase 1 Step 1 is "open both and read for 5 minutes."</li>
+  <li><strong>Will the acmedevUS → ai-pantheon transfers cause name collisions?</strong> <code>acmedevUS/ai-pantheon</code> can't transfer as <code>ai-pantheon/ai-pantheon</code> — needs a rename mid-transfer. Don't know the right target name until inspecting the repo's contents.</li>
+  <li><strong>Is <code>ai-pantheon-internal</code> intentional?</strong> The plan recommends collapsing it. But if it exists for a reason (e.g. private staging before public exposure, or a per-team isolation policy), collapsing breaks something the audit can't see.</li>
+  <li><strong>What is <code>joeycastilloUS/norman</code>?</strong> No description. Could be a person-archive, a project named for Norman Campbell, or abandoned scratch. Affects Phase 3 archive vs keep.</li>
+  <li><strong>Was Province-Light-Foundation created by Joey or by someone else?</strong> If someone else added Joey as a member, deletion isn't Joey's call. If Joey created it for a planned initiative, that initiative needs a charter, not a deletion.</li>
+  <li><strong>Are the cross-org duplicates (<code>overwatch_app</code>, <code>playwright_reports</code>) intentional client copies or stale forks?</strong> common_csharp existing in 3 client orgs is almost certainly intentional (per-client shared libs); the other two might or might not be. Need a one-minute look at each pair.</li>
+  <li><strong>How many of the ai-pantheon Feb-22 repos have ANY content vs. empty placeholders?</strong> The triage in Phase 3 is cheap if they're empty (archive-all), expensive if they have real architecture sketches worth preserving in a different form.</li>
+  <li><strong>Does anything downstream link to a soon-to-be-moved repo URL?</strong> Joey's site (joeycastillo.us), the kernel CLAUDE.md, or other repos' READMEs may hard-link to repo URLs that change. Grep needed in Phase 4.</li>
+</ol>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="revisit">
+<h3>When To Revisit (signals that trigger v2)</h3>
+<ul>
+  <li><strong>Phase 1 reveals the rename direction is wrong.</strong> If reading the two metal-console codebases shows the C repo is actually the operator surface and the HTML one is the runtime artifact, the rename flips — v2.</li>
+  <li><strong>Phase 2 transfer fails or breaks something downstream.</strong> deploy.json references, CI/CD secrets scoped to acmedev, or a Cloudflare Pages binding tied to the old org URL — any of these failing means the transfer process needs a per-repo preflight step v1 doesn't have.</li>
+  <li><strong>Phase 3 triage finds a NEW kind of drift.</strong> If the ai-pantheon Feb-22 scaffold contains a class of repo (e.g. inter-repo dependency packages) the audit didn't model, v2's pruning section needs a new policy.</li>
+  <li><strong>A 10th org appears.</strong> A new org membership (Joey gets added to a client's GitHub) changes the org-charter set. The plan's "9 orgs" assumption breaks.</li>
+  <li><strong>Joey decides the audience contract is wrong.</strong> If, mid-plan, Joey says "actually ai-pantheon should hold all customer-facing work AND acme should hold sales-pipeline tools" — the org→audience table changes and Phase 2 reshapes. v2.</li>
+  <li><strong>Final audit still shows red findings after Phase 4.</strong> If <code>~i</code> finds drift v1 didn't anticipate, v2 names the new pattern and adds a phase.</li>
+  <li><strong>3 months pass without re-running the audit.</strong> Drift accumulates silently. Re-run is its own signal — if the audit hurts to read, the structure has slipped.</li>
+</ul>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Next step</h2>
+
+<p>Approve this plan (or revise it). Then <code>~e</code> converts each phase into Fibonacci-sized board items in <code>be/board.md</code>, and <code>~b</code> starts pulling work one item at a time. The audit re-runs at each phase boundary, so progress is visible at every step.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="dod">
+  <h3 style="color: var(--accent); margin-top:0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase;">Definition of Done</h3>
+  <div class="dod-item pass">Code committed (this plan)</div>
+  <div class="dod-item pass">Commit hash in telemetry (this run logs it)</div>
+  <div class="dod-item na">Board updated (~e converts this plan to board items)</div>
+  <div class="dod-item pass">HTML report saved (be/plans/2026-05-20-1037-plan-reorg-orgs.html)</div>
+  <div class="dod-item pass">Index updated (be/index.html lists this plan)</div>
+  <div class="dod-item pass">Pushed to remote (joeycastilloUS/audit-of-all)</div>
+  <div class="dod-item pass">No prior work damaged</div>
+  <div class="dod-item na">Shipped to production (no deployable surface yet)</div>
+</div>
+
+</div>
+<footer>v0 · r3 · 2026-05-20 · ~p reorg v1 · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>

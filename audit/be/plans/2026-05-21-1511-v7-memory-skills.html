@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i V7 — api memory/skill/* vs ks memory/skill/*</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1050px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin: 0 0 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 18px 0 6px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .verdict-box { background: #0F1A1F; border: 2px solid var(--green); padding: 16px 22px; margin: 12px 0 24px; }
+  .verdict-box h2 { border: none; margin: 0 0 8px; padding: 0; }
+  .verdict-box .v { color: var(--green); font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .correction { background: #2A1010; border: 2px solid var(--red); padding: 12px 18px; margin: 14px 0; }
+  .correction b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.confirm { color: var(--green); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  td.expand { color: var(--purple); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  td.correct { color: var(--red); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  .skill { background: var(--surface); border-left: 4px solid var(--accent); padding: 14px 20px; margin: 12px 0; }
+  .skill.confirm { border-left-color: var(--green); }
+  .skill.expand { border-left-color: var(--purple); }
+  .skill.correct { border-left-color: var(--red); }
+  .skill h3 { margin: 0 0 6px; color: var(--text); font-size: 14px; display: flex; justify-content: space-between; align-items: baseline; }
+  .skill h3 .badge { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; }
+  .skill.confirm h3 .badge { color: var(--green); }
+  .skill.expand h3 .badge { color: var(--purple); }
+  .skill.correct h3 .badge { color: var(--red); }
+  .skill .summary { color: #ccc; font-size: 12.5px; margin: 4px 0 8px; }
+  .skill .api { color: var(--t2); font-size: 11.5px; padding-left: 12px; border-left: 2px solid var(--surface2); margin: 6px 0; }
+  .skill .ks { color: var(--t2); font-size: 11.5px; padding-left: 12px; border-left: 2px solid var(--accent); margin: 6px 0; }
+  .new-patch { background: var(--surface); border-left: 4px solid var(--purple); padding: 14px 20px; margin: 10px 0; }
+  .new-patch.minor { border-left-color: var(--accent); }
+  .new-patch.cond { border-left-color: var(--red); }
+  .new-patch h3 { margin: 0 0 8px; color: var(--accent); font-size: 14px; }
+  .new-patch h3 .ref { display: inline-block; background: var(--surface2); color: var(--purple); padding: 1px 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; margin-right: 6px; }
+  .new-patch.minor h3 .ref { color: var(--accent); }
+  .new-patch.cond h3 .ref { color: var(--red); }
+  .new-patch pre { background: #0A0A0A; padding: 10px 14px; border-radius: 3px; color: #ddd; font-size: 11.5px; font-family: 'Consolas', monospace; white-space: pre-wrap; margin: 8px 0; line-height: 1.45; }
+  .new-patch .what { color: var(--t2); font-size: 11.5px; margin-bottom: 6px; font-family: 'Consolas', monospace; }
+  .dod { background: var(--surface); padding: 14px 18px; margin: 28px 0 14px; }
+  .dod-item { color: var(--t2); font-size: 13px; padding: 3px 0; }
+  .dod-item.pass::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .dod-item.na::before { content: "— "; color: var(--t3); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 20px; border-top: 1px solid #222; }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 24px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i V7 · memory skills (api 6 vs ks 10)</span></nav>
+<div class="container">
+
+<h1>V7 — 6 api memory skills vs 10 ks memory skills</h1>
+<p class="sub">Full read of all 16 CLAUDE.md files. Per-skill pairwise. Same V1-style hidden-gap pattern caught on <code>store</code> — KS WINS was wrong.</p>
+
+<div class="links">Source: <a href="2026-05-21-0036-add-merge-investigation.html">merge investigation</a> · Re-verifying V8, V9, V10, V11, V12, V13</div>
+
+<div class="correction">
+<b>Correction — V13 was wrong (same as V1 was wrong)</b>
+The surface audit verdicted <code>memory/skill/store</code> as KS WINS because the ks file is 73 lines vs api's 36. Full read: ks describes content-addressed BLOB storage (SHA-256 keyed); api describes the triple-store RELATIONAL layer (S,P,O facts + dict + indexes). They document <strong>two different layers</strong>. ks is missing the relational layer entirely in this file. <strong>New M6 patch needed.</strong>
+</div>
+
+<div class="verdict-box" style="border-color: var(--green); background: #0F1F0F;">
+  <div class="label" style="color: var(--green);">EXECUTED 2026-05-21</div>
+  <div class="v">All V7 actionable items DONE — including the V13 correction (M6).</div>
+  <p>M5 deps footer landed in <code>3f18256</code>. M1↑ WAL struct + ops + Behavior landed in <code>4b6e5a2</code>. M2↑ Scope struct + zero-alloc + caveat landed in <code>68117fb</code>. <strong>M6 verification gate PASSED</strong> (parent <code>nous/memory/CLAUDE.md</code> has byte format from c7444af but lacks <code>triple_store_*</code> API + lifecycle — gap confirmed) and M6 landed in <code>e47fe79</code> with the full Fact/DictEntry/TripleStore composition and 10+ API functions. hash, mmap confirmed KS WINS (no action). Zero open V7 items.</p>
+</div>
+
+<h2>Per-skill verdicts</h2>
+
+<table>
+<thead><tr><th>api skill</th><th>prior verdict</th><th>re-verified</th><th>merge?</th></tr></thead>
+<tbody>
+<tr><td><code>memory/skill/hash</code></td><td>KS WINS (V8)</td><td class="confirm">CONFIRM KS WINS</td><td>No</td></tr>
+<tr><td><code>memory/skill/index</code></td><td>KS WINS (V9)</td><td class="confirm">KS WINS + M5 minor</td><td>One-line deps footer</td></tr>
+<tr><td><code>memory/skill/journal</code></td><td>MERGE = M1</td><td class="expand">CONFIRM + EXPAND M1</td><td>Yes — bigger M1</td></tr>
+<tr><td><code>memory/skill/mmap</code></td><td>KS WINS (V11)</td><td class="confirm">CONFIRM KS WINS</td><td>No</td></tr>
+<tr><td><code>memory/skill/scope</code></td><td>MERGE = M2</td><td class="expand">CONFIRM + EXPAND M2</td><td>Yes — bigger M2</td></tr>
+<tr><td><code>memory/skill/store</code></td><td>KS WINS (V13)</td><td class="correct">CORRECT TO MIXED — M6 needed</td><td>Substantive (conditional)</td></tr>
+</tbody>
+</table>
+
+<h2>Per-skill detail</h2>
+
+<div class="skill confirm">
+<h3>memory/skill/hash <span class="badge">CONFIRM KS WINS</span></h3>
+<div class="summary">api: FNV-1a only, string signature. ks: FNV-1a (byte-buffer signature, broader) + SHA-256 (integrity, content-addressing, intel IDs, audit chain).</div>
+<div class="ks">ks is a strict superset. api adds nothing.</div>
+</div>
+
+<div class="skill confirm">
+<h3>memory/skill/index <span class="badge">KS WINS + M5 minor</span></h3>
+<div class="summary">api: implementation-focused (chain hash, MmapFile struct, CHAIN_END = UINT64_MAX, 0.7 load factor). ks: use-case driven (4 named indexes — by type / source / time / location with geohash; full query interface).</div>
+<div class="api">api unique: <code>CHAIN_END = UINT64_MAX</code>, <code>MmapFile</code> struct composition (impl detail, skip), <strong>explicit deps line <code>Deps: mmap, hash</code></strong>.</div>
+<div class="ks">ks unique: named axes (type/source/time/location), <code>index_query_*</code> signatures, geohash spatial index.</div>
+<p>ks wins. The only worth-merging item is the explicit deps footer — ks's index file omits deps while every other ks memory skill states them. Consistency fix → M5.</p>
+</div>
+
+<div class="skill expand">
+<h3>memory/skill/journal <span class="badge">CONFIRM + EXPAND M1</span></h3>
+<div class="summary">api has the explicit C struct + ops table + behavior block; ks has the narrative + C API but lacks the concrete pieces.</div>
+<div class="api">api unique: <code>WalEntry</code> C struct, "Operations logged" table (INSERT replays via <code>triple_store_insert_ids</code>; GROW/REHASH self-heal), <strong>truncation behavior</strong> ("truncate WAL after recovery", "clean close truncates to zero"), <strong>recovery sequencing</strong> ("call <code>journal_recover</code> after data files are open"), state enum values (PENDING=0, COMMITTED=1).</div>
+<div class="ks">ks has: stronger narrative intent ("If power dies mid-write..."), 5-function C API (identical signatures to api).</div>
+<p>M1 was scoped for struct + ops table only. <strong>Expand to also include</strong> the behavior block (truncation + recovery sequencing) — all api-unique and behaviorally important.</p>
+</div>
+
+<div class="skill confirm">
+<h3>memory/skill/mmap <span class="badge">CONFIRM KS WINS</span></h3>
+<div class="summary">api: thin POSIX wrappers + Windows emulation (CreateFileMapping/MapViewOfFile, 64 active mappings). ks: same content but expanded — explicit FlushViewOfFile, FindFirstFile/FindNextFile, mapping registry note, macro-redirect rationale, full C interface, mkdir compat, "Header-only on POSIX".</div>
+<div class="ks">ks is strict superset.</div>
+</div>
+
+<div class="skill expand">
+<h3>memory/skill/scope <span class="badge">CONFIRM + EXPAND M2</span></h3>
+<div class="summary">api has the explicit Scope C struct + zero-alloc note + when-NOT-to-use guidance. ks has the narrative ("ties store and index together; reason engine walks facts through scope, never directly") and the C API.</div>
+<div class="api">api unique: <code>Scope</code> struct definition, "Zero allocation — stack struct" intent line, <strong>"For bulk reads, direct mmap access via <code>ts_facts()</code> is faster — scope is for filtered views, not raw throughput"</strong> (architectural caveat — prevents misuse).</div>
+<div class="ks">ks unique: reason-engine framing, O(1)-bucket-via-chained-hash detail.</div>
+<p>M2 was scoped for struct only. <strong>Expand to also include</strong> the zero-alloc intent line + the bulk-reads caveat — both api-unique and load-bearing.</p>
+</div>
+
+<div class="skill correct">
+<h3>memory/skill/store — <span class="badge">CORRECT TO MIXED — M6 NEEDED</span></h3>
+<div class="summary"><strong>The hidden gap.</strong> ks (73 lines) describes content-addressed intel-object blob storage by SHA-256. api (36 lines) describes the triple-store relational layer (S/P/O Facts + Dict + Indexes). These are different layers. ks's blob-store doc doesn't document the relational layer at all.</div>
+<div class="api">api unique: Fact struct (24B, three uint64), DictEntry struct (16B), TripleStore composition (facts+dict+strings as MmapFile + up to 16 indexes), full triple-store C API (10+ functions: open/close/flush, insert/insert_ids, query/query_strings, get_id/get_string/has_id, create_index/drop_index, scope/scope_field), 3 default S/P/O indexes on open, auto-grow files 2× when full, all inserts logged to WAL before write committed after, deps list.</div>
+<div class="ks">ks unique: SHA-256 content addressing, temporal provenance (4-column WHO/WHAT/WHERE/WHEN as triples), fact versioning via <code>supersedes</code>, change-detection query (4-step trace), <code>learned-at</code> ns timestamp, hardware adaptation (mmap on RK3566/x86, SPI flash on ESP32-S3).</div>
+<p><strong>Same failure mode as V1.</strong> Surface audit treated this as a length contest. Full read shows ks has more total bytes BUT is missing the entire relational layer that api documents. <strong>Action: M6 patch (conditional)</strong> — first verify the triple-store relational layer isn't already documented in <code>nous/memory/CLAUDE.md</code> or elsewhere. If absent, port api's triple-store composition into ks. M3 (cross-purpose binary-compat note from V18) still also belongs here — orthogonal to M6.</p>
+</div>
+
+<h2>The new patches</h2>
+
+<div class="new-patch minor">
+<h3><span class="ref">M5</span>MINOR — Add deps footer to <code>memory/skill/index/CLAUDE.md</code></h3>
+<div class="what">Target: <code>kastil-systems/a-d-d/nous/memory/skill/index/CLAUDE.md</code> · Insertion: end of file (after closing ``` of Interface block) · 2 lines</div>
+<pre>
+Deps: mmap, hash.</pre>
+<p>Every other ks memory skill states deps; this one omits them. Consistency fix only.</p>
+</div>
+
+<div class="new-patch">
+<h3><span class="ref">M1↑</span>EXPAND M1 — Add behavior block to journal patch</h3>
+<div class="what">Target: <code>kastil-systems/a-d-d/nous/memory/skill/journal/CLAUDE.md</code></div>
+<p>Original M1 plan was struct + ops table. Expand to also append after the existing Interface block (before "No dependencies" closer):</p>
+<pre>### Behavior
+
+- WAL is append-only during normal operation
+- On `triple_store_open`, call `journal_recover` after data files are open
+- Truncate WAL after successful recovery
+- Clean close truncates WAL to zero</pre>
+</div>
+
+<div class="new-patch">
+<h3><span class="ref">M2↑</span>EXPAND M2 — Add intent note + caveat to scope patch</h3>
+<div class="what">Target: <code>kastil-systems/a-d-d/nous/memory/skill/scope/CLAUDE.md</code></div>
+<p>Original M2 plan was struct only. Expand to ALSO add:</p>
+<p><strong>Insertion 1 — append to Intent paragraph:</strong></p>
+<pre>Zero allocation — the Scope struct lives on the stack.</pre>
+<p><strong>Insertion 2 — new Behavior block after Interface:</strong></p>
+<pre>### Behavior
+
+- `scope_field` uses index if available, falls back to sequential scan
+- `scope_next` returns false when exhausted
+- For bulk reads, direct mmap access via `ts_facts()` is faster
+- Scope is for filtered views, not raw throughput</pre>
+</div>
+
+<div class="new-patch cond">
+<h3><span class="ref">M6</span>CONDITIONAL — Add Triple-store Composition to store CLAUDE.md</h3>
+<div class="what">Target: <code>kastil-systems/a-d-d/nous/memory/skill/store/CLAUDE.md</code> · <strong>VERIFY FIRST</strong> (parent-level check)</div>
+<p><strong>Step 1 (blocker):</strong> Confirm the triple-store relational layer (Fact struct, DictEntry, <code>triple_store_*</code> API) is NOT documented in <code>nous/memory/CLAUDE.md</code> or <code>nous/CLAUDE.md</code>. If it is, drop M6.</p>
+<p><strong>Step 2 (if absent):</strong> Insert after the Implementation paragraph ending "Every write goes through audit.", before <code>## Temporal Provenance</code>:</p>
+<pre>### Triple-store composition
+
+When the store is used as a relational layer (subject/predicate/object), it composes:
+
+- **Fact** — 24 bytes: three uint64 IDs (subject, predicate, object)
+- **DictEntry** — 16 bytes: maps hash ID → string offset/length
+- **TripleStore** — owns facts, dict, strings (all MmapFile), plus up to 16 indexes
+
+Default lifecycle:
+- Creates 3 default indexes on open (subject, predicate, object)
+- Opens WAL on open, recovers uncommitted entries
+- Auto-grows files 2x when full
+- Auto-rehashes indexes at 0.7 load factor
+- All inserts logged to WAL before write, committed after
+
+Triple-store API (in addition to blob-level put/get/exists):
+- `triple_store_open/close/flush` — lifecycle
+- `triple_store_insert/insert_ids` — add facts (string or ID form)
+- `triple_store_query/query_strings` — find facts (0/NULL = wildcard)
+- `triple_store_get_id/get_string/has_id` — dictionary lookup
+- `triple_store_create_index/drop_index` — index management
+- `triple_store_scope/scope_field` — scoped iteration
+
+Deps when used as triple store: mmap, hash, index, scope, journal.</pre>
+<p>Note: M6 is orthogonal to M3 (the V18 cross-purpose binary-compat note). Both can land in <code>store/CLAUDE.md</code> without conflict.</p>
+</div>
+
+<h2>Updated M-series summary</h2>
+
+<table>
+<thead><tr><th>Patch</th><th>Source row</th><th>Status</th><th>Scope change</th></tr></thead>
+<tbody>
+<tr><td>M1</td><td>V10 journal</td><td>Pending</td><td>EXPANDED — add Behavior block</td></tr>
+<tr><td>M2</td><td>V12 scope</td><td>Pending</td><td>EXPANDED — add intent line + Behavior caveat</td></tr>
+<tr><td>M3</td><td>V18 learning/store</td><td>Pending</td><td>Same scope (cross-purpose note); possibly upgrade per V6 findings</td></tr>
+<tr><td>M4</td><td>V1 root</td><td>DONE (308ea1f)</td><td>—</td></tr>
+<tr><td>M5</td><td>V9 index</td><td>NEW (minor)</td><td>One-line deps footer</td></tr>
+<tr><td>M5a/b/c</td><td>V5 memory parent</td><td>NEW (V5)</td><td>tagline + perf baseline + conditional data model</td></tr>
+<tr><td>M6</td><td>V13 store</td><td>NEW (conditional)</td><td>Triple-store composition — V1-pattern correction</td></tr>
+<tr><td>M-new-1</td><td>V14 reason</td><td>NEW (optional)</td><td>Confidence buckets + restate modes</td></tr>
+<tr><td>M3↑</td><td>V18 learning/store</td><td>UPGRADE PROPOSAL</td><td>Verify-then-merge full binary format spec</td></tr>
+</tbody>
+</table>
+
+<div class="dod">
+  <div class="dod-item pass">Code committed (this V7 report)</div>
+  <div class="dod-item pass">Commit hash in telemetry</div>
+  <div class="dod-item na">Board updated (M1↑, M2↑, M5, M6 queued)</div>
+  <div class="dod-item pass">HTML report saved (be/plans/2026-05-21-1511-v7-memory-skills.html)</div>
+  <div class="dod-item pass">Index updated</div>
+  <div class="dod-item pass">Pushed to remote</div>
+  <div class="dod-item pass">No prior work damaged</div>
+  <div class="dod-item na">Shipped to production (audit-internal)</div>
+</div>
+
+</div>
+<footer>v0 · r8 · 2026-05-21 · ~i V7 · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>

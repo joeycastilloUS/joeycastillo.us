@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i Gemini in NOUS — how it wires today + what migration needs</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 28px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 14px 0 6px; }
+  p { color: #ccc; margin: 6px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 22px; margin: 6px 0; }
+  li { margin: 3px 0; }
+  pre { background: #0A0A0A; padding: 12px 16px; border-radius: 4px; color: #ddd; font-size: 11.5px; font-family: 'Consolas', monospace; white-space: pre; overflow-x: auto; margin: 8px 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 7px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.path { font-family: 'Consolas', monospace; font-size: 11.5px; color: var(--text); }
+  .answer { background: #0F1F0F; border: 2px solid var(--green); padding: 14px 20px; margin: 10px 0 20px; }
+  .answer .v { color: var(--text); font-size: 15px; font-weight: 600; }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 18px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i Gemini in NOUS</span></nav>
+<div class="container">
+
+<h1>~i Gemini in NOUS — how it wires today.</h1>
+<p class="sub">nous-desktop already has 4 Gemini variants wired. Key is sourced from one of three places (priority order). Today: no key set anywhere → 0 working Gemini variants. The orphan project hosts a key Joey forgot about.</p>
+
+<div class="links">Trail: <a href="2026-05-22-1530-i-nous-desktop.html">~i nous-desktop (the Director)</a> · <a href="2026-05-23-0017-i-gcp-vms-acme-to-kastil.html">~i GCP VMs</a></div>
+
+<div class="answer">
+<div class="v">Gemini integration is already coded into nous-desktop. The missing piece is just the API key — and that key should be created in <code>kastil-systems</code> (which today has neither Generative Language API nor billing). Migration = (1) unblock billing on kastil-systems, (2) enable the API there, (3) create a new key in AI Studio scoped to kastil-systems, (4) put it in <code>users.dat</code> next to the binary, (5) revoke the orphan project's key, (6) detach billing from the orphan to free a billing slot.</div>
+</div>
+
+<h2>The 4 Gemini variants already configured in nous-desktop</h2>
+
+<p>Source: <code>kastil-systems/tools/nous-desktop/src/serve.c</code> lines 353-356 (provider defaults table).</p>
+
+<table>
+<thead><tr><th>Provider name</th><th>Model</th><th>$/Mtok in</th><th>$/Mtok out</th></tr></thead>
+<tbody>
+<tr><td><code>gemini</code></td><td>gemini-2.5-pro</td><td>$1.25</td><td>$10.00</td></tr>
+<tr><td><code>gemini-flash</code></td><td>gemini-2.5-flash</td><td>$0.15</td><td>$0.60</td></tr>
+<tr><td><code>gemini-preview</code></td><td>gemini-3.1-pro-preview</td><td>$2.00</td><td>$12.00</td></tr>
+<tr><td><code>gemini-flash-preview</code></td><td>gemini-3-flash-preview</td><td>$0.50</td><td>$3.00</td></tr>
+</tbody>
+</table>
+
+<p>All 4 hit the <strong>Google AI Studio</strong> endpoint (<code>https://generativelanguage.googleapis.com/v1beta/...</code>) — not Vertex AI. All 4 use the same env var key name (<code>GEMINI_API_KEY</code>) and the same compiled-in macro (<code>NOUS_KEY_GEMINI</code>). <strong>One key unlocks all four.</strong></p>
+
+<h2>The 3-tier key source (priority order)</h2>
+
+<ol>
+  <li><strong>Per-user runtime key</strong> (highest priority) — <code>nous_userkeys_load("users.dat")</code> reads INI-style file next to the binary:
+  <pre>[user:joey]
+GEMINI_API_KEY=AIza...
+ANTHROPIC_API_KEY=sk-ant-...
+
+[user:scotty]
+GEMINI_API_KEY=AIza...</pre>
+  </li>
+  <li><strong>Env var</strong> (middle) — <code>GEMINI_API_KEY=...</code> in the launching shell</li>
+  <li><strong>Compiled-in default</strong> (lowest fallback) — <code>NOUS_KEY_GEMINI</code> macro in <code>src/nous_keys_builtin.h</code> (gitignored, <code>.example</code> template provided). For shipping pre-keyed binaries.</li>
+</ol>
+
+<p><strong>Today's state in your running binary:</strong> startup banner said "0 free (builtin), 0 paid (user key)". Confirmed by inspection — no <code>users.dat</code> exists, no env var was set, no <code>nous_keys_builtin.h</code> exists (only the <code>.example</code> template). The 4 Gemini variants are LOADED but ZERO of them have a key, so they're not callable.</p>
+
+<h2>The orphan project's role — confirmed</h2>
+
+<table>
+<thead><tr><th></th><th>gen-lang-client-0031500671 (orphan)</th><th>kastil-systems (destination)</th></tr></thead>
+<tbody>
+<tr><td>Generative Language API</td><td style="color:var(--green);">ENABLED</td><td style="color:var(--red);">DISABLED</td></tr>
+<tr><td>Billing</td><td style="color:var(--green);">attached (Acme Dev Billing Acct)</td><td style="color:var(--red);">NOT attached</td></tr>
+<tr><td>Compute Engine API</td><td>disabled (irrelevant for AI Studio)</td><td>disabled (blocked on billing)</td></tr>
+<tr><td>VMs</td><td>0</td><td>0 (until VM migration)</td></tr>
+<tr><td>Created</td><td>2026-02-11 by Google when you grabbed a Gemini API key from AI Studio</td><td>existing kASTIL project</td></tr>
+</tbody>
+</table>
+
+<p>The orphan project EXISTS solely as the billing/quota container for the Gemini API key Joey created at <code>aistudio.google.com</code> in February. The KEY itself works regardless of the project (calls hit the same endpoint), but quota and billing flow through whichever project owns the key.</p>
+
+<h2>Why migrate the key to kastil-systems</h2>
+
+<ol>
+  <li><strong>Brand alignment</strong> — kastil-systems is the new home of the platform. Gemini quota should flow through it, not through a forgotten Google-named default project.</li>
+  <li><strong>Frees a billing slot</strong> — Acme Dev Billing Acct is at the 5-project ceiling. The orphan is one of those 5. Detach it after key migration → kastil-systems can be attached → unblocks the GCP VM migration that's currently stalled.</li>
+  <li><strong>Single source of truth</strong> — quota dashboards, alerts, and cost attribution all align to kastil-systems = NOUS-related work.</li>
+</ol>
+
+<h2>The migration mechanics (what specifically needs to happen)</h2>
+
+<table>
+<thead><tr><th>Step</th><th>What</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Attach billing to kastil-systems</td><td>gcloud (blocked today — needs orphan detached first OR quota increase)</td></tr>
+<tr><td>2</td><td>Enable Generative Language API on kastil-systems</td><td><code>gcloud services enable generativelanguage.googleapis.com --project=kastil-systems</code></td></tr>
+<tr><td>3</td><td>Create a new Gemini API key scoped to kastil-systems</td><td><strong>aistudio.google.com/app/apikey</strong> (web UI — there's no CLI for AI Studio key creation). Pick kastil-systems from the project dropdown.</td></tr>
+<tr><td>4</td><td>Store the key in <code>users.dat</code> next to the nous-desktop binary</td><td><code>C:\kastil-tools\nous-desktop\users.dat</code> — INI format, <code>[user:joey]</code> section</td></tr>
+<tr><td>5</td><td>Restart nous-desktop</td><td>Banner should now show "1 paid (user key)" — confirms key is loaded</td></tr>
+<tr><td>6</td><td>Smoke test: hit one Gemini variant via the cockpit UI</td><td>http://localhost:5050 → AI provider dropdown → gemini-flash (cheapest) → test prompt</td></tr>
+<tr><td>7</td><td>Revoke old AI Studio key</td><td>aistudio.google.com → delete the orphan-project's key</td></tr>
+<tr><td>8</td><td>Detach billing from orphan project</td><td><code>gcloud billing projects unlink gen-lang-client-0031500671</code></td></tr>
+<tr><td>9 (optional)</td><td>Mark orphan project for deletion</td><td>Once you've confirmed nothing else depends on it</td></tr>
+</tbody>
+</table>
+
+<h2>What this also unblocks</h2>
+
+<p>The GCP VM migration (Acme → kastil-systems, plan v4) is currently blocked on "billing quota exceeded" because Acme Dev Billing Acct is at 5/5 projects. <strong>Step 8 above frees the slot</strong>, allowing kastil-systems to attach to billing, allowing Compute API to enable, allowing the VM migration to proceed.</p>
+
+<p>This investigation has dual value: it gets Gemini wired for NOUS AND clears the billing blocker for the VM migration plan.</p>
+
+<h2>Open items for the plan (~p)</h2>
+
+<ol>
+  <li>Where does <code>users.dat</code> live in production? Next to the binary works for desktop use; for a server-class nous-desktop, may want a system path (<code>/var/nous/users.dat</code>) similar to <code>/var/nous/cf.token</code>.</li>
+  <li>Key value — paste it into <code>users.dat</code> directly, or use the env-var path on launch (cleaner — no key on disk)? Trade-off: persistence vs. memory-only.</li>
+  <li>Should the gemini key ALSO go into <code>nous_keys_builtin.h</code> as the compiled-in fallback? Useful if Joey ships nous-desktop binaries to others and wants a "free tier" key shared. Otherwise leave it user-key only.</li>
+  <li>What's the lifespan of the AI Studio key — does Google rotate it, expire it? May want to add a key-rotation note.</li>
+  <li>Multi-user case — currently <code>users.dat</code> supports <code>[user:scotty]</code>, etc. If Scotty's joining the NOUS cockpit, he gets his own section with his own key.</li>
+</ol>
+
+<footer>v0 · r37 · 2026-05-23 · ~i Gemini in NOUS · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

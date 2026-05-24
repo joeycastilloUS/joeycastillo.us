@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~p v4 GCP VMs — elite/prime/relay, _prime DNS stays, 3 phases</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .status-banner { background: var(--amber); color: #000; padding: 6px 24px; text-align: center; font-weight: 700; letter-spacing: 2px; font-size: 11px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 18px 0 6px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 22px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  pre { background: #0A0A0A; padding: 12px 16px; border-radius: 4px; color: #ddd; font-size: 11.5px; font-family: 'Consolas', monospace; white-space: pre; overflow-x: auto; margin: 10px 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.old { color: var(--red); font-family: 'Consolas', monospace; text-decoration: line-through; opacity: 0.7; font-size: 11px; }
+  td.new { color: var(--green); font-family: 'Consolas', monospace; font-weight: 700; font-size: 11.5px; }
+  td.hw { color: var(--purple); font-family: 'Consolas', monospace; font-size: 11px; }
+  td.term { color: var(--t3); font-weight: 700; }
+  td.run { color: var(--green); font-weight: 700; }
+  .supersedes { background: #2A1010; border: 2px solid var(--red); padding: 12px 18px; margin: 14px 0; font-size: 13.5px; }
+  .supersedes b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .phase { background: var(--surface); border-left: 4px solid var(--accent); padding: 18px 24px; margin: 16px 0; }
+  .phase h3 { margin-top: 0; color: var(--accent); font-size: 16px; }
+  .phase .why { color: var(--t2); font-size: 12px; font-style: italic; margin-bottom: 10px; }
+  .phase .exit { color: var(--green); margin-top: 10px; font-size: 12px; }
+  .phase .exit::before { content: "✓ Exit: "; color: var(--green); font-weight: 700; }
+  .pick { background: #0F1F0F; border: 2px solid var(--green); padding: 14px 20px; margin: 12px 0; }
+  .pick h3 { color: var(--green); margin: 0 0 8px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 24px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 20px; border-top: 1px solid #222; margin-top: 32px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~p v4 GCP VMs · simplified to 3 phases</span></nav>
+<div class="status-banner">PLAN — AWAITING APPROVAL</div>
+<div class="container">
+
+<h1>~p v4 — 3 phases. Copy them over.</h1>
+<p class="sub">elite / prime / relay as VM prefixes. <code>_prime</code> and <code>_relay</code> DNS records unchanged. Joey was right — the migration is conceptually one phase (the copy) flanked by pre-flight and cleanup. Stop pretending each VM is its own phase.</p>
+
+<div class="supersedes">
+<b>Supersedes</b>
+v3 collapsed roles to "node + relay" — Joey corrects: <em>"go ahead and add elite- or prime- instead of node-"</em>. v3 also had 6 phases (per-VM as separate phases). Joey: <em>"for me i see one phase, copy them over to their new home."</em> Right — the per-VM repetitions aren't separate phases. v4 collapses to <strong>3 real phases</strong>: pre-flight (one-time), copy (the work), cleanup (after rollback window).
+</div>
+
+<div class="links">Trail: <a href="2026-05-23-0943-p-gcp-vms-rename-migrate-v3-dns-integrated.html">v3 (DNS-integrated, superseded)</a> · <a href="2026-05-23-0932-p-gcp-vms-rename-migrate-v2.html">v2</a></div>
+
+<h2>Confirmed decisions</h2>
+
+<div class="pick">
+<h3>VM-name prefixes — three roles</h3>
+<p><strong>elite-</strong>, <strong>prime-</strong>, <strong>relay-</strong>. The "nous-" prefix is dropped (everything is nous). The "elite" vs "prime" distinction is preserved at the VM name level — it tracks the machine class.</p>
+</div>
+
+<div class="pick">
+<h3>Protocol / DNS — unchanged</h3>
+<p>The relay protocol still uses the cert role string <code>"prime"</code>. Both elite and prime VMs register under <code>_prime.3-nous.net</code> (same role at the protocol layer). Relays register under <code>_relay.3-nous.net</code>. Operational rename only — no protocol change, no cert re-signing, no relay code edits.</p>
+</div>
+
+<h2>The 5 final names</h2>
+
+<table>
+<thead><tr><th style="width:22%;">Was (Acme)</th><th style="width:6%;">Status</th><th>Becomes (kastil-systems)</th><th style="width:12%;">HW upgrade</th></tr></thead>
+<tbody>
+<tr>
+  <td class="old">nous-elite-us</td>
+  <td class="term">TERMINATED</td>
+  <td class="new">elite-c2-standard-8-gvnic-us-east4-a-ashburn</td>
+  <td class="hw" style="color:var(--green);">→ gvnic<br>→ pd-ssd</td>
+</tr>
+<tr>
+  <td class="old">prime-asia-southeast1-a-singapore</td>
+  <td class="run">RUNNING</td>
+  <td class="new">prime-e2-micro-virtio-asia-southeast1-a-singapore</td>
+  <td class="hw">unchanged</td>
+</tr>
+<tr>
+  <td class="old">prime-us-west4-a-las-vegas</td>
+  <td class="run">RUNNING</td>
+  <td class="new">prime-e2-micro-virtio-us-west4-a-las-vegas</td>
+  <td class="hw">unchanged</td>
+</tr>
+<tr>
+  <td class="old">relay-asia-east2-a-hong-kong</td>
+  <td class="run">RUNNING</td>
+  <td class="new">relay-e2-micro-virtio-asia-east2-a-hong-kong</td>
+  <td class="hw">unchanged</td>
+</tr>
+<tr>
+  <td class="old">relay-us-west2-a-los-angeles</td>
+  <td class="run">RUNNING</td>
+  <td class="new">relay-e2-micro-virtio-us-west2-a-los-angeles</td>
+  <td class="hw">unchanged</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Longest:</strong> <code>elite-c2-standard-8-gvnic-us-east4-a-ashburn</code> = 44 chars (GCP limit 63, comfortable). At protocol level, the elite VM's <code>node.cert</code> role is still <code>"prime"</code> — only the VM name changed.</p>
+
+<h2>The 3 phases</h2>
+
+<div class="phase">
+<h3>Phase 1 — Pre-flight (one-time setup, ~30 min)</h3>
+<div class="why">Has to happen before any copy work. After this, Phase 2 just runs.</div>
+<ul>
+  <li><strong>Enable Compute API on kastil-systems:</strong> <code>gcloud services enable compute.googleapis.com --project=kastil-systems</code></li>
+  <li><strong>Confirm billing</strong> attached to kastil-systems</li>
+  <li><strong>VPC + firewall:</strong> verify auto-mode default VPC exists; replicate the firewall rules from acmedev-platform-hq (ports 22, 8080, 8443)</li>
+  <li><strong>Cross-project IAM:</strong> kastil-systems default Compute SA needs <code>roles/compute.imageUser</code> on snapshots</li>
+  <li><strong>Capture current DNS state:</strong> <code>dig +short TXT _prime.3-nous.net</code> + <code>dig +short TXT _relay.3-nous.net</code> — save the output for diff after cutover</li>
+  <li><strong>Sanity-check identity files exist on old VMs:</strong> SSH into one prime + one relay, confirm <code>/var/nous/cf.token</code> exists and <code>node.key/.pub/.cert</code> live where the binary expects. Snapshot will carry these.</li>
+</ul>
+<p class="exit">Compute API live on kastil-systems, IAM clear, current DNS state captured, identity files confirmed on old VMs.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 2 — Copy them over (the work)</h3>
+<div class="why">Joey's "one phase." 5 VMs × the same recipe. Order matters for safety, not architecture.</div>
+<p><strong>The recipe (run per VM):</strong></p>
+<pre>1. SNAPSHOT the old disk         (in acmedev-platform-hq)
+2. CREATE IMAGE                  (cross-project into kastil-systems)
+3. BOOT NEW VM                   (in kastil-systems, new name, HW upgrades for elite)
+4. VERIFY                        (SSH, check identity files, check service)
+5. WAIT FOR DNS                  (new TXT record propagates in &lt; 5 min;
+                                  consumer-side relays pick it up at next refresh)
+6. STOP OLD VM                   (don't delete — keep for rollback window)</pre>
+
+<p><strong>Recommended order (5 sub-steps within Phase 2):</strong></p>
+
+<table>
+<thead><tr><th>#</th><th>Target</th><th>Why this order</th></tr></thead>
+<tbody>
+<tr><td>2.1</td><td>elite (was nous-elite-us)</td><td>TERMINATED — zero traffic impact. Validates the recipe + HW upgrades.</td></tr>
+<tr><td>2.2</td><td>relay-hong-kong</td><td>One of the 2 relays. relay-los-angeles still serves traffic during the swap.</td></tr>
+<tr><td>2.3</td><td>relay-los-angeles</td><td>After 2.2 stable in new home.</td></tr>
+<tr><td>2.4</td><td>prime-singapore</td><td>One of the 2 primes. prime-las-vegas covers during swap.</td></tr>
+<tr><td>2.5</td><td>prime-las-vegas</td><td>Last. All 5 now in kastil-systems.</td></tr>
+</tbody>
+</table>
+
+<p><strong>Why not parallel?</strong> Could be — but doing 2.1 first lets you catch any image / NIC / cross-project IAM issue once instead of five times. After 2.1 succeeds, 2.2-2.5 can run with confidence (and even in parallel if you want).</p>
+
+<p><strong>Why pair-aware sequencing for relays + primes?</strong> The protocol handles multi-instance discovery natively (per <code>relay/CLAUDE.md</code>: <em>"Primes come and go dynamically"</em>). But if ONE side of a pair has a problem during migration, the other still serves. Belt-and-suspenders.</p>
+
+<p class="exit">All 5 VMs running in kastil-systems with new names. Old 5 VMs in acmedev-platform-hq are STOPPED (not deleted). Cloudflare DNS has both old + new TXT records co-existing temporarily.</p>
+</div>
+
+<div class="phase">
+<h3>Phase 3 — Cleanup (after ~1 week rollback window)</h3>
+<div class="why">Trailing work. Old VMs stay stopped until you're sure nothing broke.</div>
+<ul>
+  <li><strong>Delete the 5 old TXT records from Cloudflare DNS</strong> (the ones pointing at acmedev-platform-hq IPs). After this, only the new TXT records remain.</li>
+  <li><strong>Delete the 5 stopped VMs in acmedev-platform-hq</strong></li>
+  <li><strong>Delete the migration snapshots</strong> (or keep one set as cold backup if you want)</li>
+  <li><strong>Verify <code>dig TXT _prime.3-nous.net</code> + <code>dig TXT _relay.3-nous.net</code></strong> show only the new IPs</li>
+  <li><strong>Update audit-of-all reports</strong> with final state</li>
+  <li><strong>Consider:</strong> if acmedev-platform-hq has nothing else important, schedule the project for shutdown</li>
+</ul>
+<p class="exit">Old fleet deleted. DNS clean. Migration complete.</p>
+</div>
+
+<h2>What this still depends on (the "more than one phase" bits)</h2>
+
+<p>Joey's framing was right — at the architecture level, it's one operation (copy). The complications:</p>
+
+<ol>
+  <li><strong>Cross-project image sharing</strong> requires the IAM grant (Phase 1). Without it, Phase 2 fails on step 3.</li>
+  <li><strong>NIC + disk upgrades for elite</strong> mean the boot command for that one VM has extra flags (<code>--network-interface=nic-type=GVNIC</code> + <code>--create-disk=type=pd-ssd</code>). The other 4 use defaults.</li>
+  <li><strong>DNS overlap is automatic</strong> (the protocol handles it) — but cleanup of stale Cloudflare TXT records is manual (Phase 3).</li>
+  <li><strong>Identity files travel with the snapshot</strong> — node.key, node.pub, node.cert, /var/nous/cf.token all carry over. No re-signing needed.</li>
+  <li><strong>External IPs change</strong> — new VMs get new IPs unless static IPs are explicitly reserved in kastil-systems. The DNS protocol re-announces on boot, so this is fine for relay/prime discovery. If any DNS A records or external services point at the OLD IPs directly, those need updates separately.</li>
+</ol>
+
+<p>That's the gap between "one phase" (the copy) and "three phases" (one-time setup, the copy, cleanup). The middle phase IS one phase — repeated 5 times for tactical safety.</p>
+
+<h2>Phase 2.1 — execution-ready commands (the recipe for elite)</h2>
+
+<pre># Snapshot
+gcloud config set project acmedev-platform-hq
+gcloud compute disks snapshot nous-elite-us \
+    --zone=us-east4-a \
+    --snapshot-names=elite-snap-2026-05-23
+
+# Cross-project image
+gcloud compute images create elite-img-2026-05-23 \
+    --project=kastil-systems \
+    --source-snapshot=projects/acmedev-platform-hq/global/snapshots/elite-snap-2026-05-23 \
+    --storage-location=us
+
+# Boot new VM (elite gets gVNIC + pd-ssd upgrades)
+gcloud compute instances create elite-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems \
+    --zone=us-east4-a \
+    --machine-type=c2-standard-8 \
+    --network-interface=nic-type=GVNIC,subnet=default \
+    --create-disk=image=elite-img-2026-05-23,image-project=kastil-systems,boot=yes,type=pd-ssd,size=50
+
+# Verify
+gcloud compute ssh elite-c2-standard-8-gvnic-us-east4-a-ashburn \
+    --project=kastil-systems --zone=us-east4-a \
+    --command='hostname; uname -a; ip link show; ls -la /var/nous/'</pre>
+
+<p>For Phase 2.2-2.5 (the four e2-micros): same recipe minus the gVNIC + pd-ssd flags. Default NIC + pd-standard preserved.</p>
+
+<h2>Next step</h2>
+
+<p>Approve. Then Phase 1 (4 setup commands) followed immediately by Phase 2.1 (the elite recipe — 4 gcloud commands). Total time to first migrated VM: about an hour. After 2.1 succeeds, the other 4 are mechanical.</p>
+
+<footer>v0 · r36 · 2026-05-23 · ~p v4 GCP VMs · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

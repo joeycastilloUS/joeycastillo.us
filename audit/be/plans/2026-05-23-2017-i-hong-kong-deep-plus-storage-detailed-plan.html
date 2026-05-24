@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i Hong Kong deep dive + detailed storage migration plan (hot/cold)</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 28px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 14px 0 6px; }
+  p { color: #ccc; margin: 6px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 22px; margin: 6px 0; }
+  li { margin: 3px 0; }
+  pre { background: #0A0A0A; padding: 12px 16px; border-radius: 4px; color: #ddd; font-size: 11.5px; font-family: 'Consolas', monospace; white-space: pre; overflow-x: auto; margin: 8px 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 7px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.path { font-family: 'Consolas', monospace; font-size: 11.5px; color: var(--text); }
+  td.hot { color: var(--red); font-weight: 700; font-size: 11px; letter-spacing: 1px; }
+  td.cold { color: var(--accent); font-weight: 700; font-size: 11px; letter-spacing: 1px; }
+  td.move { color: var(--green); font-weight: 700; font-size: 11px; letter-spacing: 1px; }
+  td.stay { color: var(--t3); font-weight: 700; font-size: 11px; letter-spacing: 1px; }
+  .finding { background: #2A1A0F; border: 2px solid var(--amber); padding: 12px 18px; margin: 10px 0; }
+  .finding b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .answer { background: #0F1F0F; border: 2px solid var(--green); padding: 14px 20px; margin: 10px 0 20px; }
+  .answer .v { color: var(--text); font-size: 15px; font-weight: 600; }
+  .alert { background: #2A1010; border: 2px solid var(--red); padding: 12px 18px; margin: 10px 0; }
+  .alert b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .phase { background: var(--surface); border-left: 4px solid var(--accent); padding: 14px 20px; margin: 12px 0; }
+  .phase h3 { margin-top: 0; color: var(--accent); }
+  .phase .exit { color: var(--green); margin-top: 8px; font-size: 12px; }
+  .phase .exit::before { content: "✓ Exit: "; color: var(--green); font-weight: 700; }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 18px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · hong kong deep + storage plan</span></nav>
+<div class="container">
+
+<h1>Hong Kong, exactly. Storage, in full.</h1>
+<p class="sub">Deeper look at the original HK VM (intent vs. reality conflict), and the per-bucket migration plan across hot + cold tiers.</p>
+
+<div class="links">Trail: <a href="2026-05-23-2000-i-storage-migration-plus-elite-compare-plus-relay-hkg.html">previous ~i</a> · <a href="2026-05-23-1943-i-storage-parity-audit.html">parity audit</a></div>
+
+<h2>Part 1 — Original Hong Kong VM, exactly what it is</h2>
+
+<div class="answer">
+<div class="v">A 2-week-old "relay foundation tier" VM (per labels) that was installed as a CATALOG node (per systemd unit) and has been doing nothing observable since boot. The owner's intent and the actual install disagree, and nobody reconciled it.</div>
+</div>
+
+<h3>What I confirmed (SSH refused, used serial console + GCP metadata + snapshot)</h3>
+
+<table>
+<thead><tr><th>Property</th><th>Value</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>VM created</td><td><strong>2026-05-08 04:28 PDT</strong> (16 days old)</td><td>gcloud describe</td></tr>
+<tr><td>Labels</td><td><code>city=hong-kong</code>, <strong><code>role=relay</code></strong>, <strong><code>tier=foundation</code></strong></td><td>gcloud describe</td></tr>
+<tr><td>Tags</td><td>NONE (no firewall rules apply by tag — only default rules + my-IP-not-allowed rules)</td><td>gcloud describe</td></tr>
+<tr><td>OS</td><td>Debian 6.1.162-1 (2026-02-08)</td><td>serial console hostname + uname proxy</td></tr>
+<tr><td>External HTTP probe (8080)</td><td>TIMEOUT (HTTP 000) — firewall blocks my IP</td><td>curl from this machine</td></tr>
+<tr><td>External HTTP probe (8443)</td><td>TIMEOUT — same reason</td><td>curl from this machine</td></tr>
+<tr><td>Serial console (last 80 lines)</td><td>ONLY system maintenance — oslogin cache refresh, apt-daily, dpkg-db-backup, logrotate, exim4 housekeeping, man-db, e2scrub. <strong>ZERO application activity logged.</strong> No nous-catalog, no nous-relay, no catalog_server output, no errors, no traffic.</td><td>gcloud get-serial-port-output</td></tr>
+<tr><td>Disk state (via the snapshot, which is bit-for-bit identical to the OLD disk)</td><td>
+<code>/etc/systemd/system/nous-catalog.service</code> ← installed, enabled<br>
+<code>/opt/nous/catalog_server</code> ← 1.5 MB binary, owned by pantheon-0<br>
+<code>/opt/nous/relay_server</code> ← 1.0 MB binary, owned by root (no service file)<br>
+<code>/var/nous/catalog/</code> ← present but contents not retrievable without SSH<br>
+<code>/var/nous/relay/</code> ← present but empty<br>
+<code>/var/nous/triples.key</code> ← 32B PSK matching the fleet
+</td><td>SSH to NEW HK (snapshot copy)</td></tr>
+</tbody>
+</table>
+
+<h3>What it means in plain words</h3>
+
+<div class="finding">
+<b>Intent vs reality conflict</b>
+The owner labeled this VM <code>role=relay</code> and <code>tier=foundation</code> when it was created on 2026-05-08. Someone (the installer? a different deploy script?) installed <code>nous-catalog.service</code> on it instead of <code>nous-relay.service</code>. The labels never got updated, and the missing relay service never got added.
+</div>
+
+<p><strong>Functionally</strong>, this VM is a catalog node sitting in Hong Kong with no firewall rule allowing external access from anywhere I can see, no DNS announcing it as a peer, no traffic in the serial log for the entire 16-day uptime. <strong>It's a $5/month e2-micro running catalog software that nothing is connecting to.</strong></p>
+
+<p><strong>Operationally</strong>, the intent was clearly Asia-East relay coverage (paired with relay-lax for Asia↔US coverage). That intent was never realized because the install was wrong. The mistake has been quietly sitting for 16 days.</p>
+
+<h3>Three honest options for what to call it + what to do</h3>
+
+<table>
+<thead><tr><th>Choice</th><th>What you get</th><th>Cost</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>A. Honor the labels — make it a real relay</strong></td>
+  <td>Stop the catalog service. Install nous-relay.service (copy from relay-lax, adjust <code>--prime</code> to point at the new prime-sin internal IP 10.148.0.2). Update labels untouched. The VM finally is what its name says.</td>
+  <td>20 min SSH work. Renames the function to match the original intent.</td>
+</tr>
+<tr>
+  <td><strong>B. Honor the install — relabel + rename</strong></td>
+  <td>Catalog stays. Rename VM to <code>prime-e2-micro-virtio-asia-east2-a-hong-kong</code>. Update labels: <code>role=prime, tier=foundation</code>. Add the <code>nous-catalog</code> tag so firewall rules apply. The VM is honest about what it does.</td>
+  <td>5 min metadata work + 1 snapshot/rebuild for rename (renaming requires recreating). You get a real third catalog/prime in Asia-East.</td>
+</tr>
+<tr>
+  <td><strong>C. Retire it</strong></td>
+  <td>It does nothing useful today. Both relay-lax + the 2 primes (sin + las) + the elite serve as the active mesh. HK is dead weight. Stop, delete, save $5/month + remove a confusing entity.</td>
+  <td>1 command. Net negative cost.</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Recommendation: B (rename to prime).</strong> The catalog software is already working, the data is there, deleting is wasteful. Renaming makes the system honest. If you later want a real relay in Asia, spin a new VM with the right install — that's faster than fighting the existing one.</p>
+
+<h2>Part 2 — Storage classification (hot vs. cold, the truth)</h2>
+
+<div class="finding">
+<b>Surprise</b>
+ALL 13 <code>nous-kb-*</code> buckets are <strong>ARCHIVE class</strong>, not Standard. The "cold" prefix in the bucket name (e.g. <code>nous-kb-cold-asia-east1</code>) was a naming convention but does NOT reflect a different storage tier. The "warm" named ones (e.g. <code>nous-kb-asia-east1</code>) and the "cold" named ones are <strong>both Archive class</strong> — same minimum storage duration (365 days), same retrieval fees, same per-GB pricing.
+</div>
+
+<h3>Full bucket inventory with REAL storage classes</h3>
+
+<table>
+<thead><tr><th>Bucket</th><th>Location</th><th>Storage class</th><th>Tier</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td class="path">acmedev-platform-hq_cloudbuild</td><td>US (multi)</td><td>STANDARD</td><td class="hot">HOT</td><td class="stay">STAY (Acme build cache)</td></tr>
+<tr><td class="path">nous-deploy</td><td>US-CENTRAL1</td><td>STANDARD</td><td class="hot">HOT</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-knowledge</td><td>US-CENTRAL1</td><td>STANDARD</td><td class="hot">HOT</td><td class="move">MOVE</td></tr>
+<tr><td class="path">run-sources-acmedev-platform-hq-us-west4</td><td>US-WEST4</td><td>STANDARD</td><td class="hot">HOT</td><td class="stay">STAY (Acme Cloud Run)</td></tr>
+<tr><td class="path">nous-kb-asia-east1</td><td>ASIA-EAST1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-australia-southeast1</td><td>AU-SE1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-europe-west1</td><td>EU-WEST1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-southamerica-east1</td><td>SA-EAST1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-us-east4</td><td>US-EAST4</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-us-west1</td><td>US-WEST1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-cold-asia-east1</td><td>ASIA-EAST1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-cold-au-se1</td><td>AU-SE1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-cold-eu-west1</td><td>EU-WEST1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-cold-sa-east1</td><td>SA-EAST1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+<tr><td class="path">nous-kb-cold-us-east1</td><td>US-EAST1</td><td>ARCHIVE</td><td class="cold">COLD</td><td class="move">MOVE</td></tr>
+</tbody>
+</table>
+
+<p><strong>13 buckets to move</strong> (2 hot + 11 cold). 2 stay in Acme. Note: the "cold" naming for 5 of the cold buckets seems to indicate a redundant set OR a planned-but-unused tier differentiation — they aren't actually a different storage class than their "warm" siblings. Worth understanding why two parallel naming sets exist (might be a "primary" vs "backup" pattern with both at Archive).</p>
+
+<h3>Known sizes (sampled — full size scan was slow)</h3>
+
+<ul>
+  <li><code>nous-deploy</code>: 331 KiB (1 object) — tiny, just deploy bundles</li>
+  <li><code>acmedev-platform-hq_cloudbuild</code>: 17 MiB (44 objects) — staying in Acme</li>
+  <li>All others: <strong>size unknown without a full scan</strong> — recommend running <code>gsutil du -sh</code> per bucket in parallel before executing the plan, to estimate costs</li>
+</ul>
+
+<h2>Part 3 — Archive class cost reality (read before you migrate)</h2>
+
+<div class="alert">
+<b>Critical pricing — Archive class</b>
+Cross-project copy of Archive-class data is NOT free. GCP charges:
+<ul>
+  <li><strong>Retrieval (Class B operations + per-GB):</strong> <code>$0.05 / GB read</code> from Archive. If a bucket has 100 GB, reading it costs $5.</li>
+  <li><strong>Early deletion fee:</strong> Archive has a <strong>365-day minimum storage duration</strong>. Deleting objects before 365 days = pay full storage cost for the remaining days.</li>
+  <li><strong>Per-object retrieval:</strong> Each object retrieval is a Class B operation (~$0.05 per 10,000 objects).</li>
+</ul>
+Before pulling the trigger on any bucket migration, run <code>gsutil du -sh gs://&lt;bucket&gt;</code> + check the bucket creation time. If a bucket was created &lt; 365 days ago AND contains significant data, the early-deletion fee could be substantial.
+</div>
+
+<h3>Three migration strategies for Archive class</h3>
+
+<table>
+<thead><tr><th>Strategy</th><th>How</th><th>Cost profile</th><th>Best when</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>A. Native rsync (the standard)</strong></td>
+  <td><code>gsutil -m rsync -r gs://source gs://dest</code></td>
+  <td>Pay retrieval fee ($0.05/GB) + cross-region egress if different region. Source still incurs early-deletion if &lt; 365 days old when deleted.</td>
+  <td>Buckets with low GB but high object counts; you're OK paying retrieval to maintain control.</td>
+</tr>
+<tr>
+  <td><strong>B. Storage Transfer Service (STS)</strong></td>
+  <td><code>gcloud transfer jobs create</code> with source + dest. STS handles the parallel pull.</td>
+  <td>Same per-GB retrieval cost as A. STS has no extra fee BUT operations are charged at Class B rate.</td>
+  <td>Large buckets where you want managed parallelism and reporting.</td>
+</tr>
+<tr>
+  <td><strong>C. Move via "rewrite" (in-place class change first)</strong></td>
+  <td>Step 1: <code>gsutil -m rewrite -s standard gs://source/**</code> (changes class to Standard in-place). Step 2: rsync as A. Step 3: <code>gcloud projects move</code> the bucket itself.</td>
+  <td>Avoids Archive read fees (Standard reads are free). But: rewriting incurs Class A operation fees + Standard storage costs during the migration window.</td>
+  <td>Very large buckets where retrieval fees would dominate.</td>
+</tr>
+</tbody>
+</table>
+
+<p>For Joey's nous-kb-* buckets, the right strategy depends on size. Until we know GBs per bucket, Strategy A is the default conservative choice — simple, predictable, manageable.</p>
+
+<h3>Bucket name conflict (can't have same name in two projects)</h3>
+
+<p>GCS bucket names are <strong>globally unique</strong>. To copy <code>nous-kb-us-east4</code> to kastil-systems, the destination bucket can't also be named <code>nous-kb-us-east4</code> — that name is already taken by the Acme bucket. Two paths:</p>
+
+<ul>
+  <li><strong>Rename pattern (recommended for parallel run):</strong> destination becomes <code>kastil-kb-us-east4</code> (or <code>nous-kb-us-east4-ks</code>). Both buckets exist during the cutover window. Old gets deleted after verification.</li>
+  <li><strong>Delete-first pattern:</strong> empty + delete source bucket, then create with same name in destination. NO rollback once source is gone. Bigger risk.</li>
+</ul>
+
+<p>Recommend rename pattern. The <code>kastil-</code> prefix matches Joey's "kastil-systems is the new home" framing.</p>
+
+<h2>Part 4 — The detailed plan, per phase</h2>
+
+<div class="phase">
+<h3>Storage Phase 0 — Pre-flight (one-time, ~15 min)</h3>
+<ol>
+  <li><strong>Run full size scan in parallel:</strong>
+<pre>for b in $(gcloud storage buckets list --project=acmedev-platform-hq --format='value(name)' | grep -E '^nous-'); do
+  (echo "$b: $(gsutil du -sh gs://$b 2>/dev/null | head -1)" &amp;)
+done; wait</pre>
+  Capture output, sum the GB total. Estimate cost = total_GB × $0.05 (Archive retrieval).</li>
+  <li><strong>Enable APIs on kastil-systems:</strong> Cloud Storage API (likely auto-enabled with project), Storage Transfer Service API (if using Strategy B): <code>gcloud services enable storagetransfer.googleapis.com --project=kastil-systems</code></li>
+  <li><strong>Cross-project IAM:</strong> grant kastil-systems' Storage Transfer Service SA the <code>roles/storage.objectViewer</code> on the source acmedev-platform-hq buckets. (Or just use your own user creds for gsutil rsync — easier.)</li>
+  <li><strong>Decide naming pattern:</strong> <code>kastil-kb-*</code> prefix recommended. Document the mapping.</li>
+</ol>
+<p class="exit">Sizes known, total cost estimated, IAM ready, naming decided.</p>
+</div>
+
+<div class="phase">
+<h3>Storage Phase 1 — HOT buckets (2: nous-deploy + nous-knowledge)</h3>
+<p>Standard class. No retrieval fees. Cheapest and safest to migrate first — validates the recipe.</p>
+<pre># nous-deploy (331 KiB, US-CENTRAL1, Standard)
+gcloud storage buckets create gs://kastil-deploy \
+    --project=kastil-systems --location=us-central1 --default-storage-class=standard
+gsutil -m rsync -r gs://nous-deploy gs://kastil-deploy
+# Verify byte parity
+gsutil du -s gs://nous-deploy gs://kastil-deploy   # should match
+
+# nous-knowledge (size unknown, US-CENTRAL1, Standard)
+gcloud storage buckets create gs://kastil-knowledge \
+    --project=kastil-systems --location=us-central1 --default-storage-class=standard
+gsutil -m rsync -r gs://nous-knowledge gs://kastil-knowledge
+gsutil du -s gs://nous-knowledge gs://kastil-knowledge</pre>
+<p class="exit">2 hot buckets in kastil-systems, byte-parity verified.</p>
+</div>
+
+<div class="phase">
+<h3>Storage Phase 2 — COLD buckets (11: all nous-kb-*)</h3>
+<p>Archive class. Pay retrieval fee. Run in parallel to amortize time. Per-bucket template:</p>
+<pre># Per cold bucket:
+SRC=nous-kb-us-east4         # change per iteration
+DEST=kastil-kb-us-east4
+REGION=us-east4
+
+# Create destination as Archive (matches source class)
+gcloud storage buckets create gs://$DEST \
+    --project=kastil-systems --location=$REGION --default-storage-class=archive
+
+# Copy (this incurs retrieval fees on source)
+gsutil -m rsync -r gs://$SRC gs://$DEST
+
+# Verify byte parity
+gsutil du -s gs://$SRC gs://$DEST</pre>
+
+<p>Loop over all 11 cold buckets (8 "warm" named + 5 "cold" named — but actually the count is 11 in the move list: 6 without "cold" prefix in NOUS region set, plus 5 with "cold" prefix; the "warm" set has us-east4 and us-west1 in addition to the 4 international ones = 6 total non-cold-named + 5 cold-named = 11):</p>
+
+<pre>declare -A BUCKETS=(
+  [nous-kb-asia-east1]=kastil-kb-asia-east1
+  [nous-kb-australia-southeast1]=kastil-kb-au-se1
+  [nous-kb-europe-west1]=kastil-kb-eu-west1
+  [nous-kb-southamerica-east1]=kastil-kb-sa-east1
+  [nous-kb-us-east4]=kastil-kb-us-east4
+  [nous-kb-us-west1]=kastil-kb-us-west1
+  [nous-kb-cold-asia-east1]=kastil-kb-cold-asia-east1
+  [nous-kb-cold-au-se1]=kastil-kb-cold-au-se1
+  [nous-kb-cold-eu-west1]=kastil-kb-cold-eu-west1
+  [nous-kb-cold-sa-east1]=kastil-kb-cold-sa-east1
+  [nous-kb-cold-us-east1]=kastil-kb-cold-us-east1
+)
+for src in "${!BUCKETS[@]}"; do
+  dest=${BUCKETS[$src]}
+  region=$(gcloud storage buckets describe gs://$src --format='value(location)' | tr A-Z a-z)
+  (
+    gcloud storage buckets create gs://$dest --project=kastil-systems --location=$region --default-storage-class=archive
+    gsutil -m rsync -r gs://$src gs://$dest
+    echo "$src → $dest done. Sizes:"
+    gsutil du -s gs://$src gs://$dest
+  ) &
+done
+wait</pre>
+
+<p>Parallel execution — 11 buckets copying simultaneously. Each takes minutes-to-hours depending on size.</p>
+<p class="exit">All 11 cold buckets mirrored in kastil-systems. Byte-parity per bucket verified.</p>
+</div>
+
+<div class="phase">
+<h3>Storage Phase 3 — Naming reconciliation (decide later, after parallel-run window)</h3>
+<p>Once kastil-systems has its own <code>kastil-kb-*</code> set, you have a choice for the original <code>nous-kb-*</code> names (after you delete the originals in Acme):</p>
+<ul>
+  <li>Recreate them in kastil-systems with the original names (transient downtime on the second creation)</li>
+  <li>Keep the <code>kastil-</code> prefix permanently (matches the new brand stack)</li>
+</ul>
+<p>Recommend: keep <code>kastil-</code> prefix — it's honest about which org owns the buckets. The bucket-name change is invisible to readers (they reference buckets by URL anyway).</p>
+<p class="exit">Naming finalized.</p>
+</div>
+
+<div class="phase">
+<h3>Storage Phase 4 — Source bucket cleanup (after rollback window)</h3>
+<p>Per the rollback window pattern (1 week), keep source buckets intact in Acme. After window closes:</p>
+<pre># For each bucket — delete source AFTER verifying destination
+gsutil -m rm -r gs://nous-kb-us-east4/**
+gcloud storage buckets delete gs://nous-kb-us-east4 --project=acmedev-platform-hq</pre>
+
+<p><strong>Important:</strong> deleting Archive-class objects &lt; 365 days old incurs early-deletion fees. Check creation time first:</p>
+<pre>for b in nous-kb-asia-east1 nous-kb-australia-southeast1 ...; do
+  created=$(gcloud storage buckets describe gs://$b --format='value(metageneration)' 2>/dev/null)
+  echo "$b: created=$created"
+done</pre>
+<p>If a bucket has objects older than 365 days, deletion is free. If newer, you pay the prorated remainder.</p>
+<p class="exit">Source buckets deleted (or retained-with-decision per bucket if early-deletion fees are punitive). Migration complete.</p>
+</div>
+
+<h2>Part 5 — Quick reference: every bucket's destination + region</h2>
+
+<table>
+<thead><tr><th>Source (acmedev-platform-hq)</th><th>Destination (kastil-systems)</th><th>Region</th><th>Class</th></tr></thead>
+<tbody>
+<tr><td class="path">nous-deploy</td><td class="path">kastil-deploy</td><td>us-central1</td><td>STANDARD</td></tr>
+<tr><td class="path">nous-knowledge</td><td class="path">kastil-knowledge</td><td>us-central1</td><td>STANDARD</td></tr>
+<tr><td class="path">nous-kb-asia-east1</td><td class="path">kastil-kb-asia-east1</td><td>asia-east1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-australia-southeast1</td><td class="path">kastil-kb-au-se1</td><td>australia-southeast1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-europe-west1</td><td class="path">kastil-kb-eu-west1</td><td>europe-west1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-southamerica-east1</td><td class="path">kastil-kb-sa-east1</td><td>southamerica-east1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-us-east4</td><td class="path">kastil-kb-us-east4</td><td>us-east4</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-us-west1</td><td class="path">kastil-kb-us-west1</td><td>us-west1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-cold-asia-east1</td><td class="path">kastil-kb-cold-asia-east1</td><td>asia-east1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-cold-au-se1</td><td class="path">kastil-kb-cold-au-se1</td><td>australia-southeast1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-cold-eu-west1</td><td class="path">kastil-kb-cold-eu-west1</td><td>europe-west1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-cold-sa-east1</td><td class="path">kastil-kb-cold-sa-east1</td><td>southamerica-east1</td><td>ARCHIVE</td></tr>
+<tr><td class="path">nous-kb-cold-us-east1</td><td class="path">kastil-kb-cold-us-east1</td><td>us-east1</td><td>ARCHIVE</td></tr>
+</tbody>
+</table>
+
+<p><strong>Plus the 2 secrets (Part 1 of yesterday's plan) and the per-bucket sequence above. Total work: ~13 bucket creates + 13 rsync runs (mostly parallelizable) + 2 secret copies + bucket cleanup.</strong></p>
+
+<h2>Open question — the "cold" naming duplication</h2>
+
+<p>Why does the fleet have TWO sets of nous-kb-* in the same regions — one with "cold" prefix, one without — both at Archive class? Possibilities:</p>
+
+<ol>
+  <li>The "cold" set was planned to be a different (lower) tier (e.g. Coldline) but ended up Archive too — drift from the naming convention</li>
+  <li>The "cold" set is a backup/archive of the "warm" set — same data duplicated for disaster recovery</li>
+  <li>The two sets hold different content — e.g. "warm" = recent month, "cold" = older archive</li>
+  <li>Historical drift — created in two phases by different scripts</li>
+</ol>
+
+<p>Need to spot-check content of one warm/cold pair to determine. Suggested probe:</p>
+<pre>gsutil ls gs://nous-kb-us-east4/ | head -10
+gsutil ls gs://nous-kb-cold-us-east1/ | head -10
+# Compare object naming patterns + sizes — if mostly identical, it's a backup; if different, it's tiered</pre>
+
+<p>This affects the migration plan only if the "cold" set turns out to be redundant (then we can skip migrating 5 of 13 buckets and just delete them in Acme).</p>
+
+<footer>v0 · r42 · 2026-05-23 · HK + storage detailed plan · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

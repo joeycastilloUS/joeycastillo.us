@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — IDS IO Bus (pure C, multi-tool)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  .container { max-width: 880px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 16px; margin: 20px 0 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  ul, ol { margin: 8px 0 8px 22px; }
+  li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; }
+  pre code { background: none; padding: 0; color: #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .unreversible { color: #ef4444; font-weight: 600; }
+  .correction { background: #1f1a0f; border: 2px solid #f59e0b; padding: 12px 18px; border-radius: 8px; margin: 14px 0; font-size: 13.5px; }
+  .correction b { color: #f59e0b; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .links { background: #1A1A1A; padding: 10px 14px; margin: 12px 0; font-size: 13px; border-radius: 6px; }
+  .links a { color: #6FC3DF; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+  .layers { font-family: 'Consolas', monospace; font-size: 12.5px; white-space: pre; line-height: 1.6; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~d — IDS IO Bus (pure C, multi-tool)</span>
+</nav>
+<div class="container">
+
+<h1>Design — IDS IO Bus</h1>
+<p style="color:#999;">The pure-C library every metal-* tool links against. Reads from and writes to the IDS. Hosts the bootstrap protocol, scope manager, and pluggable renderers. Multiple tools and multiple AIs attach to one shared backbone. Triples in, AI-convention text out.</p>
+
+<div class="correction">
+<b>Renames applied 2026-05-21</b>
+Two corrections in sequence. <strong>(1)</strong> Original draft called this "IDS Cradle." Joey: <em>"IO layer not cradle layer. I-O Input/Output."</em> Layer named for its function, not the newborn-mother metaphor. <strong>(2)</strong> Then refactored from <code>io</code> to <code>io_bus</code> — avoids platform header collision (<code>&lt;io.h&gt;</code> exists on Windows and Linux) AND captures the bus topology (multi-tool, multi-AI, one backbone). Final: library <code>libio_bus.a</code>, header <code>io_bus.h</code>, all symbols <code>io_bus_*</code>, types <code>IOBus*</code>. The newborn↔mother bootstrap is still the bootstrap mechanism — it's a function on the IO bus, not the bus's name.
+</div>
+
+<div class="links">Trail: <a href="../plans/2026-05-21-2239-add-as-triples.html">~i a-d-d as triples</a> · <a href="2026-05-21-2228-design-add-discovery.html">~d Anchor + Registry (demoted)</a> · <a href="../plans/2026-05-21-2222-add-identity-and-consolidation.html">~i identity + consolidation</a></div>
+
+<h2>1. Subject + Intent</h2>
+<div class="section">
+  <p><strong>Subject:</strong> A pure-C shared library (<code>libio_bus.a</code>, header <code>io_bus.h</code>) that every metal-* tool links against. The IO bus between the tools and the IDS. Wraps the existing IDS triple store (<code>nous/memory/skill/store</code>). Implements the newborn↔mother bootstrap protocol, scope management with user alerts, and a pluggable renderer slot for emitting per-AI-convention output (Claude Code + Perplexity at v1).</p>
+  <p><strong>Intent:</strong> Joey's framing: "this thing needs to work for all of my tools." The tools (<code>metal</code>, <code>metal-console</code>, <code>metal-desktop</code>, and the consoles that don't exist yet) all need the same behavior — read the Pantheon IDS, feed a fresh AI session the architecture-and-intent it needs, alert the operator when scope shifts, render whatever the AI wants to consume. Today, none of this exists; the consoles invent their own conversations from raw files. The IO bus is the substrate that makes <em>every</em> console transparent to the IDS underneath. The owner/operator's intent lives in IDS once; every tool reads it the same way; the AI gets seeded the same way; the operator sees the same load/unload alerts no matter which surface they're on. One library, every surface, zero drift.</p>
+</div>
+
+<h2>2. Discovery</h2>
+<div class="section">
+  <p><strong>Landscape today.</strong> Each metal-* tool reads files (CLAUDE.md, board.md, plans/*) and talks to Claude Code directly. No shared substrate. No common bootstrap. metal-console (HTML/operator surface) and metal-desktop (C/cockpit on localhost:5050) already diverge in how they hand context to Claude. As more consoles appear, this fans out — and as Perplexity joins as a second AI target, the divergence doubles.</p>
+  <p><strong>What the nous spec already gives us.</strong></p>
+  <ul>
+    <li><code>nous/memory/skill/store</code> — the triple store. Mmap, FNV-1a, 24-byte Fact, 16-byte DictEntry, WAL crash safety, 3 default S/P/O indexes. Documented in detail today (M6 commit <code>e47fe79</code>).</li>
+    <li><code>nous/memory/skill/kts</code> — the volatile working-set pattern. "If it dies, it reboots from ROM." The mother↔newborn dynamic in code form already.</li>
+    <li><code>nous/intelligence/skill/acquire</code> — "Layer 1 — The Seed: Six engines the system is born knowing." Hardcoded trust + bootstrap pattern, named.</li>
+    <li><code>nous/memory/skill/scope</code> — iterator over filtered facts. Already the right primitive for "give me triples matching this focus."</li>
+    <li>The whole <code>nous/</code> tree treats triples as foundational. The IO bus doesn't invent — it composes.</li>
+  </ul>
+  <p><strong>Joey's gut lean.</strong> Pure C. Library, not service. Every tool links it. Works on Windows + Linux + Mac because the nous mmap skill already handles platform divergence. Single header, single archive, dead-simple link line. No framework, no daemon, no IPC. Bare metal.</p>
+  <p><strong>What's missing in plain words.</strong></p>
+  <ol>
+    <li>A <em>tool-facing API</em>: simple C functions any console calls (<code>io_bus_open</code>, <code>io_bus_query</code>, <code>io_bus_scope</code>, <code>io_bus_render</code>, <code>io_bus_close</code>).</li>
+    <li>A <em>bootstrap protocol</em>: the newborn↔mother handshake — newborn declares what it has, mother answers with the diff for current scope.</li>
+    <li>A <em>scope manager</em>: tracks working-set membership; alerts the operator on load/unload.</li>
+    <li>A <em>renderer slot</em>: function-pointer table of per-AI-convention emitters. v1 ships Claude Code + Perplexity; future renderers register at link time.</li>
+  </ol>
+</div>
+
+<h2>3. Naming Pass</h2>
+<div class="section">
+  <table>
+  <thead><tr><th>Candidate</th><th>Precision</th><th>Gut</th></tr></thead>
+  <tbody>
+  <tr><td><strong>IO Bus</strong></td><td>Names function (I/O) AND topology (bus — many tools, many AIs, one backbone). Avoids the <code>io.h</code> platform header collision. Library = <code>libio_bus.a</code>. Header = <code>io_bus.h</code>. Symbols = <code>io_bus_*</code>. Three letters added describe the structure.</td><td>Industry-standard term. PCI bus, USB bus, D-Bus, message bus — the pattern is named. Final answer.</td></tr>
+  <tr><td>IO Layer (rejected)</td><td>Function-only name. Clean but collides — <code>&lt;io.h&gt;</code> exists in MSVC for low-level POSIX-flavored I/O, in Linux as <code>&lt;sys/io.h&gt;</code> gated by <code>_GNU_SOURCE</code>. <code>io_open()</code> in code is also ambiguous — could be anything.</td><td>Almost. Header clash settled it.</td></tr>
+  <tr><td>IDS Cradle (rejected)</td><td>Cradle is metaphor for the newborn↔mother behavior — describes ONE thing the bus does. Bus also does writes, scope mgmt, renders. Cradle undersells.</td><td>Metaphor as label = decoration.</td></tr>
+  <tr><td>IDS Bridge</td><td>Generic — every library bridges something.</td><td>Bland.</td></tr>
+  <tr><td>IDS Loader</td><td>One operation. Bus also unloads, renders, alerts.</td><td>Half-name.</td></tr>
+  <tr><td>IDS Conductor</td><td>Orchestration metaphor — implies central coordination.</td><td>Over-promises hierarchy.</td></tr>
+  </tbody>
+  </table>
+  <p><strong>Winner: IO Bus.</strong> The middle layer is a bus — multiple tools attach, multiple AIs attach via renderers, data flows both ways, one IDS at the backbone. It IS a bus topology, not metaphor. Library is <code>libio_bus.a</code>. Header is <code>io_bus.h</code>. All public symbols carry the <code>io_bus_</code> prefix. The newborn↔mother dynamic, the scope-shift alerts, the renderer dispatch — these are <em>behaviors</em> on the IO bus, not the bus's identity. The bus does I/O for many endpoints. That's it. That's the name.</p>
+</div>
+
+<h2>4. Shape</h2>
+<div class="section">
+
+  <h3>The three layers</h3>
+  <pre class="layers">┌─── TOOL LAYER ──────────────────────────────────────────────┐
+│  metal · metal-console · metal-desktop · &lt;future consoles&gt;  │
+│  Each is a C binary. Each links libio_bus.a.                 │
+└──────────────────┬───────────────────────────────────────────┘
+                   │ io_bus_* API calls
+                   ▼
+┌─── IO BUS ─────────────────────────────────────────────────┐
+│  libio_bus.a (this design)                                   │
+│  ├── public API (io_bus.h)                                   │
+│  ├── bootstrap protocol (newborn ↔ mother)                   │
+│  ├── scope manager (working-set tracking + alerts)           │
+│  └── renderer table (Claude Code · Perplexity · ...)         │
+└──────────────────┬───────────────────────────────────────────┘
+                   │ wraps via triple_store_* + scope_*
+                   ▼
+┌─── IDS LAYER (already specced in nous) ────────────────────┐
+│  libids.a (per nous/memory/skill/store)                      │
+│  Mmap · FNV-1a · 24-byte Fact · WAL · 3 default S/P/O idx    │
+│  Persists to: kastil-systems/a-d-d/_store/                   │
+│    facts.bin · dict.bin · strings.bin · idx_*.* · wal.bin    │
+└─────────────────────────────────────────────────────────────┘</pre>
+
+  <h3>Public API — <code>io_bus.h</code></h3>
+  <pre><code>// ───── Lifecycle ─────
+typedef struct IOBus IOBus;  // opaque
+int  io_bus_open(IOBus **out, const char *store_path);
+int  io_bus_close(IOBus *c);
+int  io_bus_flush(IOBus *c);
+
+// ───── Bootstrap (newborn ↔ mother) ─────
+typedef struct {
+    const char  *session_id;        // unique per-session
+    const char  *scope_name;        // what the newborn is focused on
+    uint64_t    *known_fact_hashes; // what the newborn already has (or NULL if empty)
+    size_t       known_count;
+} IOBusBootstrap;
+
+typedef struct {
+    uint64_t *new_facts;     // triples to load into the newborn
+    size_t    new_count;
+    uint64_t *evicted_facts; // triples no longer in scope (newborn should forget)
+    size_t    evicted_count;
+} IOBusSeed;
+
+int  io_bus_bootstrap(IOBus *c, const IOBusBootstrap *req, IOBusSeed *out);
+int  io_bus_seed_free(IOBusSeed *seed);
+
+// ───── Scope management ─────
+typedef struct IOBusScope IOBusScope;  // opaque
+int  io_bus_scope_open(IOBus *c, const char *name, IOBusScope **out);
+int  io_bus_scope_add_focus(IOBusScope *s, const char *predicate, const char *object);
+int  io_bus_scope_query(IOBusScope *s, uint64_t **fact_hashes_out, size_t *count_out);
+int  io_bus_scope_close(IOBusScope *s);
+
+// ───── Alerts ─────
+typedef void (*IOBusAlertFn)(const char *event, const char *detail, void *user);
+int  io_bus_set_alert(IOBus *c, IOBusAlertFn fn, void *user);
+// Events: "load", "unload", "scope_shift", "bootstrap_complete"
+
+// ───── Renderers ─────
+typedef struct {
+    const char *name;                   // "claude-code", "perplexity"
+    int (*render)(const uint64_t *facts, size_t count,
+                  IOBus *c, char *out, size_t out_size);
+} IOBusRenderer;
+int  io_bus_render_register(IOBus *c, const IOBusRenderer *r);
+int  io_bus_render(IOBus *c, const char *renderer_name,
+                   const uint64_t *facts, size_t count,
+                   char *out, size_t out_size);
+
+// ───── Direct triple R/W (used by consoles' write path) ─────
+int  io_bus_assert(IOBus *c, const char *s, const char *p, const char *o);
+int  io_bus_retract(IOBus *c, const char *s, const char *p, const char *o);
+int  io_bus_query(IOBus *c, const char *s, const char *p, const char *o,
+                  uint64_t **fact_hashes_out, size_t *count_out);</code></pre>
+
+  <h3>Bootstrap protocol — the Socratic handshake</h3>
+  <p>Joey's spec: "the newborn brain asks its mother if it is completely empty of information. then the mother brain answers based on the same information the newborn brain has received." The IO bus implements this in three calls:</p>
+  <ol>
+    <li><strong>Newborn declares.</strong> Tool calls <code>io_bus_bootstrap(c, &amp;req, &amp;seed)</code> with <code>known_fact_hashes</code> set to whatever facts the AI session already has (empty if truly newborn).</li>
+    <li><strong>Mother computes the diff.</strong> The IO bus queries the IDS for all triples matching the requested <code>scope_name</code>. Subtracts the newborn's already-known set. Returns: <code>new_facts</code> (load these) + <code>evicted_facts</code> (newborn was holding these but they're out of scope now; forget them).</li>
+    <li><strong>IO bus alerts.</strong> Fires the registered <code>IOBusAlertFn</code> with <code>"bootstrap_complete"</code> and a detail string ("loaded N, evicted M, scope=X"). The operator's console surfaces it.</li>
+  </ol>
+  <p>No data dump. The mother only hands over what's missing for the current focus. Same pattern works for re-bootstrap on scope shift — the newborn isn't reborn, just rehoused.</p>
+
+  <h3>Scope shifts</h3>
+  <p>When the operator's intent changes (e.g. from "auditing orgs" to "designing IO bus"), the tool calls <code>io_bus_scope_open</code> with the new scope, then <code>io_bus_bootstrap</code> again with the newborn's current fact set. Mother computes the new diff. Alert fires: <code>"scope_shift"</code> with detail <code>"prev=X loaded=Y new=Z evicted=W"</code>. Operator sees the brain just changed shape.</p>
+
+  <h3>Renderers</h3>
+  <p>Each renderer is a struct with a name and a function pointer. v1 ships with two compiled-in renderers:</p>
+  <ul>
+    <li><strong><code>claude-code</code></strong> — emits CLAUDE.md-flavored markdown. Headers, fenced code blocks, the trade-secret notice, the kASTIL conventions. Matches what Claude Code expects to read.</li>
+    <li><strong><code>perplexity</code></strong> — emits a tighter prose form. Perplexity reads system prompts and user messages, not file conventions. Output: structured prose with citation markers pointing back at triple IDs.</li>
+  </ul>
+  <p>Future renderers register at link time via <code>io_bus_render_register</code>. Adding GPT/Gemini/RDF/JSON-LD is one function — no other code changes.</p>
+
+  <h3>Out of scope</h3>
+  <ul>
+    <li><strong>Not a daemon.</strong> Library, not service. Process lifecycle tied to caller.</li>
+    <li><strong>Not network-aware.</strong> Single-host. Cross-host sync happens at <code>nous/comms/skill/sync</code>, not here.</li>
+    <li><strong>Not a UI.</strong> Consoles render UI. The IO bus just emits text per renderer.</li>
+    <li><strong>Not GC.</strong> Caller frees seeds (<code>io_bus_seed_free</code>). No background sweep.</li>
+    <li><strong>Not multi-tenant.</strong> One IDS per IOBus instance. Multi-org reads = multiple IOBus instances.</li>
+  </ul>
+</div>
+
+<h2>5. Choices + Consequences</h2>
+<div class="section">
+
+  <table>
+  <thead><tr><th>Fork</th><th>Option A</th><th>Option B</th><th>2nd-order consequence</th><th>3rd-order consequence</th><th>Pick</th></tr></thead>
+  <tbody>
+  <tr>
+    <td><strong>API style</strong></td>
+    <td>Opaque handles (<code>IOBus*</code>, <code>IOBusScope*</code>)</td>
+    <td>Direct struct exposure</td>
+    <td>Opaque: ABI-stable across versions; struct changes don't break callers. Direct: faster (no indirection) but ABI-fragile.</td>
+    <td>Opaque keeps every tool's binary working when the IO bus evolves. Direct forces recompile-all on any internal change. With many tools (metal, metal-console, metal-desktop, more), recompile-all becomes punishing.</td>
+    <td><strong>A.</strong> Opaque. ABI stability outweighs the tiny indirection cost.</td>
+  </tr>
+  <tr>
+    <td><strong>Renderer plug-in mechanism</strong></td>
+    <td>Function pointer table, compiled-in at link time</td>
+    <td>Dynamic loading via <code>dlopen</code> / <code>LoadLibrary</code></td>
+    <td>Compiled-in: zero runtime dep, every tool ships its own renderer set. Dynamic: smaller binary, but requires a plug-in directory + DLL search path on Windows.</td>
+    <td>Compiled-in is pure metal (no dynamic linker). Dynamic adds a deployment surface every tool has to manage. Per kernel rule "No dynamic linking. Everything compiles statically into one binary."</td>
+    <td><strong>A.</strong> Compiled-in. Kernel rule says so. Adding a renderer means recompile + relink, but that's already mechanical.</td>
+  </tr>
+  <tr>
+    <td><strong>Scope state location</strong></td>
+    <td>In-IDS triples (scope membership is itself triples)</td>
+    <td>Separate in-memory side table</td>
+    <td>In-IDS: scope is queryable like any other knowledge — "what's in the operator's working set right now?" answered by an IDS query. Side table: faster ops but invisible to anyone reading the IDS.</td>
+    <td>In-IDS means the audit trail covers scope shifts automatically (temporal provenance triples land naturally). Side table loses the audit. Eat-own-cooking principle says scope is part of what the brain knows.</td>
+    <td><strong>A.</strong> In-IDS. Self-describing system stays self-describing.</td>
+  </tr>
+  <tr>
+    <td><strong>Alert transport</strong></td>
+    <td>Callback function pointer (<code>IOBusAlertFn</code>)</td>
+    <td>Write to stderr / log file directly</td>
+    <td>Callback: each tool decides how to surface (GUI toast, terminal print, log entry). Direct write: simple but tools can't filter/redirect.</td>
+    <td>Different consoles will display alerts differently (metal-console = HTML overlay, metal-desktop = browser cockpit, future = voice). Callback lets each tool own its surface.</td>
+    <td><strong>A.</strong> Callback. Tools own presentation.</td>
+  </tr>
+  <tr>
+    <td><strong>Bootstrap detection</strong></td>
+    <td>Caller declares with <code>known_fact_hashes</code> (the IO bus trusts the caller)</td>
+    <td>IO bus computes from session_id history</td>
+    <td>Caller-declared: simple, no bus-side state. Bus-computed: more magic, more failure modes (session-id tracking, mid-session crashes).</td>
+    <td>Caller-declared keeps the IO bus stateless between calls. Sessions can crash, restart, fork — caller manages, bus reacts. Recovery is the caller's domain.</td>
+    <td><strong>A.</strong> Caller declares. The IO bus stays stateless, deterministic.</td>
+  </tr>
+  <tr>
+    <td><strong>How tools find their _store</strong></td>
+    <td>Caller passes <code>store_path</code> to <code>io_bus_open</code></td>
+    <td>IO bus walks parent dirs looking for <code>.a-d-d/_store</code> (like git finds <code>.git</code>)</td>
+    <td>Caller-passed: explicit, no surprises. Auto-walked: ergonomic — tools don't need to know the path, just <code>io_bus_open(NULL)</code> from anywhere in a repo.</td>
+    <td>Walked: matches git's affordance, less for each tool to remember. Caller-passed: works in test harnesses and embedded contexts where there's no filesystem tree to walk.</td>
+    <td><strong>Both.</strong> If <code>store_path == NULL</code>, walk parent dirs. Else use the explicit path. One function, two ergonomics.</td>
+  </tr>
+  </tbody>
+  </table>
+
+</div>
+
+<h2>6. Escape Routes</h2>
+<div class="section">
+  <table>
+  <thead><tr><th>Load-bearing choice</th><th>What if it's wrong?</th><th>How to back out</th><th>Reversible?</th></tr></thead>
+  <tbody>
+  <tr>
+    <td>Opaque handle API</td>
+    <td>Performance turns out to matter (1000s of ops/sec become a bottleneck)</td>
+    <td>Add a parallel direct-access struct API (<code>io_bus_unsafe_*</code>) without removing the opaque one. Tools opt in to the fast path; ABI for opaque stays stable.</td>
+    <td><span class="pass">Yes — additive.</span></td>
+  </tr>
+  <tr>
+    <td>Compiled-in renderers</td>
+    <td>The renderer count grows past a comfortable static-link size (unlikely — each renderer is small)</td>
+    <td>Switch select renderers to dlopen-loaded plug-ins. Public API doesn't change; only the registration mechanism does.</td>
+    <td><span class="pass">Yes — internal change.</span></td>
+  </tr>
+  <tr>
+    <td>In-IDS scope state</td>
+    <td>Scope ops thrash the IDS with churn (insert + retract cycle on every scope shift)</td>
+    <td>Add a side-table cache; flush dirty scope triples to IDS on commit boundaries. Behavior preserved; throughput improved.</td>
+    <td><span class="pass">Yes — performance fix.</span></td>
+  </tr>
+  <tr>
+    <td>Caller-declared known-facts</td>
+    <td>Tools forget to track what they've handed the AI; bootstrap returns wrong diffs</td>
+    <td>Add an optional bus-side session log (file-backed). Tools opt in. Default stays stateless.</td>
+    <td><span class="pass">Yes — opt-in.</span></td>
+  </tr>
+  <tr>
+    <td>Renderer table at link time</td>
+    <td>Different tools want very different renderer sets (e.g. metal-desktop wants Claude only, metal-console wants all of them)</td>
+    <td>Already works — each tool picks which renderer object files to link. <code>io_bus_render_register</code> means "available," not "always loaded."</td>
+    <td><span class="pass">Yes — already addressed.</span></td>
+  </tr>
+  <tr>
+    <td>Path-walk auto-discovery</td>
+    <td>Path-walk collides with a non-IOBus <code>.a-d-d/</code> folder somewhere (false positive)</td>
+    <td>Require a sentinel file inside <code>_store/</code> (e.g. <code>FORMAT.PTS</code> with magic <code>0x50545300</code>) before treating the directory as valid. Mismatch = walk past it.</td>
+    <td><span class="pass">Yes — guard added at open.</span></td>
+  </tr>
+  <tr>
+    <td>Pure C constraint</td>
+    <td>A renderer needs something C can't trivially do (HTTP fetch, JSON parsing, image bytes)</td>
+    <td>Renderers may shell out to small helper binaries via <code>execve</code> if needed. The IO bus itself stays pure C; helpers are explicit subprocess calls, not library deps.</td>
+    <td><span class="warn">Yes, with discipline — helpers must be tiny + explicit.</span></td>
+  </tr>
+  </tbody>
+  </table>
+  <p>No load-bearing choice is unreversible. Every component is a static C file plus the existing nous/memory infrastructure. Worst case: rip out one piece, swap in the alternative.</p>
+</div>
+
+<h2>7. Pure Metal Test</h2>
+<div class="section">
+  <table>
+  <thead><tr><th>Dependency</th><th>Load-bearing?</th><th>Replaceable?</th><th>Notes</th></tr></thead>
+  <tbody>
+  <tr><td>libc (str*, mem*, stdint, stdbool)</td><td><span class="pass">Load-bearing</span></td><td>No (universal)</td><td>Standard C11. Available everywhere.</td></tr>
+  <tr><td><code>nous/memory/skill/mmap</code> (Windows + POSIX)</td><td><span class="pass">Load-bearing</span></td><td>Yes — already has POSIX/Win emulation per the spec</td><td>Cross-platform mmap is handled inside the IDS layer. The IO bus uses it indirectly.</td></tr>
+  <tr><td><code>nous/memory/skill/store</code> (triple_store_*)</td><td><span class="pass">Load-bearing</span></td><td>Yes — the IO bus wraps it; could wrap a different store</td><td>Documented in detail today (M6 commit <code>e47fe79</code>). The byte format is the contract.</td></tr>
+  <tr><td><code>nous/memory/skill/scope</code> (scope_*)</td><td><span class="pass">Load-bearing</span></td><td>Yes — direct mmap walk works as fallback</td><td>Already specced with the M2↑ Behavior caveat ("ts_facts() faster for bulk reads").</td></tr>
+  <tr><td><code>nous/memory/skill/hash</code> (FNV-1a)</td><td><span class="pass">Load-bearing</span></td><td>No (defines identity contract — same hash across all stores)</td><td>Required for fact identity. SHA-256 alternative for content-addressing if needed.</td></tr>
+  <tr><td><code>nous/memory/skill/journal</code> (WAL)</td><td>Load-bearing for writes</td><td>Yes — can skip WAL for read-only consoles</td><td>Documented today (M1↑ commit <code>4b6e5a2</code>).</td></tr>
+  <tr><td>Renderer code (claude-code, perplexity)</td><td>Load-bearing for the chosen renderer</td><td>Yes — each is a separate object file</td><td>Tools link only the renderers they use.</td></tr>
+  <tr><td>External libraries</td><td>—</td><td>—</td><td><strong>None.</strong> Per kernel: "No external libraries. No third-party dependencies."</td></tr>
+  </tbody>
+  </table>
+  <p><strong>Verdict.</strong> The whole IO bus is C + libc + the nous memory skills that already exist on paper. Zero new dependencies. Pure metal. Survives loss of any non-load-bearing component by graceful degradation (read-only mode without journal, single-renderer mode without others, explicit-path mode without auto-discovery).</p>
+</div>
+
+<h2>8. First Move</h2>
+<div class="section">
+  <p><strong>The smallest concrete step that proves the design is real:</strong></p>
+  <ol>
+    <li>Write <code>io_bus.h</code> in <code>kastil-systems/a-d-d/_store/io_bus/</code>. Just the public API declarations from §4. Compiles clean with <code>gcc -std=c11 -Wall -Wextra -Wpedantic -c -x c /dev/null -include io_bus.h</code>. No bodies yet.</li>
+    <li>Write <code>io_bus_open.c</code> + <code>io_bus_close.c</code> as minimal stubs that just open and close the underlying triple store (forwarding to <code>triple_store_open</code> / <code>triple_store_close</code>). No bootstrap logic, no renderers — just lifecycle.</li>
+    <li>Write a 30-line C program (<code>test/hello_io_bus.c</code>) that calls <code>io_bus_open(&amp;c, "_store")</code>, then <code>io_bus_close(c)</code>. Compiles, links, runs, returns 0.</li>
+    <li>Build it: <code>gcc -std=c11 -I . io_bus_open.c io_bus_close.c test/hello_io_bus.c -o hello_io_bus</code>. Run. Should print nothing, return 0.</li>
+    <li>Write <code>io_bus_assert.c</code> — wraps <code>triple_store_insert</code>. Now <code>hello_io_bus.c</code> can insert one fact. Read it back via <code>io_bus_query</code> (also wraps existing). Done — full round-trip on three triples.</li>
+  </ol>
+  <p>Total work for First Move: maybe 200 lines of C. One header, four implementation files, one test. Compiles, runs, demonstrates the API shape. After this lands, scaling to bootstrap + scope + renderers is mechanical — each is its own implementation file added to the archive build.</p>
+  <p><strong>Repo location:</strong> <code>kastil-systems/a-d-d/_store/io_bus/</code></p>
+  <pre><code>_store/
+  io_bus.h                     # public API
+  io_bus/                      # implementation
+    io_bus_open.c
+    io_bus_close.c
+    io_bus_bootstrap.c        # newborn↔mother handshake
+    io_bus_scope.c            # scope management + alerts
+    io_bus_render.c           # renderer table + dispatch
+    io_bus_assert.c           # triple write
+    io_bus_query.c            # triple read
+    renderers/
+      render_claude_code.c
+      render_perplexity.c
+    test/
+      hello_io_bus.c          # First Move verification
+      test_bootstrap.c
+      test_scope_shift.c
+      test_renderers.c
+    Makefile                   # builds libio_bus.a + tests
+    skill.json                 # marks this as an a-d-d skill folder</code></pre>
+</div>
+
+<h2>Definition of Done</h2>
+<div class="section">
+  <ul>
+    <li><span class="pass">✓</span> Code committed (this design, with IO Bus rename applied)</li>
+    <li><span class="pass">✓</span> Commit hash in telemetry</li>
+    <li>— Board updated (First Move queues ~b items for IO Bus skill)</li>
+    <li><span class="pass">✓</span> HTML report saved (be/designs/2026-05-21-2301-design-ids-cradle.html — kept original filename for trail continuity, content renamed to IO Bus)</li>
+    <li><span class="pass">✓</span> Index updated</li>
+    <li><span class="pass">✓</span> Pushed to remote</li>
+    <li><span class="pass">✓</span> No prior work damaged</li>
+    <li>— Shipped to production (design artifact — IO Bus binary ships when First Move + follow-ups land in ks-add)</li>
+  </ul>
+</div>
+
+</div>
+<footer>v0 · r27 · 2026-05-21 · ~d IDS IO Bus · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>

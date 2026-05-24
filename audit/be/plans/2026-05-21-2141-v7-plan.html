@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~p V7 — close out the memory-skills investigation</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .status-banner { background: var(--amber); color: #000; padding: 6px 24px; text-align: center; font-weight: 700; letter-spacing: 2px; font-size: 11px; }
+  .container { max-width: 980px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin: 0 0 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 15px; margin: 18px 0 6px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  ul, ol { color: #ccc; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .phase { background: var(--surface); border-left: 4px solid var(--accent); padding: 16px 22px; margin: 14px 0; }
+  .phase h3 { margin-top: 0; color: var(--accent); }
+  .phase .exit { color: var(--green); margin-top: 10px; font-size: 12px; }
+  .phase .exit::before { content: "✓ Exit: "; color: var(--green); font-weight: 700; }
+  .unknowns { background: #1f1a0f; border-left: 4px solid var(--amber); padding: 14px 18px; margin: 12px 0; }
+  .unknowns h3 { color: var(--amber); margin-top: 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .revisit { background: #0F1A1F; border-left: 4px solid var(--green); padding: 14px 18px; margin: 12px 0; }
+  .revisit h3 { color: var(--green); margin-top: 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .constraint { padding: 5px 0; border-bottom: 1px solid var(--surface2); font-size: 13px; }
+  .constraint:last-child { border-bottom: none; }
+  .constraint b { color: var(--accent); }
+  .dod { background: var(--surface); padding: 14px 18px; margin: 28px 0 14px; }
+  .dod-item { color: var(--t2); font-size: 13px; padding: 3px 0; }
+  .dod-item.pass::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .dod-item.na::before { content: "— "; color: var(--t3); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 20px; border-top: 1px solid #222; }
+  .links { background: var(--surface); padding: 10px 14px; margin: 8px 0 24px; font-size: 12.5px; }
+  .links a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~p V7 · memory-skills closeout</span></nav>
+<div class="status-banner">PLAN — AWAITING APPROVAL</div>
+<div class="container">
+
+<h1>Close out V7 — landing the memory-skills findings.</h1>
+<p class="sub">V7 investigated 6 api memory skills vs 10 ks memory skills. 3 verdicted as KS-WINS (no action). 3 need patches — M1 and M2 with expanded scope, plus M5 (one-liner) and M6 (conditional substantive).</p>
+
+<div class="links">Source: <a href="2026-05-21-1511-v7-memory-skills.html">~i V7 report</a> · downstream of <a href="2026-05-21-0036-add-merge-investigation.html">merge investigation</a></div>
+
+<h2>Intent</h2>
+
+<p>V7 caught the same V1-pattern failure on row V13 (memory/skill/store) — surface verdict was "KS WINS" because ks is longer; full read showed ks documents the blob-storage layer while api documents the relational triple-store layer. ks is missing an entire technical layer. M6 patches that gap.</p>
+
+<p>End state: M1↑, M2↑, M5 applied; M6 either applied (if gap confirmed at skill level) or downgraded (if c7444af's parent merge effectively covers it); V7 marked DONE in audit-of-all.</p>
+
+<h2>Scope</h2>
+
+<h3>In scope</h3>
+<ul>
+  <li><strong>M1↑</strong> — patch <code>nous/memory/skill/journal/CLAUDE.md</code> with the <code>WalEntry</code> C struct + operations table + Behavior block (4 bullets: append-only, recover-after-data-files, truncate-after-recovery, clean-close-truncates-zero). Expansion of the original M1.</li>
+  <li><strong>M2↑</strong> — patch <code>nous/memory/skill/scope/CLAUDE.md</code> with the <code>Scope</code> C struct + "Zero allocation — stack struct" intent note + Behavior block (4 bullets, including the "ts_facts() for bulk reads, scope for filtered views" caveat). Expansion of original M2.</li>
+  <li><strong>M5</strong> — append <code>Deps: mmap, hash.</code> footer to <code>nous/memory/skill/index/CLAUDE.md</code>. Consistency fix.</li>
+  <li><strong>M6 decision + conditional patch</strong> — first verify whether the triple-store relational layer (Fact / DictEntry / TripleStore + 10+ API functions) is documented anywhere in <code>nous/memory/</code> outside the skill/store file. If absent, port it. If present (post-<code>c7444af</code>'s parent merge may have covered it), downgrade to NOT NEEDED.</li>
+  <li><strong>V7 closeout</strong> — update report + index to reflect Done state.</li>
+</ul>
+
+<h3>Out of scope</h3>
+<ul>
+  <li>Re-investigating V8 / V9 / V11 / V13 — V7 confirmed all but V13. V13 is addressed via M6.</li>
+  <li>V4, V5, V6 work — separate threads with their own ~p / ~e.</li>
+  <li>Archiving api-add — broader plan-v1 step.</li>
+</ul>
+
+<h2>Approach</h2>
+
+<p><strong>Intent → Purpose → What.</strong></p>
+
+<p><strong>Intent.</strong> Land all M-series patches V7 generated, with the V13-correction (M6) gated on a quick verification check so we don't duplicate work c7444af already covered at the parent level.</p>
+
+<p><strong>Purpose.</strong> V7 is the highest-value patch set of the investigation — M1↑ and M2↑ each contain concrete C struct definitions and behavior contracts that don't exist anywhere in ks. M6 closes the relational-layer gap.</p>
+
+<p><strong>What.</strong> 4 file patches in ks-add (journal, scope, index, store) + 1 verification step + 1 report update. Surface area: 4 ks-add commits (one per file for clean revertability) + 1 audit-of-all commit.</p>
+
+<h2>Phases</h2>
+
+<div class="phase">
+  <h3>Phase V7-A — Apply the unconditional patches (M1↑, M2↑, M5)</h3>
+  <p>Goal: 3 ks-add patches landed and verified on origin/main.</p>
+  <ul>
+    <li>Patch <code>nous/memory/skill/journal/CLAUDE.md</code> per M1↑ (struct + ops table + behavior). Commit.</li>
+    <li>Patch <code>nous/memory/skill/scope/CLAUDE.md</code> per M2↑ (struct + intent note + behavior caveat). Commit.</li>
+    <li>Patch <code>nous/memory/skill/index/CLAUDE.md</code> per M5 (one-line deps footer). Commit.</li>
+    <li>Push all three. Verify with <code>gh api</code> hash check.</li>
+  </ul>
+  <p class="exit">3 commits on origin/main. Each diff is small and clean.</p>
+</div>
+
+<div class="phase">
+  <h3>Phase V7-B — M6 verification + conditional patch</h3>
+  <p>Goal: decide whether M6 is needed. If yes, apply.</p>
+  <ul>
+    <li>Read current <code>nous/memory/CLAUDE.md</code> (post-<code>c7444af</code>). Check whether the relational layer is documented there — specifically Fact struct (24B, three uint64), DictEntry, TripleStore composition, and the 10+ <code>triple_store_*</code> API functions.</li>
+    <li>If parent file COVERS this: downgrade M6 to NOT NEEDED. The byte format + cross-purpose constraint at parent level satisfies it.</li>
+    <li>If parent file does NOT cover the API surface (likely — c7444af landed format spec, not API spec): apply M6's "Triple-store composition" subsection to <code>nous/memory/skill/store/CLAUDE.md</code>. Commit.</li>
+  </ul>
+  <p class="exit">M6 status definitively recorded — either DONE with hash, or DOWNGRADED with the c7444af reference.</p>
+</div>
+
+<div class="phase">
+  <h3>Phase V7-C — Closeout</h3>
+  <p>Goal: V7 has zero open actions in the audit-of-all index.</p>
+  <ul>
+    <li>Update V7 report (<code>be/plans/2026-05-21-1511-v7-memory-skills.html</code>): mark M1↑/M2↑/M5 DONE with hashes, mark M6 status (DONE or DOWNGRADED).</li>
+    <li>Update <code>be/index.html</code> entries.</li>
+    <li>Commit + push.</li>
+  </ul>
+  <p class="exit">V7 row reads as fully closed in any future audit re-run.</p>
+</div>
+
+<h2>Constraints</h2>
+
+<div class="constraint"><b>One commit per file in ks-add.</b> M1↑, M2↑, M5, and (if applied) M6 each get their own commit. Cleaner revertability if any patch reads wrong post-merge.</div>
+<div class="constraint"><b>M6 is verification-gated.</b> Do NOT apply M6 before checking <code>nous/memory/CLAUDE.md</code> for relational-layer coverage. The whole point of catching V13's failure was to read before patching — same discipline applies to M6 itself.</div>
+<div class="constraint"><b>Preserve ks narrative voice.</b> M1↑ and M2↑ add concrete C content (struct definitions, behavior bullets) — don't replace ks's existing narrative paragraphs. Insertions only.</div>
+<div class="constraint"><b>No new investigations.</b> If reading files reveals new questions during patching, log as kaizen items — don't expand V7 mid-execution.</div>
+<div class="constraint"><b>v1 hypothesis.</b> If post-merge any M-patch reads as out-of-place or stale, v2 trims or restructures. Per kernel rule 6.</div>
+
+<div class="unknowns">
+<h3>Unknowns</h3>
+<ol>
+  <li><strong>Does M6's relational layer overlap with M1↑/M2↑?</strong> M6 mentions "WAL-before-write, committed after" — M1↑'s journal Behavior block has similar content. Avoid duplicate documentation; pick the most authoritative location.</li>
+  <li><strong>Is M3 (cross-purpose invariant) better positioned in skill/store or in the parent <code>nous/memory/CLAUDE.md</code>?</strong> The parent now has the byte format. The invariant ("Binary-compatible across all four triple stores") might fit better at parent level adjacent to the FNV constants.</li>
+  <li><strong>Did c7444af's "Storage Files" section already imply the <code>idx_*</code> file naming convention that M6 references?</strong> If yes, M6's content is partially redundant.</li>
+  <li><strong>Does ks have a separate doc somewhere defining the <code>triple_store_*</code> C API?</strong> Not seen in audited files, but the full nous/ tree wasn't exhaustively searched. Phase V7-B grep step covers this.</li>
+</ol>
+</div>
+
+<div class="revisit">
+<h3>When To Revisit (v2 triggers)</h3>
+<ul>
+  <li>If Phase V7-B finds the relational layer already documented in a different file (e.g. a new <code>nous/memory/triple-store-api.md</code>), M6 plan downgrades and V7 closes faster than v1 anticipated.</li>
+  <li>If applying M1↑ or M2↑ creates obvious tension with ks's existing narrative, redesign as separate <code>### Reference</code> subsections instead of inline bullets.</li>
+  <li>If a 7th memory skill appears in ks between now and execution, re-verify the comparison table — might change the verdicts.</li>
+  <li>If executing V7 surfaces a new C API doc gap, log it for the next ~i cycle rather than expanding V7.</li>
+</ul>
+</div>
+
+<h2>Next step</h2>
+<p>Approve, then <code>~e</code> sizes this into board items. V7 produces ~19 pts which fits cleanly in the 13–21 board range — see the estimate report for the board structure.</p>
+
+<div class="dod">
+  <div class="dod-item pass">Code committed (this plan)</div>
+  <div class="dod-item pass">Commit hash in telemetry</div>
+  <div class="dod-item na">Board updated (~e produces the board next)</div>
+  <div class="dod-item pass">HTML report saved (be/plans/2026-05-21-2141-v7-plan.html)</div>
+  <div class="dod-item pass">Index updated</div>
+  <div class="dod-item pass">Pushed to remote</div>
+  <div class="dod-item pass">No prior work damaged</div>
+  <div class="dod-item na">Shipped to production (audit-internal)</div>
+</div>
+
+</div>
+<footer>v0 · r12 · 2026-05-21 · ~p V7 · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>

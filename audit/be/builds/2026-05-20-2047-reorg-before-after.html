@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~b reorg before / after — every move, side by side</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; line-height: 1.55; }
+  nav { position: sticky; top:0; background:#000; border-bottom: 2px solid var(--accent); padding: 12px 24px; z-index: 100; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 18px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { color: var(--accent); font-size: 28px; margin: 0 0 4px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 28px; }
+  h2 { color: var(--accent); font-size: 18px; margin-top: 44px; border-bottom: 1px solid var(--surface2); padding-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+  .legend { background: var(--surface); padding: 10px 16px; margin: 12px 0 24px; font-size: 12px; color: var(--t2); display: flex; gap: 18px; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; vertical-align: bottom; }
+  td { padding: 8px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  tr:hover td { background: var(--surface); }
+  td.before { color: var(--red); font-family: 'Consolas', monospace; }
+  td.after { color: var(--green); font-family: 'Consolas', monospace; }
+  td.before.unchanged, td.after.unchanged { color: var(--t2); }
+  td.action { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+  .a-rename { color: var(--amber); }
+  .a-transfer { color: var(--accent); }
+  .a-archive { color: var(--t3); }
+  .a-redirect { color: #B084F2; }
+  .a-declare { color: var(--green); }
+  .a-keep { color: var(--t2); }
+  .a-describe { color: var(--accent); }
+  td.why { color: var(--t2); font-style: italic; font-size: 11.5px; }
+  td.count { font-family: 'Consolas', monospace; text-align: center; font-weight: 700; }
+  td.count .arrow { color: var(--t3); padding: 0 6px; }
+  td.count .delta-down { color: var(--amber); }
+  td.count .delta-up { color: var(--green); }
+  td.count .delta-same { color: var(--t3); }
+  .phase-tag { display: inline-block; background: var(--surface2); color: var(--accent); padding: 1px 6px; border-radius: 3px; font-size: 10px; letter-spacing: 1px; font-weight: 700; }
+  .pill { display: inline-block; background: var(--surface); padding: 2px 8px; border-radius: 10px; font-size: 10px; letter-spacing: 1px; }
+  .pill.red { color: var(--red); border: 1px solid #4a1f1f; }
+  .pill.amber { color: var(--amber); border: 1px solid #4a3a1f; }
+  .pill.green { color: var(--green); border: 1px solid #1f4a2a; }
+  .total-row td { background: #0F1A1F; font-weight: 700; color: var(--accent); border-top: 2px solid var(--accent); }
+  .dod { background: var(--surface); padding: 16px 20px; margin: 32px 0 16px; }
+  .dod-item { color: var(--t2); font-size: 13px; padding: 3px 0; }
+  .dod-item.pass::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .dod-item.na::before { content: "— "; color: var(--t3); }
+  footer { color: var(--t3); font-size: 11px; text-align: center; padding: 24px; border-top: 1px solid var(--surface2); }
+  .links { background: var(--surface); padding: 10px 16px; margin: 12px 0 28px; font-size: 13px; }
+  .links a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~b before/after</span></nav>
+<div class="container">
+
+<h1>Reorg, side by side. Every move.</h1>
+<p class="sub">Two tables. Org-level charter changes, then every concrete repo action. Scan, mark up, approve.</p>
+
+<div class="links">
+  Source: <a href="../plans/2026-05-20-1037-plan-reorg-orgs.html">~p reorg v1</a> · <a href="../plans/2026-05-20-0132-audit-of-all-orgs.html">~i audit</a>
+</div>
+
+<div class="legend">
+  <span><span class="swatch" style="background:var(--green)"></span> DECLARE — name what's canonical</span>
+  <span><span class="swatch" style="background:var(--amber)"></span> RENAME — fix the name in place</span>
+  <span><span class="swatch" style="background:var(--accent)"></span> TRANSFER — move to a different org</span>
+  <span><span class="swatch" style="background:#B084F2"></span> REDIRECT — README pointer to canonical</span>
+  <span><span class="swatch" style="background:var(--t3)"></span> ARCHIVE — preserve, deactivate</span>
+  <span><span class="swatch" style="background:var(--accent)"></span> DESCRIBE — add 1-line description</span>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Table 1 — Orgs: Current State → Proposed Charter</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Org</th>
+  <th>Before — what it actually is</th>
+  <th>After — audience charter</th>
+  <th style="width:90px;">Repos</th>
+  <th>Health</th>
+</tr>
+</thead>
+<tbody>
+
+<tr>
+  <td><code>joeycastilloUS</code></td>
+  <td class="before">Mixed bag. Kernel-adjacent + personal sites + experiments + archive. 5 things named "metal-*".</td>
+  <td class="after">Joey-the-person. Personal sites (joeycastillo.us), personal experiments, this audit, billiards-tracker.</td>
+  <td class="count">19<span class="arrow">→</span><span class="delta-down">~12</span></td>
+  <td><span class="pill amber">cleanup</span></td>
+</tr>
+
+<tr>
+  <td><code>kastil-systems</code></td>
+  <td class="before">The systems org. But <code>metal-console</code> collides with joeycastilloUS, and <code>a-d-d</code> isn't declared as canonical.</td>
+  <td class="after">The kernel layer. a-d-d (canonical), nous, the-last-*, metal-runtime, target-runtimes, plus collapsed ai-pantheon-internal repos.</td>
+  <td class="count">10<span class="arrow">→</span><span class="delta-up">~14</span></td>
+  <td><span class="pill amber">declare+absorb</span></td>
+</tr>
+
+<tr>
+  <td><code>ai-pantheon</code></td>
+  <td class="before">Parking lot. 28 repos, 21 last touched 2026-02-22 (create-spree). Brand + scaffold + abandoned.</td>
+  <td class="after">Public brand surface. ai-pantheon.ai + integrity/safety/identity + claude-run-* + the few real ones. Rest archived.</td>
+  <td class="count">28<span class="arrow">→</span><span class="delta-down">~10</span></td>
+  <td><span class="pill amber">prune</span></td>
+</tr>
+
+<tr>
+  <td><code>ai-pantheon-internal</code></td>
+  <td class="before">6 repos, audience unclear. Reads as accidental.</td>
+  <td class="after">DISSOLVED. Repos absorbed into kastil-systems (kernel) or ai-pantheon (brand). Org deleted.</td>
+  <td class="count">6<span class="arrow">→</span><span class="delta-down">0</span></td>
+  <td><span class="pill red">collapse</span></td>
+</tr>
+
+<tr>
+  <td><code>acmedevUS</code></td>
+  <td class="before">Acme commercial work + Philz residue + Pantheon residue + a-d-d copy. Where everything started; residue never left.</td>
+  <td class="after">Acme Dev LLC commercial only. airbyte-*, valorpro, bahalaka, acme-dev. Period.</td>
+  <td class="count">17<span class="arrow">→</span><span class="delta-down">~10</span></td>
+  <td><span class="pill red">decontaminate</span></td>
+</tr>
+
+<tr>
+  <td><code>philzcoffee</code></td>
+  <td class="before unchanged">Real Philz client work. Healthy. Deep history.</td>
+  <td class="after unchanged">Real Philz client work. Gains Crew Check repos from acmedev.</td>
+  <td class="count">38<span class="arrow">→</span><span class="delta-up">40</span></td>
+  <td><span class="pill green">healthy</span></td>
+</tr>
+
+<tr>
+  <td><code>Mendocino-Farms</code></td>
+  <td class="before unchanged">Real Mendo client work. Healthy.</td>
+  <td class="after unchanged">Unchanged.</td>
+  <td class="count">8<span class="arrow">→</span><span class="delta-same">8</span></td>
+  <td><span class="pill green">healthy</span></td>
+</tr>
+
+<tr>
+  <td><code>Life-Water</code></td>
+  <td class="before">1 repo (a stray a-d-d copy). lifewater.io product hasn't landed here yet.</td>
+  <td class="after">Life-Water client. lifewater.io product work. a-d-d copy archived or redirected.</td>
+  <td class="count">1<span class="arrow">→</span><span class="delta-same">?</span></td>
+  <td><span class="pill amber">populate</span></td>
+</tr>
+
+<tr>
+  <td><code>Province-Light-Foundation</code></td>
+  <td class="before">Empty org. Zero repos. Existence-without-intent.</td>
+  <td class="after">Joey decides: charter + first repo, OR delete the org.</td>
+  <td class="count">0<span class="arrow">→</span><span class="delta-same">0 or N/A</span></td>
+  <td><span class="pill red">decide</span></td>
+</tr>
+
+<tr class="total-row">
+  <td>TOTAL</td>
+  <td colspan="2" style="color: var(--t2);">9 orgs · 127 repos → 8 orgs · ~94 active repos (~33 archived/redirected, 0 deleted)</td>
+  <td class="count">127<span class="arrow">→</span><span class="delta-down">~94</span></td>
+  <td></td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Table 2 — Repo Moves: Every Concrete Action</h2>
+
+<table>
+<thead>
+<tr>
+  <th style="width:60px;">Phase</th>
+  <th style="width:90px;">Action</th>
+  <th>Before</th>
+  <th>After</th>
+  <th>Why</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- ───── PHASE 1 ───── -->
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-declare">DECLARE</td>
+  <td class="before">kastil-systems/a-d-d <span style="color:var(--t3)">(undeclared)</span></td>
+  <td class="after">kastil-systems/a-d-d <span style="color:var(--green)">CANONICAL</span></td>
+  <td class="why">Kernel doc already says this is source of truth. Make it official in the README.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-redirect">REDIRECT</td>
+  <td class="before">acmedevUS/a-d-d</td>
+  <td class="after">README: "Stale mirror → kastil-systems/a-d-d"</td>
+  <td class="why">Description literally says "single source of truth" — that's now false. Redirect kills the lie.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-redirect">REDIRECT</td>
+  <td class="before">Life-Water/a-d-d</td>
+  <td class="after">README: redirect to canonical</td>
+  <td class="why">Stray copy in a client org. Redirect; keep history.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-redirect">REDIRECT</td>
+  <td class="before">ai-pantheon-internal/ADD</td>
+  <td class="after">README: redirect to canonical</td>
+  <td class="why">Capitalized variant — won't survive org dissolution anyway, redirect first.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-redirect">REDIRECT</td>
+  <td class="before">joeycastilloUS/a-d-d-guidance</td>
+  <td class="after">README: redirect to canonical (or merge content first)</td>
+  <td class="why">"Guidance" might have real content — check before redirecting; otherwise redirect.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-keep">KEEP</td>
+  <td class="before unchanged">acmedevUS/a-d-d-template <span style="color:var(--t3)">[archived]</span></td>
+  <td class="after unchanged">Stays archived. No action.</td>
+  <td class="why">Already archived. Don't touch.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-rename">RENAME</td>
+  <td class="before">kastil-systems/metal-console <span style="color:var(--t3)">(C)</span></td>
+  <td class="after">kastil-systems/metal-runtime <span style="color:var(--t3)">(or metal-core)</span></td>
+  <td class="why">Two metal-consoles, two languages. Read both first; likely the C one is the runtime.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-keep">KEEP</td>
+  <td class="before unchanged">joeycastilloUS/metal-console <span style="color:var(--t3)">(HTML)</span></td>
+  <td class="after unchanged">Unchanged. The operator surface keeps the name.</td>
+  <td class="why">This is where the kernel CLAUDE.md lives. Name aligns with its function.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P1</span></td><td class="action a-describe">CHARTER</td>
+  <td class="before">All 9 orgs: no charter README</td>
+  <td class="after">All 9 orgs: 1-line charter README at org root</td>
+  <td class="why">Make audience visible at the org page. "kastil-systems — the kernel layer. Source of truth for a-d-d." Done.</td>
+</tr>
+
+<!-- ───── PHASE 2 ───── -->
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">acmedevUS/employee-validator</td>
+  <td class="after">philzcoffee/employee-validator</td>
+  <td class="why">Description says "Crew Check ... PWA for Philz Coffee." Wrong org from day one.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">acmedevUS/crew-check-api</td>
+  <td class="after">philzcoffee/crew-check-api</td>
+  <td class="why">"Crew Check API ... employee sync for Philz Coffee." Pairs with employee-validator.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">acmedevUS/ai-pantheon</td>
+  <td class="after">ai-pantheon/<i>&lt;rename needed&gt;</i></td>
+  <td class="why">Can't transfer as ai-pantheon/ai-pantheon. Read contents, pick target name.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">acmedevUS/claude-run-storyline</td>
+  <td class="after">ai-pantheon/claude-run-storyline</td>
+  <td class="why">Pairs with ai-pantheon/claude-run-web. Same product.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">acmedevUS/claudius-maximus</td>
+  <td class="after">ai-pantheon/claudius-maximus <span style="color:var(--t3)">(or archive)</span></td>
+  <td class="why">Pantheon-flavored name in wrong org. Confirm purpose; transfer or archive.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">ai-pantheon-internal/purpose-learning</td>
+  <td class="after">kastil-systems/purpose-learning</td>
+  <td class="why">"Sovereign Brain ... pure C, no deps." That's kernel work. Belongs in kastil-systems.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">ai-pantheon-internal/purpose-memory</td>
+  <td class="after">kastil-systems/purpose-memory</td>
+  <td class="why">C codebase, pairs with purpose-learning. Kernel layer.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">ai-pantheon-internal/tgt-mesh-gvnic</td>
+  <td class="after">kastil-systems/target-mesh-gvnic <span style="color:var(--t3)">(also rename for clarity)</span></td>
+  <td class="why">"piOS gVNIC bare-metal mesh kernel." Pure kernel work. Drop the cryptic "tgt" prefix.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-transfer">TRANSFER</td>
+  <td class="before">ai-pantheon-internal/tools-cockpit</td>
+  <td class="after">kastil-systems/tools-cockpit <span style="color:var(--t3)">(or ai-pantheon)</span></td>
+  <td class="why">"Architecture Cockpit — dual-panel dev tool." Operator-facing → maybe ai-pantheon if Pantheon-branded, else kastil.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-archive">ARCHIVE</td>
+  <td class="before">ai-pantheon-internal/user-dashboard</td>
+  <td class="after">Archive (or transfer if active)</td>
+  <td class="why">Generic name, no description, Feb-22 timestamp. Probably scaffold.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P2</span></td><td class="action a-archive">DELETE ORG</td>
+  <td class="before">ai-pantheon-internal <span style="color:var(--t3)">(6 repos)</span></td>
+  <td class="after">Org deleted after all 6 repos moved/archived</td>
+  <td class="why">No audience contract = no reason to exist. Collapse into kastil-systems / ai-pantheon.</td>
+</tr>
+
+<!-- ───── PHASE 3 ───── -->
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-archive">ARCHIVE</td>
+  <td class="before">joeycastilloUS/legacy</td>
+  <td class="after">Set isArchived=true</td>
+  <td class="why">Name says it. Flag should match.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-archive">ARCHIVE</td>
+  <td class="before">joeycastilloUS/kASTIL</td>
+  <td class="after">Archive (after confirming dead) <span style="color:var(--amber)">[unknown #2]</span></td>
+  <td class="why">No description, capitalized. Likely abandoned. Confirm before archiving.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-archive">ARCHIVE</td>
+  <td class="before">joeycastilloUS/kastil-systems</td>
+  <td class="after">Archive (after confirming dead) <span style="color:var(--amber)">[unknown #2]</span></td>
+  <td class="why">A repo named after the org — confusing on its own. If dead, archive; if real, rename.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-archive">ARCHIVE</td>
+  <td class="before">joeycastilloUS/metal.Be</td>
+  <td class="after">Archive (Shell, no description)</td>
+  <td class="why">Earliest "metal" experiment? Likely superseded by metal-console.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-keep">DECIDE</td>
+  <td class="before">joeycastilloUS/ai-metal</td>
+  <td class="after">Describe + keep, OR archive</td>
+  <td class="why">No description. If it's the "metal for AI" experiment, keep with description. If dead, archive.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-keep">DECIDE</td>
+  <td class="before">joeycastilloUS/metal-proposal</td>
+  <td class="after">Describe + keep, OR archive</td>
+  <td class="why">If it's the proposal-template work that became be/templates/proposal.html, archive.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-keep">DECIDE</td>
+  <td class="before">joeycastilloUS/norman</td>
+  <td class="after">Describe + keep, OR archive <span style="color:var(--amber)">[unknown #4]</span></td>
+  <td class="why">Named for Norman Campbell (Javelin Era)? Person-tracker? Need 30 seconds inside.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-archive">ARCHIVE</td>
+  <td class="before">ai-pantheon <span style="color:var(--t3)">(21 repos with Feb-22 timestamps)</span></td>
+  <td class="after">Individual triage: archive most, keep ~7 active</td>
+  <td class="why">pantheon-mesh, pantheon-mail, pantheon-personal, pantheon-worker-alpha/beta/gamma, etc. Empty scaffold from a create-spree.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-keep">KEEP</td>
+  <td class="before unchanged">ai-pantheon: integrity, safety, identity (public)</td>
+  <td class="after unchanged">Keep. The public trio.</td>
+  <td class="why">These have real descriptions and public visibility — coordinated launch surface.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-archive">ARCHIVE</td>
+  <td class="before">kastil-systems/old-root</td>
+  <td class="after">Archive (likely dead)</td>
+  <td class="why">"old-root" in the name. Confirm; archive.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P3</span></td><td class="action a-declare">DECIDE</td>
+  <td class="before">Province-Light-Foundation <span style="color:var(--t3)">(0 repos)</span></td>
+  <td class="after">Charter + first repo, OR delete the org <span style="color:var(--amber)">[unknown #5]</span></td>
+  <td class="why">Existence-without-intent. Joey-only call: was this Joey's foundation idea, or accidental?</td>
+</tr>
+
+<!-- ───── PHASE 4 ───── -->
+<tr><td><span class="phase-tag">P4</span></td><td class="action a-rename">RENAME</td>
+  <td class="before">kastil-systems/thelastfamily</td>
+  <td class="after">kastil-systems/the-last-family</td>
+  <td class="why">Convention match (the-last-platform, the-last-pos). 30 seconds.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P4</span></td><td class="action a-describe">DESCRIBE</td>
+  <td class="before">~30 active repos with no GitHub description</td>
+  <td class="after">Every one has a 1-line description</td>
+  <td class="why">The single biggest "load from metal" win. ~list becomes self-documenting forever.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P4</span></td><td class="action a-keep">REVIEW</td>
+  <td class="before">acmedevUS/overwatch_app, Mendocino-Farms/overwatch_app</td>
+  <td class="after">Confirm intentional client copies, OR consolidate</td>
+  <td class="why">Per-client shared lib pattern = OK. Stale fork = NOT OK. 1-minute look.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P4</span></td><td class="action a-keep">REVIEW</td>
+  <td class="before">acmedevUS/playwright_reports, philzcoffee/playwright_reports</td>
+  <td class="after">Confirm intentional, OR consolidate</td>
+  <td class="why">Same question as overwatch_app.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P4</span></td><td class="action a-keep">REVIEW</td>
+  <td class="before">common_csharp in acmedevUS + philzcoffee + Mendocino-Farms</td>
+  <td class="after">Keep — confirmed per-client shared libs pattern</td>
+  <td class="why">3 client orgs each with their own shared lib copy is normal — different audiences.</td>
+</tr>
+
+<tr><td><span class="phase-tag">P4</span></td><td class="action a-keep">UPDATE</td>
+  <td class="before">Kernel CLAUDE.md references to moved repos</td>
+  <td class="after">CLAUDE.md (in C:\metal) updated for any path changes</td>
+  <td class="why">If kastil-systems/metal-console → metal-runtime, the kernel doc references update too.</td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Counts at a glance</h2>
+
+<table>
+<thead><tr><th>Action type</th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th><th>Phase 4</th><th>Total</th></tr></thead>
+<tbody>
+<tr><td class="action a-declare">DECLARE</td><td>1</td><td>0</td><td>1</td><td>0</td><td class="count">2</td></tr>
+<tr><td class="action a-rename">RENAME</td><td>1</td><td>0</td><td>0</td><td>1</td><td class="count">2</td></tr>
+<tr><td class="action a-transfer">TRANSFER</td><td>0</td><td>8</td><td>0</td><td>0</td><td class="count">8</td></tr>
+<tr><td class="action a-redirect">REDIRECT</td><td>4</td><td>0</td><td>0</td><td>0</td><td class="count">4</td></tr>
+<tr><td class="action a-archive">ARCHIVE</td><td>0</td><td>1+org</td><td>5-7</td><td>0</td><td class="count">~8</td></tr>
+<tr><td class="action a-describe">DESCRIBE</td><td>1 (charters)</td><td>0</td><td>0</td><td>~30 (repos)</td><td class="count">~31</td></tr>
+<tr><td class="action a-keep">DECIDE/REVIEW</td><td>0</td><td>0</td><td>4</td><td>3</td><td class="count">7</td></tr>
+<tr class="total-row"><td>TOTAL</td><td>7</td><td>9+org</td><td>~10</td><td>~34</td><td class="count">~62</td></tr>
+</tbody>
+</table>
+
+<p class="sub">Phase 4 is volume (descriptions × 30) but each item is trivial. The hard work is Phases 1-3.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="dod">
+  <h3 style="color: var(--accent); margin-top:0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase;">Definition of Done</h3>
+  <div class="dod-item pass">Code committed (this build)</div>
+  <div class="dod-item pass">Commit hash in telemetry</div>
+  <div class="dod-item na">Board updated (~e will convert these moves into items)</div>
+  <div class="dod-item pass">HTML report saved (be/builds/2026-05-20-2047-reorg-before-after.html)</div>
+  <div class="dod-item pass">Index updated (be/index.html lists this build)</div>
+  <div class="dod-item pass">Pushed to remote</div>
+  <div class="dod-item pass">No prior work damaged</div>
+  <div class="dod-item na">Shipped to production (no deployable surface yet)</div>
+</div>
+
+</div>
+<footer>v0 · r4 · 2026-05-20 · ~b reorg-before-after · joeycastilloUS/audit-of-all</footer>
+</body>
+</html>
