@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~D: Fingerprint -- noise-free parity check via column-pruned HASH_AGG</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}
+.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.section{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:18px 0;border-left:3px solid #6FC3DF}
+.section h3{color:#6FC3DF;margin:0 0 8px;font-size:17px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}
+.choice .fork{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}
+.choice .opts{color:#888;font-size:12px;margin-bottom:6px}
+.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}
+.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}
+.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}
+.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.candidate .name{color:#6FC3DF;font-weight:700;font-family:'Consolas',monospace}
+.candidate .gut{color:#888;font-size:11px}
+.candidate.winner{border-color:#5cb85c}
+.candidate.winner .name{color:#5cb85c}
+.pmt-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:13px}
+.pmt-row .lb{color:#f06e6e;font-weight:700}
+.pmt-row .rp{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}
+.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~design: Fingerprint parity</nav>
+
+<h1>Fingerprint -- noise-free parity check via column-pruned HASH_AGG</h1>
+<p class="sub">One scalar per table, projected past Airbyte's metadata columns, optionally cursor-windowed. Same scalar on prod and clone = identical business state. No Time Travel needed.</p>
+<span class="banner">Design &mdash; Pure Metal</span>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> Replace the snapshot tool's counts panel with a parity check that survives Airbyte's metadata churn, optionally scopes to the settled past, and gives a one-glance verdict per table. <strong>Intent:</strong> A diff that's right by default. Column-pruned <code>HASH_AGG</code> as the primitive, cursor-windowed scoping as the modifier, <code>EXCEPT COUNT(*)</code> as the magnitude qualifier when the verdict comes back DIFFER. Existing clone stands; Time Travel is dead on this account; this is the highest-signal cheapest path that exists.
+</div>
+
+<h2>Discovery</h2>
+<p>Per ~i (<code>be/inspects/2026-05-23-2358-inspect-snowflake-parity-features.html</code>):</p>
+<ul>
+<li>Account: <code>ZN77432</code> AWS us-west-2, Standard edition (1-day retention cap inferred).</li>
+<li>Time Travel reach: under 24 hours in practice; clone is 3 days old; <strong>can't reach back to clone_time</strong>. Time Travel is off the table.</li>
+<li><code>HASH_AGG(col, col, ...)</code> works perfectly: prod and clone return <em>identical</em> scalars when we project past <code>_AIRBYTE_*</code>/<code>_FIVETRAN_*</code> metadata. Tested on NETSUITE.CUSTOM_ITEM: <code>8393363139480235559</code> on both sides.</li>
+<li><code>EXCEPT</code> on the same projection returns 0 rows in both directions for the same table -- confirms HASH_AGG isn't lying.</li>
+<li><code>INFORMATION_SCHEMA.COLUMNS</code> gives us the column list for each table; the metadata filter is a name-prefix exclusion. No manual maintenance.</li>
+<li>The clone we have is <em>already</em> a valid prod snapshot. Re-cloning gives a fresher anchor but unlocks no new capability since Time Travel can't extend retroactively.</li>
+</ul>
+<p>User leaning: filter out at least the last 24h before clone time, so in-flight UPSERTs don't pollute the diff. That composes cleanly with column-pruning -- two filters applied to the same projection.</p>
+
+<h2>Naming Pass</h2>
+
+<div class="candidate"><span class="name">parity_check</span><span class="gut">precise &middot; generic &middot; could be anything</span></div>
+<div class="candidate"><span class="name">fingerprint_diff</span><span class="gut">technically accurate &middot; the act &middot; two words</span></div>
+<div class="candidate"><span class="name">verdict</span><span class="gut">short &middot; binary &middot; presumes the result, not the method</span></div>
+<div class="candidate"><span class="name">parity_seal</span><span class="gut">sealed = match &middot; metal-adjacent &middot; new term to learn</span></div>
+<div class="candidate winner"><span class="name">fingerprint</span><span class="gut">winner &middot; one noun &middot; describes the primitive AND the panel &middot; same word Snowflake uses internally</span></div>
+
+<p style="font-size:13px;color:#ccc;margin-top:8px">A <code>HASH_AGG</code> output <em>is</em> a fingerprint of a multiset. The act is "fingerprint a table"; the verdict is "fingerprints match or they don't"; the panel is "fingerprints". One word, no metaphor stretching, no fork in vocabulary. The cursor-windowed mode and the column-pruning are <em>how</em> we fingerprint, not separate names. The panel replaces the current "Counts" panel and is called <strong>Fingerprint</strong>.</p>
+
+<h2>Shape</h2>
+
+<div class="section">
+<h3>The primitive</h3>
+<div class="code-block">SELECT HASH_AGG({biz_col_list}) AS fp
+FROM {db}."{schema}"."{table}"
+[WHERE {cursor} &lt;= TO_TIMESTAMP('{line_ts}')]   -- optional, applied if stream has cursor</div>
+<p style="font-size:13px">Run on PROD and CLONE side. Compare scalars. Equal &rArr; MATCH. Unequal &rArr; DIFFER (and run EXCEPT for magnitude).</p>
+</div>
+
+<div class="section">
+<h3>The column list</h3>
+<div class="code-block">SELECT COLUMN_NAME FROM {db}.INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table}'
+ORDER BY ORDINAL_POSITION;
+# python: [c for c in cols if not c.startswith('_AIRBYTE') and not c.startswith('_FIVETRAN')]</div>
+<p style="font-size:13px">Pull from PROD side only (treat as authoritative schema). Strip metadata. Quote each column. Result: ordered projection that survives schema evolution as long as Airbyte sticks to its prefix convention.</p>
+</div>
+
+<div class="section">
+<h3>The magnitude qualifier (only when DIFFER)</h3>
+<div class="code-block">SELECT COUNT(*) FROM (
+  SELECT {biz_col_list} FROM AIRBYTE_DB."{schema}"."{table}"
+   [WHERE {cursor} &lt;= TO_TIMESTAMP('{line_ts}')]
+  EXCEPT
+  SELECT {biz_col_list} FROM AIRBYTE_CLONE."{schema}"."{table}"
+   [WHERE {cursor} &lt;= TO_TIMESTAMP('{line_ts}')]
+)</div>
+<p style="font-size:13px">Only invoked when fingerprints differ. Runs twice (prod-clone and clone-prod) for symmetric "rows on one side only" counts. Slow on big tables; that's why it's not the primary check.</p>
+</div>
+
+<div class="section">
+<h3>The panel rendering</h3>
+<p>Per-schema rollup + per-table verdict table. Headline stats:</p>
+<ul>
+<li><b>MATCH</b> count (green, large): how many tables passed</li>
+<li><b>DIFFER</b> count (red, large): how many failed</li>
+<li><b>SKIP</b> count (gray): no cursor + opted out, or column-list mismatch</li>
+<li><b>ERROR</b> count (orange): query fail</li>
+</ul>
+<p>Per-table row when DIFFER: prod fp, clone fp, prod-only rows, clone-only rows, cursor used (or 'all-time'). Per-table row when MATCH: just verdict + cursor used (or 'all-time'). Hero stat: "X / Y tables MATCH at cursor &lt;= line".</p>
+</div>
+
+<div class="section">
+<h3>Filter scoping decision tree</h3>
+<ol>
+<li>If table has cursor field (from <code>stream-catalog.json</code> or <code>parity-roles.json</code>): apply <code>WHERE cursor &lt;= clone_time - 24h</code>.</li>
+<li>If table is snapshot mode (no cursor): apply <em>no</em> filter; fingerprint the whole table. Snapshot streams replace on every sync, so business rows should match clone's last pre-clone-time load.</li>
+<li>If cursor is non-timestamp (bigint ID, string): apply <em>no</em> filter; fingerprint whole table. Mark "untrimmed" in the verdict row so the human knows.</li>
+</ol>
+</div>
+
+<h2>Choices + Consequences</h2>
+
+<div class="choice">
+<div class="fork">1. HASH_AGG vs HASH_AGG + EXCEPT magnitude</div>
+<div class="opts">a) Fingerprint only (MATCH/DIFFER, no count). b) Fingerprint then EXCEPT only when DIFFER. c) Always run both.</div>
+<div class="conseq">a) Cheapest. Can't answer "how many rows differ". User has to drill in manually. b) Best of both -- cheap default, expensive only when needed, max signal. c) Wasteful on MATCH cases (most tables, hopefully).</div>
+<div class="pick">PICK: (b) -- run EXCEPT only when fingerprints differ.</div>
+<div class="why">Most streams should MATCH after column-pruning + cursor-windowing. EXCEPT is expensive (full-table set diff); only worth it when we already know there's something to count.</div>
+</div>
+
+<div class="choice">
+<div class="fork">2. Cursor-window filter: always, never, or per-stream</div>
+<div class="opts">a) Always apply the 24h-before-clone filter when a cursor exists. b) Never apply -- compare all-time. c) Per-stream opt-in.</div>
+<div class="conseq">a) Default protection from in-flight UPSERT noise; some streams may not need it but the cost is minimal. b) Catches structural divergence anywhere in history; UPSERT noise comes back. c) Adds config surface; another knob to misconfigure.</div>
+<div class="pick">PICK: (a) -- apply when cursor exists, skip when it doesn't.</div>
+<div class="why">Joey's stated preference, and the most defensible default. UPSERT noise is real and recurring; users can re-run with <code>--all-time</code> flag if they want.</div>
+</div>
+
+<div class="choice">
+<div class="fork">3. Column-pruning: prefix regex vs explicit list vs in-DB function</div>
+<div class="opts">a) Python-side prefix check on INFORMATION_SCHEMA.COLUMNS results. b) Maintain explicit per-table whitelist in <code>infra/business-columns.json</code>. c) SQL-side filter via <code>WHERE COLUMN_NAME NOT LIKE '_AIRBYTE%' ESCAPE...</code> (tested, escape syntax fragile on Snowflake).</div>
+<div class="conseq">a) Zero maintenance; self-updating; same logic the C# parity engine uses. b) Defensive against unexpected metadata column names but requires manual upkeep on every schema change. c) Escape-character gymnastics; ruled out by test.</div>
+<div class="pick">PICK: (a) -- Python prefix check, configurable prefix list.</div>
+<div class="why">Mirrors the production parity engine's <code>MetaColumnFilter</code>. Default prefixes: <code>_AIRBYTE_</code>, <code>_FIVETRAN_</code>. If a stream sneaks in a different metadata column, we add the prefix in code (one place) and every stream benefits.</div>
+</div>
+
+<div class="choice">
+<div class="fork">4. Re-clone now to reset the anchor?</div>
+<div class="opts">a) Yes -- DROP + CREATE CLONE today, get a fresh anchor matching current prod state. b) No -- keep the May 20 clone, it's still a valid frozen snapshot.</div>
+<div class="conseq">a) Fresh diff baseline; loses 4 days of existing snapshot audit trail; doesn't unlock Time Travel (still 1-day retention cap); requires Phase 0 freeze choreography. b) Existing snapshots remain meaningful; clone is increasingly stale relative to live prod (~5,500 rows of UPSERT drift per day); we proceed with current data immediately.</div>
+<div class="pick">PICK: (b) -- don't re-clone yet.</div>
+<div class="why">A re-clone doesn't fix any of the noise problems and trades audit continuity for a slightly fresher reference. The fingerprint design works on the existing clone. If parity sweep reveals real divergence we can't explain, <em>then</em> a re-clone becomes a forensic step rather than a precaution.</div>
+</div>
+
+<div class="choice">
+<div class="fork">5. Tool surface: replace counts panel, or add new fingerprint panel</div>
+<div class="opts">a) Replace counts panel in <code>snapshot.py</code>. Old data goes away. b) Add fingerprint as panel #6 alongside the existing 5.</div>
+<div class="conseq">a) Single source of truth, no confusion about which number to trust. b) Both views available; comparing the two helps debug. Larger HTML, more wall-time per snapshot.</div>
+<div class="pick">PICK: (a) -- replace.</div>
+<div class="why">The current counts panel <em>is</em> noise-laden by design. Keeping it as a side-by-side comparison normalizes the noisy view. Replace cleanly; the old snapshots remain on the site as historical record of the noisy era.</div>
+</div>
+
+<h2>Escape Routes</h2>
+
+<div class="escape"><strong>Escape from PICK 1b (run EXCEPT only on DIFFER):</strong> if EXCEPT runtime per DIFFER table becomes unacceptable on large tables (ETHER.ORDERS 4B rows), gate EXCEPT behind a <code>--magnitude</code> flag and default to fingerprint-only.</div>
+<div class="escape"><strong>Escape from PICK 2a (cursor-window always):</strong> add <code>--all-time</code> flag that drops the WHERE clause. Logged in the panel header so the user sees which mode produced the report.</div>
+<div class="escape"><strong>Escape from PICK 3a (prefix check):</strong> if a new metadata column slips in (e.g., <code>_DBT_*</code> from a downstream transform), add the prefix to the exclusion list in one place. The Python helper handles it for all 208 streams.</div>
+<div class="escape"><strong>Escape from PICK 4b (don't re-clone):</strong> if the parity sweep shows mass DIFFER, re-clone (one SQL statement, no real cost) and re-run. The cost of being wrong here is one phase 1 re-do.</div>
+<div class="escape"><strong>Escape from PICK 5a (replace panel):</strong> historical snapshots stay on the site -- the noisy counts panel is preserved in those pages. New snapshots only show the fingerprint panel.</div>
+
+<h2>Pure Metal Test</h2>
+
+<p style="font-size:13px">Can this be built with no frameworks, no external runtime, no vendor lock?</p>
+
+<div class="pmt-row"><span><code>snowflake.connector</code> (Python)</span><span class="rp">replaceable -- any SQL client</span></div>
+<div class="pmt-row"><span><code>HASH_AGG</code> + <code>EXCEPT</code> (Snowflake SQL)</span><span class="lb">load-bearing -- the primitive is Snowflake-specific</span></div>
+<div class="pmt-row"><span><code>INFORMATION_SCHEMA.COLUMNS</code></span><span class="rp">replaceable -- any SQL engine has equivalent</span></div>
+<div class="pmt-row"><span>Stream catalog JSON</span><span class="rp">replaceable -- already a flat file</span></div>
+<div class="pmt-row"><span>Static HTML render (no framework)</span><span class="rp">replaceable -- already vanilla</span></div>
+<div class="pmt-row"><span>Git for publish</span><span class="rp">replaceable -- any VCS</span></div>
+
+<p style="font-size:13px;margin-top:10px"><strong>Load-bearing count: 1.</strong> The Snowflake <code>HASH_AGG</code> primitive. Acceptable -- AIRBYTE_DB and AIRBYTE_CLONE are <em>on</em> Snowflake; we're not introducing a foreign dependency, we're using the platform's native fingerprint function. If we ever move off Snowflake, every other parity tool also needs rewrites; this one isn't an outlier.</p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>The smallest concrete proof</strong>
+Write a 40-line standalone Python script that does <em>only</em> step 1 of the new design: for every active stream, pull column list, project past <code>_AIRBYTE_*</code>, run <code>HASH_AGG</code> on both DBs, print <code>SCHEMA.TABLE MATCH</code> or <code>SCHEMA.TABLE DIFFER (prod_fp clone_fp)</code>. No HTML, no publish, no panel integration. If &gt; 90% of streams return MATCH on the existing clone, the design is correct and we can fold it into <code>snapshot.py</code> with confidence. Wall time estimate: 2-4 minutes for 208 streams.
+</div>
+
+<h2>What this design does NOT do</h2>
+<ul>
+<li>Change the existing clone. The May 20 anchor stands.</li>
+<li>Touch the parity engine or its Cloud Run dashboard.</li>
+<li>Modify <code>airbyte_migration_tools</code> scripts.</li>
+<li>Require a Snowflake edition upgrade.</li>
+<li>Add new external dependencies.</li>
+<li>Introduce a config file (column prefixes default in code).</li>
+</ul>
+
+<h2>Path to plan + build</h2>
+<p style="font-size:13px">Next: <code>~p</code> formalizes this design into a build plan (probably one board, ~13 pts: First Move proof, replace counts panel, re-render template, ship Phase 2 snapshot under new design, update CLAUDE.md). After approval, <code>~b</code> executes it.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved to <code>be/designs/2026-05-24-0000-design-fingerprint-parity.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/design-fingerprint-parity.html</code></div>
+<div class="dod-item">&check; Be index updated</div>
+<div class="dod-item">&check; Both repos committed + pushed</div>
+<div class="dod-item">&check; 5 naming candidates, winner: <strong>fingerprint</strong></div>
+<div class="dod-item">&check; 5 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Pure Metal Test: 1 load-bearing dep (HASH_AGG, acceptable)</div>
+<div class="dod-item">&check; First Move named: 40-line proof script across 208 streams</div>
+<div class="dod-item">&check; Re-clone decision: NO (with escape route)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r66 &middot; 2026-05-24 00:00 &middot; ~d Fingerprint parity</div>
+</body></html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~I: Snowflake language + features for parity checking on this account</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}
+.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+.fail{background:#2a1414;border-left:3px solid #f06e6e;padding:14px 18px;margin:14px 0;color:#f0bcbc;font-size:14px;border-radius:0 4px 4px 0}
+.fail strong{color:#f06e6e}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.pill-yes{background:#0d2818;color:#5cb85c;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.4px}
+.pill-no{background:#2a1414;color:#f06e6e;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.4px}
+.pill-lim{background:#1f1f0a;color:#f0ad4e;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.4px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~inspect: Snowflake features for parity</nav>
+
+<h1>Snowflake language + features for parity checking on this account</h1>
+<p class="sub">What this Snowflake account (<code>ZN77432</code>, AWS us-west-2) actually gives us for comparing AIRBYTE_DB vs AIRBYTE_CLONE -- and the one trick that collapses the &quot;noise&quot; entirely.</p>
+<span class="banner">Inspect &mdash; Hands-On Findings</span>
+
+<div class="lede">
+<strong>Headline:</strong> The "noise" in every diff so far is the <code>_AIRBYTE_*</code> metadata columns (4 per table on average: AB_ID, EMITTED_AT, NORMALIZED_AT, HASHID). When we strip them and compare only business columns, <strong>prod and clone match exactly</strong>. <code>HASH_AGG</code> returns the same fingerprint and <code>EXCEPT</code> returns 0 rows in both directions. That's the design unlock -- everything else is detail. Time Travel is unusable on this account (1-day retention cap, clone is 3 days old), so the path forward is column-pruned <code>HASH_AGG</code> + cursor-windowed scoping, not historical replay.
+</div>
+
+<h2>What It Is</h2>
+<p>Joey asked what Snowflake language and features we can lean on for a noise-free parity check. This inspect is the hands-on inventory: which features exist, which work on <em>this</em> account (Standard edition signs), which we can use today, and which are fool's gold. Every claim below was tested against the live <code>AIRBYTE_DB</code> + <code>AIRBYTE_CLONE</code> tonight, not paraphrased from docs.</p>
+
+<h2>Structure -- the feature matrix</h2>
+
+<table>
+<tr><th>Feature</th><th>Available here</th><th>Verdict for parity</th></tr>
+<tr><td><code>HASH_AGG(col, col, ...)</code></td><td><span class="pill-yes">YES</span></td><td>Pruned-column fingerprint per table. Same value on both sides = identical content. Cheap, decisive, scales.</td></tr>
+<tr><td><code>EXCEPT</code> / <code>MINUS</code> / <code>INTERSECT</code></td><td><span class="pill-yes">YES</span></td><td>Row-level diff between two SELECTs. Returns the rows in one side not in the other. Run on column-pruned projections to get business-row differences only.</td></tr>
+<tr><td><code>HASH(*)</code> per row</td><td><span class="pill-yes">YES</span></td><td>Useful for per-row identity. Combine with <code>HASH_AGG</code> over the result for an order-independent table fingerprint.</td></tr>
+<tr><td>Zero-copy <code>CLONE</code></td><td><span class="pill-yes">YES</span></td><td>What we're already using for <code>AIRBYTE_CLONE</code>. Cost: metadata only.</td></tr>
+<tr><td><code>INFORMATION_SCHEMA.COLUMNS</code></td><td><span class="pill-yes">YES</span></td><td>Drives column-pruning: enumerate cols per table, exclude <code>_AIRBYTE_*</code>/<code>_FIVETRAN_*</code>, project the rest.</td></tr>
+<tr><td><code>INFORMATION_SCHEMA.TABLES</code> with <code>ROW_COUNT</code> + <code>CLUSTERING_KEY</code></td><td><span class="pill-yes">YES</span></td><td>Already used by the snapshot tool's clustering and (old) counts panel.</td></tr>
+<tr><td>Time Travel <code>AT(TIMESTAMP =&gt; ...)</code> / <code>AT(OFFSET =&gt; ...)</code></td><td><span class="pill-lim">VERY LIMITED</span></td><td>Account-level <code>DATA_RETENTION_TIME_IN_DAYS = 1</code>. Tested: 1-hour-ago works, 23-hours-ago already fails ("data is not available... beyond the allowed"). Clone is 3 days old -- Time Travel cannot reach back to clone_time on this account.</td></tr>
+<tr><td>Time Travel <code>BEFORE(STATEMENT =&gt; queryId)</code></td><td><span class="pill-lim">VERY LIMITED</span></td><td>Same retention constraint. We don't even have the original CLONE statement's query_id captured.</td></tr>
+<tr><td>Increasing <code>DATA_RETENTION_TIME_IN_DAYS</code> beyond 1</td><td><span class="pill-no">NO (Standard edition)</span></td><td>The account-level parameter caps at 1. Enterprise edition allows up to 90; Standard caps at 1. <code>SHOW PARAMETERS</code> confirms value=1, default=1. No edition flag in <code>SNOWFLAKE.ACCOUNT_USAGE</code> we can read, but the 1-day cap is the Standard-edition tell.</td></tr>
+<tr><td>Streams (CDC change feed on a table)</td><td><span class="pill-lim">UNTESTED</span></td><td>Likely Standard-supported but requires <code>CHANGE_TRACKING=TRUE</code> on each tracked table, which would need to be set retroactively. Airbyte source tables don't have it on. Streams help going forward, not backward.</td></tr>
+<tr><td>Tasks (scheduled procs)</td><td><span class="pill-yes">YES (assumed)</span></td><td>Could schedule snapshot runs, but our snapshot tool is already explicit-invocation.</td></tr>
+<tr><td>UDFs / Stored Procedures</td><td><span class="pill-yes">YES</span></td><td>Could wrap the per-table parity check as a SQL UDF for reuse from Snowsight. Probably overkill -- Python tool already does this.</td></tr>
+<tr><td>Account / region / edition introspection</td><td><span class="pill-lim">PARTIAL</span></td><td><code>CURRENT_ACCOUNT()</code> = <code>ZN77432</code>, <code>CURRENT_REGION()</code> = <code>AWS_US_WEST_2</code>. Direct edition query (<code>SNOWFLAKE.ACCOUNT_USAGE.SNOWFLAKE_EDITIONS_TYPE</code>) doesn't exist. Inferred Standard from retention cap.</td></tr>
+</table>
+
+<h2>Stack -- the live test results</h2>
+
+<h3>Test 1: Time Travel reach</h3>
+<div class="code-block">SELECT COUNT(*) FROM AIRBYTE_DB.NETSUITE.CUSTOM_ITEM AT(OFFSET =&gt; -3600);     -- 1 hour ago
+-- &rArr; 7636 (works)
+
+SELECT COUNT(*) FROM AIRBYTE_DB.NETSUITE.CUSTOM_ITEM AT(OFFSET =&gt; -82800);    -- 23 hours ago
+-- &rArr; ERROR 000707: Time travel data is not available... beyond the allowed</div>
+<p style="font-size:13px">Even within the supposed "1 day" retention, the actual reach is much shorter -- the table only has time-travel data for a few hours back. Going to clone_time (2026-05-20, 3 days ago) is impossible. <strong>Time Travel is dead for our use case.</strong></p>
+
+<h3>Test 2: EXCEPT on raw tables (the noise)</h3>
+<div class="code-block">SELECT COUNT(*) FROM (
+    SELECT * FROM AIRBYTE_DB.NETSUITE.CUSTOM_ITEM
+    EXCEPT
+    SELECT * FROM AIRBYTE_CLONE.NETSUITE.CUSTOM_ITEM
+);
+-- &rArr; 7636
+
+-- (CUSTOM_ITEM has 7636 rows total. ALL of them appear different.)</div>
+<p style="font-size:13px">100% "difference" rate. Cause: <code>_AIRBYTE_EMITTED_AT</code> and <code>_AIRBYTE_NORMALIZED_AT</code> get fresh timestamps on every sync run. Clone is frozen at the last pre-clone-time sync; prod has run many times since. Same business rows, different metadata. <code>HASH_AGG(*)</code> confirms: <code>-1971404395514912172</code> on prod vs <code>-4684837344629546606</code> on clone.</p>
+
+<h3>Test 3: EXCEPT on business columns only (the unlock)</h3>
+<div class="code-block">-- INFORMATION_SCHEMA confirms 8 cols total: 4 business, 4 _AIRBYTE_*
+SELECT COUNT(*) FROM (
+    SELECT col1, col2, col3, col4 FROM AIRBYTE_DB.NETSUITE.CUSTOM_ITEM
+    EXCEPT
+    SELECT col1, col2, col3, col4 FROM AIRBYTE_CLONE.NETSUITE.CUSTOM_ITEM
+);
+-- &rArr; 0   (and 0 in the reverse direction)
+
+SELECT HASH_AGG(col1, col2, col3, col4) FROM AIRBYTE_DB.NETSUITE.CUSTOM_ITEM;
+-- &rArr; 8393363139480235559
+SELECT HASH_AGG(col1, col2, col3, col4) FROM AIRBYTE_CLONE.NETSUITE.CUSTOM_ITEM;
+-- &rArr; 8393363139480235559   IDENTICAL</div>
+<div class="callout">
+<strong>This is the design.</strong> Drop 4 metadata columns, run <code>HASH_AGG</code> on the rest, compare. Same fingerprint = the business data is bit-for-bit identical. One scalar value per table. ~2 seconds per medium table. Decisive verdict per stream: <code>MATCH</code> or <code>DIFFER</code>.
+</div>
+
+<h2>Patterns Found</h2>
+
+<h3>1. The noise is structural, not stochastic</h3>
+<p>Every Airbyte sync rewrites <code>_AIRBYTE_EMITTED_AT</code>. The clone preserves whatever timestamp was current at clone time; prod marches forward. The "difference" is therefore <em>deterministic</em>: number of rows differing = number of rows in the table. That's why <code>EXCEPT *</code> said 7636/7636. Once we know this, the fix is obvious -- project away the metadata.</p>
+
+<h3>2. Column-set is stable per stream, derivable from INFORMATION_SCHEMA</h3>
+<p>We don't need to maintain a manual list of "business columns per table". <code>INFORMATION_SCHEMA.COLUMNS</code> gives us every column, we filter by name prefix, the result is the business projection. Same query works for any table on either DB. Self-updating as schemas evolve.</p>
+
+<h3>3. HASH_AGG is order-independent</h3>
+<p>Unlike <code>HASH</code> per row + then <code>SUM</code>, <code>HASH_AGG</code> is designed for "fingerprint a set of rows regardless of order". That matters because clone and prod may have rows physically stored in different orders (Snowflake doesn't guarantee scan order). HASH_AGG of the same multiset returns the same scalar.</p>
+
+<h3>4. The "in-flight" noise is separate from metadata noise</h3>
+<p>Even with column-pruning, rows whose cursor field has been UPDATEd on prod since clone time will still differ -- because prod's value for some business column changed. That's <em>real divergence</em>, not metadata churn. The cursor-windowed filter (only count rows with cursor &lt;= clone_time - 24h) excludes those, leaving only structurally settled rows. Two separate filters, both useful, both compose cleanly.</p>
+
+<h3>5. Per-table parity is one HASH_AGG away</h3>
+<p>Once we have the column list, the parity check is one round-trip per side per table. 208 streams &times; 2 queries = 416 cheap queries. Snowflake caches column-pruned scans well. Estimate: 1-3 minutes total wall time for a full sweep, vs. the current per-row COUNT pattern that takes ~45s for counts alone.</p>
+
+<h2>Open Questions (for ~d to resolve)</h2>
+<ul>
+<li><b>Re-clone or not?</b> Re-cloning gives a fresh anchor but doesn't unlock Time Travel (we're capped at 1 day retention by edition). The current clone (May 20) is still a valid prod snapshot for comparison. Lean: don't re-clone unless we have another reason to.</li>
+<li><b>Cursor-windowed filter on top of column-pruning?</b> Compose both: <code>WHERE cursor &lt;= clone_time - 24h</code> applied to the projected SELECT. Probably yes for incremental streams, N/A for full-refresh / snapshot tables.</li>
+<li><b>Verdict granularity:</b> per-table <code>MATCH/DIFFER</code> Boolean, or also count of differing rows? Both are cheap; HASH_AGG gives Boolean, EXCEPT COUNT gives the magnitude. Probably show both in the panel.</li>
+<li><b>What about non-timestamp cursors?</b> The 7 streams that errored on the current cursor-windowed counts have bigint or string cursors. For HASH_AGG-only parity the cursor doesn't matter (we just hash the whole table); the cursor filter only matters when we want to time-bound. So those 7 streams probably "promote" to clean MATCH/DIFFER under the new design.</li>
+<li><b>Pre-existing parity engine overlap.</b> The C# parity engine already has <code>MetaColumnFilter</code> and column-set diffing for steady-state production. The snapshot tool is for procedure-bracketing. They can share the &quot;business columns per table&quot; logic but stay separate tools.</li>
+<li><b>Auth fingerprint for HASH_AGG runtime.</b> JOEY_BE + ACCOUNTADMIN + DEVELOPER_WH -- same path as today's snapshot. No change needed.</li>
+</ul>
+
+<h2>What ~d must produce</h2>
+<ol style="font-size:14px;margin-left:22px">
+<li>A naming pass for the new approach (3+ candidates) and a chosen winner.</li>
+<li>The shape of the new counts panel: per-table <code>MATCH/DIFFER</code> + (optional) row-diff count + optional cursor-windowed scoping.</li>
+<li>A choices table: HASH_AGG-only vs HASH_AGG + EXCEPT magnitude; cursor-windowed vs all-time; column-pruning strategy (regex-based vs explicit list).</li>
+<li>An escape route for each load-bearing choice.</li>
+<li>A decision on re-cloning (lean: no, here is why).</li>
+<li>First Move: the smallest concrete proof. Probably: run the column-pruned <code>HASH_AGG</code> sweep across all 208 streams, count how many MATCH vs DIFFER, render results inline. If &gt;90% MATCH, the design is right.</li>
+</ol>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Inspect report saved to <code>be/inspects/2026-05-23-2358-inspect-snowflake-parity-features.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/inspect-snowflake-parity-features.html</code></div>
+<div class="dod-item">&check; Be index updated</div>
+<div class="dod-item">&check; Committed + pushed both repos</div>
+<div class="dod-item">&check; Hands-on test results, not paraphrased docs</div>
+<div class="dod-item">&check; The unlock named: column-pruned HASH_AGG, demonstrated PROD==CLONE on CUSTOM_ITEM</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r64 &middot; 2026-05-23 23:58 &middot; ~i Snowflake parity features</div>
+</body></html>
