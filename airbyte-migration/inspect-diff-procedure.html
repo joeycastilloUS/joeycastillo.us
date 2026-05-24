@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~I: Diff visibility across the migration procedure</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}
+.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.gap{background:#3a1a1a;border-left:3px solid #d9534f;padding:14px 18px;margin:14px 0;color:#f0bcbc;font-size:14px;border-radius:0 4px 4px 0}
+.gap strong{color:#d9534f}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.pill-have{background:#0d2818;color:#5cb85c;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.4px}
+.pill-partial{background:#1f1f0a;color:#f0ad4e;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.4px}
+.pill-missing{background:#2a1414;color:#f06e6e;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.4px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~inspect: diff visibility</nav>
+
+<h1>Diff visibility across the AIRBYTE_DB &harr; AIRBYTE_CLONE migration procedure</h1>
+<p class="sub">What we already have, what's missing, and where the gap blocks a click-through publish-to-site standard.</p>
+<span class="banner">Inspect &mdash; Answer Below</span>
+
+<div class="lede">
+<strong>Subject:</strong> Joey wants to see the diff between AIRBYTE_DB and AIRBYTE_CLONE <em>at each step</em> of the migration procedure, rendered as HTML, auto-published to <code>joeycastillo.us/airbyte-migration/</code>, with a click-able link surfaced back into the conversation each time. Today this exists piecewise &mdash; the diff dimensions are owned by 5+ separate scripts and one production dashboard, but nothing produces a single per-phase snapshot and nothing auto-publishes. This is the standard we should make standard.
+</div>
+
+<h2>What It Is</h2>
+<p>The clone-rebuild procedure (<code>be/plans/2026-05-20-1236-plan-clone-rebuild-and-parity-baseline.html</code>) walks AIRBYTE_CLONE through six phases. Each phase transforms the clone in a different dimension. The "diff" between AIRBYTE_DB and AIRBYTE_CLONE is therefore not one number &mdash; it's a tuple of five measurements, each with its own tool today.</p>
+
+<h2>Structure &mdash; the procedure as it exists</h2>
+<table>
+<tr><th>Phase</th><th>What changes on AIRBYTE_CLONE</th><th>Diff dimension that matters</th><th>Current tool</th></tr>
+<tr><td>0 &mdash; Freeze</td><td>airbyte-philz cron paused. No data change.</td><td>None (baseline freeze marker)</td><td><span class="pill-have">N/A</span></td></tr>
+<tr><td>1 &mdash; Drop + Clone</td><td>AIRBYTE_CLONE replaced atomically via <code>CREATE DATABASE CLONE</code>.</td><td>Row counts; near-zero delta expected.</td><td><code>quick_count_diff.py</code> <span class="pill-have">HAVE</span></td></tr>
+<tr><td>2 &mdash; Post-clone cleanup</td><td>Inherited <code>_AIRBYTE_*</code> clustering keys dropped (416 in the May 20 run); orphaned generation rows deleted in full-refresh schemas.</td><td>Clustering keys; orphan row count.</td><td><code>discover_clustering.py</code> + <code>post_clone_cleanup.py --dry-run</code> <span class="pill-have">HAVE</span></td></tr>
+<tr><td>3 &mdash; V2 metadata discovery</td><td>Add V2 columns on clone-side tables (Airbyte 2.0.1 schema).</td><td>Column-set diff per table.</td><td>Parity engine <code>L3Async</code> in prod; no script form. <span class="pill-partial">PARTIAL</span></td></tr>
+<tr><td>4 &mdash; Cron resume</td><td>airbyte-philz incremental syncs resume; clone catches up.</td><td>Per-stream freshness gap.</td><td><code>audit_clone_freshness.py</code> <span class="pill-have">HAVE</span></td></tr>
+<tr><td>5 &mdash; Parity baseline</td><td>Steady-state drift detection.</td><td>L1/L2/L3 verdicts across all streams.</td><td>Cloud Run <code>/dashboard</code> + <code>/parity/l3</code>. <span class="pill-have">HAVE</span></td></tr>
+</table>
+
+<h2>Stack</h2>
+<ul>
+<li><b>Five diff scripts</b> in <code>airbyte_migration_tools/scripts/</code> + <code>airbyte-parity/scripts/</code>: <code>quick_count_diff.py</code>, <code>audit_clone_freshness.py</code>, <code>discover_clustering.py</code>, <code>verify.py</code>, <code>verify_batch.py</code>. Each owns one dimension. Each emits stdout markdown or JSON.</li>
+<li><b>Parity engine</b> &mdash; C# service on Cloud Run (<code>airbyte-parity-d5vc4tye3a-uc.a.run.app</code>). 5 layers: L1 (counts via INFORMATION_SCHEMA), L2 (column sums), L3 (column intersection + min/max), L4 (PK-based row-hash diff, 1000-row cap), L5 (surgical row inspect). <code>/dashboard/data</code> emits per-stream verdicts as JSON.</li>
+<li><b>Site</b> &mdash; <code>joeycastillo.us</code> = Cloudflare Pages, auto-deploy on push to <code>github.com/joeycastilloUS/joeycastillo.us</code>. <code>/airbyte-migration/</code> already hosts 13 pages (parity.html, stream-comparison.html, append-cutover-plan.html, snowflake-keypair-master.html, etc) all using the same dark + tron-blue idiom.</li>
+<li><b>Auth gate on the site</b> &mdash; <code>/airbyte-migration/gate.css</code> + <code>gate.js</code> + a Cloudflare Function under <code>functions/airbyte-migration/</code>. Existing pattern: signed-hash gating for sensitive pages.</li>
+</ul>
+
+<h2>Patterns Found</h2>
+
+<h3>1. Diff is dimensional, not scalar</h3>
+<p>No single number is "the diff." Counts answer "did rows get lost", freshness answers "is clone caught up", clustering answers "did Airbyte's V2 prereqs get satisfied", schema answers "are the columns in alignment", drift answers "is there semantic divergence". A standard snapshot must capture all five &mdash; or at least flag which are N/A for the phase.</p>
+
+<h3>2. Production parity engine already does steady-state. Snapshots are missing.</h3>
+<p>The L1-L5 engine runs on cron every tick against the steady-state pair. What it does not do: capture a frozen "before this phase" and "after this phase" view. The dashboard is always now-tense. Procedure work needs then-vs-now.</p>
+
+<h3>3. Site publishing is one <code>git push</code>.</h3>
+<p>Cloudflare Pages auto-deploys the joeycastillo.us repo. To get a new HTML page live at <code>joeycastillo.us/airbyte-migration/foo.html</code>: write <code>/c/joeycastillo.us/airbyte-migration/foo.html</code>, commit, push. CF picks it up in ~30s. There is no <code>deploy.json</code>, no wrangler config to maintain &mdash; the push <em>is</em> the deploy.</p>
+
+<h3>4. Existing /airbyte-migration pages share a CSS idiom.</h3>
+<p>Max-width 860px, dark background <code>#111</code>, accent <code>#6FC3DF</code>, summary-box grid with <code>.stat .num</code> for hero numbers, status pills (<code>.status-live</code>, <code>.status-warn</code>, etc), Helvetica Neue. A snapshot template should match so it doesn't feel like a foreign tab.</p>
+
+<h2>The gap, named</h2>
+<div class="gap">
+<strong>What is missing:</strong> a single tool that, given a phase identifier and a label (<code>before</code>/<code>after</code> or a free-form slug), takes a five-dimensional snapshot of AIRBYTE_DB vs AIRBYTE_CLONE, renders one HTML page in the site idiom, writes it to <code>airbyte-parity/be/snapshots/</code> for audit and copies it into <code>joeycastillo.us/airbyte-migration/snapshots/</code> for publication, updates an index page that lists every snapshot in reverse-chronological order, and emits the click-able public URL back to stdout. Today that workflow is six scripts + a manual stitching + a manual copy + a manual commit. No one would do it consistently because it's friction-heavy. <strong>The standard procedure exists only on demand if the tool exists in one invocation.</strong>
+</div>
+
+<h2>Open Questions (for ~p to resolve)</h2>
+<ul>
+<li><b>Five dimensions in one snapshot, or one dimension per snapshot?</b> Recommendation: one snapshot = all five (or N/A markers for irrelevant ones). The whole point is one click for one moment in the procedure.</li>
+<li><b>Snapshot location on site:</b> <code>/airbyte-migration/snapshots/&lt;file&gt;</code> with an index at <code>/airbyte-migration/snapshots/</code>? Or flat? Recommendation: subdir + index.</li>
+<li><b>Which repo owns the snapshot tool:</b> <code>airbyte-parity</code> (the diff-aware repo, already has parity engine + sf_connect helper, and is the "clone perspective" project) or <code>airbyte_migration_tools</code> (the operator's toolkit)? Recommendation: <code>airbyte-parity</code> &mdash; it already imports the parity engine concepts.</li>
+<li><b>Auto-snapshot per procedure-phase script, or always explicit?</b> Recommendation: explicit invocation. Procedure scripts mention the snapshot command in their output as the next-step nudge. Avoids surprise writes during a tight DDL window.</li>
+<li><b>Auth gate on the snapshots?</b> The existing keypair pages are gated. Snapshot pages contain row counts and schema diffs &mdash; sensitive enough to also gate, or public enough to leave open? Recommendation: gate them with the same <code>gate.js</code> pattern, since they contain prod schema info.</li>
+<li><b>L4/L5 row-level diff inclusion?</b> Cheap dimensions (counts, freshness, clustering, schema) run in ~5s. L4 row-hash diff can be slow on large streams. Recommendation: include L1-L3 always, L4/L5 only with <code>--deep</code> flag.</li>
+</ul>
+
+<h2>What ~p must produce</h2>
+<ol style="margin-left:22px;font-size:14px">
+<li>A single tool: <code>airbyte-parity/scripts/snapshot.py --phase &lt;N&gt; --label &lt;slug&gt; [--publish] [--deep]</code></li>
+<li>A template: snapshot HTML that matches the site idiom and renders 5 panels (counts, freshness, clustering, schema, drift)</li>
+<li>An index page: <code>joeycastillo.us/airbyte-migration/snapshots/index.html</code> listing every snapshot newest-first</li>
+<li>A publish path: write local copy + copy to site repo + auto-update index + git commit + git push &mdash; ideally in <em>one</em> command</li>
+<li>A first invocation: backfill a "post-Phase-2" snapshot so the standard has its first datapoint visible at the click-able URL right away</li>
+</ol>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Inspect report saved to <code>be/inspects/2026-05-23-1943-inspect-diff-procedure.html</code></div>
+<div class="dod-item">&check; Inspect copy published to <code>joeycastillo.us/airbyte-migration/inspect-diff-procedure.html</code></div>
+<div class="dod-item">&check; Be index updated in airbyte-parity</div>
+<div class="dod-item">&check; Both repos committed + pushed</div>
+<div class="dod-item">&check; Telemetry entry logged with commit hash</div>
+<div class="dod-item">&check; Public URL surfaced in conversation</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r54 &middot; 2026-05-23 19:43 &middot; ~i diff visibility &middot; commit 66f40ad</div>
+</body></html>

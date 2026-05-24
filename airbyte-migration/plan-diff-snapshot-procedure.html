@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~P: Diff snapshot procedure -- one tool, five panels, auto-published</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}
+.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}
+.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}
+.phase .accept strong{color:#5cb85c}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~plan: diff snapshot procedure</nav>
+
+<h1>Diff snapshot procedure &mdash; one tool, five panels, auto-published</h1>
+<p class="sub">Build a standard procedure: one command captures a five-dimensional AIRBYTE_DB vs AIRBYTE_CLONE snapshot, renders HTML in the site idiom, publishes to joeycastillo.us/airbyte-migration/snapshots/, and emits a click-able URL.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> Replace the current fragmented diff workflow (six scripts, manual stitching, no publication) with a single command that produces one publish-quality HTML snapshot per invocation. The first invocation backfills the current "post-Phase-2" state. Every subsequent procedure phase gets a before/after pair. The site grows a snapshot history that is the visible audit trail of the clone-rebuild. Source of truth: <code>be/inspects/2026-05-23-1943-inspect-diff-procedure.html</code>.
+</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td>New tool <code>airbyte-parity/scripts/snapshot.py</code>; per-snapshot HTML template; <code>/airbyte-migration/snapshots/</code> subdirectory + index on the site; auto-publish path (write &rarr; copy &rarr; commit &rarr; push); backfill one snapshot for current state; CLAUDE.md note in both repos pointing to the new standard.</td><td>Changing the parity engine. Rewriting the existing diff scripts. Gating policy decisions for individual snapshot pages (use existing gate.js pattern). Real-time / continuous snapshotting &mdash; this is explicit-invocation-only.</td></tr>
+</table>
+
+<h2>Decisions baked into this plan</h2>
+<table>
+<tr><th>Choice</th><th>Decision</th><th>Why</th></tr>
+<tr><td>How many dimensions per snapshot</td><td><b>Five panels</b>: counts, freshness, clustering, schema, drift verdict. Each panel renders N/A if irrelevant for the named phase.</td><td>The whole reason to standardize is to make "the diff" one click. One file, all dimensions.</td></tr>
+<tr><td>L4/L5 row-level deep diff</td><td><b>Off by default.</b> Opt-in via <code>--deep</code> flag.</td><td>L4 is slow on large streams. Default fast, opt-in for forensic snapshots.</td></tr>
+<tr><td>Tool home repo</td><td><b><code>airbyte-parity</code></b>.</td><td>Already owns sf_connect helper, stream-catalog, parity engine concepts. Operators run the parity perspective from here. <code>airbyte_migration_tools</code> stays the producer-side toolkit.</td></tr>
+<tr><td>Snapshot file location</td><td>Local: <code>airbyte-parity/be/snapshots/YYYY-MM-DD-HHMM-phaseN-&lt;label&gt;.html</code>. Site: <code>joeycastillo.us/airbyte-migration/snapshots/YYYY-MM-DD-HHMM-phaseN-&lt;label&gt;.html</code>. Index: <code>/airbyte-migration/snapshots/index.html</code>.</td><td>Audit trail in repo, public copy on the site, index for browsing. Same filename in both places.</td></tr>
+<tr><td>Site auth gate</td><td><b>Use existing <code>gate.js</code> pattern.</b> Each snapshot page includes the same gate script as <code>parity.html</code>.</td><td>Snapshots contain prod schema + row counts. Same sensitivity as parity dashboard.</td></tr>
+<tr><td>Publish path</td><td><b>One flag: <code>--publish</code></b>. Without it, snapshot writes locally only. With it: write local, copy to site, update index, commit both repos, push both, print URL.</td><td>Friction kills standards. Standard procedure must be one command.</td></tr>
+<tr><td>Phase identifier</td><td><b><code>--phase &lt;0..5&gt;</code></b> integer + <b><code>--label &lt;slug&gt;</code></b> free-form (e.g. <code>before</code>, <code>after</code>, <code>post-cleanup</code>).</td><td>Phase number matches the clone-rebuild plan's section numbering. Label disambiguates multiple snapshots within a phase.</td></tr>
+<tr><td>Index page format</td><td>Reverse-chronological table: timestamp, phase, label, link, key stat (row-count delta).</td><td>Quick scan for "what happened when". One-click to detail page.</td></tr>
+</table>
+
+<h2>Pre-flight checks</h2>
+<div class="warn">
+<strong>Before phase 1:</strong> verify that <code>/c/joeycastillo.us/.git</code> is clean and on <code>main</code>; verify that <code>cp</code> from airbyte-parity to joeycastillo.us works across the Windows path boundary (it does, but worth a smoke); verify CF Pages auto-deploy is still wired to the GitHub repo (last successful auto-deploy: <code>d1b6b1d &mdash; airbyte-migration: cascade ACMEDEV_TOOLS_SVC -&gt; JOEY_BE</code>).
+</div>
+
+<h2>Phases</h2>
+
+<div class="phase">
+<h3><span class="num">1</span> Core diff collector + 5-panel data model</h3>
+<div class="meta">~45 min. <code>scripts/snapshot.py</code> module that opens one sf_connect session and gathers all five dimensions into a single dict.</div>
+<ul>
+<li><b>Counts panel:</b> per-schema row counts AIRBYTE_DB vs AIRBYTE_CLONE via <code>INFORMATION_SCHEMA.TABLES</code>. Mirror <code>quick_count_diff.py</code> logic; produce <code>{schema: {old_rows, new_rows, delta}}</code>.</li>
+<li><b>Freshness panel:</b> per-stream gap_days. Mirror <code>audit_clone_freshness.py</code> logic; produce <code>{stream: {prod_max, clone_max, gap_days, status}}</code>.</li>
+<li><b>Clustering panel:</b> count + sample of <code>_AIRBYTE_*</code> clustering keys on AIRBYTE_CLONE. Mirror <code>discover_clustering.py</code>.</li>
+<li><b>Schema panel:</b> column-set diff per stream (uses parity engine's <code>ColumnSignalDetector</code> approach: data cols common / prod-only / clone-only). Lightweight INFORMATION_SCHEMA.COLUMNS query, no API call.</li>
+<li><b>Drift panel:</b> latest L1-L3 verdicts from the Cloud Run <code>/dashboard/data</code> endpoint. Optional <code>--deep</code> adds L4 row-hash sample for top N drifters.</li>
+</ul>
+<div class="accept"><strong>Accept:</strong> <code>python scripts/snapshot.py --phase 2 --label post-cleanup --dry-run</code> prints all five panel data structures to stdout. No HTML, no copy.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">2</span> HTML render in site idiom</h3>
+<div class="meta">~30 min. Render the dict into one HTML page that visually belongs next to <code>parity.html</code>.</div>
+<ul>
+<li>Same nav, CSS palette, hero box, summary-stat row.</li>
+<li>Five collapsible <code>&lt;section&gt;</code> blocks &mdash; one per panel. Each shows N/A with a one-line explanation when the dimension is irrelevant.</li>
+<li>Hero card surfaces the headline number per panel: row delta, max gap days, clustering count, schema deltas, drift count.</li>
+<li>Footer: command that generated it, snapshot ID, time, link to the previous and next snapshots if present.</li>
+</ul>
+<div class="accept"><strong>Accept:</strong> <code>python scripts/snapshot.py --phase 2 --label post-cleanup</code> writes <code>be/snapshots/2026-05-23-1943-phase2-post-cleanup.html</code>. Opens cleanly in browser. Visually matches <code>parity.html</code> idiom.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">3</span> Publish path + index</h3>
+<div class="meta">~30 min. The <code>--publish</code> flag does the whole site-side dance.</div>
+<ul>
+<li>Copy local HTML to <code>/c/joeycastillo.us/airbyte-migration/snapshots/&lt;same-filename&gt;</code>.</li>
+<li>Open or create <code>/c/joeycastillo.us/airbyte-migration/snapshots/index.html</code>. Walk the snapshots directory, build reverse-chronological table. Each row: timestamp + phase + label + headline stat + link.</li>
+<li>Commit airbyte-parity (the snapshot in <code>be/snapshots/</code>) and joeycastillo.us (the publish copy + updated index) as separate commits with parallel messages.</li>
+<li>Push both. Wait for CF Pages deploy &mdash; print the final URL only after a curl returns HTTP 200 (or after a 30s timeout).</li>
+<li>Emit to stdout: <code>https://joeycastillo.us/airbyte-migration/snapshots/&lt;filename&gt;</code>.</li>
+</ul>
+<div class="accept"><strong>Accept:</strong> <code>python scripts/snapshot.py --phase 2 --label post-cleanup --publish</code> runs end-to-end. URL printed at the end resolves to the new page within 60s.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">4</span> Backfill snapshot for current state + first index page</h3>
+<div class="meta">~15 min. Prove the procedure exists by using it.</div>
+<ul>
+<li>Run: <code>python scripts/snapshot.py --phase 2 --label post-cleanup --publish</code>.</li>
+<li>Verify the index page renders with one row. Verify the URL resolves.</li>
+<li>Paste the URL into the conversation (this turn does that automatically once Phases 1-3 land).</li>
+</ul>
+<div class="accept"><strong>Accept:</strong> Snapshot live at <code>joeycastillo.us/airbyte-migration/snapshots/YYYY-MM-DD-HHMM-phase2-post-cleanup.html</code>. Index live at <code>joeycastillo.us/airbyte-migration/snapshots/</code>. Both clickable.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">5</span> Standard procedure documented in both CLAUDE.md files</h3>
+<div class="meta">~10 min. Make the standard discoverable.</div>
+<ul>
+<li><code>airbyte-parity/CLAUDE.md</code>: add a <b>Diff Snapshots</b> section noting the tool, the URL pattern, and the one-line invocation.</li>
+<li><code>airbyte_migration_tools/CLAUDE.md</code>: add a one-line pointer to the airbyte-parity tool ("for AIRBYTE_DB vs AIRBYTE_CLONE diffs, use <code>airbyte-parity/scripts/snapshot.py</code>").</li>
+<li>Add a one-line note to each procedure-phase script's docstring suggesting <code>snapshot.py --phase N --label before/--label after</code> as the bracketing call.</li>
+</ul>
+<div class="accept"><strong>Accept:</strong> CLAUDE.md greps for "snapshot.py" in both repos return non-empty. Phase scripts mention it in their <code>--help</code> output.</div>
+</div>
+
+<h2>Risks + mitigations</h2>
+<table>
+<tr><th>Risk</th><th>Mitigation</th></tr>
+<tr><td>L4 in <code>--deep</code> mode times out on huge streams</td><td>Per-stream timeout (15s default); skip-with-marker on timeout; never block the snapshot.</td></tr>
+<tr><td>Site repo dirty at snapshot time</td><td>Pre-flight check: abort with clear message if <code>git status --porcelain</code> shows changes in joeycastillo.us. Joey resolves, re-runs.</td></tr>
+<tr><td>CF Pages deploy lag &gt; 60s</td><td>Print "URL pending; check in 1-2 min" instead of polling forever. Local snapshot file is the audit trail regardless.</td></tr>
+<tr><td>Two snapshots collide on filename (same minute, same phase, same label)</td><td>Filename includes <code>HHMM</code>; if a collision happens, the second one's filename gets a <code>-2</code> suffix.</td></tr>
+<tr><td>Snapshot becomes too heavy for fast iteration</td><td>Default mode targets &lt;15s. <code>--deep</code> opt-in for slow forensic. Drift panel uses cached <code>/dashboard/data</code> &mdash; no extra round-trip to Snowflake.</td></tr>
+<tr><td>Snapshots leak schema + row counts publicly</td><td>Reuse <code>/airbyte-migration/gate.js</code> auth pattern; snapshot pages gated by default same as <code>parity.html</code>.</td></tr>
+</table>
+
+<h2>What this unlocks</h2>
+<ul>
+<li><b>Board 7's last item</b> ships with its first snapshot already live &mdash; the smoke pass becomes the moment we proved the standard works end-to-end.</li>
+<li><b>Phase 3 (V2 discovery)</b> gets bracketed cleanly: snapshot <code>--label before</code>, run V2 DDL, snapshot <code>--label after</code>. Two URLs in chat, fully diff-able by eye.</li>
+<li><b>Phase 4 (cron resume)</b> snapshot trail over time shows the catch-up curve as freshness gaps shrink &mdash; a forensic record if anything goes sideways.</li>
+<li><b>Phase 5 (parity baseline)</b> snapshot becomes the new steady-state baseline that the live parity engine drifts away from over time.</li>
+<li><b>Any future emergency</b> (Wesley reports drift; Joey wants a moment-in-time) is one command away from a click-able URL anyone can read.</li>
+</ul>
+
+<h2>Estimate (preview &mdash; ~e will formalize)</h2>
+<table>
+<tr><th>Phase</th><th>Work</th><th>Size</th></tr>
+<tr><td>1</td><td>Core collector + 5-panel data model</td><td>5 pts</td></tr>
+<tr><td>2</td><td>HTML render in site idiom</td><td>3 pts</td></tr>
+<tr><td>3</td><td>Publish path + auto-index</td><td>5 pts</td></tr>
+<tr><td>4</td><td>Backfill current state + verify URL</td><td>3 pts</td></tr>
+<tr><td>5</td><td>CLAUDE.md updates in both repos</td><td>3 pts</td></tr>
+<tr><td colspan="2" style="text-align:right"><strong>Total</strong></td><td><strong>19 pts</strong></td></tr>
+</table>
+<p style="font-size:12px;color:#888;margin-top:6px">Fits one board (13-21 window). Critical path: Phase 1 -&gt; 2 -&gt; 3 -&gt; 4. Phase 5 parallelizable.</p>
+
+<h2>First Move</h2>
+<div class="callout">
+<strong>The smallest concrete proof:</strong> write <code>scripts/snapshot.py</code> Phase 1 only, run it against current state, dump the dict to stdout, confirm all five panels return non-error data (drift panel may need a Cloud Run auth token; if so, that becomes an item on Phase 1). If that works in under 15 seconds, the rest of the plan is mechanics.
+</div>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan report saved to <code>be/plans/2026-05-23-1943-plan-diff-snapshot-procedure.html</code></div>
+<div class="dod-item">&check; Plan copy published to <code>joeycastillo.us/airbyte-migration/plan-diff-snapshot-procedure.html</code></div>
+<div class="dod-item">&check; Be index updated in airbyte-parity</div>
+<div class="dod-item">&check; Both repos committed + pushed</div>
+<div class="dod-item">&check; Telemetry entry logged with commit hash</div>
+<div class="dod-item">&check; Public URL surfaced in conversation</div>
+<div class="dod-item">&check; Estimate preview included (~e will produce board form)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r54 &middot; 2026-05-23 19:43 &middot; ~p diff snapshot procedure &middot; commit 66f40ad</div>
+</body></html>
