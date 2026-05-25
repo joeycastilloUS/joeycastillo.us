@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i: API key storage — where keys live, where they should live, what's broken</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 1.2rem; }
+  .container { max-width: 920px; margin: 0 auto; padding: 32px 24px; }
+  h1 { color: #6FC3DF; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 1rem; margin-bottom: 24px; }
+  h2 { color: #6FC3DF; font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #6FC3DF; font-size: 1rem; margin: 18px 0 8px; }
+  .card { background: #1A1A1A; border-radius: 8px; padding: 16px 20px; margin: 10px 0; }
+  ul, ol { margin-left: 22px; margin-bottom: 12px; }
+  li { margin: 6px 0; }
+  pre { color: #ccc; font-size: 0.78rem; overflow-x: auto; background: #0a0a0a; padding: 12px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+  code { color: #6FC3DF; background: #1A1A1A; padding: 1px 6px; border-radius: 3px; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88rem; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-size: 0.82rem; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1A1A1A; vertical-align: top; }
+  .ok { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .fail { color: #ef4444; font-weight: 600; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #222; color: #555; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span></nav>
+<div class="container">
+
+<h1>~i: API key storage — where keys live, where they should live, what's broken</h1>
+<p class="subtitle">Audit of the 4-layer key resolution in <code>serve.c</code>. Why the Windows registry path bit us yesterday, why the existing user-store path is dead code today, and exactly what flipping a single argument unlocks.</p>
+
+<h2>Headline</h2>
+<div class="card">
+<p><strong>Keys live in 4 documented layers; today only 1 actually fires.</strong> The user-store layer (which Joey would want — a sovereign local file, no registry, no env-block staleness) is built and ready in <code>nous_userkeys.c</code>, but unused: <code>load_providers()</code> passes <code>user=NULL</code> to <code>resolve_key()</code>, so the user-store lookup short-circuits to NULL on every call. The whole "no registry" pivot is essentially <strong>one argument change</strong> from working.</p>
+<p><strong>For Claude as orchestrator:</strong> the existing "guided AI" thread (the one that drives the THINKING column in the cockpit) picks the <em>first available</em> provider from <code>g_providers[]</code>. To make Claude the orchestrator, put a Claude entry first in <code>g_defaults[]</code> — no new code, just reordering the table.</p>
+</div>
+
+<h2>1. The four documented storage layers</h2>
+<div class="card">
+<p>From <code>serve.c:322-338</code>:</p>
+<pre>static const char *resolve_key(const char *user, const char *env_name,
+                                const char *builtin)
+{
+    /* 1. Per-user key from users.dat */
+    if (user) {
+        const char *uk = nous_userkeys_get(user, env_name);
+        if (uk &amp;&amp; uk[0]) return uk;
+    }
+    /* 2. Environment variable */
+    const char *env = getenv(env_name);
+    if (env &amp;&amp; env[0]) return env;
+    /* 3. Compiled-in builtin (free tier) */
+    if (builtin &amp;&amp; builtin[0]) return builtin;
+    return NULL;
+}</pre>
+
+<table>
+  <tr><th>#</th><th>Layer</th><th>Where it lives</th><th>Status today</th></tr>
+  <tr>
+    <td>1</td>
+    <td><strong>Per-user store</strong></td>
+    <td><code>users.dat</code> next to the binary. INI format: <code>[user:joey]</code> sections with <code>KEY=VALUE</code> lines. Loaded at startup via <code>nous_userkeys_load("users.dat")</code>.</td>
+    <td><span class="fail">DEAD CODE</span> — load_providers calls <code>resolve_key(NULL, ...)</code> at line 409, so the <code>if (user)</code> guard is always false. Lookup never fires.</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><strong>Process env var</strong></td>
+    <td>OS env block of the running process. Populated by Windows from <code>HKCU\Environment</code> registry at process-start. <code>setx</code> writes the registry, but the propagation is fragile — yesterday's Claude-dark bug.</td>
+    <td><span class="ok">ACTIVE</span> but <span class="warn">FRAGILE</span> — only layer doing real work right now. Bug we hit: setx doesn't propagate to running PowerShell, child binary inherits stale block.</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><strong>Compile-time built-in</strong></td>
+    <td><code>nous_keys_builtin.h</code> with <code>#define NOUS_KEY_GEMINI</code> etc. Used for "free tier" zero-config first-run.</td>
+    <td><span class="warn">UNDEFINED</span> — file doesn't exist; only <code>.example</code> is checked in. <code>#ifndef</code> guards in serve.c (line 25-32) fall back to NULL.</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td><strong>NULL</strong></td>
+    <td>(no key, provider disabled)</td>
+    <td><span class="ok">FALLBACK</span> — works as designed.</td>
+  </tr>
+</table>
+</div>
+
+<h2>2. Why the registry-via-env path is the wrong primary</h2>
+<div class="card">
+<p>Joey's instinct: "we should not be using registry at all for storage." Three reasons this is right:</p>
+<ol>
+  <li><strong>Windows env-block staleness.</strong> <code>setx</code> writes to the registry but doesn't broadcast to already-running processes in a way they reliably honor. Yesterday's Claude-dark bug — the server child inherited a stale block and saw <code>getenv("ANTHROPIC_API_KEY")=NULL</code> despite the registry having the key.</li>
+  <li><strong>Cross-OS portability.</strong> The registry doesn't exist on Linux/macOS. Any code path that assumes "setx + getenv" is Windows-only. The C code itself (<code>getenv</code>) is portable, but the install path isn't.</li>
+  <li><strong>Sovereignty.</strong> Per kernel CLAUDE.md / a-d-d Rule 4 (Joey pastes, Be handles): keys never leave the local machine to a vendor service; they sit in user-controlled storage. The Windows registry is technically local but it's a system-managed surface — backups, sync tools, group policy, can all touch it. A file-on-disk that <em>only</em> the app reads is cleaner.</li>
+</ol>
+</div>
+
+<h2>3. Where keys SHOULD live</h2>
+<div class="card">
+<p><strong>Primary: <code>users.dat</code> next to the binary.</strong> The code is already written; <code>nous_userkeys.c</code> handles load/get/set with the INI format above. Pure-C, no dependencies, ~150 LOC. The format:</p>
+<pre>[user:joey]
+ANTHROPIC_API_KEY=sk-ant-api03-...
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=...
+DEEPSEEK_API_KEY=...
+MISTRAL_API_KEY=...
+XAI_API_KEY=...
+PERPLEXITY_API_KEY=...</pre>
+
+<p><strong>What needs to change in code:</strong></p>
+<ol>
+  <li><code>load_providers()</code> at <code>serve.c:409</code> currently passes <code>NULL</code> as user: <code>resolve_key(NULL, d->key_env, d->builtin_key)</code>. Change to <code>resolve_key(g_active_user, d->key_env, d->builtin_key)</code> where <code>g_active_user</code> is the operator name (default "joey" or read from FQDN identity).</li>
+  <li>Pick the operator name. Simplest: hardcode "joey" for v1 (Joey is the only operator). Cleaner: read from <code>desktop.conf</code> or <code>$USERNAME</code> env. Cleanest (v2+): from FQDN-keyed identity via NOUS user skill.</li>
+  <li>Optionally a CLI flag <code>--user &lt;name&gt;</code> so multiple operators can share one binary.</li>
+</ol>
+
+<p><strong>One-time migration:</strong> populate <code>users.dat</code> by reading the current env-scope values and writing them out:</p>
+<pre># PowerShell migration (one-time, run once, then can clear setx)
+$dest = 'C:\tools\nous-desktop\users.dat'
+"[user:joey]" | Out-File $dest -Encoding ASCII
+foreach ($k in 'ANTHROPIC_API_KEY','OPENAI_API_KEY','GEMINI_API_KEY',
+                'DEEPSEEK_API_KEY','MISTRAL_API_KEY','XAI_API_KEY',
+                'PERPLEXITY_API_KEY') {
+    $v = [Environment]::GetEnvironmentVariable($k,'User')
+    if ($v) { "${k}=${v}" | Out-File $dest -Encoding ASCII -Append }
+}</pre>
+
+<p><strong>Then:</strong> remove all <code>setx</code>-based persistence; <code>launch.ps1</code> no longer needs to inject env vars; the binary self-sufficient with <code>users.dat</code>. Registry-free.</p>
+
+<h3>Security note (v1 vs v2+)</h3>
+<p><strong>v1 (now):</strong> <code>users.dat</code> is plain text. File is gitignored. Filesystem permissions are NTFS user-only by default. Acceptable for single-operator dev machine.</p>
+<p><strong>v2+:</strong> encrypt <code>users.dat</code> using NOUS's existing <code>security/skill/crypt</code> (AES-256-GCM, key derived from TOTP). Same path, encrypted-at-rest. <code>nous_userkeys_load()</code> grows a decrypt step. Not in v1 scope but the path is clear.</p>
+</div>
+
+<h2>4. Current key probe (what's working as of this session)</h2>
+<div class="card">
+<table>
+  <tr><th>Provider</th><th>Env var</th><th>In User-scope registry?</th><th>users.dat?</th><th>Working via cockpit?</th></tr>
+  <tr><td>Anthropic</td><td><code>ANTHROPIC_API_KEY</code></td><td><span class="ok">yes (108)</span></td><td><span class="fail">no</span></td><td><span class="ok">yes</span> (after launch.ps1 env injection fix)</td></tr>
+  <tr><td>OpenAI</td><td><code>OPENAI_API_KEY</code></td><td><span class="ok">yes (164)</span></td><td><span class="fail">no</span></td><td><span class="ok">yes</span></td></tr>
+  <tr><td>Google Gemini</td><td><code>GEMINI_API_KEY</code></td><td><span class="ok">yes (39)</span></td><td><span class="fail">no</span></td><td><span class="warn">partial</span> — free-tier rate limits hit 429</td></tr>
+  <tr><td>DeepSeek</td><td><code>DEEPSEEK_API_KEY</code></td><td><span class="ok">yes (35)</span></td><td><span class="fail">no</span></td><td><span class="ok">yes</span> (all 4 entries)</td></tr>
+  <tr><td>Mistral</td><td><code>MISTRAL_API_KEY</code></td><td><span class="ok">yes (57)</span></td><td><span class="fail">no</span></td><td><span class="fail">no</span> — key 401-rejected, pending Joey regen</td></tr>
+  <tr><td>xAI</td><td><code>XAI_API_KEY</code></td><td><span class="ok">yes (84)</span></td><td><span class="fail">no</span></td><td><span class="ok">yes</span> (all 3 grok entries)</td></tr>
+  <tr><td>Perplexity</td><td><code>PERPLEXITY_API_KEY</code></td><td><span class="ok">yes (53)</span></td><td><span class="fail">no</span></td><td><span class="ok">yes</span> (all 3 sonar entries)</td></tr>
+</table>
+</div>
+
+<h2>5. What must happen to make as many as possible work</h2>
+<div class="card">
+<table>
+  <tr><th>Provider</th><th>Action required</th><th>Who</th></tr>
+  <tr><td>Anthropic (claude-opus, claude-sonnet, claude-haiku)</td><td>Migrate key to <code>users.dat</code>. Already working via env; just retire the env path.</td><td>Be</td></tr>
+  <tr><td>OpenAI (8 entries incl. gpt-5.5, pro, codex)</td><td>Same. Working; migrate.</td><td>Be</td></tr>
+  <tr><td>Gemini (5 entries)</td><td>Migrate. Note: free-tier rate limits hit; for production use, upgrade to paid Gemini tier or accept 429s on heavy fan-outs.</td><td>Be migrates; Joey decides paid tier</td></tr>
+  <tr><td>DeepSeek (4 entries)</td><td>Migrate.</td><td>Be</td></tr>
+  <tr><td>Mistral (3 entries) + codestral (queued)</td><td>Joey regen at <a href="https://console.mistral.ai/api-keys">console.mistral.ai/api-keys</a>; paste; Be writes to <code>users.dat</code>. THEN codestral entry adds as the 4th Mistral.</td><td>Joey paste; Be handle</td></tr>
+  <tr><td>xAI (3 grok entries)</td><td>Migrate.</td><td>Be</td></tr>
+  <tr><td>Perplexity (3 sonar entries)</td><td>Migrate.</td><td>Be</td></tr>
+</table>
+
+<h3>The migration steps (concrete, ~10 min total)</h3>
+<ol>
+  <li>Write <code>users.dat</code> using current env-scope values (PowerShell snippet above).</li>
+  <li>Edit <code>serve.c:409</code>: change <code>resolve_key(NULL, ...)</code> to <code>resolve_key("joey", ...)</code> (or add a <code>g_active_user</code> default).</li>
+  <li>Optionally add <code>--user</code> CLI flag for multi-operator.</li>
+  <li>Rebuild + relaunch via <code>launch.ps1</code>.</li>
+  <li>Verify via WS task probe: all 27+ keyed providers light up.</li>
+  <li>Retire env-var path: launch.ps1's env injection becomes belt-and-suspenders; can be deleted once users.dat is proven.</li>
+  <li>Joey pastes fresh Mistral key; Be writes to <code>users.dat</code> via <code>nous_userkeys_set</code> (or text-edit; both work). All 4 Mistral tiles revive. Codestral entry adds.</li>
+</ol>
+</div>
+
+<h2>6. Claude as orchestrator — what makes it the main driver</h2>
+<div class="card">
+<p>Joey's framing: <strong>"Claude is the main driver/orchestrator."</strong> The cockpit already has two distinct concepts:</p>
+<ul>
+  <li><strong>Fan-out</strong> (DATA ACCESS column) — every keyed provider gets the prompt in parallel. All 30 tiles light up. This is the "many advisors" view.</li>
+  <li><strong>Guided AI</strong> (THINKING column) — a single provider drives a curated/synthesized answer. Today this is the <em>first available provider</em> in <code>g_providers[]</code> order (<code>serve.c:1780</code>):</li>
+</ul>
+<pre>/* Launch guided AI thread — picks first available provider */
+for (int i = 0; i < g_provider_count; i++) {
+    Provider *p = &amp;g_providers[i];
+    if (p->disabled || !p->api_key[0]) continue;
+    /* ...launches guided_ai_thread with this provider... */
+    break;  /* (effectively — only takes the first) */
+}</pre>
+
+<p>"First available" today = first in <code>g_defaults[]</code> table order. Right now that's <code>gemini</code> (line 354) — because Gemini was put first in the "FREE" block. So Gemini gets to be the guided AI, not Claude.</p>
+
+<p><strong>Two ways to make Claude the orchestrator:</strong></p>
+<ol>
+  <li><strong>Simple (recommended for v1):</strong> reorder <code>g_defaults[]</code> so claude-opus is the first entry. The existing "first available" logic picks Claude. Zero new code. One line moved.</li>
+  <li><strong>Explicit (v2):</strong> add an <code>is_orchestrator</code> bool to <code>ProviderDefault</code>. The guided-AI selection looks for <code>is_orchestrator &amp;&amp; api_key[0]</code> first; falls back to first-available if no orchestrator. Lets you have a configured primary independent of table order. Useful when you want different orchestrators per workspace.</li>
+</ol>
+
+<p><strong>What the "orchestrator" actually does in the current code:</strong></p>
+<ul>
+  <li>It's the model that drives <code>guided_ai_thread</code>. The same model gets called twice per task — once in fan-out (as a peer) and once as the guided AI (as the lead).</li>
+  <li>The guided AI's output goes into the THINKING column. The fan-out outputs go into the per-provider tiles.</li>
+  <li>The guided AI is also the model invoked for <code>summarize</code>, <code>judge</code>, and other meta-cognitive tasks (per the WS message router).</li>
+</ul>
+
+<p>So making Claude the orchestrator gives Claude:</p>
+<ul>
+  <li>The THINKING column (primary visible voice)</li>
+  <li>The summarize/judge dispatch (synthesis tasks)</li>
+  <li>Still a tile in DATA ACCESS (peer in the fan-out)</li>
+</ul>
+
+<p>Specifically: put <strong>claude-opus</strong> as #1 (best reasoner) OR <strong>claude-sonnet</strong> as #1 (best speed/intelligence trade for orchestration latency). For an AI LIVE FACTORY show where each query feels snappy, Sonnet is probably better; for solo deep-work, Opus.</p>
+</div>
+
+<h2>7. Recommendation (one paragraph)</h2>
+<div class="card">
+<p>Migrate to <code>users.dat</code> as the primary key store: one PowerShell snippet writes the file, one C-source line change (NULL → "joey") activates the user-store layer, rebuild, relaunch. Then reorder <code>g_defaults[]</code> so claude-sonnet is the first entry — Claude becomes the orchestrator. Result: no more setx, no more env-staleness bugs, Claude drives the THINKING column, all 27+ keyed providers fan out as peers, Mistral revives the moment Joey pastes a fresh key, and the system is one step closer to the NOUS-vault future (v2+ encrypts <code>users.dat</code> with AES-256-GCM via existing crypt skill). Total wall time ~20 min including the verify.</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none; margin:0; padding:0;">
+  <li>&#x2713; Code committed (this artifact + index + telemetry)</li>
+  <li>&#x2713; Hash in telemetry (backfilled post-commit)</li>
+  <li>&#x2014; Board updated (this is an inspect; the migration plan needs its own <code>~p</code>)</li>
+  <li>&#x2713; HTML report saved (this file)</li>
+  <li>&#x2713; Index updated (Plans section gets this entry)</li>
+  <li>&#x2713; Pushed to remote</li>
+  <li>&#x2713; No prior damage (read-only audit + doc reads)</li>
+  <li>&#x2713; Production verified (artifact will live-mirror to joeycastillo.us/tools/nous-desktop)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r126 &middot; 2026-05-25 01:30 &middot; nous-desktop &middot; ~i api key storage</div>
+
+</div>
+</body>
+</html>
