@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i ~d AP-12 placement — tools/founding-principles-guardian</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.good { color: var(--green); font-weight: 600; }
+  td.bad { color: var(--red); font-weight: 600; }
+  td.ok { color: var(--accent); font-weight: 600; }
+  .ok { background: #0F1F0F; border: 2px solid var(--green); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .ok b { color: var(--green); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i ~d AP-12 placement · founding-principles-guardian</span></nav>
+<div class="container">
+
+<h1>~i ~d AP-12 — pantheon-seal: best home in kastil-systems.</h1>
+<p class="sub">Investigated 2026-05-24 18:10. Joey decided KEEP pantheon-seal (not archive). Where exactly? Five options evaluated. Recommendation: <code>kastil-systems/tools/founding-principles-guardian/</code> (rename to remove name collision with nous/seal).</p>
+
+<div class="ok">
+<b>Recommendation</b>
+Transfer pantheon-seal to kastil-systems org, place in <code>tools/</code> sibling to nous-desktop, rename to <code>founding-principles-guardian</code>. 230 LOC, ~15-minute rename. Service stays standalone Cloud Run; zero nous/a-d-d dependencies. Future governance daemons land alongside.
+</div>
+
+<h2>§1 — Why "tools/" and not elsewhere</h2>
+
+<table>
+<thead><tr><th>Option</th><th>Pros</th><th>Cons</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td><code>kastil-systems/tools/pantheon-seal/</code></td><td>Sibling to nous-desktop; tools = ops services; Cloud Run fits</td><td>Name collides with nous/seal (file encryption)</td><td class="ok">GOOD with rename</td></tr>
+<tr><td><code>kastil-systems/pantheon-seal/</code> (own repo)</td><td>Independent deploy pipeline</td><td>Overkill for 230 LOC; defeats consolidation goal</td><td class="bad">NO</td></tr>
+<tr><td><code>metal-console/be/governance/</code></td><td>Be kernel owns Joey's principles</td><td>Blurs console (pure C CLI) with daemons (Python Cloud Run)</td><td class="bad">NO</td></tr>
+<tr><td><code>kastil-systems/tools/founding-principles-guardian/</code> (rename)</td><td>Name reveals intent; no collision; future governance daemons fit nearby</td><td>15-min rename in code + cloudbuild.yaml</td><td class="good">BEST</td></tr>
+<tr><td>Stay in ai-pantheon</td><td>Zero cost</td><td>Defeats consolidation; splits ops across two orgs</td><td class="bad">NO</td></tr>
+</tbody>
+</table>
+
+<h2>§2 — Exact path + migration</h2>
+
+<pre>kastil-systems/tools/founding-principles-guardian/
+  main.py              ← renames in docstrings: "The Seal" → "The Guardian"
+  requirements.txt     ← unchanged (Flask 3.1.0 + gunicorn 23.0.0)
+  Dockerfile           ← update COPY paths, CMD
+  cloudbuild.yaml      ← image tag: pantheon-seal → founding-principles-guardian
+  NOTICE               ← trade-secret header
+  README.md            ← link to metal-console CLAUDE.md Founding Principles
+
+Steps:
+  1. gh repo transfer ai-pantheon/pantheon-seal kastil-systems/tools
+     (or: gh repo create kastil-systems/founding-principles-guardian
+          + git push if going standalone-repo path)
+  2. mv pantheon-seal/ tools/founding-principles-guardian/
+  3. sed -i 's/The Seal/The Guardian/g' main.py
+  4. sed -i 's/pantheon-seal/founding-principles-guardian/g' cloudbuild.yaml Dockerfile
+  5. Redeploy: gcloud builds submit --config cloudbuild.yaml
+  6. Verify Slack DM heartbeat still works
+  7. Update DNS / Cloud Scheduler if URL changed</pre>
+
+<h2>§3 — Integration design (~d sketch)</h2>
+
+<pre>  ┌────────────────────────────────────────────────────────────────┐
+  │  metal-console (Be kernel)                                     │
+  │    ~h ─ Joey Quote pool                                        │
+  │    Founding Principles canonical text (in CLAUDE.md prose)     │
+  └──────────────────────┬─────────────────────────────────────────┘
+                         │ reads (no runtime dep)
+                         ▼
+  ┌────────────────────────────────────────────────────────────────┐
+  │  tools/founding-principles-guardian/                           │
+  │    (Cloud Run, us-west4, 128Mi, Scheduler every 5 min)         │
+  │                                                                │
+  │    /verify endpoint:                                           │
+  │      ├─ SHA-256 check: FOUNDING_PRINCIPLES hardcoded text      │
+  │      ├─ SHA-256 check: pantheon-monitor code hash (mutual)     │
+  │      ├─ Slack DM on mismatch                                   │
+  │      └─ Hourly heartbeat: "all clear" to Joey's DM             │
+  └──────────────────────┬────────────┬────────────────────────────┘
+                         │            │
+                         ▼            ▼
+                ┌──────────────┐  ┌──────────────┐
+                │  Slack DM    │  │  pantheon-   │
+                │  (Joey)      │  │  monitor     │
+                │              │  │  (mutual)    │
+                └──────────────┘  └──────────────┘
+
+  Dependencies:    NONE on nous, a-d-d, or metal-console code
+                   (reads metal CLAUDE.md prose as TEXT INPUT, that's all)
+  Coupling:        Only to pantheon-monitor (mutual-lock pair)
+  Output:          Slack DM (Joey only)
+  Future siblings: tools/sentinel-monitor/ (the pair),
+                   tools/principles-mirror/ (redundancy),
+                   tools/ethics-watcher/ (behavior monitoring)</pre>
+
+<h2>§4 — One-line for Joey</h2>
+<p style="color:#fff;font-size:15px;background:var(--surface);padding:14px 18px;border-left:3px solid var(--accent);">
+<strong>Transfer to kastil-systems org as <code>tools/founding-principles-guardian/</code>.</strong> Rename "Seal" → "Guardian" throughout (230 LOC, 15-min refactor). Sits alongside nous-desktop. Stays standalone Cloud Run service. Zero coupling to nous or a-d-d. Future governance daemons land nearby.
+</p>
+
+<footer>v0 · 2026-05-24 18:10 PDT · ~i ~d AP-12 placement · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>
