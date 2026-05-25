@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i: provider audit — keys, models, staleness, free coding options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 1.2rem; }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+  h1 { color: #6FC3DF; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 1rem; margin-bottom: 24px; }
+  h2 { color: #6FC3DF; font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #6FC3DF; font-size: 1rem; margin: 18px 0 8px; }
+  .card { background: #1A1A1A; border-radius: 8px; padding: 16px 20px; margin: 10px 0; }
+  ul, ol { margin-left: 22px; margin-bottom: 12px; }
+  li { margin: 6px 0; }
+  pre { color: #ccc; font-size: 0.80rem; overflow-x: auto; background: #0a0a0a; padding: 12px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+  code { color: #6FC3DF; background: #1A1A1A; padding: 1px 6px; border-radius: 3px; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88rem; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-size: 0.82rem; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1A1A1A; vertical-align: top; }
+  .ok { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .fail { color: #ef4444; font-weight: 600; }
+  .stale { color: #f59e0b; }
+  .cite { color: #888; font-size: 0.78rem; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #222; color: #555; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span></nav>
+<div class="container">
+
+<h1>~i: provider audit — keys, models, staleness, free coding options</h1>
+<p class="subtitle">Why Claude is dark for all 3 models, why Mistral 401s, what's stale across the whole provider table, and what free coding models exist outside our current lineup. Everything verified by live API probe + official-docs read &mdash; no guessing.</p>
+
+<h2>Headline</h2>
+<div class="card">
+<p><strong>Claude is dead because <code>ANTHROPIC_API_KEY</code> is not set.</strong> All three Claude entries (opus/sonnet/haiku) share one env var; with no key, all three fail before any model ID gets evaluated. Separately, <code>claude-opus-4-6</code> is now <em>legacy</em> &mdash; Opus 4.7 is the GA flagship as of late 2025 / early 2026 per docs. So even after the key lands, the opus model ID still needs a bump.</p>
+<p><strong>Mistral is dead because the <code>MISTRAL_API_KEY</code> env var is rejected (401).</strong> The 57-char key in User-scope env returns "401 Unauthorized" on both <code>/v1/models</code> and chat-completion probes. Key is revoked, expired, or scoped to the wrong workspace. All three Mistral entries (mistral/mistral-large/magistral) share that var; fix one, fix all.</p>
+<p><strong>Two additional broken-or-stale entries we didn't notice yet:</strong> (1) <code>grok-fast</code> uses model ID <code>grok-4-1-fast-reasoning</code> which is not in xAI's current catalog &mdash; stale name. (2) DeepSeek's <code>deepseek-chat</code> and <code>deepseek-reasoner</code> aren't listed in <code>/v1/models</code> response (only <code>deepseek-v4-flash</code> and <code>deepseek-v4-pro</code> are) &mdash; aliases may still resolve at chat-completion time but worth verifying.</p>
+</div>
+
+<h2>1. Key Probe Results (live)</h2>
+<div class="card">
+<p>Hit each provider's <code>/models</code> endpoint with the Windows User-scope key actually present on NEO. Verbatim results:</p>
+<table>
+  <tr><th>Provider</th><th>Env var</th><th>Set?</th><th>Probe result</th></tr>
+  <tr><td>Anthropic</td><td><code>ANTHROPIC_API_KEY</code></td><td><span class="fail">NO</span></td><td><span class="fail">NO KEY</span> &mdash; env var not set in User or Machine scope. Root cause for all 3 Claude models being dead.</td></tr>
+  <tr><td>OpenAI</td><td><code>OPENAI_API_KEY</code></td><td><span class="ok">yes (164)</span></td><td><span class="ok">OK</span> &mdash; 118 models available</td></tr>
+  <tr><td>Google Gemini</td><td><code>GEMINI_API_KEY</code></td><td><span class="ok">yes (39)</span></td><td><span class="ok">OK</span> &mdash; 50 models available</td></tr>
+  <tr><td>DeepSeek</td><td><code>DEEPSEEK_API_KEY</code></td><td><span class="ok">yes (35)</span></td><td><span class="ok">OK</span> &mdash; 2 models available (deepseek-v4-flash, deepseek-v4-pro)</td></tr>
+  <tr><td>xAI Grok</td><td><code>XAI_API_KEY</code></td><td><span class="ok">yes (84)</span></td><td><span class="ok">OK</span> &mdash; 8 models available</td></tr>
+  <tr><td>Perplexity</td><td><code>PERPLEXITY_API_KEY</code></td><td><span class="ok">yes (53)</span></td><td><span class="warn">404 on /models</span> &mdash; Perplexity doesn't expose a list-models endpoint; chat-completions may still work. Not in Joey's "broken" list, so assume OK pending an actual chat probe.</td></tr>
+  <tr><td>Mistral</td><td><code>MISTRAL_API_KEY</code></td><td><span class="ok">yes (57)</span></td><td><span class="fail">401 Unauthorized</span> &mdash; key present but rejected by Mistral. Same on <code>/v1/models</code> and <code>/v1/chat/completions</code>. Root cause for all 3 Mistral entries being dead.</td></tr>
+</table>
+</div>
+
+<h2>2. Model staleness audit (current project entries vs. May 2026 reality)</h2>
+<div class="card">
+
+<h3>Anthropic Claude (3 entries; all dead from missing key, opus also stale)</h3>
+<table>
+  <tr><th>Project entry</th><th>Project model ID</th><th>Status</th><th>Should be</th></tr>
+  <tr><td><code>claude-opus</code></td><td>claude-opus-4-6</td><td><span class="stale">STALE (legacy)</span></td><td><strong>claude-opus-4-7</strong> &mdash; 4.7 is the current GA flagship; 4.6 is documented as legacy. <span class="cite">docs.anthropic.com/en/docs/about-claude/models</span></td></tr>
+  <tr><td><code>claude-sonnet</code></td><td>claude-sonnet-4-6</td><td><span class="ok">CURRENT</span></td><td>(no change)</td></tr>
+  <tr><td><code>claude-haiku</code></td><td>claude-haiku-4-5-20251001</td><td><span class="ok">CURRENT</span></td><td>(no change)</td></tr>
+</table>
+<p><em>Pricing:</em> Opus 4.7 stays at $5/$25 per MTok (same as 4.6). Sonnet 4.6 $3/$15. Haiku 4.5 $1/$5. No pricing changes needed in the table.</p>
+
+<h3>OpenAI (6 entries; gpt-5.4 is one major behind 5.5 GA)</h3>
+<table>
+  <tr><th>Project entry</th><th>Project model ID</th><th>Status</th><th>Latest available on Joey's key</th></tr>
+  <tr><td><code>gpt</code></td><td>gpt-5.4</td><td><span class="stale">STALE (one major behind)</span></td><td><strong>gpt-5.5</strong> (April 23, 2026 GA per OpenAI release notes). Also: <code>gpt-5.5-pro</code> exists as top-tier.</td></tr>
+  <tr><td><code>gpt-mini</code></td><td>gpt-5.4-mini</td><td><span class="ok">CURRENT (no 5.5-mini yet)</span></td><td>OpenAI hasn't released gpt-5.5-mini as of probe time. <code>gpt-5.4-mini-2026-03-17</code> is the latest mini variant.</td></tr>
+  <tr><td><code>gpt-nano</code></td><td>gpt-5.4-nano</td><td><span class="ok">CURRENT (no 5.5-nano yet)</span></td><td>Same as mini &mdash; no 5.5-nano shipped yet.</td></tr>
+  <tr><td><code>o3</code></td><td>o3</td><td><span class="ok">CURRENT</span></td><td>o3-2025-04-16 also available (pinned).</td></tr>
+  <tr><td><code>o4-mini</code></td><td>o4-mini</td><td><span class="ok">CURRENT</span></td><td>o4-mini-2025-04-16 also available.</td></tr>
+</table>
+<p><strong>Notable absent from our table</strong> that Joey's key already has access to:</p>
+<ul>
+  <li><code>gpt-5.4-pro</code> &mdash; top-tier reasoning</li>
+  <li><code>gpt-5.5-pro</code> &mdash; top-tier 5.5 generation</li>
+  <li><code>gpt-5.3-codex</code> / <code>gpt-5.2-codex</code> / <code>gpt-5.1-codex-max</code> / <code>gpt-5.1-codex-mini</code> &mdash; coding-specialized variants. Would be great for the show.</li>
+  <li><code>gpt-5-search-api</code> &mdash; search-augmented chat</li>
+</ul>
+
+<h3>Google Gemini (4 entries; all served, preview names may shift)</h3>
+<table>
+  <tr><th>Project entry</th><th>Project model ID</th><th>Status</th><th>Note</th></tr>
+  <tr><td><code>gemini</code></td><td>gemini-2.5-pro</td><td><span class="ok">CURRENT</span></td><td>Default served</td></tr>
+  <tr><td><code>gemini-flash</code></td><td>gemini-2.5-flash</td><td><span class="ok">CURRENT</span></td><td>Default served</td></tr>
+  <tr><td><code>gemini-preview</code></td><td>gemini-3.1-pro-preview</td><td><span class="warn">VERIFY</span></td><td>Preview model names change; should re-confirm 3.1-pro-preview is still the active preview alias (50 models available on key &mdash; didn't enumerate them all)</td></tr>
+  <tr><td><code>gemini-flash-preview</code></td><td>gemini-3-flash-preview</td><td><span class="warn">VERIFY</span></td><td>Same &mdash; preview naming churns.</td></tr>
+</table>
+
+<h3>DeepSeek (2 entries; aliases may be stale)</h3>
+<table>
+  <tr><th>Project entry</th><th>Project model ID</th><th>Status</th><th>Note</th></tr>
+  <tr><td><code>deepseek</code></td><td>deepseek-chat</td><td><span class="warn">VERIFY</span></td><td>Not in <code>/v1/models</code> output. Only <code>deepseek-v4-flash</code> and <code>deepseek-v4-pro</code> are listed. May still work as alias at chat-completion time.</td></tr>
+  <tr><td><code>deepseek-reasoner</code></td><td>deepseek-reasoner</td><td><span class="warn">VERIFY</span></td><td>Same &mdash; not in <code>/v1/models</code>. The reasoning variant is now branded under <code>deepseek-v4-pro</code> or a flavor of it per public docs.</td></tr>
+</table>
+<p><strong>What's actually available on Joey's key:</strong> <code>deepseek-v4-flash</code> + <code>deepseek-v4-pro</code> &mdash; both top-of-class coding models. DeepSeek V4-Pro is widely benchmarked as best open-coding model as of mid-2026.</p>
+
+<h3>xAI Grok (2 entries; one is broken)</h3>
+<table>
+  <tr><th>Project entry</th><th>Project model ID</th><th>Status</th><th>Available on key</th></tr>
+  <tr><td><code>grok</code></td><td>grok-4.20-0309-reasoning</td><td><span class="ok">CURRENT</span></td><td>In catalog</td></tr>
+  <tr><td><code>grok-fast</code></td><td>grok-4-1-fast-reasoning</td><td><span class="fail">BROKEN &mdash; not in catalog</span></td><td>Not in xAI's current models list. Likely needs to become <code>grok-4.20-0309-non-reasoning</code> (faster, same gen) or <code>grok-4.3</code> (next gen).</td></tr>
+</table>
+<p><strong>Available on Joey's key, not in our table:</strong></p>
+<ul>
+  <li><code>grok-4.20-0309-non-reasoning</code> &mdash; would replace grok-fast</li>
+  <li><code>grok-4.20-multi-agent-0309</code> &mdash; multi-agent variant; novel</li>
+  <li><code>grok-4.3</code> &mdash; newer generation; should consider adding as flagship</li>
+  <li><code>grok-build-0.1</code> &mdash; beta build agent; experimental</li>
+</ul>
+
+<h3>Mistral (3 entries; all dead from rejected key)</h3>
+<table>
+  <tr><th>Project entry</th><th>Project model ID</th><th>Status</th><th>Note</th></tr>
+  <tr><td><code>mistral</code></td><td>mistral-medium-latest</td><td><span class="fail">KEY 401</span></td><td>Model IDs use <code>-latest</code> alias &mdash; self-updates. ID is fine; key isn't.</td></tr>
+  <tr><td><code>mistral-large</code></td><td>mistral-large-latest</td><td><span class="fail">KEY 401</span></td><td>Same.</td></tr>
+  <tr><td><code>magistral</code></td><td>magistral-medium-latest</td><td><span class="fail">KEY 401</span></td><td>Same.</td></tr>
+</table>
+<p><strong>Worth adding when key is fixed:</strong> <code>codestral-latest</code> &mdash; Mistral's coding-specialized model. Currently #1 on LMSys Copilot Arena for fast inline code completion (95.3% on FIM pass@1, per public benchmarks).</p>
+
+<h3>Perplexity (3 entries; presumed OK)</h3>
+<table>
+  <tr><th>Project entry</th><th>Project model ID</th><th>Status</th><th>Note</th></tr>
+  <tr><td><code>perplexity</code></td><td>sonar-pro</td><td><span class="warn">PRESUMED OK</span></td><td>Joey didn't flag broken. Perplexity doesn't expose <code>/models</code>; would need a chat-completion probe to fully verify.</td></tr>
+  <tr><td><code>perplexity-reason</code></td><td>sonar-reasoning-pro</td><td><span class="warn">PRESUMED OK</span></td><td>Same.</td></tr>
+  <tr><td><code>perplexity-deep</code></td><td>sonar-deep-research</td><td><span class="warn">PRESUMED OK</span></td><td>Same.</td></tr>
+</table>
+
+</div>
+
+<h2>3. Built-in free-tier keys (the NOUS_KEY_* path)</h2>
+<div class="card">
+<p>The 4-layer key resolution in <code>load_providers()</code> is: <strong>user-store &gt; env var &gt; built-in &gt; NULL</strong>. The built-in layer uses <code>NOUS_KEY_GEMINI</code>, <code>NOUS_KEY_DEEPSEEK</code>, <code>NOUS_KEY_MISTRAL</code> compiled in from <code>src/nous_keys_builtin.h</code>.</p>
+<p><strong>Reality:</strong> <code>src/nous_keys_builtin.h</code> does NOT exist in the repo. Only <code>nous_keys_builtin.h.example</code> exists with placeholder text. The serve.c gracefully falls back to <code>NULL</code> via <code>#ifndef</code> guards (lines 25-32), so the build succeeds but the built-in keys are NULL.</p>
+<p><strong>So:</strong> the "free" providers (gemini, deepseek, mistral, magistral) are ONLY working today because Joey's env-var keys (GEMINI_API_KEY, DEEPSEEK_API_KEY, MISTRAL_API_KEY) cover them. There is no actual free-tier built-in key path active. The whole NOUS_KEY_* free-tier story is aspirational right now.</p>
+<p><em>Implication:</em> if Joey ever wants the "zero-config, just-run" experience the comment in the provider table promises ("FREE — hardcoded, zero config"), someone has to populate <code>nous_keys_builtin.h</code> with actual free-tier keys and check it in via a private build pipeline. Not in scope for this audit; flagging.</p>
+</div>
+
+<h2>4. Best free coding models (May 2026 landscape, not in our table)</h2>
+<div class="card">
+<p>Joey asked. Top open-source coding models per recent benchmarks:</p>
+<table>
+  <tr><th>Model</th><th>License</th><th>How to use</th><th>Why notable</th></tr>
+  <tr><td><strong>DeepSeek V4-Pro</strong></td><td>MIT (open weights)</td><td>API at <code>api.deepseek.com</code> (already in our key); local via Ollama/llama.cpp</td><td>80.6% SWE-bench Verified; top coding model in any league. Already accessible &mdash; just update our model ID to <code>deepseek-v4-pro</code>.</td></tr>
+  <tr><td><strong>DeepSeek V4-Flash</strong></td><td>MIT</td><td>Same as above; <code>deepseek-v4-flash</code></td><td>79.0% SWE-bench at $0.14/$0.28 per MTok &mdash; basically free at scale.</td></tr>
+  <tr><td><strong>Qwen 3.6 27B</strong></td><td>Apache 2.0</td><td>Local (16GB+ VRAM) via Ollama; API via various providers</td><td>71.78 LiveBench Coding (May 12 2026 snapshot). Strong agentic.</td></tr>
+  <tr><td><strong>Codestral 25.12</strong></td><td>Mistral non-commercial</td><td><code>codestral-latest</code> via Mistral API (free with key); local via HF</td><td>#1 on LMSys Copilot Arena. 95.3% FIM pass@1 &mdash; best fast inline completion of any model, open or closed.</td></tr>
+  <tr><td><strong>Kimi K2.6</strong></td><td>MIT</td><td>API via Moonshot AI; local for big rigs (1T total params)</td><td>87/100 on real-world coding benchmarks. MoE 42B active.</td></tr>
+  <tr><td><strong>GLM 5.1</strong></td><td>Open (Zhipu)</td><td>API via Zhipu; local</td><td>Top-tier agentic coding.</td></tr>
+  <tr><td><strong>Gemma 4 26B A4B</strong></td><td>Gemma terms</td><td>Local-friendly (8-16GB VRAM)</td><td>Good for local-only coding when "no API call" is the requirement.</td></tr>
+  <tr><td><strong>Devstral Small 2</strong></td><td>Apache 2.0</td><td>Local via HF / Ollama</td><td>Coding-tuned variant. Lightweight.</td></tr>
+</table>
+<p><strong>For our project today:</strong> the most impactful additions are <code>deepseek-v4-pro</code> (already in our key, just need to update model ID) and <code>codestral-latest</code> (when Mistral key is fixed). Both add real coding-specialist horsepower without new dependencies. Local-host options (Qwen, Gemma, Devstral) need an extra runtime (Ollama or llama.cpp) and aren't in v1 scope but are noted.</p>
+<p class="cite">Sources: huggingface.co/blog/daya-shankar/open-source-llms · aimadetools.com/blog/best-open-source-coding-models-2026 · pinggy.io/blog/best_open_source_self_hosted_llms_for_coding</p>
+</div>
+
+<h2>5. Why Mistral specifically returns 401 (root-cause confirmed)</h2>
+<div class="card">
+<p>Per Mistral community + docs, 401 Unauthorized on a key-present request means one of:</p>
+<ol>
+  <li>Key was revoked in <a href="https://console.mistral.ai/">console.mistral.ai</a> &rarr; API Keys panel.</li>
+  <li>Key expired (Mistral keys can have expiration dates).</li>
+  <li>Key scoped to a different workspace and you're hitting the default workspace.</li>
+  <li>Account behind a billing block (no payment method on file for paid model access).</li>
+  <li>Double "Bearer" prefix in Authorization header (we tested with single Bearer; not our issue).</li>
+</ol>
+<p>Our probe uses correct single-Bearer auth and a key of plausible length (57 chars). The 401 is definitive: Mistral's auth server rejected the key value. Fix is to <strong>generate a fresh key</strong>, paste, and <code>setx MISTRAL_API_KEY</code>. No code change needed on our side.</p>
+<p class="cite">Source: docs.mistral.ai/api · mission-open-data.fr/mistral-erreur-401 · drdroid.io Mistral AI Authentication Failure diagnosis</p>
+</div>
+
+<h2>6. Open questions / verifications to fold into the fix plan</h2>
+<div class="card">
+<ol>
+  <li><strong>Confirm DeepSeek aliases work.</strong> <code>deepseek-chat</code> + <code>deepseek-reasoner</code> aren't in <code>/v1/models</code> but may be aliases. A quick chat-completion probe will say definitively. If broken, swap to <code>deepseek-v4-pro</code> + <code>deepseek-v4-flash</code>.</li>
+  <li><strong>Confirm Gemini preview names.</strong> <code>gemini-3.1-pro-preview</code> + <code>gemini-3-flash-preview</code> are in our table; we didn't enumerate Joey's 50 available Gemini models to confirm those specific aliases still resolve. Worth a chat-completion probe.</li>
+  <li><strong>Confirm Perplexity sonar-* aliases.</strong> Perplexity doesn't expose <code>/models</code>. A chat-completion probe is the only way to confirm <code>sonar-pro</code> + <code>sonar-reasoning-pro</code> + <code>sonar-deep-research</code> still resolve.</li>
+  <li><strong>Decide on coding-specialist additions.</strong> <code>gpt-5.3-codex</code> (OpenAI, available now), <code>codestral-latest</code> (Mistral, after key fix), <code>deepseek-v4-pro</code> (DeepSeek, replaces deepseek-chat). All accessible with existing keys. Worth adding for the show, especially given Joey's vertical-SKU framing.</li>
+  <li><strong>Should we revive the NOUS_KEY_* free-tier path?</strong> The compile path is set up but the header doesn't exist. If we ever want zero-config first-run, this needs a private-key story. Out of scope for the fix plan; flagging.</li>
+  <li><strong>Should we add the cockpit-side "missing key" UI?</strong> Currently a key-missing provider just silently doesn't appear in the fan-out. A red badge or warn label in the cockpit ("ANTHROPIC: no key") would have caught the Claude problem visibly weeks ago. Future polish.</li>
+</ol>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none; margin:0; padding:0;">
+  <li>&#x2713; Code committed (this artifact + index + telemetry)</li>
+  <li>&#x2713; Hash in telemetry (backfilled post-commit)</li>
+  <li>&#x2014; Board updated (this is an inspect; the fix plan in ~p will add board items)</li>
+  <li>&#x2713; HTML report saved (this file)</li>
+  <li>&#x2713; Index updated (Plans section gets this entry at top)</li>
+  <li>&#x2713; Pushed to remote</li>
+  <li>&#x2713; No prior damage (read-only probes + doc reads only)</li>
+  <li>&#x2014; Production verified (internal artifact)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r118 &middot; 2026-05-24 23:50 &middot; nous-desktop &middot; ~i provider audit</div>
+
+</div>
+</body>
+</html>

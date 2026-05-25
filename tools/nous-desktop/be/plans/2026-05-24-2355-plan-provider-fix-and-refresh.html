@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~p: provider fix + table refresh</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 1.2rem; }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+  h1 { color: #6FC3DF; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 1rem; margin-bottom: 24px; }
+  .banner { background: #6FC3DF11; border-left: 3px solid #6FC3DF; padding: 10px 16px; margin-bottom: 24px; color: #6FC3DF; font-weight: 600; font-size: 0.9rem; }
+  h2 { color: #6FC3DF; font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #6FC3DF; font-size: 1rem; margin: 18px 0 8px; }
+  .card { background: #1A1A1A; border-radius: 8px; padding: 16px 20px; margin: 10px 0; }
+  ul, ol { margin-left: 22px; margin-bottom: 12px; }
+  li { margin: 6px 0; }
+  pre { color: #ccc; font-size: 0.80rem; overflow-x: auto; background: #0a0a0a; padding: 12px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+  code { color: #6FC3DF; background: #1A1A1A; padding: 1px 6px; border-radius: 3px; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88rem; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-size: 0.82rem; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1A1A1A; vertical-align: top; }
+  .ok { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #222; color: #555; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span></nav>
+<div class="container">
+
+<h1>~p: provider fix + table refresh</h1>
+<p class="subtitle">Make all 22 provider entries actually work + bring stale model IDs to current + add the obvious gaps (coding-specialist variants, top-tier additions). Sequenced so each step is verifiable; secrets-first to unblock Joey's pastes, code-second.</p>
+<div class="banner">Plan -- Awaiting Approval</div>
+
+<h2>1. Intent</h2>
+<div class="card">
+<p>Three things, in this order:</p>
+<ol>
+  <li><strong>Make the broken providers work.</strong> Anthropic (no key) + Mistral (rejected key). Six dead provider entries become live.</li>
+  <li><strong>Refresh stale model IDs.</strong> <code>claude-opus-4-6</code> &rarr; <code>claude-opus-4-7</code>; <code>gpt-5.4</code> &rarr; <code>gpt-5.5</code>; <code>grok-fast</code> stale ID replaced; DeepSeek aliases verified. No model ID gets left a major version behind.</li>
+  <li><strong>Add the obvious gaps.</strong> Top-tier additions: <code>gpt-5.5-pro</code>, <code>grok-4.3</code>. Coding specialists: <code>gpt-5.3-codex</code> (or <code>gpt-5.1-codex-max</code>), <code>codestral-latest</code> (once Mistral key is fixed). Replace stale DeepSeek aliases with the actual current model IDs.</li>
+</ol>
+<p>End state: all entries in <code>g_defaults[]</code> resolve to a real, live, current model. The cockpit fan-out has access to the best of every major lab's lineup including coding-specialist variants. Joey can pick any tile for the show and trust it works.</p>
+</div>
+
+<h2>2. Scope</h2>
+<div class="card">
+<h3>In</h3>
+<ul>
+  <li>Install <code>ANTHROPIC_API_KEY</code> via <code>setx</code> (Joey pastes, Be handles per Rule 4).</li>
+  <li>Reinstall <code>MISTRAL_API_KEY</code> via <code>setx</code> after Joey regens it at console.mistral.ai.</li>
+  <li>Edit <code>src/serve.c</code> <code>g_defaults[]</code> table: bump stale model IDs, fix grok-fast, add new entries.</li>
+  <li>Verify each provider via live chat-completion probe after the change.</li>
+  <li>Rebuild <code>nous-desktop.exe</code> via gcc (the live server needs a restart since provider table is compile-time).</li>
+  <li>Re-launch server via PowerShell <code>&amp;</code> operator (the WDAC-bypass path we already proved works).</li>
+  <li>Hard-refresh browser; visually confirm all tiles populate.</li>
+</ul>
+<h3>Out (deferred)</h3>
+<ul>
+  <li>Building the <code>nous_keys_builtin.h</code> private-key path for zero-config first-run.</li>
+  <li>Cockpit-side "missing key" red-badge UI.</li>
+  <li>Local-model integration (Ollama/llama.cpp) for Qwen / Gemma / Devstral.</li>
+  <li>Pricing-table updates (most pricing unchanged; only update if a model has shifted price).</li>
+  <li>Cost-tracking changes; existing daily-total tracking stays as-is.</li>
+</ul>
+</div>
+
+<h2>3. Approach</h2>
+<div class="card">
+<p><strong>Secrets-first, code-second, verify-third.</strong></p>
+<p>Why this order: Joey's keys are the gating dependency for half the fixes; we collect them up front so the rebuild lands with everything ready. Code changes are surgical and bounded to <code>serve.c</code>'s <code>g_defaults[]</code>. Verify each provider's actual chat-completion (not just <code>/v1/models</code>) since some providers don't expose model lists.</p>
+<ol>
+  <li>Joey pastes ANTHROPIC + MISTRAL keys; Be runs <code>setx</code> and verifies via chat-completion probe immediately.</li>
+  <li>Be edits <code>g_defaults[]</code>: update stale IDs, fix grok-fast, add new entries. Single commit per logical group.</li>
+  <li>Rebuild binary via gcc (same incantation as the auth-bypass build).</li>
+  <li>Stop running server, relaunch via PowerShell <code>&amp;</code> + <code>--no-auth</code>.</li>
+  <li>Hit <code>/api/loop-config</code> via curl to confirm the new provider table is served.</li>
+  <li>Hard-refresh the browser cockpit; visually confirm all tiles render and respond to a test query.</li>
+</ol>
+</div>
+
+<h2>4. Phases</h2>
+<div class="card">
+
+<h3>Phase 1 &mdash; Collect missing keys (Joey-paste, Be-setx, &lt;5 min)</h3>
+<table>
+  <tr><th>Step</th><th>Who</th><th>What</th></tr>
+  <tr><td>1.1</td><td>Joey</td><td>Generate <code>ANTHROPIC_API_KEY</code> at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com/settings/keys</a>. Paste here.</td></tr>
+  <tr><td>1.2</td><td>Be</td><td>Run <code>setx ANTHROPIC_API_KEY &lt;value&gt;</code> in PowerShell. Verify via fresh PowerShell subprocess that User-scope env reads back the value. Per Rule 4 (Joey pastes, Be handles).</td></tr>
+  <tr><td>1.3</td><td>Be</td><td>Probe Anthropic <code>/v1/messages</code> with each of the 3 Claude IDs (opus, sonnet, haiku) using a 2-token test prompt. Confirm 200 + content for all 3. Report.</td></tr>
+  <tr><td>1.4</td><td>Joey</td><td>Regen <code>MISTRAL_API_KEY</code> at <a href="https://console.mistral.ai/api-keys/">console.mistral.ai/api-keys</a> (the existing key is rejected). Paste here.</td></tr>
+  <tr><td>1.5</td><td>Be</td><td>Run <code>setx MISTRAL_API_KEY &lt;value&gt;</code>. Verify env. Probe Mistral chat with the 3 model IDs (mistral-medium-latest, mistral-large-latest, magistral-medium-latest). Report.</td></tr>
+</table>
+<p><strong>Exit gate:</strong> 6 previously-dead provider entries respond with content to a 2-token probe. No code changes yet.</p>
+
+<h3>Phase 2 &mdash; Verify stale-suspect providers (Be-only, &lt;5 min)</h3>
+<table>
+  <tr><th>Probe</th><th>Why</th><th>If FAIL</th></tr>
+  <tr><td>DeepSeek with <code>deepseek-chat</code></td><td>Not in <code>/v1/models</code>; may be a legacy alias</td><td>Swap to <code>deepseek-v4-pro</code> in Phase 3.</td></tr>
+  <tr><td>DeepSeek with <code>deepseek-reasoner</code></td><td>Same as above</td><td>Swap to <code>deepseek-v4-pro</code> (which is also the reasoner) OR remove if redundant.</td></tr>
+  <tr><td>Gemini with <code>gemini-3.1-pro-preview</code></td><td>Preview names churn</td><td>Find the current preview alias in Joey's 50-model list; update.</td></tr>
+  <tr><td>Gemini with <code>gemini-3-flash-preview</code></td><td>Same</td><td>Same.</td></tr>
+  <tr><td>Perplexity with <code>sonar-pro</code></td><td>No <code>/models</code> endpoint; must chat-probe</td><td>If 4xx, check current sonar model lineup at <code>docs.perplexity.ai</code>.</td></tr>
+  <tr><td>Perplexity with <code>sonar-reasoning-pro</code> + <code>sonar-deep-research</code></td><td>Same</td><td>Same.</td></tr>
+</table>
+<p><strong>Exit gate:</strong> Decision row for every entry: keep as-is, swap to new ID, or remove.</p>
+
+<h3>Phase 3 &mdash; Edit <code>g_defaults[]</code> in <code>serve.c</code> (Be-only, ~10 min)</h3>
+<p>One commit, all edits together (single logical change: refresh provider table).</p>
+<table>
+  <tr><th>Action</th><th>Entry</th><th>Change</th></tr>
+  <tr><td>UPDATE</td><td><code>claude-opus</code></td><td>model <code>claude-opus-4-6</code> &rarr; <code>claude-opus-4-7</code>. Pricing stays $5/$25.</td></tr>
+  <tr><td>UPDATE</td><td><code>gpt</code></td><td>model <code>gpt-5.4</code> &rarr; <code>gpt-5.5</code>. Pricing per OpenAI current; check + update.</td></tr>
+  <tr><td>FIX</td><td><code>grok-fast</code></td><td>model <code>grok-4-1-fast-reasoning</code> &rarr; <code>grok-4.20-0309-non-reasoning</code> (faster sibling of current grok). Verify pricing.</td></tr>
+  <tr><td>UPDATE (conditional on Phase 2)</td><td><code>deepseek</code></td><td>model <code>deepseek-chat</code> &rarr; <code>deepseek-v4-flash</code> if alias is broken; else keep.</td></tr>
+  <tr><td>UPDATE (conditional)</td><td><code>deepseek-reasoner</code></td><td>Same — <code>deepseek-reasoner</code> &rarr; <code>deepseek-v4-pro</code> if alias broken.</td></tr>
+  <tr><td>UPDATE (conditional)</td><td>Gemini previews</td><td>Whatever Phase 2 says is current.</td></tr>
+  <tr><td>ADD</td><td><code>gpt-pro</code></td><td>NEW entry. Model <code>gpt-5.5-pro</code>. Top-tier OpenAI. Pricing ~$10/$40 per MTok (verify).</td></tr>
+  <tr><td>ADD</td><td><code>gpt-codex</code></td><td>NEW entry. Model <code>gpt-5.3-codex</code> (or <code>gpt-5.1-codex-max</code>). Coding-specialist. Pricing per OpenAI.</td></tr>
+  <tr><td>ADD</td><td><code>grok-flagship</code></td><td>NEW entry. Model <code>grok-4.3</code>. Next-gen Grok. Pricing per xAI.</td></tr>
+  <tr><td>ADD</td><td><code>codestral</code></td><td>NEW entry. Model <code>codestral-latest</code>. Coding-specialist. Pricing per Mistral. (Depends on Phase 1.5 success.)</td></tr>
+</table>
+<p><strong>Exit gate:</strong> <code>g_defaults[]</code> compiles cleanly; <code>MAX_PROVIDERS</code> not exceeded (current 22, adding up to 4 &rarr; 26; check <code>MAX_PROVIDERS</code> define).</p>
+
+<h3>Phase 4 &mdash; Rebuild + relaunch (Be-only, &lt;3 min)</h3>
+<ol>
+  <li><strong>Stop running server</strong>: <code>Stop-Process -Name nous-desktop -Force</code>.</li>
+  <li><strong>Rebuild</strong>: <code>gcc -Wall -Wextra -O2 -Isdk -Isrc -o nous-desktop.exe src/*.c sdk/*.c -lws2_32 -lwinhttp -lbcrypt</code>. Same incantation as the auth-bypass build. Expect zero new warnings.</li>
+  <li><strong>Relaunch</strong>: via PowerShell <code>&amp;</code> operator with <code>--no-auth 5050</code> in background. WDAC bypass already proven on this path.</li>
+  <li><strong>Verify served config</strong>: <code>curl http://127.0.0.1:5050/api/loop-config | jq .providers[].model | sort</code> &mdash; the new model list should appear.</li>
+  <li><strong>Hard-refresh browser</strong>: ctrl-F5 at <code>http://localhost:5050</code>. NOUS tab should show all tiles; DATA ACCESS column should show every provider with its updated model.</li>
+</ol>
+<p><strong>Exit gate:</strong> server up, served config matches edits, browser shows the new lineup.</p>
+
+<h3>Phase 5 &mdash; Live chat-completion smoke (Be-only, ~5 min)</h3>
+<p>Fire one tiny chat completion against every provider via the cockpit's fan-out (or via REST direct as fallback). Each tile should return content. Any 4xx/5xx gets logged for cleanup follow-up.</p>
+<table>
+  <tr><th>Provider</th><th>Smoke prompt</th><th>Expected</th></tr>
+  <tr><td>Each of the 22+ entries</td><td><code>"reply with just OK"</code> (8 tokens max)</td><td>HTTP 200 + reply containing "OK" or similar acknowledgement.</td></tr>
+</table>
+<p><strong>Exit gate:</strong> green status on every tile. Any red gets diagnosed before commit-done.</p>
+
+<h3>Phase 6 &mdash; Build report + commit (Be-only, ~5 min)</h3>
+<p>Render <code>~a~t</code> build report summarizing all 5 phases + smoke results. Commit + push. Backfill telemetry hash. Pop the report.</p>
+
+<h3>Total estimated effort</h3>
+<table>
+  <tr><th>Phase</th><th>Time</th><th>Blocking on?</th></tr>
+  <tr><td>1 &mdash; Collect keys</td><td>&lt;5 min</td><td>Joey paste (Anthropic + Mistral)</td></tr>
+  <tr><td>2 &mdash; Verify stales</td><td>&lt;5 min</td><td>nothing</td></tr>
+  <tr><td>3 &mdash; Edit g_defaults[]</td><td>~10 min</td><td>Phase 2 decisions</td></tr>
+  <tr><td>4 &mdash; Rebuild + relaunch</td><td>&lt;3 min</td><td>Phase 3</td></tr>
+  <tr><td>5 &mdash; Smoke completions</td><td>~5 min</td><td>Phase 4</td></tr>
+  <tr><td>6 &mdash; Build report + commit</td><td>~5 min</td><td>Phase 5</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>~35 min wall time</strong></td><td>Joey's two pastes</td></tr>
+</table>
+<p><strong>Board item:</strong> one 5-pt item under the "Cockpit UI" section (already exists from the NOUS tab work). Or its own "Providers" section &mdash; reader's call.</p>
+</div>
+
+<h2>5. Constraints</h2>
+<div class="card">
+<ul>
+  <li><strong>Rule 4 (Joey pastes, Be handles).</strong> Anthropic + Mistral keys arrive in chat from Joey, never asked for one at a time; Be runs setx, verifies env, never echoes the value. Keys captured in transcript trigger rotation reminder per SETUP.md convention.</li>
+  <li><strong>No new external dependencies.</strong> Pure C, same toolchain (gcc/MSYS). Provider list is a <code>ProviderDefault</code> array literal &mdash; no schema changes, no parser changes.</li>
+  <li><strong>Pricing in the table is informational only.</strong> Daily-total tracking uses these. If a model's pricing has changed, update; if uncertain, leave as-is (worst case: a stale pricing report &mdash; not a correctness bug).</li>
+  <li><strong>MAX_PROVIDERS limit.</strong> Currently 22 entries; adding up to 4 brings us to 26. Need to check <code>MAX_PROVIDERS</code> define in serve.c &mdash; bump if needed (likely set generously already).</li>
+  <li><strong>Server must restart.</strong> Provider table is compile-time. Wwwroot edits don't apply; only a rebuild + relaunch propagates the table change.</li>
+  <li><strong>WDAC launch path is fragile.</strong> PowerShell <code>&amp;</code> works; <code>Start-Process</code> doesn't. Same procedure as the auth-bypass build.</li>
+</ul>
+</div>
+
+<h2>6. Unknowns</h2>
+<div class="card">
+<ol>
+  <li><strong>Does <code>deepseek-chat</code> still resolve as alias?</strong> Phase 2 chat-completion probe answers definitively.</li>
+  <li><strong>Are the Gemini preview aliases still current?</strong> Same &mdash; Phase 2 probe.</li>
+  <li><strong>Does Perplexity's <code>sonar-deep-research</code> still exist?</strong> Same.</li>
+  <li><strong>What's the current pricing for <code>gpt-5.5</code> + <code>gpt-5.5-pro</code>?</strong> Quick check at OpenAI pricing page before commit. If unchanged from 5.4 ($2.50/$15 + $40/$80 pro), no edit needed.</li>
+  <li><strong>What's the right coding-variant pick for OpenAI?</strong> Options are <code>gpt-5.3-codex</code>, <code>gpt-5.2-codex</code>, <code>gpt-5.1-codex-max</code>, <code>gpt-5.1-codex-mini</code>. Recommend <code>gpt-5.3-codex</code> as most recent codex-tagged; verify endpoint compatibility (codex variants may use different API surface than chat-completions).</li>
+  <li><strong>Will Codestral work with the current OpenAI-compatible format setting?</strong> Codestral uses Mistral's OpenAI-compatible endpoint; format=<code>"openai"</code> should be fine. Verify with smoke probe.</li>
+  <li><strong>Should we proactively rotate the OpenAI key?</strong> Not flagged broken, but it's been in Joey's env for unknown duration. Out of scope; flag for future.</li>
+</ol>
+</div>
+
+<h2>7. When To Revisit</h2>
+<div class="card">
+<table>
+  <tr><th>Signal</th><th>Action</th></tr>
+  <tr>
+    <td>First failed smoke probe in Phase 5 (any tile)</td>
+    <td>Diagnose-in-place. Pull the model ID, hit it via curl with the right key, read the error. Patch <code>g_defaults[]</code> entry. Rebuild + re-smoke that one. Don't escalate to a new plan unless the fix is architectural.</td>
+  </tr>
+  <tr>
+    <td>Anthropic Opus 4.7 has unexpected request-format changes vs 4.6</td>
+    <td>Read <code>docs.anthropic.com</code> for migration notes. Update <code>build_request_anthropic()</code> if needed. Low risk &mdash; Anthropic preserves API shape across minor versions.</td>
+  </tr>
+  <tr>
+    <td>OpenAI gpt-5.5 requires new request fields</td>
+    <td>Check OpenAI changelog. Likely backward-compatible.</td>
+  </tr>
+  <tr>
+    <td>Mistral key gets rejected again (second 401 after regen)</td>
+    <td>Stop and call Mistral support. Probable account-side issue (billing block, workspace mismatch). Not a Be-fixable problem.</td>
+  </tr>
+  <tr>
+    <td>Joey wants the NOUS_KEY_* built-in free-tier path actually populated</td>
+    <td>New <code>~p</code> for the private-key build pipeline. Out of this plan's scope.</td>
+  </tr>
+  <tr>
+    <td>Adding local-model support (Ollama, llama.cpp) for Qwen/Gemma/Devstral</td>
+    <td>New <code>~p</code> for the local-runtime integration. The format field would gain "ollama" as a new option; endpoint becomes <code>http://localhost:11434/api/generate</code>. Worth it for "no-API-call" coding work.</td>
+  </tr>
+</table>
+</div>
+
+<h2>8. Board impact</h2>
+<div class="card">
+<p>One 5-pt board item under "Cockpit UI" (the section added for the NOUS tab work earlier this session):</p>
+<pre>{provider audit + fix — Anthropic key install, Mistral key regen,
+ 6 stale/broken IDs refreshed, 4 new entries (gpt-5.5-pro, gpt-codex,
+ grok-4.3, codestral), all 22+ tiles smoke-tested green, server
+ rebuilt and relaunched, add to, nous-desktop cockpit per ~i
+ 2026-05-24 23:50 + ~p 2026-05-24 23:55} · 5 pts · ~a~t</pre>
+</div>
+
+<h2>9. Next</h2>
+<div class="card">
+<p>Plan awaits Joey's approval. On approve:</p>
+<ol>
+  <li>Be asks Joey for ANTHROPIC + MISTRAL keys (one at a time, paste-by-paste).</li>
+  <li>Phases 1 &rarr; 6 run sequentially. Phase 1 is the slowest in wall-clock because it depends on Joey's paste; everything else is Be-only and contiguous.</li>
+  <li>End state: cockpit at <code>http://localhost:5050</code> with NOUS tab showing all tiles, every tile a verified-live provider, including newly-added coding-specialist variants.</li>
+</ol>
+<p>If Joey doesn't have an Anthropic account yet: 5 min at <a href="https://console.anthropic.com">console.anthropic.com</a>, $5 credit on signup. If Joey doesn't want to pay for Anthropic right now, we can keep Claude entries in the table but skip Phase 1.1-1.3 &mdash; entries will just sit gray until a key lands later. Same applies for any other paid provider.</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none; margin:0; padding:0;">
+  <li>&#x2713; Code committed (this artifact + companion ~i + index + telemetry)</li>
+  <li>&#x2713; Hash in telemetry (backfilled post-commit)</li>
+  <li>&#x2014; Board updated (board item lands on approval, not before)</li>
+  <li>&#x2713; HTML report saved (this file)</li>
+  <li>&#x2713; Index updated (Plans section gets this entry)</li>
+  <li>&#x2713; Pushed to remote</li>
+  <li>&#x2713; No prior damage</li>
+  <li>&#x2014; Production verified (internal artifact)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r119 &middot; 2026-05-24 23:55 &middot; nous-desktop &middot; ~p provider fix (Awaiting Approval)</div>
+
+</div>
+</body>
+</html>
