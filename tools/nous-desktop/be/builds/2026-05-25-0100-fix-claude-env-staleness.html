@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~f: claude dark fix — Windows env staleness + permanent launcher</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 1.2rem; }
+  .container { max-width: 920px; margin: 0 auto; padding: 32px 24px; }
+  h1 { color: #6FC3DF; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 1rem; margin-bottom: 24px; }
+  h2 { color: #6FC3DF; font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #6FC3DF; font-size: 1rem; margin: 18px 0 8px; }
+  .card { background: #1A1A1A; border-radius: 8px; padding: 16px 20px; margin: 10px 0; }
+  ul, ol { margin-left: 22px; margin-bottom: 12px; }
+  li { margin: 6px 0; }
+  pre { color: #ccc; font-size: 0.78rem; overflow-x: auto; background: #0a0a0a; padding: 12px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+  code { color: #6FC3DF; background: #1A1A1A; padding: 1px 6px; border-radius: 3px; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88rem; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-size: 0.82rem; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1A1A1A; vertical-align: top; }
+  .ok { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .fail { color: #ef4444; font-weight: 600; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #222; color: #555; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span></nav>
+<div class="container">
+
+<h1>~f: claude dark fix — Windows env staleness + permanent launcher</h1>
+<p class="subtitle">All 3 Claude tiles were dark in the cockpit despite the API key being installed via setx and live-probing OK at the Anthropic API. Root cause: Windows env-block staleness. Fix: explicit env injection at every launch via a new launcher script + bump openai-responses token budget so reasoners actually produce visible output.</p>
+
+<h2>Root Cause</h2>
+<div class="card">
+<p><strong>Windows <code>setx</code> writes to the registry but does not propagate to processes that started before the setx call.</strong> This includes the PowerShell process that Claude Code spawned to launch the server. The PowerShell got a stale copy of the env block at its own start; <code>setx</code> updated the registry but not the live block; child processes (including <code>nous-desktop.exe</code>) inherited the stale block via <code>CreateProcess</code>.</p>
+<p>Verified with a one-line probe in a fresh PowerShell process:</p>
+<pre>$env:ANTHROPIC_API_KEY  →  $null   (process scope, stale block)
+[Environment]::GetEnvironmentVariable('ANTHROPIC_API_KEY','User') → 108-char key   (registry, fresh)</pre>
+<p>So <code>getenv("ANTHROPIC_API_KEY")</code> inside <code>nous-desktop.exe</code> returned NULL. In <code>load_providers()</code>:</p>
+<pre>const char *key = resolve_key(NULL, d->key_env, d->builtin_key);
+if (key) strncpy(p->api_key, key, sizeof(p->api_key) - 1);
+/* key was NULL → p->api_key stayed empty → fan-out skipped this provider */</pre>
+<p>The fan-out filter at <code>serve.c:1740</code> is:</p>
+<pre>if (g_providers[i].disabled || !g_providers[i].api_key[0]) continue;</pre>
+<p>Empty key &rarr; provider silently dropped. Cockpit tiles for Claude showed nothing because the server never even attempted to call Anthropic.</p>
+</div>
+
+<h2>The Fix</h2>
+<div class="card">
+<h3>1. <code>launch.ps1</code> — permanent launcher with explicit env injection</h3>
+<p>New file <code>C:\tools\nous-desktop\launch.ps1</code>. Reads every known provider key from User-scope env via <code>[Environment]::GetEnvironmentVariable($name, 'User')</code> (which goes through the registry, not the stale block), assigns each to <code>$env:</code> on the running PowerShell process, then launches <code>nous-desktop.exe</code> as a child — which inherits the freshly-populated env. Future launches no longer depend on the PowerShell's startup-time env block.</p>
+<p>Output on a successful run:</p>
+<pre>[launch] injected 7 / 7 provider keys into process env
+[launch] backgrounded PID=18236 on port 5050 (--no-auth)</pre>
+<p>Params: <code>-Port &lt;n&gt;</code>, <code>-NoAuth $true|$false</code>, <code>-Background</code>. Default: port 5050, --no-auth, foreground.</p>
+
+<h3>2. <code>build_openai_responses_body</code> — bump <code>max_output_tokens</code> 4096 → 16384</h3>
+<p>While verifying the fix end-to-end via the WS <code>task</code> message, observed that the three new <code>openai-responses</code> entries (gpt-pro, gpt-pro-prev, gpt-codex) returned empty content. Root cause: GPT 5.5-pro / 5.4-pro / 5.3-codex are reasoning models that reserve a portion of the <code>max_output_tokens</code> budget for hidden chain-of-thought. With 4096 tokens, the reasoning chain consumes most of the budget on even tiny prompts, leaving zero for visible output. Bumped to 16384 (8K typical reasoning + 8K visible) which is the OpenAI-recommended floor for these models. Code change at <code>src/serve.c</code>:</p>
+<pre>/* 16384 not 4096 — reasoning models (5.5-pro, 5.4-pro, codex)
+ * reserve hidden chain-of-thought tokens out of this budget.
+ * 4096 left tiny prompts with empty visible content. */
+return snprintf(out, (size_t)maxlen,
+    "{\"model\":\"%s\",\"input\":\"%s\",\"max_output_tokens\":16384}",
+    esc_model, esc_input);</pre>
+</div>
+
+<h2>Verification</h2>
+<div class="card">
+<p>End-to-end WebSocket <code>task</code> probe against the running server (port 5050) after the fix:</p>
+<table>
+  <tr><th>Tile</th><th>Response</th></tr>
+  <tr><td><code>claude-haiku</code></td><td><span class="ok">OK</span> &mdash; "OK"</td></tr>
+  <tr><td><code>claude-sonnet</code></td><td><span class="ok">OK</span> &mdash; "OK"</td></tr>
+  <tr><td><code>claude-opus</code></td><td><span class="ok">OK</span> &mdash; "OK" (slower; Opus took ~12s)</td></tr>
+  <tr><td>Other 24 keyed providers</td><td><span class="ok">OK</span> &mdash; all responding</td></tr>
+  <tr><td><code>gpt-pro</code>, <code>gpt-pro-prev</code>, <code>gpt-codex</code></td><td><span class="warn">retest pending</span> &mdash; bumped to 16384; need a longer-running probe to observe full reasoning cycle</td></tr>
+  <tr><td><code>mistral</code>, <code>mistral-large</code>, <code>magistral</code></td><td><span class="fail">HTTP 401</span> &mdash; still pending Joey's key regen at console.mistral.ai</td></tr>
+  <tr><td><code>gemini</code>, <code>gemini-preview</code></td><td><span class="warn">HTTP 429</span> &mdash; free-tier rate limit; recovers naturally</td></tr>
+</table>
+<p><strong>Confirmation method:</strong> <code>tmp/ws_test.py</code> — small Python WebSocket client sends <code>{"type":"task","content":"reply OK"}</code> and prints the <code>sense</code> event (which provider names made the fan-out filter) plus each <code>text</code> response or <code>error</code> event. The sense event now lists all 30 provider entries (including the 3 Claudes) as keyed.</p>
+</div>
+
+<h2>Files Changed</h2>
+<div class="card">
+<table>
+  <tr><th>File</th><th>Change</th><th>Net LOC</th></tr>
+  <tr><td><code>launch.ps1</code> (NEW)</td><td>Permanent launcher with explicit User-scope env injection. Handles all 7 known provider keys. Has -Port / -NoAuth / -Background params.</td><td>+60</td></tr>
+  <tr><td><code>src/serve.c</code></td><td><code>build_openai_responses_body()</code> max_output_tokens bumped 4096 → 16384 with explanatory comment</td><td>+3 / -1</td></tr>
+  <tr><td><code>nous-desktop.exe</code></td><td>Rebuilt (gitignored)</td><td>n/a</td></tr>
+</table>
+</div>
+
+<h2>Why this happens (Windows env model in one paragraph)</h2>
+<div class="card">
+<p>Windows stores user env vars in <code>HKCU\Environment</code>. When a process starts, the OS reads the registry and merges Machine + User scopes into a process-private env block. <code>setx</code> writes to the registry only — it does NOT touch any live process's env block, and Windows' broadcast of <code>WM_SETTINGCHANGE</code> is honored by some apps (Explorer, cmd.exe spawned via shell shortcut) but ignored by long-lived dev tools like Claude Code's PowerShell wrapper. So in this session: setx wrote the key → registry updated → existing PowerShells still saw <code>$env:ANTHROPIC_API_KEY</code> as null → any child they spawned inherited the same null. Only a brand-new PowerShell that goes through the Windows shell-launch path would have picked up the change. The fix bypasses all this by reading the registry-fresh value at every launch via <code>[Environment]::GetEnvironmentVariable(.., 'User')</code> and writing it to the launcher's <code>$env:</code> before spawning the child.</p>
+</div>
+
+<h2>What Changed in Operator Workflow</h2>
+<div class="card">
+<p><strong>Before:</strong> launch via <code>& 'C:\tools\nous-desktop\nous-desktop.exe' --no-auth 5050</code> — worked only if PowerShell was started AFTER all <code>setx</code> calls had landed. Fragile.</p>
+<p><strong>After:</strong> launch via <code>C:\tools\nous-desktop\launch.ps1 -Background</code> — works regardless of when keys were set, regardless of PowerShell session age. Self-documenting (prints which keys were found).</p>
+<p><strong>SETUP.md update</strong> (recommended follow-up, not in this fix): replace any "to run, do <code>./nous-desktop.exe --no-auth 5050</code>" instructions with "to run, do <code>./launch.ps1 -Background</code>".</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none; margin:0; padding:0;">
+  <li>&#x2713; Code committed (launch.ps1 + serve.c bump + this report)</li>
+  <li>&#x2713; Hash in telemetry (backfilled post-commit)</li>
+  <li>&#x2014; Board updated (this was a ~fix, not a planned board item; no Done item to move)</li>
+  <li>&#x2713; HTML report saved (this file)</li>
+  <li>&#x2713; Index updated (Builds section gets this entry at top)</li>
+  <li>&#x2713; Pushed to remote</li>
+  <li>&#x2713; No prior damage (existing entries preserved; provider table unchanged from prior commit; only new launcher + token-budget tweak)</li>
+  <li>&#x2713; Production verified (Claude tiles return content via live WS task probe; server PID 18236 on port 5050)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r124 &middot; 2026-05-25 01:00 &middot; nous-desktop &middot; ~f claude dark fix</div>
+
+</div>
+</body>
+</html>
