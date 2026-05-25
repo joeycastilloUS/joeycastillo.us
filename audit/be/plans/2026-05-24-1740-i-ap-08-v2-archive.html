@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i AP-08 v2 — archive (not partial move)</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1050px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.no { color: var(--red); font-weight: 600; }
+  td.yes { color: var(--green); font-weight: 600; }
+  td.orphan { color: var(--amber); font-weight: 600; }
+  .crit { background: #1F0F0F; border: 2px solid var(--red); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .crit b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  ol li { color: #ccc; font-size: 13.5px; margin: 6px 0; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i AP-08 v2 · second-pass verdict: ARCHIVE</span></nav>
+<div class="container">
+
+<h1>~i AP-08 v2 — second pass: ARCHIVE the whole repo.</h1>
+<p class="sub">Second deep investigation 2026-05-24 17:40, checking a-d-d + source + open source. Prior verdict was "partial MOVE" (boot.S + pi-vm/). This v2 reverses that — both pieces fail the relevance test. Archive the whole assembly repo.</p>
+
+<div class="crit">
+<b>Revision to AP-08 v1</b>
+v1 said "partial MOVE: boot.S (Multiboot2) + pi-vm/ are unique value." v2 finds: (1) Multiboot2 is orphaned — the a-d-d spec doesn't call for GRUB/Multiboot2 and kastil-systems boots raw MBR on GCE/IoT — and (2) Pi VM is marked "(future)" in pnos.c with no spec calling for a bytecode VM and no current code that needs one. Both pieces are dead.
+</div>
+
+<h2>§1 — Re-confirmed inventory</h2>
+<ul style="color:#ccc;font-size:13.5px;margin-left:20px;">
+<li><code>boot/boot.S</code> — 48 lines GAS Multiboot2 entry point</li>
+<li><code>boot/boot.asm</code> — 148 lines NASM BIOS MBR (DUPLICATE of target-runtimes/boot.asm)</li>
+<li><code>pi-vm/examples/</code> — 5 files, 698 LOC bytecode (receiver.pi.asm dominates at 643 lines)</li>
+<li><code>pi-vm/mesh/</code> — mesh routing bytecode programs</li>
+<li>README, LICENSE, NOTICE</li>
+</ul>
+
+<h2>§2 — a-d-d spec verdict</h2>
+<pre>Grep for: Multiboot, Multiboot2, GRUB, Pi VM, bytecode, register machine,
+            VM interpreter across kastil-systems/a-d-d
+
+Result: ZERO matches. The a-d-d does not call for Multiboot2 or for a
+        bytecode VM. Both are orphan concepts not in the canonical spec.
+
+Smoking gun: pnos.c contains this comment:
+  "Core 1+: Reserved for Pi VM workers (future)"
+
+That's a PLACEHOLDER. Future intent, not current requirement.</pre>
+
+<h2>§3 — Source verdict</h2>
+<p><code>kastil-systems/target-runtimes</code> already owns the production boot.asm (148 lines, ESP=64MB stack — tuned beyond assembly's 16MB version). Linker script + pnos.c + Makefile.biRT all baked into a single 1MB disk image. <strong>Zero references</strong> to <code>piasm</code>, <code>.pi.enc</code>, Pi VM bytecode, GRUB, or Multiboot2 anywhere in the kastil-systems active code.</p>
+
+<h2>§4 — Open-source verdict</h2>
+
+<table>
+<thead><tr><th>Concept</th><th>Open-source landscape</th><th>Relevance to kastil-systems</th></tr></thead>
+<tbody>
+<tr><td>Multiboot2</td><td>2016 spec, GRUB-only. Useful when you boot via GRUB and want memory map + module passing. Irrelevant for raw MBR/UEFI/IoT boot.</td><td class="orphan">NONE — kastil-systems boots raw MBR on GCE biRT and vendor loaders on IoT (TECNO phone). No GRUB anywhere.</td></tr>
+<tr><td>Register VMs / custom bytecode</td><td>World converged on JVM (heavyweight), WASM (general portable), eBPF (kernel-restricted). Custom register VMs are usually a sign of a specialized use case OR legacy reinvention.</td><td class="orphan">NONE — kastil-systems runs native C everywhere. No need for a bytecode layer.</td></tr>
+<tr><td>Encrypted bytecode</td><td>BISPE (research) keeps decryption key in CPU registers (TRESOR pattern). Defends against cold-boot attacks. Narrow use case.</td><td class="orphan">UNCLEAR — assembly README doesn't document Pi VM's encryption threat model. No design justification.</td></tr>
+</tbody>
+</table>
+
+<h2>§5 — The honest GO/NO-GO</h2>
+
+<table>
+<thead><tr><th>Option</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>MOVE boot.S only</td><td class="no">NO — Multiboot2 is orphan; spec doesn't call for it; production boots raw MBR.</td></tr>
+<tr><td>MOVE pi-vm/ only</td><td class="no">NO — bytecode VM not specced; pnos.c comment marks it "future"; no current code uses it.</td></tr>
+<tr><td>MOVE both</td><td class="no">NO — same reasons combined.</td></tr>
+<tr><td>MOVE boot.asm only</td><td class="no">NO — duplicate of what target-runtimes already owns.</td></tr>
+<tr><td><strong>ARCHIVE the whole repo</strong></td><td class="yes"><strong>YES</strong> — historical fossil from the Pantheon era. Multiboot2 + Pi VM concepts have no place in current architecture. Preserve as museum reference; don't import.</td></tr>
+</tbody>
+</table>
+
+<h2>§6 — Schematic</h2>
+<pre>  BEFORE (v1 plan)
+  ────────────────────────────────────────────────────────────
+   ai-pantheon/assembly       →   PARTIAL MOVE (boot.S + pi-vm/)
+                                  to target-runtimes
+                                  Archive the rest
+
+  AFTER (v2 verdict)
+  ────────────────────────────────────────────────────────────
+   ai-pantheon/assembly       →   ARCHIVE the whole thing
+                                  Nothing moves to target-runtimes
+                                  No code added, no debt incurred
+
+   target-runtimes            ←   UNCHANGED
+                                  (already owns the production boot stack)</pre>
+
+<h2>§7 — Recommendation</h2>
+<ol>
+<li><strong>Archive ai-pantheon/assembly</strong> with note: "Historical reference. Multiboot2 + Pi VM concepts not in current a-d-d. Boot maintained in target-runtimes/boot.asm. Do not import."</li>
+<li><strong>If Pi VM ever becomes needed</strong> (when Core 1+ workers ship, per pnos.c "future" marker), create a fresh purpose-built skill with a real spec, threat model, and integration plan. Don't resurrect this repo — write fresh in pure C.</li>
+<li><strong>target-runtimes/boot.asm stays put</strong> — platform-specific to the RT target, not a reusable component.</li>
+</ol>
+
+<footer>v0 · 2026-05-24 17:40 PDT · ~i AP-08 v2 archive verdict · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

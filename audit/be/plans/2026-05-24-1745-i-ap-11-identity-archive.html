@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i AP-11 identity — ARCHIVE</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.no { color: var(--red); font-weight: 600; }
+  td.yes { color: var(--green); font-weight: 600; }
+  .crit { background: #1F0F0F; border: 2px solid var(--red); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .crit b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i AP-11 identity · verdict: ARCHIVE</span></nav>
+<div class="container">
+
+<h1>~i AP-11 — identity: ARCHIVE.</h1>
+<p class="sub">Investigated 2026-05-24 17:45. Same pattern as AP-10 — language mismatch + already-covered. Zero merge value.</p>
+
+<div class="crit">
+<b>Revision to original plan</b>
+Original: MERGE INTO nous/security/skill/crypt or new identity skill. Reality: C# + Docker (1,805 LOC, .NET); nous is pure-C zero-deps. The a-d-d does not name an "identity" skill anywhere — identity responsibilities are correctly split between crypt (Ed25519 primitives) and auth (TOTP + sessions + Cloudflare verification). The compiled-in operator pubkey pattern (in nous/comms/relay) IS the trust root. Identity is an orphan concept.
+</div>
+
+<h2>§1 — What's in identity</h2>
+<pre>identity/
+  Sovereign.Core/        interfaces
+  Sovereign.Crypto/      AES-256-GCM envelope encryption (C# wrapper)
+  Sovereign.Recovery/    Shamir's secret sharing
+  Sovereign.Verify/      Merkle tree
+  Sovereign.Integrity/   founding-principles hash lock
+
+  19 C# files, 1,805 LOC, 390 KB
+  Build: .NET Core (csproj), Dockerfile
+  License: AGPL-3.0
+  Pitched as: "your identity is yours" — hosted service for client-side
+              encryption + social recovery + tamper-proof storage</pre>
+
+<h2>§2 — a-d-d verdict</h2>
+<p>NO mention of an "identity skill" anywhere. The 6 specced security skills are <code>crypt, auth, seal, vault, policy, wipe</code>. Identity responsibilities are correctly split:</p>
+<ul>
+<li><strong>crypt</strong> — Ed25519 primitives (sign/verify/keypair), X25519, AES-GCM, SHA-256, PBKDF2 — already implemented in nous</li>
+<li><strong>auth</strong> — TOTP, sessions, nonce ring, API keys, Cloudflare domain verification — already implemented</li>
+<li><strong>relay/CLAUDE.md</strong> — Node Identity model: operator's Ed25519 pubkey compiled into binary, each node carries node.key + node.pub + node.cert (operator signature over pubkey+role) — this IS the identity model</li>
+</ul>
+
+<h2>§3 — Three-way comparison</h2>
+<table>
+<thead><tr><th>Capability</th><th>nous status</th><th>From identity?</th></tr></thead>
+<tbody>
+<tr><td>Ed25519 sign/verify</td><td class="yes">✅ crypt (pure C, RFC 8032)</td><td class="no">no — already covered</td></tr>
+<tr><td>X25519 ECDH</td><td class="yes">✅ crypt (RFC 7748)</td><td class="no">no — already covered</td></tr>
+<tr><td>AES-256-GCM envelope</td><td class="yes">✅ crypt + vault</td><td class="no">no — already covered</td></tr>
+<tr><td>Trust root (operator pubkey)</td><td class="yes">✅ relay/CLAUDE.md (compiled-in pattern)</td><td class="no">no — already covered</td></tr>
+<tr><td>Domain ownership verification</td><td class="yes">✅ auth (Cloudflare flow)</td><td class="no">no — already covered</td></tr>
+<tr><td>Shamir secret sharing</td><td class="no">✗ not in nous</td><td>not needed — nous threat model is wipe-on-capture, not distributed recovery</td></tr>
+<tr><td>Merkle tree</td><td class="no">✗ not in nous</td><td>not needed in current scope (relates to deferred audit skill)</td></tr>
+</tbody>
+</table>
+
+<h2>§4 — Open-source verdict</h2>
+<p>Canonical Ed25519 + X25519 pure-C libraries (orlp/ed25519, compact25519, Micro25519) — all are <strong>point utilities</strong>, not "frameworks." NIST/Venafi trust-anchor guidance: compile the trust root into the binary. That's exactly what nous does. <strong>No open-source pattern suggests a separate "identity framework" is needed.</strong></p>
+
+<h2>§5 — Recommendation</h2>
+<pre>AP-11 → ARCHIVE ai-pantheon/identity
+
+Reasons:
+  1. Language mismatch — C#/.NET vs pure C99 zero-deps (insurmountable)
+  2. No new primitives — every capability is already in crypt + auth + seal + vault
+  3. No a-d-d gap — spec doesn't name an "identity" skill
+  4. Operator trust root pattern already deployed in relay/CLAUDE.md
+  5. Same disposition as AP-10 (safety): platform mismatch, aspirational, zero merge path</pre>
+
+<h2>§6 — One-line for Joey</h2>
+<p style="color:#fff;font-size:15px;background:var(--surface);padding:14px 18px;border-left:3px solid var(--accent);">
+<strong>Identity's philosophy is sound, but nous architecture already implements the same guarantees (crypt + auth + compiled-in operator pubkey) without needing a separate identity service.</strong> Archive as reference material.
+</p>
+
+<footer>v0 · 2026-05-24 17:45 PDT · ~i AP-11 identity ARCHIVE · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

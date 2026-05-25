@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i AP-09 v2 — audit skill: DEFER not BUILD</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.no { color: var(--red); font-weight: 600; }
+  td.yes { color: var(--green); font-weight: 600; }
+  td.maybe { color: var(--amber); font-weight: 600; }
+  .warn { background: #1F1A0F; border: 2px solid var(--amber); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .warn b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  ol li, ul li { color: #ccc; font-size: 13.5px; margin: 6px 0; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i AP-09 v2 · second-pass verdict: DEFER</span></nav>
+<div class="container">
+
+<h1>~i AP-09 v2 — audit skill: DEFER (not BUILD).</h1>
+<p class="sub">Second pass 2026-05-24 17:40 with the harder question: <em>do we really need this, why was it specced, and should we do it now?</em> Answer: no, not now. Park as backlog with explicit trigger conditions for revisit.</p>
+
+<div class="warn">
+<b>Revision to AP-09 v1</b>
+v1 said "WRITE FRESH from spec in pure C." v2 asks "but should we?" and answers: not yet. The journal already records every store mutation. Provenance-as-triples (single triple per fact author + timestamp) solves the "who wrote this" question with less complexity. Audit's real value (court-grade tamper-proof evidence chain) requires offline witnessing to be meaningful — out of scope for current 5-node mesh. Park the spec; revisit when context demands.
+</div>
+
+<h2>§1 — The origin story (why was audit specced?)</h2>
+<p>From the a-d-d: nous's Intel Object model includes a <code>provenance</code> field defined as "hash-chained log — every edit, share, access — cryptographically chained." The audit skill spec frames it as:</p>
+<ul>
+<li><strong>Immutable record</strong> — complete operational transparency</li>
+<li><strong>Court-admissible</strong> — evidence chain of custody (photos/video/audio hashed at capture with device, timestamp, GPS)</li>
+<li><strong>Tamper-evident</strong> — detect manipulation of any operational record, including the history itself</li>
+</ul>
+<p>This is forensic-grade design for <strong>legal/intelligence operations</strong> — law enforcement, emergency response, regulated data handling. The spec is sound but oriented to a regulated future, not today's 5-node prime/relay mesh.</p>
+
+<h2>§2 — Open-source landscape (5 comparable patterns)</h2>
+
+<table>
+<thead><tr><th>System</th><th>Purpose</th><th>Mechanism</th><th>Closest match to spec?</th></tr></thead>
+<tbody>
+<tr><td><strong>Sigstore Rekor</strong></td><td>Software supply-chain transparency log</td><td>Append-only Merkle ledger; entries signed; consistency proofs</td><td class="yes">CLOSEST — same shape, "local-only variant"</td></tr>
+<tr><td>Certificate Transparency (RFC 6962)</td><td>Detect misissued SSL certs</td><td>Merkle tree of cert logs; external witnesses verify consistency</td><td>Similar intent; stronger guarantees but heavier</td></tr>
+<tr><td>Linux auditd</td><td>OS-level security event logging</td><td>Ring buffer; categorized; kernel emits, userspace logs</td><td>Different scope — OS not application</td></tr>
+<tr><td>Git commit hash chain</td><td>Version control integrity</td><td>Each commit = hash of parent; tampering breaks chain</td><td>Closest analog by mechanism</td></tr>
+<tr><td>Postgres WAL</td><td>Crash recovery, replication</td><td>Sequential log, no hash chain</td><td>Adjacent (sequential log) but no tamper-proof</td></tr>
+</tbody>
+</table>
+<p>The a-d-d spec is essentially <strong>"Rekor but local + for operations instead of artifacts"</strong> — sound design, well aligned with mature patterns.</p>
+
+<h2>§3 — Today's reality check (5 scenarios)</h2>
+
+<table>
+<thead><tr><th>Scenario</th><th>Does audit help?</th><th>Simpler path</th></tr></thead>
+<tbody>
+<tr><td>Joey runs <code>~retro</code> and wants to see what changed between two dates</td><td class="no">No — marginally</td><td>Journal already records every mutation with payload; git of be/ artifacts encodes complete history. Replay journal. <strong>Audit not needed.</strong></td></tr>
+<tr><td>Operator claims a node added a fact maliciously; prove or disprove</td><td class="maybe">Yes — IF audit is on read-only storage (e.g., USB stick signed offline)</td><td>Without offline witness, attacker can edit audit too. Audit alone is insufficient. <strong>Adds value with prerequisite that's out of scope today.</strong></td></tr>
+<tr><td>Joey wants to know who/what wrote a specific triple</td><td class="no">No</td><td>Add a provenance triple per fact: <code>(fact_id, written_by, node_id)</code>, <code>(fact_id, written_at, ts)</code>. Single triples, queryable via normal store. <strong>Provenance-as-triples is cleaner than a separate audit skill.</strong></td></tr>
+<tr><td>Operator dispute — "I never approved this share"</td><td class="maybe">Yes — with prerequisite</td><td>Audit appends + offline witness on operator's personal device proves it. Same offline-witness prerequisite as scenario 2. <strong>Out of scope today.</strong></td></tr>
+<tr><td>Compliance demand — "Show immutable record that data X was handled securely"</td><td class="yes">Yes — perfectly</td><td>Hash-chained log with external signature/timestamp is exactly what regulators want. <strong>But Joey's not facing this pressure yet.</strong></td></tr>
+</tbody>
+</table>
+
+<h2>§4 — Honest go/no-go: DEFER</h2>
+
+<p><strong>Why not BUILD:</strong></p>
+<ul>
+<li>No current operational need — Joey runs a 5-node field-intel mesh, not a regulated/evidence system</li>
+<li>Incomplete without offline witness — audit on a compromised system can be re-written by the attacker; useful audit requires periodic external signing/storage (offline USB, third-party witness) which is out of current scope</li>
+<li>Provenance can be solved simpler — provenance-as-triples integrates cleanly with store and is query-friendly</li>
+<li>Journal already does half the job — write-ahead log records every mutation (just not hash-chained); for "what changed" forensics, journal replay is sufficient today</li>
+<li>Low current ROI — building ~400 LOC + integration to address a scenario Joey hasn't encountered yields negative ROI</li>
+</ul>
+
+<p><strong>Why not DROP:</strong></p>
+<ul>
+<li>Real future value — when nous scales to multi-org federation, law enforcement use, or formal supply-chain roles, audit becomes mandatory</li>
+<li>The spec is solid — well-reasoned, aligns with Rekor/auditd/Git patterns, not over-engineered</li>
+<li>Low cost to hold — spec is frozen; revisiting it next year when context changes is fast</li>
+</ul>
+
+<p><strong>Trigger conditions for revisit:</strong></p>
+<ul>
+<li>Joey integrates with a law enforcement / government agency (compliance demand)</li>
+<li>nous federated sharing crosses organizational boundaries with formal agreements</li>
+<li>Joey needs "prove this data was never tampered with" as part of a contract or legal discovery</li>
+<li>An incident occurs where lacking audit would have prevented disambiguating a dispute</li>
+</ul>
+
+<h2>§5 — If/when BUILD happens, the implementation sketch (for the file)</h2>
+<pre>nous/memory/skill/audit/
+  audit.c    ~250 LOC  — append-only log, SHA-256 hash chain, mmap'd file
+  audit.h    ~80 LOC   — interface (audit_append, audit_verify, audit_walk) + types
+  CLAUDE.md  + DIAGRAM.md + TRIPLES.md + skill.json
+
+Entry shape (128 bytes fixed):
+  action     uint8_t       write | read | share | delete | access | refactor
+  obj_id     uint8_t[32]   SHA-256 of intel object
+  actor_id   uint8_t[32]   node or user ID
+  timestamp  uint64_t      ns UTC
+  prev_hash  uint8_t[32]   SHA-256 link to previous entry
+  _padding   uint8_t[11]   to 128 bytes
+
+Storage:  audit.bin (mmap'd, hash-chained)
+Deps:     hash (already in nous), journal (for crash safety)
+Perf:     spec target 39K ops/sec (hash + disk write per append)
+Hooks:    3-4 audit_append() calls in store.c on write/delete/share
+Effort:   ~1 week dev + 1 week test/integration. Not critical path.</pre>
+
+<h2>§6 — Updated plan entry</h2>
+
+<table>
+<thead><tr><th>ID</th><th>Action</th><th>What</th></tr></thead>
+<tbody>
+<tr><td><code>AP-09a</code></td><td class="maybe">ARCHIVE integrity</td><td><code>gh repo archive ai-pantheon/integrity</code> — README-only manifesto; vision preserved for when audit is built later</td></tr>
+<tr><td><code>AP-09b</code></td><td class="maybe">DEFER nous audit skill</td><td>Park in backlog. Add Kaizen entry with trigger conditions (legal/compliance/federation events). Implementation sketch (§5 above) preserved here for future reference.</td></tr>
+</tbody>
+</table>
+
+<h2>§7 — One-line answer to Joey</h2>
+<p style="color:#fff;font-size:15px;background:var(--surface);padding:14px 18px;border-left:3px solid var(--accent);">
+<strong>No, we don't need audit right now.</strong> Journal + provenance-as-triples + periodic offline snapshots cover today's forensics needs. Build audit when you hit a legal/regulatory boundary requiring court-grade evidence chains, or when nous federates across orgs. Until then it's aspirational architecture, not blocking capability. Archive integrity; park the spec.
+</p>
+
+<footer>v0 · 2026-05-24 17:40 PDT · ~i AP-09 v2 audit skill defer verdict · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

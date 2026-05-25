@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i AP-13 pantheon-sentinel — ARCHIVE</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  .crit { background: #1F0F0F; border: 2px solid var(--red); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .crit b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i AP-13 pantheon-sentinel · verdict: ARCHIVE</span></nav>
+<div class="container">
+
+<h1>~i AP-13 — pantheon-sentinel: Pantheon-era oversight, ARCHIVE.</h1>
+<p class="sub">Investigated 2026-05-24 17:45. Sentinel is "always-on oversight of Cloud Run agents" — designed for the Pantheon platform era (multi-tenant Cloud Run, autonomous agents). Nous has no agents to oversee. Architecturally wrong fit.</p>
+
+<div class="crit">
+<b>Revision to original plan</b>
+Original: MERGE INTO nous/security/skill/policy. Reality: pantheon-sentinel is a 912-LOC Python Cloud Run service monitoring concurrent autonomous agents in the Pantheon platform. nous/security/skill/policy is RESERVED for object-policy primitives (tear-line, revocation, per-object access) — totally different scope. nous has zero autonomous agents — it's a synchronous request/reply mesh with self-destruct on capture.
+</div>
+
+<h2>§1 — What "Internal Affairs Animus" actually means</h2>
+<pre>main.py (912 LOC Python Flask service)
+Dockerfile (Python 3.13 slim + gunicorn)
+cloudbuild.yaml — Cloud Run deployment (256Mi, 1 CPU, us-west4)
+
+Five continuously-scheduled sweeps:
+  1. LIGHTWEIGHT sweep (Cloud Scheduler, every 5 min)
+     ─ drift detection (task wandering from spec)
+     ─ stall detection (no progress)
+     ─ law enforcement (Founding Principles, Five Laws, Golden Rules)
+  2. DEEP sweep (every 30 min) — same as lightweight + patent scouting
+  3. RULES AUDIT (daily/on-demand via Claude Opus 4.6)
+     ─ discovers ALL rules across Pantheon repos
+     ─ validates compliance, proposes REMOVE/CONSOLIDATE/UPDATE
+  4. SELF-PROTECTION CHECK — Golden Rule: no file deletion/copying
+     without Joey's explicit approval. Sentinel watches itself first.
+  5. PRINCIPLES INTEGRITY — SHA-256 hash verification on Founding
+     Principles blob (overlap with pantheon-seal)
+
+Tagline: "Eyes wide open. Reports directly to Joey."</pre>
+
+<h2>§2 — a-d-d verdict</h2>
+<p><strong>nous/security/skill/policy</strong> exists as docs only (NOTE.md). Per a-d-d: <em>reserved for object-level primitives — tear-line stripping (auto-hide fields above recipient's clearance), revocation (originator revokes access), per-object access control.</em></p>
+<p>That's NOT what sentinel does. sentinel does runtime behavior monitoring of autonomous agents. Wrong scope.</p>
+
+<h2>§3 — Source verdict</h2>
+<p>nous architecture today (per MESH_STATUS.md): 4 primes + 1 relay, all synchronous request/reply. <strong>Zero autonomous agents. No background tasks. No daemons monitoring other daemons.</strong> There's nothing for sentinel to oversee — every operation in nous is bounded by a single client request lifecycle.</p>
+<p>nous/comms/skill/waf (pure C, already implemented) handles request-edge: rate limiting, path validation, origin allowlist. That's the only "monitoring" surface nous needs.</p>
+
+<h2>§4 — Open-source verdict</h2>
+<table>
+<thead><tr><th>System</th><th>Layer</th><th>Relevance to nous</th></tr></thead>
+<tbody>
+<tr><td>Falco</td><td>eBPF kernel + cloud-native</td><td>NONE — nous is bare-metal RT (1MB IA-32 image), no Linux kernel layer</td></tr>
+<tr><td>Cilium Tetragon</td><td>eBPF process / file / network probes</td><td>NONE — same: no kernel infrastructure to hook</td></tr>
+<tr><td>HashiCorp Sentinel</td><td>Policy-as-code (deploy-time enforcement for Terraform/Vault)</td><td>MODERATE — concept of rules audit + compliance parallels sentinel's feature, but Sentinel enforces at deploy-time while pantheon-sentinel enforces at runtime; nous has no equivalent deploy or runtime concept</td></tr>
+</tbody>
+</table>
+<p>All open-source oversight patterns target cloud/kernel/multi-agent systems. None target offline bare-metal meshes.</p>
+
+<h2>§5 — Recommendation</h2>
+<pre>AP-13 → ARCHIVE ai-pantheon/pantheon-sentinel
+
+Reasons:
+  1. Python + Docker + Cloud Run vs pure-C nous — language mismatch
+  2. Designed for Claude Run / Pantheon platform — being archived
+  3. Nous has zero autonomous agents to oversee — synchronous mesh
+  4. Threat model mismatch — cloud needs oversight of concurrent agents;
+     field needs autonomy + self-destruct on capture
+  5. nous/security/skill/policy is reserved for OBJECT-policy (tear-line,
+     revocation), not RUNTIME-oversight
+
+If nous ever gains async daemons (e.g., the planned ~drift spec-sync
+reconciler), that would be DIFFERENT:
+  - written in C, not Python
+  - embedded on-node, not separate Cloud Run service
+  - focused on spec reconciliation, not rule enforcement
+  - and a fresh design, not a port of sentinel</pre>
+
+<h2>§6 — One-line for Joey</h2>
+<p style="color:#fff;font-size:15px;background:var(--surface);padding:14px 18px;border-left:3px solid var(--accent);">
+<strong>Sentinel is Pantheon-era oversight for Cloud Run autonomous agents; nous is a 5-node offline mesh with no agents to oversee.</strong> Archive it. If you need drift detection later, build the planned ~drift spec-sync reconciler as fresh C code embedded on-node.
+</p>
+
+<footer>v0 · 2026-05-24 17:45 PDT · ~i AP-13 pantheon-sentinel ARCHIVE · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>
