@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~I: mendo-dgx SteeringWheel -- the step-by-step approval pattern Joey wants for cadence</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~inspect: mendo-dgx SteeringWheel pattern</nav>
+
+<h1>mendo-dgx SteeringWheel &mdash; the step-by-step approval pattern Joey wants for cadence</h1>
+<p class="sub">Reading the C# driver at <code>C:\mendo-dgx\src\MendoDgx.Driver\SteeringWheel.cs</code>. Found the pattern; here&apos;s what it is and what it does well.</p>
+<span class="banner">Inspect &mdash; Pattern Captured</span>
+
+<div class="lede">
+<strong>Subject:</strong> Joey wants cadence to stop running autonomously and start running like mendo-dgx: a step-by-step driver where the AI proposes each action, the human approves, then it executes. Today's session blew up because cadence fired a /tick autonomously that I then mis-explained ("makes no sense"). The 88% MATCH on a 21-min-old clone was real, but the lack of step-by-step transparency made it feel like a bug. The mendo-dgx steering wheel is the answer.
+</div>
+
+<h2>What It Is</h2>
+<p>A 395-line C# class (<code>SteeringWheel.cs</code>) that drives a sequence of <code>IStep</code> objects through three possible modes:</p>
+<ul>
+<li><b>Interactive</b> &mdash; previews each step, prompts the user for action, then executes. User can approve, skip, go back, inspect the page, search for text, dump HTML, or quit.</li>
+<li><b>Manual</b> &mdash; shows the step's manual guide, the user does it in the browser themselves, AI records pass/fail/notes. Useful when automation is impossible (e.g. Cloudflare challenges).</li>
+<li><b>Auto</b> &mdash; runs through every step end-to-end without prompts. Falls back to interactive on failure if it's in interactive mode.</li>
+</ul>
+
+<h2>Structure</h2>
+
+<h3>The IStep interface</h3>
+<div class="code-block">public interface IStep
+{
+    string Name { get; }                       // "AddItem", "Checkout", ...
+    string Description { get; }                // human-readable summary
+    string ManualGuide { get; }                // instructions if user does it manually
+    bool RequiresManualIntervention { get; }   // hint: this step may need user help
+
+    Task&lt;StepResult&gt; Execute(IPage page, StepContext context);
+}</div>
+
+<h3>The StepResult record</h3>
+<p>Captured per step: <code>Index</code>, <code>Name</code>, <code>Status</code> (Pending/Passed/Failed/Skipped/ManualRequired), <code>StartTime</code>, <code>DurationMs</code>, <code>ScreenshotBefore</code>, <code>ScreenshotAfter</code>, <code>Notes</code>, <code>SelectorUsed</code>, <code>Error</code>, <code>RetryCount</code>.</p>
+
+<h3>The interactive loop</h3>
+<div class="code-block">while (currentIndex &lt; steps.Count)
+{
+    var step = steps[currentIndex];
+
+    // 1. PREVIEW
+    Console.Write($"Step {currentIndex+1}/{steps.Count}  {step.Name}");
+    Console.Write($"  {step.Description}");
+    if (step.RequiresManualIntervention) Console.Write("[!] manual action may be required");
+
+    // 2. PROMPT
+    Console.Write("[Enter]=Go  [S]=Skip  [B]=Back  [I]=Inspect  [F]=Find  [D]=Dump  [Q]=Quit:");
+    var action = readUser();
+
+    // 3. ACT
+    switch (action) {
+        case Go:       break;                          // fall through to execute
+        case Skip:     record skipped; index++;        // skip this step
+        case Back:     index = max(0, index - 1);     // back up to previous
+        case Inspect:  show DOM elements + clicker;   // explore the page
+        case Search:   search by text;
+        case Dump:     save current HTML to disk;
+        case Quit:     goto done;
+    }
+
+    // 4. EXECUTE + CAPTURE
+    screenshotBefore = capture();
+    result = await step.Execute(page, context);
+    await Task.Delay(stepDelayMs);
+    result.ScreenshotAfter = capture();
+
+    // 5. POST-HOOK -- failure offers retry
+    if (result.Status == Failed)
+        prompt("[R]etry / [I]nspect / [S]kip / [Q]uit");
+}</div>
+
+<h2>Stack</h2>
+<ul>
+<li><b>Language:</b> C# / .NET 8 (same as cadence)</li>
+<li><b>Driver UI:</b> Console.WriteLine with ANSI color codes. Pure CLI, no GUI.</li>
+<li><b>Step ordering:</b> List&lt;IStep&gt; in the order defined by the Flow class (<code>BasicOrderFlow.GetSteps()</code>)</li>
+<li><b>State:</b> Held in the SteeringWheel instance and a per-run <code>StepContext</code> passed to each step</li>
+<li><b>Discovered selectors:</b> Steps can record selectors they used; future steps can reuse them via <code>StepContext.DiscoveredSelectors</code></li>
+<li><b>Persistence:</b> <code>ResultWriter</code> dumps the full RunResult JSON to <code>results/runs/</code> when done</li>
+</ul>
+
+<h2>Patterns Found</h2>
+
+<h3>1. Preview always precedes execution</h3>
+<p>The user sees what's about to happen <em>before</em> it happens. Step name, description, flag if it might need manual help. Then the prompt. This is the single most important property of the pattern.</p>
+
+<h3>2. Six escape hatches per step</h3>
+<p>Skip / Back / Inspect / Find / Dump / Quit. The user is never trapped. Every step is one keystroke away from "no, do something else." Inspect and Find let them explore the current state before deciding. Dump preserves the moment for post-mortem analysis.</p>
+
+<h3>3. Three run modes share the same step definitions</h3>
+<p>The same <code>IStep</code> list runs as Interactive (approve-each), Manual (operator does it, AI records), or Auto (lights-out). The mode is selected at startup; the step authors don't have to know which mode is active. This is why the pattern scales &mdash; you write the step ONCE, then choose the trust level at runtime.</p>
+
+<h3>4. Failure prompts a recovery action, not a hard stop</h3>
+<p>If a step fails in Interactive mode, the user sees the error and chooses Retry / Inspect / Skip / Quit. No "restart from beginning." The work already done is preserved.</p>
+
+<h3>5. Step results are first-class artifacts</h3>
+<p>Every step writes a <code>StepResult</code> with status, timing, screenshots, notes. The final RunResult is serialized as JSON and the dashboard renders it. Forensic value: every run is fully reconstructable later.</p>
+
+<h3>6. Manual mode is a peer of automated mode</h3>
+<p>When automation can't do something (Cloudflare challenge, captcha, manual login), the Manual mode prompts the user and records what they did. Not a failure path &mdash; a first-class mode. The step's <code>ManualGuide</code> property gives the user the instructions.</p>
+
+<h3>7. The DOM Inspector is a sibling tool, not a separate program</h3>
+<p>Pressing <code>I</code> mid-flow drops the user into <code>RunInspector()</code> which lists visible interactive elements with their selectors, lets them click any one, and returns to the main loop. The user can inspect-click-resume without losing their place.</p>
+
+<h2>Why This Fits Cadence&apos;s Problem</h2>
+
+<div class="warn">
+<strong>Today&apos;s session blew up</strong> because cadence&apos;s /tick fires autonomously and only reports a final number. When I got <code>match: 176/208 (84.6%)</code> with <code>cloneCreatedAt</code> showing the old clone, I had to investigate <em>after the fact</em> to discover the SQL hadn&apos;t actually run. Then later, when the fresh-clone tick returned <code>183/208 (88.0%)</code>, Joey said "makes no sense" because there was no step-by-step narrative explaining where the 25 differs came from. <strong>The information was all there in the response. The interaction model wasn&apos;t.</strong>
+</div>
+
+<h3>What a steering wheel for cadence would look like</h3>
+<table>
+<tr><th>Step</th><th>Preview shows</th><th>What it does after approval</th></tr>
+<tr><td>1. Connect Snowflake</td><td>"Connecting as JOEY_BE / ACCOUNTADMIN / DEVELOPER_WH via JWT keypair"</td><td>Open connection, verify with SELECT CURRENT_USER()</td></tr>
+<tr><td>2. Resolve clone time</td><td>"About to SHOW DATABASES LIKE 'AIRBYTE_CLONE' and read created_on"</td><td>Run query, show the timestamp, calculate age</td></tr>
+<tr><td>3. Read stream catalog</td><td>"Loading infra/stream-catalog.json, filtering to 10 active schemas"</td><td>Parse, show count (208 expected), list any unexpected schemas</td></tr>
+<tr><td>4. Resolve business columns</td><td>"One INFORMATION_SCHEMA.COLUMNS query per DB; strip _AIRBYTE_* / _FIVETRAN_*"</td><td>Show count per stream, flag any with zero biz cols</td></tr>
+<tr><td>5. Build PROD SQL</td><td>"UNION ALL of 208 HASH_AGG SELECTs (~60KB)"</td><td>Construct, show first few lines + length, save to file if asked</td></tr>
+<tr><td>6. Execute PROD sweep</td><td>"Single query, expected 15-130s depending on cache state"</td><td>Run, time it, show fingerprint distribution</td></tr>
+<tr><td>7. Build CLONE SQL</td><td>(same shape against AIRBYTE_CLONE)</td><td>...</td></tr>
+<tr><td>8. Execute CLONE sweep</td><td>...</td><td>...</td></tr>
+<tr><td>9. Compute verdicts</td><td>"208 fingerprint pairs to compare"</td><td>Tally MATCH/DIFFER/ERROR/SKIP, show per-schema rollup</td></tr>
+<tr><td>10. Write to Firestore</td><td>"Snapshot doc cadence-snapshots/sweep-{ts}, fields: ..."</td><td>Write, show snapshot ID + URL</td></tr>
+<tr><td>11. Resume Scheduler? Pause Scheduler?</td><td>"Toggling cadence-tick-5m state"</td><td>Call PauseJob/ResumeJob, verify new state</td></tr>
+<tr><td>12. Wipe Firestore?</td><td>"Deleting N docs from cadence-snapshots"</td><td>Batch-commit delete, verify zero remaining</td></tr>
+</table>
+
+<p style="font-size:13px;margin-top:8px">Mode selection at startup:</p>
+<ul>
+<li><b>Interactive</b> &mdash; approve each step, see the data as it comes in. This is what Joey wants when something feels wrong.</li>
+<li><b>Auto</b> &mdash; what the Scheduler-fired ticks do. Same step list, no prompts.</li>
+<li><b>Manual</b> &mdash; if Snowflake is unreachable, Joey could pretend-run by hand and record the result. Rare but useful for forensic comparison.</li>
+</ul>
+
+<h2>Open Questions (for ~d to resolve)</h2>
+<ul>
+<li><b>Where does the steering wheel live?</b> Option A: separate <code>Cadence.Driver/</code> console app in the cadence repo, references the existing FingerprintPrimitive directly. Option B: an interactive mode on the Cloud Run service exposed via WebSocket/SSE + web UI. Option C: both.</li>
+<li><b>Does Scheduler stay auto and Driver is for the operator?</b> Or does the steering wheel REPLACE the Scheduler-fired tick during operator sessions? My instinct: keep Scheduler as Auto, Driver is for human-initiated investigation runs.</li>
+<li><b>Inspector tools for cadence equivalent of DOM Inspector?</b> Show current Snowflake session state, current Firestore count, last snapshot, Scheduler state, top DIFFER streams from last sweep. The "what's the current state of the world" call.</li>
+<li><b>Step granularity for /tick?</b> mendo-dgx has ~5-8 steps per flow. Cadence's tick has ~10-12 natural steps. Probably right-sized to match.</li>
+<li><b>Step preview detail level?</b> mendo-dgx is browser-focused so steps describe page actions. Cadence steps describe SQL queries + data movement. Need a different preview vocabulary (show SQL? show row counts? both?).</li>
+<li><b>Recovery: retry-from-step vs full restart?</b> mendo-dgx allows retry-from-step. Same should apply to cadence (e.g. PROD sweep failed; user retries that step; doesn't redo connect + resolve).</li>
+</ul>
+
+<h2>What ~d must produce</h2>
+<ol style="margin-left:22px;font-size:14px">
+<li>Naming pass for the driver (3+ candidates)</li>
+<li>Shape: console app vs web vs both; project layout in cadence repo</li>
+<li>Choice table with picks + escape routes</li>
+<li>First Move: the smallest concrete proof (probably the Connect + Resolve clone time steps in interactive mode)</li>
+<li>Pure Metal Test</li>
+<li>Scope boundary: what the driver does NOT do</li>
+</ol>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Inspect saved to <code>be/inspects/2026-05-24-2010-inspect-mendo-dgx-steering-wheel.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/inspect-mendo-dgx-steering-wheel.html</code></div>
+<div class="dod-item">&check; mendo-dgx code read in full (SteeringWheel.cs 395 lines, IStep.cs, Program.cs)</div>
+<div class="dod-item">&check; Pattern named: <strong>Preview &rarr; Prompt &rarr; Act &rarr; Capture &rarr; Recover</strong></div>
+<div class="dod-item">&check; Mapped to cadence's step inventory (12 candidate steps)</div>
+<div class="dod-item">&check; Open questions surfaced for ~d</div>
+<div class="dod-item">&check; Be index updated</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r81 &middot; 2026-05-24 20:10 &middot; ~i mendo-dgx steering wheel</div>
+</body></html>

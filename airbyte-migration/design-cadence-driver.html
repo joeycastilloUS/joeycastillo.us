@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~D: Cadence.Driver -- console app steering wheel for human-approved cadence sweeps</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.section{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:18px 0;border-left:3px solid #6FC3DF}
+.section h3{color:#6FC3DF;margin:0 0 8px;font-size:17px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}
+.choice .fork{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}
+.choice .opts{color:#888;font-size:12px;margin-bottom:6px}
+.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}
+.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}
+.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}
+.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.candidate .name{color:#6FC3DF;font-weight:700;font-family:'Consolas',monospace}
+.candidate .gut{color:#888;font-size:11px}
+.candidate.winner{border-color:#5cb85c}
+.candidate.winner .name{color:#5cb85c}
+.pmt-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:13px}
+.pmt-row .lb{color:#f06e6e;font-weight:700}
+.pmt-row .rp{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}
+.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~design: Cadence.Driver steering wheel</nav>
+
+<h1>Cadence.Driver &mdash; console app steering wheel for human-approved cadence sweeps</h1>
+<p class="sub">Same pattern as mendo-dgx&apos;s SteeringWheel, adapted for cadence&apos;s Snowflake-fingerprint workflow. Console app that wraps the existing FingerprintPrimitive in step-by-step preview-and-approve. Cloud Run service stays as-is for autonomous Scheduler-fired ticks. The Driver is the human-in-the-loop mode.</p>
+<span class="banner">Design &mdash; Pure Metal</span>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> Add <code>Cadence.Driver/</code> &mdash; a separate .NET 8 console app in the <code>acmedevus/cadence</code> repo &mdash; that runs a cadence sweep as a sequence of approved steps. <strong>Intent:</strong> Give Joey the same operator confidence he has with mendo-dgx. When the autonomous Scheduler-fired sweep returns a number that feels wrong, he runs the Driver in Interactive mode, watches each step happen, sees the intermediate data, and either trusts the result or stops mid-flow to investigate. The Cloud Run service keeps doing its autonomous work; the Driver is for human-initiated investigation runs.
+</div>
+
+<h2>Discovery</h2>
+<p>Per ~i (<code>be/inspects/2026-05-24-2010-inspect-mendo-dgx-steering-wheel.html</code>):</p>
+<ul>
+<li>mendo-dgx&apos;s SteeringWheel pattern is <strong>Preview &rarr; Prompt &rarr; Act &rarr; Capture &rarr; Recover</strong>.</li>
+<li>Three modes: <code>Interactive</code> (approve each step), <code>Auto</code> (lights out), <code>Manual</code> (operator does it, AI records).</li>
+<li>Six escape hatches per step: Skip, Back, Inspect, Find, Dump, Quit. Plus failure recovery: Retry, Inspect, Skip, Quit.</li>
+<li>Same <code>IStep</code> list runs in any of the three modes &mdash; the step author never sees the mode selection. This is the property that makes the pattern scale.</li>
+<li>Step results are first-class artifacts &mdash; every run is reconstructable from the saved <code>RunResult</code> JSON.</li>
+</ul>
+
+<p>What cadence has already that this design can reuse:</p>
+<ul>
+<li><code>Cadence/Fingerprint/FingerprintPrimitive.cs</code> with public static methods (<code>LoadStreamCursors</code>, <code>ResolveBusinessColumnsAsync</code>, <code>BuildBatchedFingerprintSql</code>, <code>RunSweepAsync</code>). The Driver calls into these directly &mdash; no Cloud Run round-trip needed.</li>
+<li><code>Cadence/Snowflake/SnowflakeConn.cs</code> + <code>KeyHelper.cs</code> &mdash; same Snowflake auth path the service uses.</li>
+<li>The static infra files (<code>infra/stream-catalog.json</code>) ship with the assembly.</li>
+<li>Cloud Run service exposes <code>/tick</code>, <code>/health</code>, <code>/dashboard</code>. None of those go away.</li>
+</ul>
+
+<h2>Naming Pass</h2>
+
+<div class="candidate"><span class="name">Cadence.Driver</span><span class="gut">direct mendo-dgx parallel &middot; matches MendoDgx.Driver &middot; clear intent</span></div>
+<div class="candidate"><span class="name">Cadence.SteeringWheel</span><span class="gut">borrows the metaphor &middot; longer &middot; less searchable</span></div>
+<div class="candidate"><span class="name">Cadence.Console</span><span class="gut">accurate &middot; generic &middot; doesn&apos;t say what it does</span></div>
+<div class="candidate"><span class="name">Cadence.Operator</span><span class="gut">describes the user &middot; not the tool</span></div>
+<div class="candidate winner"><span class="name">Cadence.Driver</span><span class="gut">winner &middot; matches MendoDgx.Driver convention &middot; same project pattern, same role</span></div>
+
+<p style="font-size:13px;color:#ccc;margin-top:8px">Joey already uses "Driver" as the naming for steering-wheel CLI tools in mendo-dgx. Same convention here means anyone landing in either repo immediately knows what <code>X.Driver</code> is. Project: <code>Cadence.Driver/Cadence.Driver.csproj</code>.</p>
+
+<h2>Shape</h2>
+
+<div class="section">
+<h3>Layout in the cadence repo</h3>
+<div class="code-block">cadence/
+  Cadence/                         # existing ASP.NET service (unchanged)
+    Cadence.csproj
+    Program.cs
+    Snowflake/
+    Fingerprint/
+  Cadence.Driver/                  # NEW console app
+    Cadence.Driver.csproj          # references ..\Cadence\Cadence.csproj
+    Program.cs                     # entry: mode selection, flow load
+    SteeringWheel.cs               # 200-300 lines, adapted from mendo-dgx
+    Config.cs                      # RunMode enum, options
+    Steps/
+      IStep.cs                     # interface + StepResult + StepContext
+      ConnectStep.cs
+      ResolveCloneTimeStep.cs
+      ResolveStreamsStep.cs
+      ResolveBizColsStep.cs
+      BuildSqlStep.cs              # parameterized for PROD or CLONE
+      ExecuteSweepStep.cs          # parameterized for PROD or CLONE
+      ComputeVerdictsStep.cs
+      WriteFirestoreStep.cs
+    Flows/
+      SweepFlow.cs                 # the 12-step list for a full /tick equivalent
+    Inspectors/
+      CadenceInspector.cs          # &quot;current state of the world&quot; for the [I] hatch
+    Results/
+      RunResult.cs                 # mirror of mendo-dgx RunResult
+      ResultWriter.cs              # JSON dumps to results/runs/
+</div>
+</div>
+
+<div class="section">
+<h3>Step granularity for a full sweep</h3>
+<table>
+<tr><th>#</th><th>Step</th><th>What the preview shows</th></tr>
+<tr><td>1</td><td>ConnectStep</td><td>JOEY_BE / ACCOUNTADMIN / DEVELOPER_WH; key path; auth method (JWT keypair via KeyHelper temp file)</td></tr>
+<tr><td>2</td><td>ResolveCloneTimeStep</td><td>Query: SHOW DATABASES LIKE &apos;AIRBYTE_CLONE&apos;. After: created_on, age in minutes</td></tr>
+<tr><td>3</td><td>ResolveStreamsStep</td><td>infra/stream-catalog.json path; filter set = 10 active schemas. After: 208 expected, list any unexpected</td></tr>
+<tr><td>4</td><td>ResolveBizColsStep (PROD)</td><td>One INFORMATION_SCHEMA.COLUMNS query against AIRBYTE_DB. After: total cols, biz cols (after stripping _AIRBYTE_*), per-stream summary</td></tr>
+<tr><td>5</td><td>BuildSqlStep (PROD)</td><td>UNION ALL of 208 HASH_AGG SELECTs. After: SQL length in chars, first 3 lines</td></tr>
+<tr><td>6</td><td>ExecuteSweepStep (PROD)</td><td>Show expected wall-clock range. After: actual wall, fingerprint count, sample fps</td></tr>
+<tr><td>7</td><td>BuildSqlStep (CLONE)</td><td>(same as #5 against AIRBYTE_CLONE)</td></tr>
+<tr><td>8</td><td>ExecuteSweepStep (CLONE)</td><td>(same as #6)</td></tr>
+<tr><td>9</td><td>ComputeVerdictsStep</td><td>208 pairs to compare. After: MATCH / DIFFER / ERROR / SKIP per-schema rollup</td></tr>
+<tr><td>10</td><td>WriteFirestoreStep</td><td>Doc path: cadence-snapshots/sweep-{ts}. Field shape. After: snapshot ID, write status</td></tr>
+</table>
+
+<p>Optional sub-flows for ops:</p>
+<ul>
+<li><b>SchedulerToggleStep</b> &mdash; pause/resume cadence-tick-5m (one step, parameterized)</li>
+<li><b>FirestoreWipeStep</b> &mdash; batch-delete all docs in cadence-snapshots (one step, includes preview of doc count)</li>
+<li><b>ResetBaselineFlow</b> &mdash; compound: SchedulerToggle(pause) &rarr; FirestoreWipe &rarr; full Sweep &rarr; SchedulerToggle(resume)</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>Inspector tools (the [I] hatch)</h3>
+<ul>
+<li>Show current Snowflake session: CURRENT_USER, CURRENT_ROLE, CURRENT_WAREHOUSE, account params</li>
+<li>Show Firestore state: collection name, doc count, latest snapshot summary</li>
+<li>Show Scheduler state: ENABLED/PAUSED, next run time, last attempt status</li>
+<li>Show Cloud Run service state: latest revision, ready replicas, latest log entries</li>
+<li>Show stream catalog: schemas, stream count per schema, cursor field overrides</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>Mode selection</h3>
+<ul>
+<li><code>cadence-driver</code> or <code>cadence-driver --interactive</code> (default) &mdash; approve each step</li>
+<li><code>cadence-driver --auto</code> &mdash; run end to end with no prompts (matches what Scheduler does, useful for local smoke)</li>
+<li><code>cadence-driver --flow reset-baseline --interactive</code> &mdash; named compound flow</li>
+<li><code>cadence-driver --skip 1,2,3</code> &mdash; pre-skip steps that you know don&apos;t need approval</li>
+</ul>
+</div>
+
+<h2>Choices + Consequences</h2>
+
+<div class="choice">
+<div class="fork">1. Where does the Driver live -- separate project, separate repo, or interactive mode on the Cloud Run service</div>
+<div class="opts">a) New <code>Cadence.Driver/</code> project in cadence repo (proposed). b) Separate <code>acmedevus/cadence-driver</code> repo. c) Interactive mode on the Cloud Run service via WebSocket + web UI.</div>
+<div class="conseq">a) One repo, one solution, shared code references, runs locally on operator&apos;s machine. b) Decoupled but duplicate Snowflake config + auth setup. c) Accessible from anywhere but adds WebSocket plumbing complexity and identity-token auth gymnastics for interactive sessions.</div>
+<div class="pick">PICK: (a) -- separate project, same repo.</div>
+<div class="why">Matches mendo-dgx convention exactly (MendoDgx.Driver alongside MendoDgx.Tests). One <code>dotnet build</code> covers both. The Driver can reference Cadence&apos;s public classes directly with no service-call overhead.</div>
+</div>
+
+<div class="choice">
+<div class="fork">2. Does the Driver replace the Cloud Run /tick during operator sessions or run alongside</div>
+<div class="opts">a) Run alongside. Driver and Cloud Run service are independent; Driver is for operator-initiated investigation. b) Driver pauses Scheduler at session start, resumes at session end. c) Driver kills the Cloud Run service for the duration.</div>
+<div class="conseq">a) Two paths writing to same Firestore -- need to differentiate (driver-initiated vs scheduler-initiated). b) Operator gets exclusive control during session but Scheduler misses ticks. c) Way too heavy.</div>
+<div class="pick">PICK: (a) -- run alongside, tag each snapshot with its source.</div>
+<div class="why">Add <code>source: &quot;driver&quot;|&quot;scheduler&quot;</code> field to Firestore docs. Dashboard can filter or color-code. No interference between modes.</div>
+</div>
+
+<div class="choice">
+<div class="fork">3. Inspector tools -- always available or only when explicitly enabled</div>
+<div class="opts">a) Always available via [I] key. b) Behind a flag for performance reasons. c) Separate command (<code>cadence-driver inspect</code>).</div>
+<div class="conseq">a) Match mendo-dgx exactly; always one keypress away. Inspector calls are cheap (small queries). b) Adds friction; defeats the purpose. c) Loses the flow context.</div>
+<div class="pick">PICK: (a) -- always available.</div>
+<div class="why">The whole point of the steering wheel is to give the operator visibility without leaving the flow. Inspector is part of the flow.</div>
+</div>
+
+<div class="choice">
+<div class="fork">4. Failure recovery -- retry from step vs restart vs ignore-and-continue</div>
+<div class="opts">a) Retry the failed step in place (default). b) Restart the whole flow. c) Mark failed and continue.</div>
+<div class="conseq">a) Preserves work already done; matches mendo-dgx; user can fix the underlying issue and retry. b) Wastes the Connect + Resolve work. c) Easy to corrupt downstream state.</div>
+<div class="pick">PICK: (a) -- retry in place.</div>
+<div class="why">Matches the established pattern. Driver can offer all four options on failure: Retry / Inspect / Skip / Quit (same as mendo-dgx).</div>
+</div>
+
+<div class="choice">
+<div class="fork">5. Step preview format -- summary text only vs full SQL preview vs both</div>
+<div class="opts">a) Summary text + minimal data (Joey said "wall time, fingerprint count, sample fps"). b) Full SQL preview by default. c) Both with [V]erbose toggle.</div>
+<div class="conseq">a) Quick scan, low noise. b) 60KB of UNION ALL SQL drowns the prompt. c) Best of both but more state to manage.</div>
+<div class="pick">PICK: (a) -- summary text. Add [D]ump to save full SQL to disk if needed.</div>
+<div class="why">Preview is for the GO/NO-GO decision. Forensic detail goes to file via Dump.</div>
+</div>
+
+<div class="choice">
+<div class="fork">6. Where do snapshots from the Driver get written</div>
+<div class="opts">a) Same Firestore collection as Cloud Run service. b) Separate <code>cadence-driver-snapshots</code> collection. c) Local <code>results/runs/*.json</code> only, no Firestore.</div>
+<div class="conseq">a) Unified timeline; dashboard shows everything. b) Cleaner separation; two timelines to view. c) Driver-only data isolated from operations record.</div>
+<div class="pick">PICK: (a) -- same collection, with <code>source: &quot;driver&quot;</code> field.</div>
+<div class="why">One timeline. Operator can see "here is the autonomous tick + here is the driver-initiated investigation I did right after, they match." Dashboard filter handles the rest.</div>
+</div>
+
+<h2>Escape Routes</h2>
+<div class="escape"><strong>Escape from PICK 1a (project in cadence repo):</strong> if the Driver grows beyond ~10 files or develops a UI of its own, split to <code>acmedevus/cadence-driver</code>. The project boundary is clean -- a move is a git filter-branch away.</div>
+<div class="escape"><strong>Escape from PICK 2a (run alongside):</strong> if the dual-source Firestore writes cause confusion, add a Driver mode that auto-pauses Scheduler at session start (matches behavior C). Single flag, no code change beyond adding the pause call.</div>
+<div class="escape"><strong>Escape from PICK 3a (always-available inspector):</strong> if inspector queries become expensive (e.g. Snowflake STATUS calls add cost), gate behind a flag. Default-on, opt-out.</div>
+<div class="escape"><strong>Escape from PICK 5a (summary preview):</strong> if operators want SQL by default, add an env var or config flag <code>CADENCE_DRIVER_VERBOSE_SQL=1</code> that flips the default.</div>
+<div class="escape"><strong>Escape from PICK 6a (unified collection):</strong> if filtering becomes tedious in the dashboard, fork to a separate collection. The <code>source</code> field already exists so backfill is straightforward.</div>
+
+<h2>Pure Metal Test</h2>
+
+<p style="font-size:13px">Can this be built with no frameworks, no external runtime, no vendor lock?</p>
+
+<div class="pmt-row"><span>.NET 8 console app</span><span class="rp">replaceable -- any console framework</span></div>
+<div class="pmt-row"><span>Cadence.Fingerprint reference</span><span class="rp">replaceable -- could duplicate the primitive if Cadence project ever split</span></div>
+<div class="pmt-row"><span>Snowflake.Data (via Cadence project)</span><span class="lb">load-bearing -- already a Cadence dep, no new dependency</span></div>
+<div class="pmt-row"><span>Console.WriteLine + Console.ReadLine</span><span class="rp">stdlib -- works anywhere .NET runs</span></div>
+<div class="pmt-row"><span>ANSI color codes</span><span class="rp">stdlib -- not strictly required</span></div>
+<div class="pmt-row"><span>System.Text.Json for RunResult serialization</span><span class="rp">stdlib</span></div>
+
+<p style="font-size:13px;margin-top:10px"><strong>Load-bearing count: 1.</strong> Snowflake.Data, already a Cadence dependency. The Driver introduces zero new external deps -- it&apos;s pure C# stdlib + reuses what Cadence already imports. Matches the mendo-dgx pattern (which has zero new deps over MendoDgx.Driver).</p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>The smallest concrete proof</strong>
+Create <code>Cadence.Driver/</code> with just three files: <code>Cadence.Driver.csproj</code>, <code>Program.cs</code> (mode selection only), and <code>Steps/ConnectStep.cs</code>. Wire SteeringWheel as a stub that runs one step (Connect) interactively. <code>dotnet run --project Cadence.Driver -- --interactive</code> prompts "Connect to JOEY_BE on DEVELOPER_WH? [Enter]=Go [Q]=Quit", runs the connect on Enter, prints "Connected as JOEY_BE / ACCOUNTADMIN / DEVELOPER_WH" or the error. If that works, the rest is mechanical -- add steps one at a time, each ~30 lines.
+</div>
+
+<h2>What this design does NOT do</h2>
+<ul>
+<li>Replace the Cloud Run service. Cloud Run keeps doing autonomous Scheduler-fired ticks.</li>
+<li>Add a web UI. Console-only, same as mendo-dgx. A web UI could come later in its own design.</li>
+<li>Add new Snowflake auth modes. Reuses <code>SnowflakeConn</code> + <code>KeyHelper</code> from the Cadence project.</li>
+<li>Add new fingerprint logic. Reuses <code>FingerprintPrimitive</code>.</li>
+<li>Touch airbyte-parity, airbyte_migration_tools, or any other repo.</li>
+<li>Add a tilde command to Be. The Driver is a normal .NET console app; <code>dotnet run</code> is the invocation.</li>
+</ul>
+
+<h2>Path to plan + build</h2>
+<p style="font-size:13px"><code>~p</code> formalizes this into a build plan (probably 5-6 phases: csproj scaffold + Connect step + SteeringWheel loop + remaining steps + Inspector + Result persistence). <code>~e</code> sizes into a board. <code>~b</code> chain through it the same way Board 9 went. Estimate: 15-20 pts.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved to <code>be/designs/2026-05-24-2010-design-cadence-driver.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/design-cadence-driver.html</code></div>
+<div class="dod-item">&check; 5 naming candidates, winner: <strong>Cadence.Driver</strong></div>
+<div class="dod-item">&check; 6 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Pure Metal Test: 1 load-bearing dep (Snowflake.Data, already in Cadence)</div>
+<div class="dod-item">&check; First Move named: csproj + Program.cs + ConnectStep alone</div>
+<div class="dod-item">&check; Pattern explicitly cites mendo-dgx as the source</div>
+<div class="dod-item">&check; Be index updated</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r82 &middot; 2026-05-24 20:10 &middot; ~d Cadence.Driver</div>
+</body></html>
