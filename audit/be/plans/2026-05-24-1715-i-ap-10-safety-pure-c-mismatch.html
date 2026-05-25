@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i AP-10 safety — pure-C mismatch, ARCHIVE</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1050px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.no { color: var(--red); font-weight: 600; }
+  td.yes { color: var(--green); font-weight: 600; }
+  td.maybe { color: var(--amber); font-weight: 600; }
+  .crit { background: #1F0F0F; border: 2px solid var(--red); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .crit b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .ok { background: #0F1F0F; border: 2px solid var(--green); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .ok b { color: var(--green); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  ol li { color: #ccc; font-size: 13.5px; margin: 6px 0; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i AP-10 safety · pure-C alignment</span></nav>
+<div class="container">
+
+<h1>~i AP-10 — ai-pantheon/safety: pure-C alignment.</h1>
+<p class="sub">Joey's framing: "why do we want to merge this, what is the value, we are pure C don't forget." Investigation 2026-05-24 17:15. <strong>Joey's instinct was 100% right. Answer: zero merge value. Archive.</strong></p>
+
+<div class="crit">
+<b>Verdict: ARCHIVE (no merge, no rewrite, no value extraction)</b>
+safety is Python + Solidity (~1,198 + ~1,200 LOC). It targets client→server transmission privacy with passive-observer threat model. nous is pure-C offline mesh with active-attacker (node capture) threat model. The two solve different problems. nous's existing vault is BETTER than safety's vault. The pieces that don't already exist in nous (Shamir recovery, blockchain seal authorities) are architecturally INCOMPATIBLE with nous's "no trusted third parties" stance.
+</div>
+
+<h2>§1 — What's actually in ai-pantheon/safety</h2>
+
+<pre>safety/
+  safety/                          ← Python modules (1,198 LOC, 11 files)
+    cloak.py                       full pipeline (strip → pad → shuffle → encrypt)
+    vault.py                       AES-256-GCM envelope, PBKDF2 (uses cryptography lib)
+    seal.py                        Shamir's Secret Sharing, 4-of-7 blockchain authorities
+    padding.py                     pad to 6 fixed bucket sizes
+    shuffle.py                     randomize storage order
+    tokens.py                      HMAC-based privacy tokens (production needs RFC 9576)
+    shamir.py                      secret splitting math
+    connectors/                    Ethereum + Bitcoin + Arweave + Solana + Base + Filecoin
+  contracts/
+    SealAuthority.sol              Ethereum smart contract (~1,200 LOC Solidity)
+  tests/, examples/, scripts/
+
+Build: pip install -e .  (Python 3.10+, depends on 'cryptography' library)
+Languages: Python + Solidity.
+Pure C content: 0 lines.</pre>
+
+<h2>§2 — The fundamental mismatch</h2>
+
+<table>
+<thead><tr><th>Property</th><th>safety</th><th>nous</th></tr></thead>
+<tbody>
+<tr><td>Language</td><td class="no">Python 3.10+ &amp; Solidity</td><td class="yes">pure C99</td></tr>
+<tr><td>External deps</td><td class="no">pip's <code>cryptography</code> lib + 7 blockchain RPC clients</td><td class="yes">zero (libc + OS primitives only)</td></tr>
+<tr><td>Build</td><td>pip install</td><td>cc</td></tr>
+<tr><td>Threat model</td><td>Passive observer of client→server traffic</td><td>Active attacker captures node</td></tr>
+<tr><td>Recovery model</td><td>Distributed Shamir recovery across 7 blockchains (trust 4-of-7)</td><td>Crypto-shred on capture (no recovery; key dies with power)</td></tr>
+<tr><td>Trust assumption</td><td>Trust 4 of 7 named blockchain authorities</td><td>Trust nothing external; only operator's compiled-in pubkey</td></tr>
+</tbody>
+</table>
+
+<h2>§3 — Concept-by-concept disposition</h2>
+
+<table>
+<thead><tr><th>Capability</th><th>nous status</th><th>Real gap?</th><th>Adopt from safety?</th></tr></thead>
+<tbody>
+<tr><td>AES-256-GCM</td><td class="yes">✅ nous/security/crypt/ (HW+SW paths)</td><td class="no">no</td><td class="no">no — nous already has it, with hardware acceleration safety lacks</td></tr>
+<tr><td>PBKDF2 + HKDF binding</td><td class="yes">✅ nous/security/vault/ (115 LOC pure C)</td><td class="no">no</td><td class="no">no — already covered</td></tr>
+<tr><td>Brute-force lockout</td><td class="yes">✅ nous vault: 256-bucket per-IP, 5 max fails, 5s backoff</td><td class="no">no</td><td class="no">nous vault is MORE sophisticated than safety's vault — safety has no brute-force defense at all</td></tr>
+<tr><td>Bucket padding</td><td class="no">✗ not implemented</td><td class="maybe">maybe</td><td class="maybe">10 lines of fresh C if Joey wants it — but operates at different layer than nous mesh; benefit unclear</td></tr>
+<tr><td>Metadata stripping</td><td class="no">✗ not in nous</td><td class="maybe">maybe — but is a request-edge concern, belongs at <code>comms/skill/waf</code> (already there)</td><td class="no">no — waf moved out of security/policy 2026-05-18 for exactly this reason</td></tr>
+<tr><td>Order shuffling</td><td class="no">✗ not implemented</td><td class="maybe">maybe</td><td class="maybe">trivial; nous packet layer already encrypts; benefit dubious</td></tr>
+<tr><td>Privacy tokens (unlinkable auth)</td><td class="no">✗ not implemented</td><td class="no">no — nous has no user identity for tokens to anonymize (mesh is peer-to-peer)</td><td class="no">no — irrelevant</td></tr>
+<tr><td>Shamir secret-splitting</td><td class="no">✗ not implemented</td><td class="no">no — nous threat model is "wipe on capture" not "distributed recovery"</td><td class="no">no — architecturally rejected (no trusted third parties)</td></tr>
+<tr><td>Blockchain-backed seal authorities</td><td class="no">✗ not implemented</td><td class="no">no — nous is offline pure-C mesh, makes ZERO blockchain RPC calls</td><td class="no">no — incompatible with nous design</td></tr>
+</tbody>
+</table>
+
+<h2>§4 — Why merging is wrong (4 reasons)</h2>
+
+<ol>
+<li><strong>Language barrier is insurmountable.</strong> Python + Solidity will not compile into pure-C. Rewriting from scratch (as we did with AP-09 integrity) discards safety's code anyway — there's no code to "merge."</li>
+<li><strong>nous already solves the problems safety solves, better.</strong> nous vault has brute-force defense safety lacks. nous crypt has HW-accelerated AES-GCM safety doesn't. The padding/shuffle/tokens concepts are traffic-analysis defenses for client→server architectures — nous operates peer-to-peer with end-to-end encryption already at link layer.</li>
+<li><strong>The pieces unique to safety contradict nous's design.</strong> Distributed seal authority means trusting 4 of 7 blockchains — that's adding 7 trusted third parties. nous starts from "all external systems are untrusted." Your key lives in RAM, dies with power. There is no recovery; there is only continuation or wipe.</li>
+<li><strong>safety addresses a different threat model.</strong> safety = "encrypt my data so a server can't read it" + "obfuscate traffic so an observer can't fingerprint it." nous = "encrypt a military-grade mesh so captured nodes reveal nothing." The second is a harder problem with a different answer (volatile keys + crypto-shred, not distributed recovery).</li>
+</ol>
+
+<h2>§5 — Schematic (BEFORE / AFTER)</h2>
+
+<pre>  BEFORE — Language Mismatch
+  ────────────────────────────────────────────────────────────────────
+   ai-pantheon/safety (Python 3.10+, Solidity)
+     ├─ Vault: AES-256-GCM         (Python; no brute-force defense)
+     ├─ Cloak: padding+shuffle+tokens (Python; client-server defense)
+     ├─ Seal: 4-of-7 Shamir         (relies on 7 blockchains)
+     └─ Connectors: Ethereum/Bitcoin/Arweave/Solana/Base/Filecoin
+
+   kastil-systems/nous (pure C99, zero deps)
+     security/skill/
+       ├─ vault/   ✅ (AES-GCM + PBKDF2 + brute-force lockout — BETTER)
+       ├─ crypt/   ✅ (AES-GCM HW+SW + SHA-256 + Ed25519 + X25519)
+       ├─ auth/    ✅ (sessions, HMAC, nonce ring)
+       ├─ seal/    ✅ (file envelope encryption)
+       ├─ policy/  ⏳ spec only (object-policy reserved, not impl)
+       └─ wipe/    ⏳ spec only (crypto-shred reserved, not impl)
+
+   Can safety merge?     NO — incompatible languages
+   Can code be reused?   NO — depends on pip
+   Concepts worth it?    PARTIAL but already covered or irrelevant
+
+
+  AFTER — Archive safety; implement policy + wipe from a-d-d spec
+  ────────────────────────────────────────────────────────────────────
+   ai-pantheon/safety → ARCHIVED
+     (reference doc for future blockchain-adjacent projects; not for nous)
+
+   kastil-systems/nous (pure C99, spec-driven)
+     security/skill/
+       ├─ vault/   ✅ KEEP (already better than safety)
+       ├─ crypt/   ✅ KEEP
+       ├─ auth/    ✅ KEEP
+       ├─ seal/    ✅ KEEP
+       ├─ policy/  ⬆ IMPLEMENT FROM A-D-D SPEC (object-policy:
+       │              tear-line stripping, per-object access,
+       │              revocation) — IGNORE safety code
+       └─ wipe/    ⬆ IMPLEMENT FROM A-D-D SPEC (crypto-shred,
+                       RAM zero, storage destroy) — IGNORE safety</pre>
+
+<h2>§6 — Updated plan</h2>
+
+<table>
+<thead><tr><th>ID</th><th>Action</th><th>What</th></tr></thead>
+<tbody>
+<tr><td><code>AP-10</code></td><td class="no">ARCHIVE</td><td><code>gh repo archive ai-pantheon/safety</code> — no merge, no rewrite, no value extraction. Preserved as historical vision doc.</td></tr>
+</tbody>
+</table>
+
+<p>Replaces the prior "MERGE INTO nous/security/skill/vault or new wipe" recommendation. That recommendation was wrong; this corrects it.</p>
+
+<h2>§7 — Direct answer to "what value, we are pure C"</h2>
+
+<p><strong>The value is zero.</strong></p>
+
+<ol>
+<li>safety's code can't compile into pure C — language barrier kills it.</li>
+<li>safety's concepts are either (a) already in nous and BETTER there (vault brute-force defense), (b) for a different threat model than nous (passive observer vs active attacker capture), or (c) architecturally incompatible with nous (blockchain trust + Shamir recovery contradict "no trusted third parties + wipe-on-capture").</li>
+<li>If we want object-policy or crypto-shred (the security gaps in nous), the a-d-d spec already names them. Build from the spec in pure C. Don't try to extract anything from safety.</li>
+</ol>
+
+<p><strong>Action: archive safety. Move on. The policy/ and wipe/ skills nous actually needs come from the a-d-d spec, not from safety.</strong></p>
+
+<footer>v0 · 2026-05-24 17:15 PDT · ~i AP-10 safety pure-C mismatch · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

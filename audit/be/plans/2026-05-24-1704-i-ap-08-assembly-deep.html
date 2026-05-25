@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i AP-08 assembly — deep investigation</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 8px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.skip { color: var(--amber); font-weight: 600; }
+  td.move { color: var(--green); font-weight: 600; }
+  .warn { background: #1F1A0F; border: 2px solid var(--amber); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .warn b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i AP-08 assembly · deep investigation</span></nav>
+<div class="container">
+
+<h1>~i AP-08 — ai-pantheon/assembly deep investigation.</h1>
+<p class="sub">Investigated 2026-05-24 16:50 via parallel Explore agent. <strong>Surprise: original recommendation needs revision.</strong> target-runtimes already has a production boot.asm; assembly's is superseded. Only boot.S (Multiboot2) + pi-vm/ (Pi bytecode + 7 demo programs) are net-new value.</p>
+
+<div class="warn">
+<b>Revision to original plan</b>
+AP-08 was scoped as a wholesale MOVE of ai-pantheon/assembly into target-runtimes/architecture/boot/. The investigation found ~70% of assembly is duplicate/superseded code. Recommendation downgrades to PARTIAL MOVE.
+</div>
+
+<h2>§1 — What's actually in ai-pantheon/assembly</h2>
+
+<pre>assembly/
+├── boot/
+│   ├── boot.asm    (149 lines, NASM, 16-bit→32-bit MBR)
+│   └── boot.S      (49 lines, GAS Multiboot2 entry)
+├── pi-vm/
+│   ├── examples/
+│   │   ├── example1.pi.asm        (6 lines, arith)
+│   │   ├── example2.pi.asm        (11 lines, conditionals)
+│   │   ├── example3.pi.asm        (9 lines, function calls)
+│   │   ├── fibonacci.pi.asm       (18 lines, iterative)
+│   │   └── receiver.pi.asm        (559 lines, transaction gateway)
+│   └── mesh/
+│       ├── mesh.pi.asm            (130 lines, mesh routing)
+│       └── mesh-client.pi.asm     (125 lines, node discovery)
+├── README.md, LICENSE, NOTICE
+
+Total: 12 files, 1,372 LOC. Languages: 8 .pi.asm (Pi VM bytecode),
+1 .asm (x86 NASM), 1 .S (x86 GAS), 3 docs.</pre>
+
+<h2>§2 — What target-runtimes already has (for comparison)</h2>
+
+<pre>target-runtimes/
+├── boot.asm       (124 lines, NASM)           ← PRODUCTION boot
+├── linker.ld      (47 lines)                  ← kernel layout
+├── pnos.c                                     ← kernel main, mesh poll
+├── klibc.c/h, cpuid.c/h, pio.h                ← freestanding runtime
+├── + 30 more .c/.h (gate, auth, vault, audit,
+│   sha256, aes_gcm, gvnic, network, kts, etc.)
+├── Makefile.biRT                              ← cross-compile build
+├── mesh-gvnic-learning/  (variant)
+└── hex-tecno-km7k-sensing/  (variant)
+
+Total: 124 files, 26,256 LOC. Active production code (deployed to
+GCE biRT gVNIC nodes).</pre>
+
+<h2>§3 — Overlap matrix (the surprise)</h2>
+
+<table>
+<thead><tr><th>Asset</th><th>In assembly</th><th>In target-runtimes</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td><code>boot.asm</code> (NASM MBR)</td><td>149 lines, ESP=0x1000000 (16 MB)</td><td>124 lines, ESP=0x4000000 (64 MB) ← PRODUCTION</td><td class="skip">SKIP — target-runtimes version is newer + tuned</td></tr>
+<tr><td><code>boot.S</code> (Multiboot2 entry)</td><td>49 lines</td><td>—</td><td class="move">MOVE — enables GRUB/QEMU boot scenarios target-runtimes can't currently support</td></tr>
+<tr><td><code>pi-vm/examples/</code></td><td>4 demos (603 LOC)</td><td>—</td><td class="move">MOVE — net-new Pi VM bytecode reference programs</td></tr>
+<tr><td><code>pi-vm/mesh/</code></td><td>mesh.pi.asm + mesh-client.pi.asm (255 LOC)</td><td>(mesh implemented in native C in pnos.c)</td><td class="move">MOVE — bytecode-level mesh routing protocol; complements (not replaces) pnos.c native impl</td></tr>
+<tr><td>linker.ld</td><td>—</td><td>47 lines ← only canonical</td><td>—</td></tr>
+<tr><td>Build system</td><td>—</td><td>Makefile.biRT</td><td>—</td></tr>
+<tr><td>Kernel main (C)</td><td>—</td><td>pnos.c</td><td>—</td></tr>
+<tr><td>Security/crypto/network engines</td><td>—</td><td>~2000+ LOC across many files</td><td>—</td></tr>
+</tbody>
+</table>
+
+<h2>§4 — What's net-new (the value)</h2>
+
+<p>Of assembly's 1,372 LOC:</p>
+
+<ul style="color:#ccc;font-size:13.5px;margin-left:20px;line-height:1.7;">
+<li><strong>boot.S (49 LOC)</strong> — Multiboot2 entry. Enables boot via GRUB, QEMU's <code>-kernel</code> mode, and other modern bootloaders. target-runtimes is BIOS-MBR-only today; this opens new test/dev scenarios.</li>
+<li><strong>Pi VM bytecode (858 LOC across 7 programs)</strong> — A custom 64-bit register VM with 16 GPRs, 8-byte fixed instruction format, ~40 opcodes (arith/logic/control/crypto/syscall). Programs include arithmetic, conditionals, function calls, iterative Fibonacci, a 559-line transaction gateway (receiver.pi.asm), and bytecode-level mesh routing.</li>
+<li><strong>The <code>piasm</code> compiler is REFERENCED but NOT in the repo</strong> — the .pi.asm files are source; the binary toolchain that compiles them to encrypted .pi.enc bytecode lives somewhere else. Joey would need to find/include that tool for the Pi VM to be runnable, OR write a fresh assembler in pure C if going forward.</li>
+</ul>
+
+<p><strong>Conceptual value:</strong> Pi VM is a portable bytecode layer that could run on any bare-metal or hypervisor target — separate from target-runtimes' native C kernel. It's reference/demo material that documents intended behavior of the mesh protocol in a more readable form than C.</p>
+
+<h2>§5 — Schematic (BEFORE / AFTER partial-move)</h2>
+
+<pre>  BEFORE
+  ───────────────────────────────────────────────────────────────
+   ai-pantheon/assembly                kastil-systems/target-runtimes
+     boot/                               boot.asm  (124 lines, PRODUCTION)
+       boot.asm (149 lines, stale) ⚠     linker.ld
+       boot.S   (49 lines, MB2)           pnos.c (kernel main)
+     pi-vm/                               klibc.c/h, cpuid, pio
+       examples/ (4 demos + receiver)     Makefile.biRT
+       mesh/ (mesh.pi.asm,                mesh-gvnic-learning/ variant
+              mesh-client.pi.asm)         hex-tecno-km7k-sensing/ variant
+     1,372 LOC                           26,256 LOC
+
+  AFTER (partial MOVE, not full)
+  ───────────────────────────────────────────────────────────────
+   ai-pantheon/assembly                kastil-systems/target-runtimes
+     ARCHIVED                            boot.asm    ← UNCHANGED (production)
+       (preserved for                    linker.ld
+        history; superseded              pnos.c
+        by target-runtimes)              boot.S      ← NEW (Multiboot2 entry)
+                                         pi-vm/      ← NEW (entire subtree, 858 LOC)
+                                           examples/ (4 .pi.asm + receiver.pi.asm)
+                                           mesh/ (mesh.pi.asm + mesh-client.pi.asm)
+                                         27,114 LOC (was 26,256 + 858 new)
+
+  Net code added to target-runtimes: ~907 LOC (boot.S 49 + pi-vm/ 858)
+  Code skipped/archived: ~465 LOC (assembly/boot.asm + docs)</pre>
+
+<h2>§6 — Updated recommendation</h2>
+
+<p>Replace AP-08 in the consolidation plan with two sub-items:</p>
+
+<table>
+<thead><tr><th>ID</th><th>Action</th><th>What</th></tr></thead>
+<tbody>
+<tr><td><code>AP-08a</code></td><td class="move">MOVE (partial)</td><td>Copy <code>assembly/boot/boot.S</code> + entire <code>assembly/pi-vm/</code> tree into <code>kastil-systems/target-runtimes/</code>. Update Makefile.biRT if any references needed. Verify build still passes.</td></tr>
+<tr><td><code>AP-08b</code></td><td class="skip">ARCHIVE</td><td><code>ai-pantheon/assembly</code> after AP-08a lands. Older boot.asm preserved in archive only; everything valuable migrated.</td></tr>
+</tbody>
+</table>
+
+<h2>§7 — Open question</h2>
+
+<p>The <code>piasm</code> compiler that turns <code>.pi.asm</code> source into runnable <code>.pi.enc</code> bytecode is referenced in the README but not present in the repo. Without it, the Pi VM programs are documentation only. <strong>Joey decides:</strong> hunt down piasm and bring it too? Write a fresh assembler in pure C as a tools/ entry? Or accept the .pi.asm files as reference/spec material only?</p>
+
+<h2>§8 — Risks</h2>
+
+<ul style="color:#ccc;font-size:13.5px;margin-left:20px;">
+<li>Makefile path references — if boot.S goes into target-runtimes/boot/ (vs root), variants (mesh-gvnic-learning, hex-tecno-km7k-sensing) need their relative paths updated.</li>
+<li>Symbol collisions — boot.S defines Multiboot2 header symbols; check no clash with boot.asm's existing symbols. (Unlikely — they target different boot mechanisms — but verify at link time.)</li>
+<li>Pi VM tooling gap — without piasm, the .pi.asm files build nothing. Make the move scope clear (we're moving the .pi.asm sources, not promising to make them runnable).</li>
+</ul>
+
+<footer>v0 · 2026-05-24 17:04 PDT · ~i AP-08 assembly deep investigation · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>

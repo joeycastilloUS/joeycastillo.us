@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~i AP-09 integrity — gap-fill analysis</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1050px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.req { color: var(--accent); font-weight: 600; }
+  td.gap { color: var(--red); font-weight: 600; }
+  td.partial { color: var(--amber); font-weight: 600; }
+  td.has { color: var(--green); font-weight: 600; }
+  .warn { background: #1F1A0F; border: 2px solid var(--amber); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .warn b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .ok-box { background: #0F1F0F; border: 2px solid var(--green); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .ok-box b { color: var(--green); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  ol li { color: #ccc; font-size: 13.5px; margin: 6px 0; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~i AP-09 integrity · gap-fill + schematics</span></nav>
+<div class="container">
+
+<h1>~i AP-09 — ai-pantheon/integrity gap-fill analysis.</h1>
+<p class="sub">Investigated 2026-05-24 17:00 via parallel Explore agent. <strong>Surprise: integrity is a manifesto (109 lines README.md), zero code.</strong> The merge isn't about copying code — it's about using integrity's design vision as conceptual validation while writing fresh pure-C in nous/memory/skill/audit/ from the a-d-d spec.</p>
+
+<div class="warn">
+<b>Revision to original plan</b>
+AP-09 was scoped as MERGE INTO nous/security/skill/seal or memory/skill/audit. The investigation found integrity has no code at all — it's a vision document. So "merge" means: write fresh pure-C from spec, adapt the 310-LOC reference impl in target-runtimes, and archive integrity as the founding vision doc that motivated the build.
+</div>
+
+<h2>§1 — What's actually in ai-pantheon/integrity</h2>
+
+<pre>integrity/
+└── README.md  (109 lines, pure markdown manifesto)
+
+Languages: zero code.
+Total LOC: 0 (just docs).
+
+Content summary:
+  - Vision: three cryptographic guarantees
+    1. Nothing changes silently (hash-chained detection)
+    2. Provenance is provable (Ed25519 signatures)
+    3. Verification is independent (client-side audit)
+  - Three-pillar architecture: Identity + Safety + Integrity
+  - References hash chains, Merkle trees, Ed25519 — at concept level only</pre>
+
+<h2>§2 — What the a-d-d spec REQUIRES for memory/skill/audit</h2>
+
+<pre>From nous/memory/CLAUDE.md § Skills table:
+  | audit | Append-only log. Every write, read, share, delete —
+            hash-chained. Tamper-evident. | hash |
+
+From nous/memory/skill/audit/CLAUDE.md § Intent:
+  "Immutable record of everything that happens. Every write, read,
+   share, delete, access — hash-chained. Tamper-evident.
+   Court-admissible."
+
+Required interface:
+  int audit_append(uint8_t action, const uint8_t obj_id[32],
+                   const uint8_t actor_id[32]);
+  int audit_verify(void);  /* walks chain, returns 0 if intact */
+  int audit_walk(audit_visitor_fn visitor, void *ctx);
+
+Required entry shape:
+  action      (uint8_t)      — write | read | share | delete | access | refactor
+  obj_id      (uint8_t[32])  — which intel object
+  actor_id    (uint8_t[32])  — which node or user
+  timestamp   (uint64_t ns)  — UTC nanosecond precision
+  prev_hash   (uint8_t[32])  — SHA-256 link to previous entry
+
+Constraints (from TRIPLES.md):
+  append_only, cannot_be_edited, cannot_be_truncated,
+  tamper_detection ("chain break detected instantly")
+
+Performance baseline: 39K ops/sec (per api-add reference)
+Deps (per skill.json): ["hash"]</pre>
+
+<h2>§3 — What kastil-systems currently has</h2>
+
+<table>
+<thead><tr><th>Location</th><th>Status</th><th>What it has</th></tr></thead>
+<tbody>
+<tr><td><code>nous/memory/skill/audit/</code></td><td class="gap">DOES NOT EXIST</td><td>Zero code. Named in spec, completely unimplemented in canonical nous.</td></tr>
+<tr><td><code>target-runtimes/audit_engine.c + .h</code></td><td class="partial">PARTIAL (310 LOC)</td><td>SHA-256 hash-chained ring buffer for bare-metal RT. 4K entries, ~512KB BSS. Genesis hash = SHA256("PANTHEON:AUDIT:GENESIS"). Functions: audit_init, audit_log, audit_query, audit_digest. <strong>Missing</strong>: actor_id/obj_id (only src_ip), full-chain walk, persistent storage, action enum, visitor pattern, triple-store integration.</td></tr>
+<tr><td><code>ai-pantheon/integrity</code></td><td class="gap">VISION ONLY</td><td>109-line markdown manifesto. No C code, no .h files, no test suite, no build system.</td></tr>
+</tbody>
+</table>
+
+<h2>§4 — Three-way comparison (the gap, named precisely)</h2>
+
+<table>
+<thead><tr><th>Capability</th><th>a-d-d spec</th><th>nous current</th><th>target-runtimes</th><th>integrity</th></tr></thead>
+<tbody>
+<tr><td>SHA-256 hash chain</td><td class="req">required</td><td class="gap">NO CODE</td><td class="has">✓ implemented</td><td class="gap">described only</td></tr>
+<tr><td>Append-only enforcement</td><td class="req">required</td><td class="gap">NO CODE</td><td class="partial">~ ring wraps</td><td class="gap">described only</td></tr>
+<tr><td>Full-chain audit_verify()</td><td class="req">required</td><td class="gap">NO CODE</td><td class="gap">✗ digest only</td><td class="gap">described only</td></tr>
+<tr><td>audit_walk(visitor, ctx)</td><td class="req">required</td><td class="gap">NO CODE</td><td class="gap">✗ query only</td><td class="gap">described only</td></tr>
+<tr><td>actor_id[32] + obj_id[32]</td><td class="req">required</td><td class="gap">NO CODE</td><td class="gap">✗ src_ip only</td><td class="gap">not addressed</td></tr>
+<tr><td>Action enumeration (6 vals)</td><td class="req">required</td><td class="gap">NO CODE</td><td class="partial">5 hardcoded cats</td><td class="gap">not addressed</td></tr>
+<tr><td>Persistence (disk/journal)</td><td class="req">required</td><td class="gap">NO CODE</td><td class="gap">✗ volatile RAM</td><td class="gap">not addressed</td></tr>
+<tr><td>Triple-store integration</td><td class="req">required</td><td class="gap">NO CODE</td><td class="gap">✗ standalone</td><td class="gap">not addressed</td></tr>
+<tr><td>Lines of code</td><td>—</td><td>0</td><td>310</td><td>0</td></tr>
+</tbody>
+</table>
+
+<p><strong>The gap, in one sentence:</strong> kastil-systems/nous needs a disk-persistent, triple-indexed, hash-chained audit log that connects every write/read/share/delete operation on intel objects to the actor who performed it, with full cryptographic proof of integrity — and zero lines of code exist for it today.</p>
+
+<h2>§5 — Schematic (BEFORE / AFTER gap-fill)</h2>
+
+<pre>  BEFORE (today — gap)
+  ────────────────────────────────────────────────────────────────────
+   nous/memory/skill/
+     hash/      ✅   FNV-1a + SHA-256 primitives
+     store/     ✅   triple store (facts, dict, strings)
+     journal/   ✅   WAL for crash safety
+     index/     ✅
+     scope/     ✅
+     mmap/      ✅
+     pack/      ✅
+     audit/     ❌   << GAP — named in spec, zero code >>
+
+   target-runtimes/audit_engine.c (310 LOC)
+     ─ standalone ring buffer for bare-metal RT
+     ─ different platform, different semantics
+     ─ not a nous skill
+
+   ai-pantheon/integrity/README.md
+     ─ founding vision: "nothing changes silently"
+     ─ 109 lines manifesto
+     ─ NO CODE
+
+
+  AFTER (audit skill implemented in nous)
+  ────────────────────────────────────────────────────────────────────
+   nous/memory/skill/
+     hash/      ✅
+     store/     ✅ ─── calls ───┐
+     journal/   ✅              │
+     audit/     ✅ NEW          ▼
+       audit.c                  audit_append(action, obj_id, actor_id)
+       audit.h                  audit_verify()  — walks full chain
+       CLAUDE.md (from a-d-d)   audit_walk(visitor_fn, ctx)
+       skill.json: deps=[hash, journal]
+       Storage:  audit.bin  (128 bytes/entry, hash-chained)
+
+   target-runtimes/audit_engine.c   ← unchanged (different platform)
+
+   ai-pantheon/integrity            ← ARCHIVED, points at nous/memory/skill/audit
+                                      "vision implemented; see canonical"
+
+   Every store write → audit_append → SHA-256 chain extends → tamper-evident</pre>
+
+<h2>§6 — What we GET from this (concrete capabilities)</h2>
+
+<ol>
+<li><strong>Full forensic trail</strong> — every triple store write/read/delete/share logged with (action, obj_id[32], actor_id[32], timestamp, prev_hash[32]). 39K ops/sec spec baseline.</li>
+<li><strong>Tamper-proof history</strong> — walk entire chain from genesis to present. Break one entry, all downstream hashes fail. Detected instantly on <code>audit_verify()</code>.</li>
+<li><strong>Replay any historical state</strong> — hash-chain walk with visitor callback reconstructs store state at any prior timestamp. Forensic recovery + legal discovery.</li>
+<li><strong>Actor accountability</strong> — every operation signed with actor_id[32]. Answers "who changed fact X on date Y?" with cryptographic proof.</li>
+<li><strong>Immutable chain-of-custody</strong> — intel objects inherit audit history from capture (device + timestamp + hash at point 0). Court-admissible.</li>
+<li><strong>Crash-safe</strong> — journal integration means audit entries survive power loss (unlike target-runtimes' volatile BSS ring buffer).</li>
+<li><strong>Evidence chain maturity</strong> — "tamper-evident from birth" — enables investigative/legal workflows where provenance IS evidence.</li>
+</ol>
+
+<h2>§7 — Updated recommendation</h2>
+
+<div class="ok-box">
+<b>Implementation path</b>
+Write fresh pure-C audit.c in nous/memory/skill/audit/ derived from (a) a-d-d spec for interface + storage shape, (b) target-runtimes/audit_engine.c for hash-chain logic (port semantics, swap ring buffer for journal-backed append-only file, swap src_ip for actor_id/obj_id), (c) integrity README as the design vision that motivates the build.
+</div>
+
+<p>Replace AP-09 in the consolidation plan with:</p>
+
+<table>
+<thead><tr><th>ID</th><th>Action</th><th>What</th></tr></thead>
+<tbody>
+<tr><td><code>AP-09a</code></td><td class="req">BUILD</td><td>Implement <code>nous/memory/skill/audit/{audit.c, audit.h, CLAUDE.md, DIAGRAM.md, TRIPLES.md, skill.json}</code> from the a-d-d spec, adapting hash-chain logic from <code>target-runtimes/audit_engine.c</code>. Add hooks in <code>store.c</code> so every fact write calls <code>audit_append()</code>.</td></tr>
+<tr><td><code>AP-09b</code></td><td class="partial">ARCHIVE</td><td><code>ai-pantheon/integrity</code> after AP-09a lands. README updated to point at <code>kastil-systems/nous/memory/skill/audit</code> as the implemented vision.</td></tr>
+</tbody>
+</table>
+
+<h2>§8 — Direct answer to "what is this and what do we get from it"</h2>
+
+<p><strong>What integrity IS</strong>: a 109-line founding manifesto from ai-pantheon describing three cryptographic guarantees (nothing changes silently, provenance is provable, verification is independent). Zero implementation.</p>
+
+<p><strong>What we GET</strong>: integrity itself contributes the design vision — it doesn't contribute code. The actual deliverable is a fresh pure-C audit skill in nous, derived from the a-d-d spec, adapting battle-tested hash-chain logic from target-runtimes. Once shipped, every NOUS triple-store operation becomes tamper-evident and forensically replayable.</p>
+
+<p><strong>What we DON'T need to do</strong>: try to merge integrity's nonexistent code into nous. The "merge" framing was misleading; the real action is "write the skill the spec demands, archive integrity as the vision doc."</p>
+
+<footer>v0 · 2026-05-24 17:04 PDT · ~i AP-09 integrity gap-fill analysis · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>
