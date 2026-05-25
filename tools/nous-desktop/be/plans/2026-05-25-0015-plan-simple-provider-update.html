@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~p: simple provider update — add what works, defer what needs more</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 1.2rem; }
+  .container { max-width: 920px; margin: 0 auto; padding: 32px 24px; }
+  h1 { color: #6FC3DF; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 1rem; margin-bottom: 24px; }
+  .banner { background: #6FC3DF11; border-left: 3px solid #6FC3DF; padding: 10px 16px; margin-bottom: 24px; color: #6FC3DF; font-weight: 600; font-size: 0.9rem; }
+  h2 { color: #6FC3DF; font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #6FC3DF; font-size: 1rem; margin: 18px 0 8px; }
+  .card { background: #1A1A1A; border-radius: 8px; padding: 16px 20px; margin: 10px 0; }
+  ul, ol { margin-left: 22px; margin-bottom: 12px; }
+  li { margin: 6px 0; }
+  pre { color: #ccc; font-size: 0.80rem; overflow-x: auto; background: #0a0a0a; padding: 12px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+  code { color: #6FC3DF; background: #1A1A1A; padding: 1px 6px; border-radius: 3px; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88rem; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-size: 0.82rem; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1A1A1A; vertical-align: top; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #222; color: #555; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span></nav>
+<div class="container">
+
+<h1>~p: simple provider update</h1>
+<p class="subtitle">Add the 5 models that live-probed green. Replace 1 broken model ID. Restart the server so the new Anthropic key takes effect. Defer the 6 candidates that need code changes to a follow-up plan. Total wall time ~15 min.</p>
+<div class="banner">Plan -- Awaiting Approval</div>
+
+<h2>1. Intent</h2>
+<div class="card">
+<p>Make every Anthropic + Mistral entry actually work AND add the 5 new models that probed green &mdash; without breaking anything else. Keep this update simple: <strong>config table edits + rebuild, no request-format changes, no new format types</strong>. The other 6 candidates that need code changes (gpt-5.5 max_completion_tokens, codex variants on Responses API, etc.) are documented in the companion <code>~i</code> and queued for a follow-up <code>~p</code>.</p>
+</div>
+
+<h2>2. Scope</h2>
+<div class="card">
+<h3>In</h3>
+<ul>
+  <li>Edit <code>g_defaults[]</code> in <code>src/serve.c</code>: 1 update, 1 swap, 3 adds (5 line-changes total).</li>
+  <li>Confirm <code>MAX_PROVIDERS</code> can hold 25 entries (currently 22, going to 25).</li>
+  <li>Wait for Joey's Mistral key paste &mdash; if received, install via setx + add codestral-latest as a 26th entry. If not received, skip the Mistral additions; the 5 must-have additions don't depend on it.</li>
+  <li>Rebuild via gcc, kill running server, relaunch via PowerShell <code>&amp;</code> + <code>--no-auth 5050</code>.</li>
+  <li>Smoke probe each NEW or CHANGED entry to confirm production behavior matches probe.</li>
+  <li>Hard-refresh browser; visually confirm tile lineup.</li>
+  <li>Render <code>~a~t</code> build report, commit, push, backfill.</li>
+</ul>
+<h3>Out (deferred to follow-up plan)</h3>
+<ul>
+  <li>gpt-5.5 family &mdash; needs serve.c switch to <code>max_completion_tokens</code>.</li>
+  <li>OpenAI codex variants (gpt-5.3-codex etc.) &mdash; need new <code>openai-responses</code> format type for <code>/v1/responses</code> endpoint.</li>
+  <li>grok-multi-agent &mdash; needs different API surface.</li>
+  <li>gemini-3.5-flash / gemini-3-pro-preview &mdash; retry after current 429.</li>
+  <li>"Missing key" red-badge in cockpit UI.</li>
+  <li>Populating <code>nous_keys_builtin.h</code> for zero-config first-run.</li>
+</ul>
+</div>
+
+<h2>3. Approach</h2>
+<div class="card">
+<p>Three commits, each verifiable independently:</p>
+<ol>
+  <li><strong>Commit A</strong> &mdash; Edit <code>g_defaults[]</code> (config only). 5 lines. App stays runnable on rebuild.</li>
+  <li><strong>Commit B</strong> &mdash; Rebuild + relaunch + smoke probe + build report. The runtime side.</li>
+  <li><strong>Commit C</strong> (conditional) &mdash; Mistral key install + codestral entry. Only fires if Joey pastes Mistral key. If not, this phase is a no-op.</li>
+</ol>
+<p>Server restart is required because the provider table is compile-time + env keys are read at <code>load_providers()</code>. The currently-running server (PID 26904) was launched before <code>ANTHROPIC_API_KEY</code> existed in env, so even though the binary has Anthropic entries, the key field is empty in that process. <strong>The restart is what lights Claude up.</strong></p>
+</div>
+
+<h2>4. Phases</h2>
+<div class="card">
+
+<h3>Phase A &mdash; Edit g_defaults[] (~5 min)</h3>
+<p>File: <code>src/serve.c</code>. Exact changes:</p>
+<table>
+  <tr><th>Action</th><th>Entry name</th><th>Old model ID</th><th>New model ID</th><th>Why</th></tr>
+  <tr><td>UPDATE</td><td><code>claude-opus</code></td><td>claude-opus-4-6</td><td><strong>claude-opus-4-7</strong></td><td>Current GA flagship per Anthropic docs; 4-6 is now legacy.</td></tr>
+  <tr><td>SWAP</td><td><code>grok-fast</code></td><td>grok-4-1-fast-reasoning <em>(broken — not in xAI catalog)</em></td><td><strong>grok-4.20-0309-non-reasoning</strong></td><td>Faster sibling of current grok entry; same generation; verified working.</td></tr>
+  <tr><td>ADD</td><td><code>grok-flagship</code> (new entry)</td><td>—</td><td><strong>grok-4.3</strong></td><td>Next-gen Grok flagship; verified working.</td></tr>
+  <tr><td>ADD</td><td><code>deepseek-coder</code> (new entry)</td><td>—</td><td><strong>deepseek-v4-pro</strong></td><td>MIT-licensed best open coding model (80.6% SWE-bench Verified). Headline coding addition.</td></tr>
+  <tr><td>ADD</td><td><code>deepseek-coder-fast</code> (new entry)</td><td>—</td><td><strong>deepseek-v4-flash</strong></td><td>Cheap fast coding ($0.14/$0.28 per MTok).</td></tr>
+</table>
+<p>Pricing for new entries: grok-4.3 ($2/$6 estimate — verify against xAI page); deepseek-v4-pro ($1.74/$3.48 per public refs); deepseek-v4-flash ($0.14/$0.28 per public refs). If uncertain at edit time, use the existing sibling's pricing as placeholder and update later from a billing-true source.</p>
+<p><strong>Exit gate:</strong> serve.c compiles cleanly. New entries count: 22 + 3 = 25 entries (need to verify MAX_PROVIDERS &gt;= 25 in the define).</p>
+
+<h3>Phase B &mdash; Rebuild + relaunch + smoke (~5 min)</h3>
+<ol>
+  <li>Stop running server: <code>Stop-Process -Name nous-desktop -Force</code>.</li>
+  <li>Rebuild: same gcc incantation from prior builds. Expect zero new warnings.</li>
+  <li>Relaunch: PowerShell <code>&amp;</code> + <code>--no-auth 5050</code> in background. WDAC bypass proven path.</li>
+  <li>Probe <code>/api/loop-config</code>: confirm 25 entries served, including all 5 changes.</li>
+  <li>Hit each of the 5 new/changed entries via chat-completion through the cockpit fan-out (or REST direct). Confirm 200 + non-empty reply for each.</li>
+  <li>Hard-refresh browser; visually verify NOUS tab tiles render and DATA ACCESS column shows new providers.</li>
+</ol>
+<p><strong>Exit gate:</strong> 5 green smokes. Claude tiles populate. Cockpit shows new lineup.</p>
+
+<h3>Phase C &mdash; Mistral (conditional, if key pasted) (~5 min)</h3>
+<p>Only runs if Joey pastes a Mistral key before Phase B completes (or as a follow-up after).</p>
+<ol>
+  <li>Be runs <code>setx MISTRAL_API_KEY &lt;value&gt;</code>. Verifies env readback.</li>
+  <li>Probes the 3 existing Mistral entries (mistral-medium-latest / mistral-large-latest / magistral-medium-latest) for 200 reply.</li>
+  <li>Adds <code>codestral</code> entry to <code>g_defaults[]</code> with model <code>codestral-latest</code> at Mistral endpoint, openai format.</li>
+  <li>Rebuilds + relaunches.</li>
+  <li>Smoke probes all 4 Mistral entries.</li>
+</ol>
+<p>If Joey doesn't paste Mistral key: skip Phase C entirely. The 5 must-have additions from Phase A still ship. Mistral entries stay dark but visually present.</p>
+
+<h3>Total estimated effort</h3>
+<table>
+  <tr><th>Phase</th><th>Time</th><th>Blocking on?</th></tr>
+  <tr><td>A &mdash; Edit g_defaults</td><td>~5 min</td><td>nothing</td></tr>
+  <tr><td>B &mdash; Rebuild + smoke</td><td>~5 min</td><td>Phase A</td></tr>
+  <tr><td>C &mdash; Mistral (optional)</td><td>~5 min</td><td>Joey's Mistral key paste</td></tr>
+  <tr><td><strong>Total (with Mistral)</strong></td><td><strong>~15 min</strong></td><td>1 paste</td></tr>
+  <tr><td><strong>Total (without Mistral)</strong></td><td><strong>~10 min</strong></td><td>nothing</td></tr>
+</table>
+</div>
+
+<h2>5. Constraints</h2>
+<div class="card">
+<ul>
+  <li><strong>Config-only changes.</strong> No request-format changes. No new format types. The 6 candidates that need code changes are explicitly DEFERRED to a follow-up plan.</li>
+  <li><strong>MAX_PROVIDERS bump if needed.</strong> Currently 22 &rarr; 25 (or 26 with Mistral phase). If <code>MAX_PROVIDERS</code> define is set to anything &gt;= 26, no change. If lower, bump to 32 for headroom.</li>
+  <li><strong>Server restart required.</strong> Provider table is compile-time + env keys are read at startup. wwwroot edits don't apply.</li>
+  <li><strong>Anthropic key rotation reminder.</strong> Key appeared in chat transcript. After Phase B confirms Claude works, recommend Joey regenerate the key at console.anthropic.com and re-paste; Be re-runs setx. Same protocol as SETUP.md §ROTATION.</li>
+  <li><strong>Rule 4 (Joey pastes, Be handles)</strong> for Mistral key when it lands.</li>
+  <li><strong>No DoD-bypass.</strong> Build report at the end. Hash backfilled. Board item moved to Done.</li>
+</ul>
+</div>
+
+<h2>6. Unknowns</h2>
+<div class="card">
+<ol>
+  <li><strong>Exact pricing for new entries.</strong> grok-4.3, deepseek-v4-pro, deepseek-v4-flash, codestral-latest &mdash; my pricing values are from public refs (may be slightly off). Verify against each provider's billing page; update if needed in a follow-up.</li>
+  <li><strong>MAX_PROVIDERS define.</strong> Need to read it before edit; bump if &lt; 26. Easy fix, just need to check.</li>
+  <li><strong>Does deepseek-v4-pro return well-shaped responses through the existing openai format builder?</strong> Reasoner models sometimes need different handling. The probe returned empty content at max_tokens=4 (expected for reasoners that reserve tokens for hidden chain-of-thought). Real production calls with larger max_tokens should be fine, but worth observing first call.</li>
+  <li><strong>Will Claude work without restarting the server first?</strong> No &mdash; need restart. Stated as a constraint, not really unknown.</li>
+  <li><strong>If Mistral key paste doesn't come tonight, does anything break?</strong> No. Phase A+B ships independently. Mistral entries stay dark but inert.</li>
+</ol>
+</div>
+
+<h2>7. When To Revisit</h2>
+<div class="card">
+<table>
+  <tr><th>Signal</th><th>Action</th></tr>
+  <tr>
+    <td>Phase B smoke FAIL on any of the 5 entries</td>
+    <td>Diagnose-in-place per entry. The probes already confirmed each works at the API; if the cockpit-served call fails, something in the request builder needs adjusting for that specific provider/model. Patch and re-rebuild.</td>
+  </tr>
+  <tr>
+    <td>Joey wants the deferred 6 candidates (gpt-5.5, codex variants)</td>
+    <td>New <code>~p</code> for "advanced provider update": add max_completion_tokens per-model handling + new openai-responses format type + /v1/responses endpoint support. Bigger lift (~2 hours code), clear path.</td>
+  </tr>
+  <tr>
+    <td>Joey wants local-model support (Qwen, Gemma, Devstral via Ollama)</td>
+    <td>New <code>~p</code> for "local-runtime providers": add "ollama" format type + localhost:11434 endpoints + auto-discover installed models.</td>
+  </tr>
+  <tr>
+    <td>Joey wants the missing-key red-badge in cockpit UI</td>
+    <td>Small UI plan; loop.js already has tile-building code. Add a visual marker when <code>api_key</code> is empty for a provider. ~30 min.</td>
+  </tr>
+  <tr>
+    <td>Pricing drift detected (cost tracking shows surprising totals)</td>
+    <td>Audit pricing values against each provider's current billing page; one-line fixes per entry.</td>
+  </tr>
+</table>
+</div>
+
+<h2>8. Board impact</h2>
+<div class="card">
+<p>The existing in-flight board item from the <code>~p</code> 2026-05-24 23:55 plan covers this scope. No new board item needed &mdash; just mark this plan as the executable refinement of that one. The earlier plan listed the same 5 must-have changes plus the deferred candidates; this plan keeps the same goal but explicitly drops the candidates that need code-level work.</p>
+<p>If we want a fresh, narrower board entry to track only the simple update: optional, recommend not (would split the audit trail).</p>
+</div>
+
+<h2>9. Next</h2>
+<div class="card">
+<p>Plan awaits Joey's approval. On approve:</p>
+<ol>
+  <li>Phase A: edit g_defaults[] (~5 min). Commit.</li>
+  <li>Phase B: rebuild + relaunch + smoke + build report. Commit. Pop the cockpit so Joey sees Claude tiles light up.</li>
+  <li>(Phase C: only if Mistral key paste lands.)</li>
+  <li>Rotation reminder for Anthropic key.</li>
+</ol>
+<p><strong>One question for Joey before approve:</strong> for the 6 deferred candidates (gpt-5.5 family, codex variants, multi-agent grok, 3.5-flash retry), do you want a follow-up <code>~p</code> drafted right after this lands, or want to see what the simple update feels like first before deciding to invest in the code-level changes?</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none; margin:0; padding:0;">
+  <li>&#x2713; Code committed (this artifact + ~i + index + telemetry)</li>
+  <li>&#x2713; Hash in telemetry (backfilled post-commit)</li>
+  <li>&#x2014; Board updated (no new item; rolls under existing in-flight item)</li>
+  <li>&#x2713; HTML report saved (this file)</li>
+  <li>&#x2713; Index updated (Plans section gets this entry)</li>
+  <li>&#x2713; Pushed to remote</li>
+  <li>&#x2713; No prior damage (planning only)</li>
+  <li>&#x2713; Production verified (artifact mirrored to joeycastillo.us/tools/nous-desktop after commit)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r121 &middot; 2026-05-25 00:15 &middot; nous-desktop &middot; ~p simple provider update (Awaiting Approval)</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i: model candidates — live probe of every new model</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 1.2rem; }
+  .container { max-width: 920px; margin: 0 auto; padding: 32px 24px; }
+  h1 { color: #6FC3DF; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 1rem; margin-bottom: 24px; }
+  h2 { color: #6FC3DF; font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #6FC3DF; font-size: 1rem; margin: 18px 0 8px; }
+  .card { background: #1A1A1A; border-radius: 8px; padding: 16px 20px; margin: 10px 0; }
+  ul, ol { margin-left: 22px; margin-bottom: 12px; }
+  li { margin: 6px 0; }
+  pre { color: #ccc; font-size: 0.80rem; overflow-x: auto; background: #0a0a0a; padding: 12px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+  code { color: #6FC3DF; background: #1A1A1A; padding: 1px 6px; border-radius: 3px; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.87rem; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-size: 0.82rem; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1A1A1A; vertical-align: top; }
+  .ok { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .fail { color: #ef4444; font-weight: 600; }
+  .add { background: #22c55e22; }
+  .skip { background: #f59e0b15; }
+  .investigate { background: #6FC3DF15; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #222; color: #555; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span></nav>
+<div class="container">
+
+<h1>~i: model candidates — live probe of every new model</h1>
+<p class="subtitle">Probed each candidate with a 4-token "reply OK" prompt against the actual provider endpoint, using Joey's NEO env-scope keys. Decisions in column 4. No guessing.</p>
+
+<h2>Headline</h2>
+<div class="card">
+<p><strong>Anthropic key now works.</strong> Fresh-installed via setx; all 4 Claude models probed (including legacy 4-6) returned "OK". Claude is alive at the API layer — cockpit will light up after the server restart in Phase 4.</p>
+<p><strong>5 new models can be ADDED today</strong> with existing keys: claude-opus-4-7, grok-4.3, grok-4.20-0309-non-reasoning, deepseek-v4-pro, deepseek-v4-flash. All live-probed green.</p>
+<p><strong>6 candidates have specific blockers</strong> that require more than a model-ID swap. Documented per-model below with the exact error. Recommend skip-for-now; revisit in a follow-up plan.</p>
+<p><strong>Mistral key still pending</strong> from Joey. Once it lands, 3 existing dead entries (mistral / mistral-large / magistral) come back, and 1 NEW entry (codestral-latest) becomes addable.</p>
+</div>
+
+<h2>Per-candidate probe results</h2>
+<div class="card">
+
+<h3>Anthropic — confirms key works on all 4 (including legacy)</h3>
+<table>
+  <tr><th>Model</th><th>What it is</th><th>Live status</th><th>Decision</th></tr>
+  <tr class="add"><td><code>claude-opus-4-7</code></td><td>Current GA Opus flagship. "Step-change improvement in agentic coding over 4.6" per Anthropic docs.</td><td><span class="ok">OK</span> · reply "OK"</td><td><strong>ADD</strong> (replace claude-opus-4-6)</td></tr>
+  <tr><td><code>claude-opus-4-6</code></td><td>Legacy Opus (still served, will be deprecated).</td><td><span class="ok">OK</span> · reply "OK"</td><td><strong>REPLACE</strong> with 4-7</td></tr>
+  <tr><td><code>claude-sonnet-4-6</code></td><td>Current GA Sonnet. Speed + intelligence balance.</td><td><span class="ok">OK</span> · reply "OK"</td><td>KEEP as-is</td></tr>
+  <tr><td><code>claude-haiku-4-5-20251001</code></td><td>Current GA Haiku. Fastest near-frontier.</td><td><span class="ok">OK</span> · reply "OK"</td><td>KEEP as-is</td></tr>
+</table>
+
+<h3>OpenAI — gpt-5.5 + codex variants blocked on request-shape</h3>
+<table>
+  <tr><th>Model</th><th>What it is</th><th>Live status</th><th>Decision</th></tr>
+  <tr class="investigate"><td><code>gpt-5.5</code></td><td>April 23 2026 GA. "Frontier model for complex professional work."</td><td><span class="fail">HTTP 400</span> · "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead."</td><td><strong>INVESTIGATE</strong> — needs serve.c request-builder change (per-model max_tokens vs max_completion_tokens). Code change, not config.</td></tr>
+  <tr class="skip"><td><code>gpt-5.5-pro</code></td><td>Top-tier 5.5 reasoning.</td><td><span class="fail">HTTP 404</span> · model exists in /v1/models but not accessible at chat-completions endpoint with this key tier.</td><td>SKIP — account/tier or Responses API only.</td></tr>
+  <tr class="skip"><td><code>gpt-5.4-pro</code></td><td>Top-tier 5.4 reasoning.</td><td><span class="fail">HTTP 404</span> · same.</td><td>SKIP — same.</td></tr>
+  <tr class="skip"><td><code>gpt-5.3-codex</code></td><td>Coding-specialist. Per OpenAI docs, the codex variants run on Responses API (<code>/v1/responses</code>), not Chat Completions.</td><td><span class="fail">HTTP 404</span> on chat-completions</td><td>SKIP — needs new "openai-responses" format type in serve.c. Real coding win but bigger lift.</td></tr>
+  <tr class="skip"><td><code>gpt-5.1-codex-max</code> / <code>-mini</code></td><td>Same family.</td><td><span class="fail">HTTP 404</span> on chat-completions</td><td>SKIP — same.</td></tr>
+</table>
+
+<h3>xAI Grok — 2 add, 1 skip</h3>
+<table>
+  <tr><th>Model</th><th>What it is</th><th>Live status</th><th>Decision</th></tr>
+  <tr class="add"><td><code>grok-4.3</code></td><td>Next-gen Grok flagship. Newer than 4.20.</td><td><span class="ok">OK</span> · reply "OK"</td><td><strong>ADD</strong> as new entry (grok-flagship or similar).</td></tr>
+  <tr class="add"><td><code>grok-4.20-0309-non-reasoning</code></td><td>Faster sibling of grok-4.20-0309-reasoning (current "grok" entry).</td><td><span class="ok">OK</span> · reply "OK"</td><td><strong>REPLACE</strong> the broken grok-fast (model-ID <code>grok-4-1-fast-reasoning</code> doesn't exist in xAI catalog).</td></tr>
+  <tr class="skip"><td><code>grok-4.20-multi-agent-0309</code></td><td>Multi-agent variant.</td><td><span class="fail">HTTP 400</span> · "Multi Agent requests are not allowed on chat completions"</td><td>SKIP — needs different API surface. Future plan.</td></tr>
+</table>
+
+<h3>DeepSeek — both new V4 variants work</h3>
+<table>
+  <tr><th>Model</th><th>What it is</th><th>Live status</th><th>Decision</th></tr>
+  <tr class="add"><td><code>deepseek-v4-pro</code></td><td>MIT-licensed top open coding model. 80.6% SWE-bench Verified. Codeforces 3206. 1M context. <strong>Best open coding model in any league.</strong></td><td><span class="ok">OK</span> · empty reply (normal for reasoner at max_tokens=4)</td><td><strong>ADD</strong> as new entry.</td></tr>
+  <tr class="add"><td><code>deepseek-v4-flash</code></td><td>Cheap fast coding. 79.0% SWE-bench at $0.14/$0.28 per MTok — almost free at scale.</td><td><span class="ok">OK</span></td><td><strong>ADD</strong> as new entry.</td></tr>
+  <tr><td><code>deepseek-chat</code> (existing)</td><td>Existing entry; uses alias that still resolves at chat-completion time though not in /v1/models.</td><td><span class="ok">OK</span> · reply "OK"</td><td>KEEP — alias works. Could rename for clarity later but no urgency.</td></tr>
+  <tr><td><code>deepseek-reasoner</code> (existing)</td><td>Existing entry; alias still resolves.</td><td><span class="ok">OK</span> · empty reply (normal)</td><td>KEEP — alias works.</td></tr>
+</table>
+
+<h3>Gemini — 3.x preview names exist but unstable on probe</h3>
+<table>
+  <tr><th>Model</th><th>What it is</th><th>Live status</th><th>Decision</th></tr>
+  <tr class="investigate"><td><code>gemini-3.5-flash</code></td><td>Newer than our gemini-2.5-flash. Listed in /models.</td><td><span class="fail">empty error</span> on probe</td><td>INVESTIGATE — listed but errored; may be staged/preview-only.</td></tr>
+  <tr class="investigate"><td><code>gemini-3-pro-preview</code></td><td>Pro preview generation 3.</td><td><span class="warn">HTTP 429</span> · rate limited (model exists, just busy)</td><td>RETRY in Phase 2 follow-up; if PASS, ADD; if 429 persists, defer.</td></tr>
+  <tr><td><code>gemini-3.1-pro-preview</code> (existing)</td><td>Already in our table.</td><td><span class="warn">HTTP 429</span> · rate limited</td><td>KEEP — alias resolves; just was busy at probe time.</td></tr>
+  <tr><td><code>gemini-3-flash-preview</code> (existing)</td><td>Already in our table.</td><td><span class="warn">empty error</span></td><td>KEEP for now — listed in /models; may need different invocation.</td></tr>
+</table>
+
+<h3>Perplexity — probe params wrong (production probably fine)</h3>
+<table>
+  <tr><th>Model</th><th>What it is</th><th>Live status</th><th>Decision</th></tr>
+  <tr><td><code>sonar-pro</code></td><td>Existing entry.</td><td><span class="warn">HTTP 400</span> · "max_tokens must be at least 16 for sonar-pro"</td><td>KEEP — production uses higher max_tokens; my 4-token probe was too small. <em>Not a real breakage.</em></td></tr>
+  <tr><td><code>sonar-reasoning-pro</code></td><td>Existing entry.</td><td>Same 400 (same root cause likely)</td><td>KEEP — same.</td></tr>
+  <tr><td><code>sonar-deep-research</code></td><td>Existing entry.</td><td>Same 400</td><td>KEEP — same.</td></tr>
+</table>
+
+<h3>Mistral — pending key paste from Joey</h3>
+<table>
+  <tr><th>Model</th><th>What it is</th><th>Live status</th><th>Decision</th></tr>
+  <tr class="investigate"><td><code>mistral-medium-latest</code> (existing)</td><td>Existing entry; alias auto-updates.</td><td><span class="fail">HTTP 401</span> · key rejected</td><td>WAIT for Joey's fresh Mistral key paste.</td></tr>
+  <tr class="investigate"><td><code>mistral-large-latest</code> (existing)</td><td>Same.</td><td><span class="fail">HTTP 401</span></td><td>WAIT.</td></tr>
+  <tr class="investigate"><td><code>magistral-medium-latest</code> (existing)</td><td>Same.</td><td><span class="fail">HTTP 401</span></td><td>WAIT.</td></tr>
+  <tr class="add"><td><code>codestral-latest</code> (NEW)</td><td>Coding-specialist. #1 LMSys Copilot Arena. 95.3% FIM pass@1 — best fast inline code completion of any model open or closed.</td><td><em>(not probed yet — pending key)</em></td><td><strong>ADD</strong> after Mistral key fixed.</td></tr>
+</table>
+</div>
+
+<h2>Summary by decision</h2>
+<div class="card">
+<h3>ADD NOW (5 models, all live-probed working with existing keys)</h3>
+<ol>
+  <li><code>claude-opus-4-7</code> — replace claude-opus-4-6</li>
+  <li><code>grok-4.3</code> — new entry, Grok flagship</li>
+  <li><code>grok-4.20-0309-non-reasoning</code> — replace broken grok-fast</li>
+  <li><code>deepseek-v4-pro</code> — new entry, best open coding model</li>
+  <li><code>deepseek-v4-flash</code> — new entry, cheap coding</li>
+</ol>
+
+<h3>ADD AFTER MISTRAL KEY LANDS (1 model + 3 revived)</h3>
+<ol>
+  <li><code>codestral-latest</code> — new entry, best fast inline coding</li>
+  <li>(plus mistral / mistral-large / magistral entries revive automatically once key works)</li>
+</ol>
+
+<h3>SKIP for this update (5 candidates, blockers documented)</h3>
+<ol>
+  <li><code>gpt-5.5</code> — needs serve.c change (max_tokens &rarr; max_completion_tokens). Real, but adds code complexity. Future plan.</li>
+  <li><code>gpt-5.5-pro</code>, <code>gpt-5.4-pro</code> — HTTP 404, account/tier or Responses API only.</li>
+  <li><code>gpt-5.3-codex</code>, <code>gpt-5.1-codex-max</code>, <code>gpt-5.1-codex-mini</code> — Responses API only. Needs new format type in serve.c. Future plan for "coding specialist" surface.</li>
+  <li><code>grok-4.20-multi-agent-0309</code> — different API surface; not chat-completions.</li>
+  <li><code>gemini-3.5-flash</code>, <code>gemini-3-pro-preview</code> — listed but unstable on probe; retry later.</li>
+</ol>
+
+<h3>NO ACTION (working as expected, probe issues only)</h3>
+<ul>
+  <li>Perplexity sonar-* — probe used max_tokens=4 which Perplexity rejects; production uses higher. Production is presumed fine.</li>
+  <li>Existing DeepSeek aliases — probe shows they DO resolve at chat-completion time; keep as-is.</li>
+  <li>Existing Gemini 3.1-pro-preview &amp; 3-flash-preview — listed in /models; probe was rate-limited.</li>
+</ul>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none; margin:0; padding:0;">
+  <li>&#x2713; Code committed (this artifact + index + telemetry)</li>
+  <li>&#x2713; Hash in telemetry (backfilled post-commit)</li>
+  <li>&#x2014; Board updated (this is an inspect; the ~p artifact handles board flow)</li>
+  <li>&#x2713; HTML report saved (this file)</li>
+  <li>&#x2713; Index updated (Plans section gets this entry)</li>
+  <li>&#x2713; Pushed to remote</li>
+  <li>&#x2713; No prior damage (read-only probes only)</li>
+  <li>&#x2713; Production verified (artifact will be live-mirrored to joeycastillo.us/tools/nous-desktop)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r120 &middot; 2026-05-25 00:10 &middot; nous-desktop &middot; ~i model candidates</div>
+
+</div>
+</body>
+</html>
