@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~E: cadence reset build sizing -- 5 items / 15 pts / one board</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.board{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.board h3{color:#6FC3DF;font-size:18px;margin-bottom:6px}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.item{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:6px 0;font-size:13px}
+.item .pts{display:inline-block;background:#6FC3DF;color:#111;padding:2px 8px;border-radius:3px;font-weight:700;margin-right:8px;min-width:30px;text-align:center}
+.item .cmd{display:inline-block;background:#222;color:#5cb85c;padding:2px 6px;border-radius:3px;font-size:11px;margin-left:8px;font-family:'Consolas',monospace}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~estimate: cadence reset build</nav>
+
+<h1>Sizing: cadence reset build</h1>
+<p class="sub">Plan: <code>be/plans/2026-05-24-1659-plan-cadence-reset-build.html</code>. One board, 5 items, 15 pts. Fits 13-21 envelope. Each item 3 pts.</p>
+<span class="banner">Estimate &mdash; Ready for ~b</span>
+
+<div class="lede">
+<strong>Approach:</strong> All 5 items are 3 pts each. They follow the plan phases 1:1. Critical path is strict 1 -&gt; 2 -&gt; 3 -&gt; 4 -&gt; 5 (each needs the previous deploy live to verify). No parallelism. ~2-2.5 hours hands-on across the chain.
+</div>
+
+<h2>Sizing rationale</h2>
+<table>
+<tr><th>Mass of work</th><th>Sized at</th><th>Reasoning</th></tr>
+<tr><td>SDK + IAM + config (one csproj edit, one gcloud command, one appsettings update)</td><td>3 pts</td><td>Mechanical but multi-spot. Need to verify SDK version compatibility with existing Firestore SDK.</td></tr>
+<tr><td>Single endpoint /reset/wipe with header guard, batch delete logic, deploy + smoke (First Move)</td><td>3 pts</td><td>~30 lines + redeploy cycle (Cloud Build = ~3 min). Smoke against current Firestore state.</td></tr>
+<tr><td>Two endpoints /reset/pause + /reset/resume using Scheduler SDK</td><td>3 pts</td><td>Symmetric pair. Each ~10 lines. Single deploy covers both.</td></tr>
+<tr><td>Compound /reset/baseline + status endpoint</td><td>3 pts</td><td>Orchestrates the other ops; longest sweep is the embedded /tick (~30-120s).</td></tr>
+<tr><td>Dashboard button + CLAUDE.md update</td><td>3 pts</td><td>Front-end is vanilla HTML + fetch. Doc is one paragraph.</td></tr>
+<tr><td colspan="2" style="text-align:right"><strong>Total</strong></td><td><strong>15 pts</strong></td></tr>
+</table>
+
+<h2>Board 10 -- cadence reset build (15 pts)</h2>
+<div class="board">
+<h4 style="color:#5cb85c;margin-top:0">Ready</h4>
+<div class="item"><span class="pts">3</span>{Google.Cloud.Scheduler.V1 NuGet add + cloudscheduler.admin grant to cadence-svc + Reset config block in appsettings.json, add to, cadence/Cadence/Cadence.csproj + appsettings.json + GCP IAM}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{POST /reset/wipe endpoint -- FirestoreDb.StartBatch + Delete loop + 500-doc batch commit + X-Reset-Confirm header guard helper; deploy + smoke against current empty collection (idempotent verify), add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{POST /reset/pause + POST /reset/resume endpoints using CloudSchedulerClient.PauseJobAsync/ResumeJobAsync; deploy + verify with gcloud scheduler jobs describe, add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{POST /reset/baseline (compound pause -> wipe -> RunSweepAsync -> resume) + GET /reset/status returning scheduler state + snapshot count + last sweep doc; in-process SemaphoreSlim lock to prevent concurrent resets, add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{Reset button group on /dashboard with browser confirm modal + fetch with identity token + X-Reset-Confirm header; CLAUDE.md update in airbyte-parity documenting /reset/* endpoints, update in, cadence/Cadence/Program.cs MinimalDashboardHtml + airbyte-parity/CLAUDE.md}<span class="cmd">~u</span></div>
+</div>
+
+<h2>Verb mapping</h2>
+<p style="font-size:13px;color:#888">"add to" -&gt; ~a (items 1-4 add new capability), "update in" -&gt; ~u (item 5 modifies existing dashboard + docs).</p>
+
+<h2>Critical path</h2>
+<p style="font-size:13px">Strict 1 -&gt; 2 -&gt; 3 -&gt; 4 -&gt; 5. Item 1 unlocks the SDK + permissions for items 2-4. Item 2 (First Move) is the gate -- if /reset/wipe doesn't work, halt and reassess. Items 3-4 are similar shape. Item 5 needs item 4 live.</p>
+
+<h2>Wall-time estimate</h2>
+<p style="font-size:13px">Each item is ~30 min hands-on + ~3 min Cloud Build redeploy + ~5 min smoke. Total ~3.5 hours including deploy cycles. Excludes any debugging.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Board 10 added to <code>be/board.md</code></div>
+<div class="dod-item">&check; All 5 items Ready</div>
+<div class="dod-item">&check; Total pts in 13-21 window (15 pts confirmed)</div>
+<div class="dod-item">&check; Critical path documented (strict serial)</div>
+<div class="dod-item">&check; Estimate published at joeycastillo.us/airbyte-migration/</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r80 &middot; 2026-05-24 16:59 &middot; ~e cadence reset build</div>
+</body></html>

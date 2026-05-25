@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~D: cadence reset surface -- pause + wipe + baseline endpoints inside the C# service</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.section{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:18px 0;border-left:3px solid #6FC3DF}
+.section h3{color:#6FC3DF;margin:0 0 8px;font-size:17px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}
+.choice .fork{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}
+.choice .opts{color:#888;font-size:12px;margin-bottom:6px}
+.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}
+.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}
+.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}
+.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.candidate .name{color:#6FC3DF;font-weight:700;font-family:'Consolas',monospace}
+.candidate .gut{color:#888;font-size:11px}
+.candidate.winner{border-color:#5cb85c}
+.candidate.winner .name{color:#5cb85c}
+.pmt-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:13px}
+.pmt-row .lb{color:#f06e6e;font-weight:700}
+.pmt-row .rp{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}
+.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+.arch-box{background:#0a0a0a;border:1px solid #1f3540;border-radius:6px;padding:16px 20px;margin:14px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;white-space:pre;line-height:1.6;overflow-x:auto}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~design: cadence reset surface</nav>
+
+<h1>cadence reset surface &mdash; pause + wipe + baseline endpoints inside the C# service</h1>
+<p class="sub">Bring the reset capability into the same service that creates the data. No more out-of-band Python wipes against Firestore. Five endpoints, all idempotent, all OIDC + confirmation-header guarded.</p>
+<span class="banner">Design &mdash; Pure Metal</span>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> Add a self-contained reset surface to <code>cadence</code> so the service can pause its own Scheduler, wipe its own Firestore snapshots, and re-baseline -- all from C# code in the same process that produces those snapshots in the first place. <strong>Intent:</strong> One place to look when something needs to be reset. No Python scripts. No "remember the gcloud incantation". The cadence service owns its lifecycle.
+</div>
+
+<h2>Discovery</h2>
+<p>Today's reset took three out-of-band steps:</p>
+<ol style="margin-left:22px;font-size:14px">
+<li><code>gcloud scheduler jobs pause cadence-tick-5m ...</code></li>
+<li>A Python loop calling Firestore REST API <code>batch-commit delete</code> (after pip install + auth dance + parens-in-URL workaround)</li>
+<li>Manual <code>curl POST /tick</code> with OIDC token to seed the baseline</li>
+</ol>
+<p>Friction at every step. Worse: the reset logic lives in <em>this conversation transcript</em> rather than in the service. Next time, the next operator (or me-in-a-new-session) has to rediscover the choreography. <strong>Reset should be a button.</strong></p>
+
+<p>Available primitives in C# / .NET that make this trivial:</p>
+<ul>
+<li><code>Google.Cloud.Firestore</code> &mdash; already a package reference. <code>WriteBatch.Delete()</code> + <code>CommitAsync()</code> covers the wipe.</li>
+<li><code>Google.Cloud.Scheduler.V1</code> &mdash; new package. <code>CloudSchedulerClient.PauseJobAsync</code> / <code>ResumeJobAsync</code>.</li>
+<li>Existing <code>FingerprintPrimitive.RunSweepAsync</code> reused for the baseline tick.</li>
+<li>ASP.NET endpoint mapping &mdash; trivial additions to <code>Program.cs</code>.</li>
+</ul>
+
+<h2>Naming Pass</h2>
+
+<div class="candidate"><span class="name">/admin/*</span><span class="gut">conventional &middot; generic &middot; doesn't say what it does</span></div>
+<div class="candidate"><span class="name">/control/*</span><span class="gut">vague &middot; control is a verb without object</span></div>
+<div class="candidate"><span class="name">/lifecycle/*</span><span class="gut">accurate &middot; long &middot; bureaucratic</span></div>
+<div class="candidate"><span class="name">/ops/*</span><span class="gut">short &middot; ops-y &middot; mostly empty meaning</span></div>
+<div class="candidate winner"><span class="name">/reset/*</span><span class="gut">winner &middot; describes the intent &middot; matches what Joey said &middot; verb the operator wants to do</span></div>
+
+<p style="font-size:13px;color:#ccc;margin-top:8px">Pick the noun that matches the operator's mental model. Joey said "I want to reset" -- so the surface is <code>/reset/*</code>. Sub-paths: <code>/reset/pause</code>, <code>/reset/resume</code>, <code>/reset/wipe</code>, <code>/reset/baseline</code>, <code>/reset/status</code>.</p>
+
+<h2>Shape</h2>
+
+<div class="section">
+<h3>Five endpoints</h3>
+<table>
+<tr><th>Endpoint</th><th>Method</th><th>Effect</th><th>Idempotent?</th></tr>
+<tr><td><code>/reset/pause</code></td><td>POST</td><td>Pause Cloud Scheduler job <code>cadence-tick-5m</code>. Returns <code>{paused: true, wasAlreadyPaused: bool}</code>.</td><td>Yes</td></tr>
+<tr><td><code>/reset/resume</code></td><td>POST</td><td>Resume Scheduler. Returns <code>{resumed: true, nextRun: ts}</code>.</td><td>Yes</td></tr>
+<tr><td><code>/reset/wipe</code></td><td>POST</td><td>Batch-delete all docs in <code>cadence-snapshots</code> collection. Returns <code>{deleted: N}</code>.</td><td>Yes (re-run on empty = no-op)</td></tr>
+<tr><td><code>/reset/baseline</code></td><td>POST</td><td>Compound: <code>pause</code> -&gt; <code>wipe</code> -&gt; run one <code>/tick</code> as baseline -&gt; <code>resume</code>. Returns the baseline sweep result.</td><td>Yes (the canonical "I just re-cloned" operation)</td></tr>
+<tr><td><code>/reset/status</code></td><td>GET</td><td>Returns <code>{schedulerState, snapshotCount, lastSweepAt, lastSweepMatch, cloneCreatedAt}</code>. Read-only health-check for the operator.</td><td>Yes</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h3>Auth + safety</h3>
+<ul>
+<li>All endpoints require <code>X-Reset-Confirm: yes</code> request header. Prevents accidental browser/curl invocation.</li>
+<li>Same OIDC identity-token gate as <code>/tick</code> (Cloud Run <code>--no-allow-unauthenticated</code>).</li>
+<li>Compound <code>/reset/baseline</code> can be invoked via dashboard "Reset" button (which uses fetch + the user's identity token).</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>Service account IAM (new)</h3>
+<p><code>cadence-svc</code> already has <code>datastore.user</code> (covers Firestore delete) and <code>secretmanager.secretAccessor</code>. New role needed:</p>
+<ul>
+<li><code>roles/cloudscheduler.admin</code> on the project (to call PauseJob/ResumeJob on its own Scheduler job). Could be narrowed to <code>roles/cloudscheduler.jobRunner</code> if that exists -- doesn't, the smallest is admin.</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>Configuration surface</h3>
+<p>Scheduler job name + location is fixed today. Make it configurable so swapping cadence or moving regions doesn't break reset:</p>
+<div class="code-block">{
+  "Reset": {
+    "SchedulerProject":  "acmedev-platform-hq",
+    "SchedulerLocation": "us-central1",
+    "SchedulerJobName":  "cadence-tick-5m",
+    "SnapshotsCollection": "cadence-snapshots"
+  }
+}</div>
+<p>All overridable via <code>CADENCE_RESET__SCHEDULER_*</code> env vars (the standard ASP.NET nested-config pattern).</p>
+</div>
+
+<h2>Choices + Consequences</h2>
+
+<div class="choice">
+<div class="fork">1. Where lives the wipe code -- C# in cadence vs sidecar Python vs Cloud Function</div>
+<div class="opts">a) C# in cadence (proposed). b) Separate Python sidecar. c) Cloud Function triggered by Firestore TTL or HTTP.</div>
+<div class="conseq">a) One process, one repo, one auth identity, reuses existing IAM. b) Two languages, two CI pipelines, drift risk. c) New deploy target, separate IAM, more moving parts.</div>
+<div class="pick">PICK: (a) -- C# in cadence.</div>
+<div class="why">Joey's explicit request. Co-location with the data writer. Reuses everything already in place.</div>
+</div>
+
+<div class="choice">
+<div class="fork">2. Compound /reset/baseline vs separate ops only</div>
+<div class="opts">a) Both -- granular ops + a compound for the common case. b) Granular only -- caller orchestrates. c) Compound only -- one button.</div>
+<div class="conseq">a) Operator picks the right tool; common case is one call. b) More flexible but every reset needs 3-4 calls. c) Less flexible; what if you only want to pause?</div>
+<div class="pick">PICK: (a) -- both.</div>
+<div class="why">The granular ops are nearly free once we have the underlying libraries wired. The compound covers the "I just re-cloned" workflow in one click.</div>
+</div>
+
+<div class="choice">
+<div class="fork">3. Confirmation guard -- header / query-string / request body</div>
+<div class="opts">a) <code>X-Reset-Confirm: yes</code> header. b) <code>?confirm=yes</code> query string. c) <code>{"confirm": true}</code> JSON body.</div>
+<div class="conseq">a) Hard to send by accident; explicit. b) Easy to accidentally copy-paste into a browser URL bar. c) Body parsing for POSTs that don't otherwise need a body.</div>
+<div class="pick">PICK: (a) -- header.</div>
+<div class="why">Headers are invisible in browser URL bars, browser history, and shell history (mostly). Hardest to invoke accidentally. Matches the existing OIDC pattern.</div>
+</div>
+
+<div class="choice">
+<div class="fork">4. Scheduler pause via gcloud subprocess vs Google.Cloud.Scheduler.V1 SDK</div>
+<div class="opts">a) Add SDK package, call <code>PauseJobAsync</code>. b) <code>Process.Start("gcloud", "scheduler jobs pause ...")</code>.</div>
+<div class="conseq">a) Strongly-typed, in-process, no subprocess overhead. New package dependency (~few MB). b) No new dep but spawns processes, no gcloud in the Cloud Run container by default.</div>
+<div class="pick">PICK: (a) -- SDK.</div>
+<div class="why">gcloud isn't in the container. We'd have to install it. SDK is the right primitive in a C# service.</div>
+</div>
+
+<div class="choice">
+<div class="fork">5. /reset/baseline ordering -- pause-wipe-tick-resume vs wipe-tick-pause-resume etc.</div>
+<div class="opts">a) pause -&gt; wipe -&gt; tick -&gt; resume. b) wipe -&gt; pause-during-tick -&gt; resume after.</div>
+<div class="conseq">a) No risk of a Scheduler tick racing during wipe; baseline tick is deterministic. b) Shorter pause window but tick could race with wipe.</div>
+<div class="pick">PICK: (a) -- pause first.</div>
+<div class="why">Race-free. The "duration paused" is ~10s + the sweep time (~120s cold-start on fresh clone). Worst case we miss one scheduled tick. Acceptable.</div>
+</div>
+
+<div class="choice">
+<div class="fork">6. Dashboard "Reset" button -- present or hidden behind a toggle</div>
+<div class="opts">a) Always visible. b) Hidden behind <code>?admin=1</code> query string. c) Separate /admin page.</div>
+<div class="conseq">a) Discoverable; one accidental click away from disaster (mitigated by confirm modal). b) Hidden but anyone reading the HTML can find it. c) Cleaner but more friction.</div>
+<div class="pick">PICK: (a) + confirm modal.</div>
+<div class="why">Already gated by OIDC at network layer. The header-confirmation is the real guard. UI confirm-modal adds the "are you sure" friction at the right moment.</div>
+</div>
+
+<h2>Escape Routes</h2>
+
+<div class="escape"><strong>Escape from PICK 1a (wipe in C#):</strong> the Python REST loop still works as the emergency fallback if the C# endpoint is broken. Document it once in CLAUDE.md and forget.</div>
+<div class="escape"><strong>Escape from PICK 2a (compound):</strong> if <code>/reset/baseline</code> behaves unpredictably, document deprecating it in favor of the granular ops. Caller orchestrates explicitly.</div>
+<div class="escape"><strong>Escape from PICK 3a (header guard):</strong> if accidental invocation happens despite the header, add a second-factor (e.g. ?confirm=YYYY-MM-DD with today's date) without breaking the existing header contract.</div>
+<div class="escape"><strong>Escape from PICK 4a (SDK):</strong> if the SDK is unmaintained or has a critical bug, replace with HTTP call to Scheduler REST API. Both speak the same protocol.</div>
+<div class="escape"><strong>Escape from PICK 5a (pause-first):</strong> if the pause-during-tick window becomes a problem (e.g. we miss too many ticks), add a "skip-pause" flag to <code>/reset/baseline</code> for the fast-path.</div>
+<div class="escape"><strong>Escape from PICK 6a (visible button):</strong> hide behind <code>?admin=1</code> if the visible button gets clicked accidentally. Trivial CSS change.</div>
+
+<h2>Pure Metal Test</h2>
+
+<p style="font-size:13px">Can this be built with no frameworks, no external runtime, no vendor lock?</p>
+
+<div class="pmt-row"><span>ASP.NET Web API endpoints</span><span class="rp">replaceable -- any HTTP server framework</span></div>
+<div class="pmt-row"><span><code>Google.Cloud.Firestore</code> SDK</span><span class="lb">load-bearing -- Firestore is the storage we picked</span></div>
+<div class="pmt-row"><span><code>Google.Cloud.Scheduler.V1</code> SDK</span><span class="lb">load-bearing -- Scheduler is what we're pausing</span></div>
+<div class="pmt-row"><span>OIDC identity token auth</span><span class="rp">replaceable -- standard JWT, any provider</span></div>
+<div class="pmt-row"><span>Header-based confirmation</span><span class="rp">trivial -- one if-statement</span></div>
+
+<p style="font-size:13px;margin-top:10px"><strong>Load-bearing count: 2.</strong> Both Google Cloud SDKs. Acceptable -- we're building a Cloud Run service that operates Firestore + Cloud Scheduler. Those ARE the platform.</p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>The smallest concrete proof</strong>
+Add <code>/reset/wipe</code> endpoint only, using the already-injected <code>FirestoreDb</code> from Phase 4. ~30 lines in Program.cs + a header-guard helper. Deploy and call it to confirm a real wipe replicates today's Python behavior. If that works, the other four endpoints follow the same pattern with the Scheduler SDK and existing FingerprintPrimitive.
+</div>
+
+<h2>What this design does NOT do</h2>
+<ul>
+<li>Touch the parity engine on airbyte-parity Cloud Run. Cadence's reset only affects cadence's own state.</li>
+<li>Re-clone Snowflake databases. The DROP/CREATE OR REPLACE is Joey's surgical operation; cadence doesn't own it.</li>
+<li>Replace the snapshot tool in airbyte-parity. That tool is for manual procedure-bracketing; cadence is for continuous heartbeat.</li>
+<li>Add a UI framework. Vanilla HTML + fetch() for the dashboard button. Same pattern as today.</li>
+</ul>
+
+<h2>Path to plan + build</h2>
+<p style="font-size:13px"><code>~p</code> formalizes this into a build plan (probably 4-5 phases / 13-15 pts: SDK install + IAM bump, wipe endpoint, pause/resume endpoints, baseline compound + status, dashboard button). After approval, <code>~b</code> chain executes it.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved to <code>be/designs/2026-05-24-1659-design-cadence-reset.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/design-cadence-reset.html</code></div>
+<div class="dod-item">&check; 5 candidates considered, winner: <strong>/reset/*</strong></div>
+<div class="dod-item">&check; 6 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Pure Metal Test: 2 load-bearing deps (both Google Cloud SDKs, acceptable since we operate on those platforms)</div>
+<div class="dod-item">&check; First Move named: <code>/reset/wipe</code> alone, ~30 lines</div>
+<div class="dod-item">&check; Be index updated</div>
+<div class="dod-item">&check; Both repos committed + pushed</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r78 &middot; 2026-05-24 16:59 &middot; ~d cadence reset surface</div>
+</body></html>

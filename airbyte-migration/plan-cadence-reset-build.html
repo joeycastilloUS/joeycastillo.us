@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~P: Build cadence reset surface -- 5 endpoints in 5 phases</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}
+.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}
+.phase .accept strong{color:#5cb85c}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~plan: cadence reset build</nav>
+
+<h1>Build cadence reset surface &mdash; 5 endpoints in 5 phases</h1>
+<p class="sub">Execute the design at <code>be/designs/2026-05-24-1659-design-cadence-reset.html</code>. Bring reset capability into cadence so no out-of-band Python is ever needed again. ~13 pts. One board.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> Add five endpoints to the cadence Cloud Run service: <code>/reset/pause</code>, <code>/reset/resume</code>, <code>/reset/wipe</code>, <code>/reset/baseline</code>, <code>/reset/status</code>. All under <code>X-Reset-Confirm: yes</code> header guard. Compound <code>/reset/baseline</code> for the "just re-cloned" workflow. Dashboard gets a Reset button. Service account gets <code>cloudscheduler.admin</code>. No new infrastructure -- just C# code + IAM bump + a redeploy.
+</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td>5 endpoints in cadence/Cadence/Program.cs. Header-guard helper. Reset config section. <code>Google.Cloud.Scheduler.V1</code> package add. IAM grant <code>cloudscheduler.admin</code> to <code>cadence-svc</code>. Dashboard "Reset" button with confirm modal. Redeploy via cloudbuild. Update CLAUDE.md (airbyte-parity).</td><td>Touching the parity engine (unrelated). Re-cloning Snowflake (Joey's surgical op). Replacing the airbyte-parity snapshot tool. Adding new diff dimensions. Public access for /reset (stays OIDC-gated).</td></tr>
+</table>
+
+<h2>Approach</h2>
+<ol style="margin-left:22px;font-size:14px">
+<li><b>SDK + IAM first.</b> Phase 1 adds the Scheduler SDK and grants the SA cloudscheduler.admin. Without these the rest can't work.</li>
+<li><b>/reset/wipe alone.</b> Phase 2 is the First Move proof -- replicate today's Python wipe behavior in C#. Deploy + smoke test.</li>
+<li><b>Pause + resume.</b> Phase 3 adds Scheduler control. Verify by pausing, watching scheduler.state, resuming, watching next-run.</li>
+<li><b>Compound baseline.</b> Phase 4 chains pause -&gt; wipe -&gt; tick -&gt; resume in one endpoint. The canonical "I just re-cloned" call.</li>
+<li><b>Dashboard button.</b> Phase 5 surfaces the Reset action in the live /dashboard. Confirm modal. Calls /reset/baseline via fetch with the operator's identity token.</li>
+</ol>
+
+<h2>Pre-flight</h2>
+<div class="warn">
+<strong>Before Phase 1:</strong> verify cadence Cloud Run service is healthy. Verify Scheduler is paused (current state from today's reset). Confirm the wipe-via-Python pattern matches what we want C# to do (deletion behavior identical). Branching: do this build on a branch <code>reset-surface</code>, merge to main after Phase 5 smoke passes -- or YOLO to main since cadence is single-operator. Recommend main, no branch ceremony.
+</div>
+
+<h2>Phases</h2>
+
+<div class="phase">
+<h3><span class="num">1</span> SDK package + IAM bump</h3>
+<div class="meta">~20 min. Add Google.Cloud.Scheduler.V1 to csproj. Grant cadence-svc cloudscheduler.admin on the project. Update appsettings.json with Reset config block.</div>
+<div class="code-block"># csproj
+&lt;PackageReference Include="Google.Cloud.Scheduler.V1" Version="3.7.0" /&gt;
+
+# IAM
+SA="cadence-svc@acmedev-platform-hq.iam.gserviceaccount.com"
+gcloud projects add-iam-policy-binding acmedev-platform-hq \
+    --member="serviceAccount:$SA" --role="roles/cloudscheduler.admin"</div>
+<div class="accept"><strong>Accept:</strong> Local build clean. <code>gcloud projects get-iam-policy</code> shows the new role on cadence-svc.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">2</span> /reset/wipe endpoint (First Move)</h3>
+<div class="meta">~30 min. Implement the wipe using FirestoreDb.WriteBatch + Delete. Add header-guard helper. Deploy. Smoke against current state.</div>
+<div class="code-block">// Program.cs sketch
+app.MapPost("/reset/wipe", async (HttpContext ctx, FirestoreDb fs, IConfiguration cfg) =&gt;
+{
+    if (ctx.Request.Headers["X-Reset-Confirm"] != "yes")
+        return Results.BadRequest(new { error = "missing X-Reset-Confirm: yes header" });
+    var coll = cfg["Reset:SnapshotsCollection"] ?? "cadence-snapshots";
+    var docs = await fs.Collection(coll).GetSnapshotAsync();
+    var batch = fs.StartBatch();
+    int count = 0;
+    foreach (var d in docs.Documents)
+    {
+        batch.Delete(d.Reference);
+        if (++count % 500 == 0) { await batch.CommitAsync(); batch = fs.StartBatch(); }
+    }
+    if (count % 500 != 0) await batch.CommitAsync();
+    return Results.Ok(new { deleted = count });
+});</div>
+<div class="accept"><strong>Accept:</strong> Deploy. <code>POST /reset/wipe</code> with header -&gt; <code>{ deleted: N }</code>. Without header -&gt; 400. Re-call returns <code>{ deleted: 0 }</code> (idempotent).</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">3</span> /reset/pause + /reset/resume</h3>
+<div class="meta">~30 min. Add CloudSchedulerClient. Implement both endpoints. Idempotent via wasAlreadyPaused detection.</div>
+<div class="code-block">var scheduler = await CloudSchedulerClient.CreateAsync();
+var jobName = JobName.FromProjectLocationJob(
+    cfg["Reset:SchedulerProject"]!,
+    cfg["Reset:SchedulerLocation"]!,
+    cfg["Reset:SchedulerJobName"]!);
+await scheduler.PauseJobAsync(jobName);
+// or ResumeJobAsync</div>
+<div class="accept"><strong>Accept:</strong> Pause -&gt; <code>gcloud scheduler jobs describe</code> shows PAUSED. Resume -&gt; ENABLED with next run within 5 min.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">4</span> /reset/baseline (compound) + /reset/status</h3>
+<div class="meta">~30 min. Compound endpoint: call pause + wipe + RunSweepAsync (existing) + resume in sequence. Status endpoint reads scheduler state + firestore count + last sweep doc.</div>
+<div class="code-block">app.MapPost("/reset/baseline", async (... services ...) =&gt;
+{
+    // 1. pause
+    await scheduler.PauseJobAsync(jobName);
+    // 2. wipe
+    var deleted = await WipeSnapshotsAsync(fs);
+    // 3. baseline tick
+    var sweep = await FingerprintPrimitive.RunSweepAsync(snow, catalogPath, null, null);
+    var snapshotId = $"baseline-{DateTimeOffset.UtcNow:yyyyMMddTHHmmss}";
+    await fs.Collection("cadence-snapshots").Document(snapshotId).SetAsync(...);
+    // 4. resume
+    await scheduler.ResumeJobAsync(jobName);
+    return Results.Ok(new { wiped = deleted, baseline = sweep, resumedAt = DateTimeOffset.UtcNow });
+});</div>
+<div class="accept"><strong>Accept:</strong> One POST -&gt; pause logged, wipe deleted X, baseline tick recorded as Firestore doc, resume completed. Total time: 60-180s depending on cold/warm.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">5</span> Dashboard Reset button + CLAUDE.md update</h3>
+<div class="meta">~30 min. Add "Reset" button group to /dashboard. Confirm modal calls /reset/baseline with header + identity token. Update CLAUDE.md in airbyte-parity to mention /reset/* endpoints.</div>
+<div class="code-block">&lt;!-- in /dashboard HTML --&gt;
+&lt;button onclick="if(confirm('Wipe N snapshots + re-baseline? This pauses the Scheduler briefly.')) {
+  const t = ...identity token...;
+  fetch('/reset/baseline', { method: 'POST', headers: { 'X-Reset-Confirm': 'yes', 'Authorization': 'Bearer '+t } })
+    .then(r =&gt; r.json()).then(j =&gt; alert('Done. Baseline: ' + j.baseline.match + '/' + j.baseline.total));
+}"&gt;Reset baseline&lt;/button&gt;</div>
+<div class="accept"><strong>Accept:</strong> Dashboard renders Reset button. Click triggers confirm modal. Confirmed click runs full baseline; alert shows result. CLAUDE.md grep "reset" returns matches in cadence section.</div>
+</div>
+
+<h2>Sizing</h2>
+<table>
+<tr><th>Phase</th><th>Work</th><th>Size</th></tr>
+<tr><td>1</td><td>SDK package + IAM + config block</td><td>3 pts</td></tr>
+<tr><td>2</td><td>/reset/wipe (First Move)</td><td>3 pts</td></tr>
+<tr><td>3</td><td>/reset/pause + /reset/resume</td><td>3 pts</td></tr>
+<tr><td>4</td><td>/reset/baseline compound + /reset/status</td><td>3 pts</td></tr>
+<tr><td>5</td><td>Dashboard button + CLAUDE.md</td><td>3 pts</td></tr>
+<tr><td colspan="2" style="text-align:right"><strong>Total</strong></td><td><strong>15 pts</strong></td></tr>
+</table>
+<p style="font-size:12px;color:#888;margin-top:6px">Fits one board (13-21 envelope). Critical path strict: 1 -&gt; 2 -&gt; 3 -&gt; 4 -&gt; 5. None parallelize meaningfully (each phase depends on the previous deploy).</p>
+
+<h2>Risks + mitigations</h2>
+<table>
+<tr><th>Risk</th><th>Mitigation</th></tr>
+<tr><td>cloudscheduler.admin grant is too broad</td><td>Bind at project level for now. Could narrow to per-job resource binding later via <code>conditions</code> on the IAM binding.</td></tr>
+<tr><td>Reset button accidentally clicked</td><td>Header guard + browser confirm modal. Two friction points. If still happens, add a 5-second hold-to-confirm.</td></tr>
+<tr><td>/reset/baseline runs while Scheduler tick is in-flight</td><td>Pause is the first step. Tick is short (~30s warm). Worst case: an in-flight sweep completes and writes one extra doc which the wipe sees and deletes anyway.</td></tr>
+<tr><td>SDK version conflict with Google.Cloud.Firestore</td><td>Both Google Cloud SDKs share the same core (Google.Api.Gax etc). 3.7.0 of Scheduler is compatible with 3.7.0 of Firestore.</td></tr>
+<tr><td>Header guard not enforced in some edge case</td><td>Helper function used in every endpoint. Unit-test the helper. Defensive default-deny.</td></tr>
+<tr><td>Re-running /reset/baseline mid-sweep stacks operations</td><td>Add a simple in-process lock (SemaphoreSlim). One reset at a time per instance. Cloud Run can have multiple instances; second instance gets 409 Conflict.</td></tr>
+</table>
+
+<h2>What this unlocks</h2>
+<ul>
+<li><b>One-click reset after every re-clone.</b> Joey re-clones, hits the dashboard Reset button, baseline is fresh in 30-180 seconds.</li>
+<li><b>No more Python wipe scripts.</b> No more bash loops with curl parens-in-URL gotchas. The capability is part of the service.</li>
+<li><b>Audit trail.</b> Reset operations log to Cloud Run logs with the operator identity. Who reset when is queryable.</li>
+<li><b>Foundation for future ops.</b> /reset/* surface is the right place to add things like /reset/retention (delete snapshots older than N days), /reset/clear-warnings (clear ERROR-state streams), etc.</li>
+</ul>
+
+<h2>Open follow-ups (not in this board)</h2>
+<ul>
+<li><b>Public-access dashboard.</b> Currently /dashboard requires identity token. IAP or gate.js wrap could land in a future board.</li>
+<li><b>Per-stream subcollection writes.</b> Currently snapshot doc has tallies; per-stream verdicts in subcollection would enable drill-down. Out of scope here.</li>
+<li><b>Cost telemetry endpoint.</b> /reset/status returns snapshot count + state; could add /cost/today with QUERY_HISTORY-derived $. Separate board.</li>
+</ul>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved to <code>be/plans/2026-05-24-1659-plan-cadence-reset-build.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/plan-cadence-reset-build.html</code></div>
+<div class="dod-item">&check; 5 phases sized + accept criteria + risks</div>
+<div class="dod-item">&check; Decisions inherited from ~d listed (not re-debated)</div>
+<div class="dod-item">&check; First Move (Phase 2) is independently deployable</div>
+<div class="dod-item">&check; Be index updated</div>
+<div class="dod-item">&check; Both repos committed + pushed</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r79 &middot; 2026-05-24 16:59 &middot; ~p cadence reset build</div>
+</body></html>
