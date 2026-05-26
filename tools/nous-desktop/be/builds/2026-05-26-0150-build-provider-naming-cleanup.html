@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~u: provider naming cleanup — grok aliases fixed + convention documented</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}
+  pre{color:#ccc;font-size:0.78rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.88rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .ok{color:#22c55e;font-weight:600}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~u: provider naming cleanup</h1>
+<p class="subtitle">Grok aliases fixed (current flagship is now <code>grok</code>, old gen is <code>grok-prev</code>). Provider-naming convention documented in <code>nous-desktop/CLAUDE.md</code> so future model upgrades follow the same pattern.</p>
+
+<h2>What Changed</h2>
+<div class="card">
+<table>
+<tr><th>File</th><th>Change</th></tr>
+<tr><td><code>src/serve.c</code></td><td>Renamed grok entries to match the <vendor>-prev convention used everywhere else (gpt, gpt-pro-prev, etc.)</td></tr>
+<tr><td><code>CLAUDE.md</code></td><td>Added "Provider Naming (tool name vs model name)" section documenting the two-name design + the alias pattern (vendor, vendor-prev, vendor-pro, vendor-mini, vendor-fast, vendor-codex, etc.)</td></tr>
+<tr><td><code>nous-desktop.exe</code></td><td>Rebuilt (gitignored)</td></tr>
+</table>
+
+<h3>Grok alias changes</h3>
+<table>
+<tr><th>Before</th><th>After</th><th>Model (unchanged)</th></tr>
+<tr><td><code>grok</code></td><td><code>grok-prev</code></td><td>grok-4.20-0309-reasoning (was misnamed — this is the OLD gen)</td></tr>
+<tr><td><code>grok-flagship</code></td><td><code>grok</code></td><td>grok-4.3 (the current xAI flagship — should always be the unadorned alias)</td></tr>
+<tr><td><code>grok-fast</code></td><td><code>grok-fast</code> (unchanged)</td><td>grok-4.20-0309-non-reasoning</td></tr>
+</table>
+
+<p>Now consistent with the pattern: <code>gpt</code> → 5.5 (current), <code>gpt-prev</code> → 5.4 (old). And with: <code>claude-opus</code> → 4-7 (current). The unadorned alias always points at the current flagship.</p>
+</div>
+
+<h2>Verification</h2>
+<div class="card">
+<p>Server rebuilt + relaunched via launch.ps1 (PID 22708). WS task probe confirmed each alias resolves to the right model in the SELECT line:</p>
+<pre>=== grok (should be 4.3 flagship) ===
+  SELECT: expert: grok (grok-4.3)             ✓
+
+=== grok-prev (should be 4.20 reasoning) ===
+  SELECT: expert: grok-prev (grok-4.20-0309-reasoning)  ✓
+
+=== grok-fast (should be 4.20 non-reasoning) ===
+  SELECT: expert: grok-fast (grok-4.20-0309-non-reasoning)  ✓</pre>
+<p>All 3 PASS. No collision with any other alias. The g_active_driver lookup still resolves correctly (claude-opus default unchanged).</p>
+</div>
+
+<h2>Cockpit Implication</h2>
+<div class="card">
+<p>If anyone had <code>grok-flagship</code> selected in their dropdown (from before this change), they'll now see "Let NOUS decide" as their selection (because <code>grok-flagship</code> no longer exists in the provider list). They can re-select as <code>grok</code> for the same behavior. New operators get <code>claude-opus</code> as default — unchanged.</p>
+</div>
+
+<h2>What This Sets Up</h2>
+<div class="card">
+<p>The CLAUDE.md convention block becomes the rule for every future provider-table edit:</p>
+<ul>
+  <li>When OpenAI ships gpt-5.6: change <code>model</code> on the <code>gpt</code> entry; rename <code>gpt-prev</code> → <code>gpt-5.5</code> reference; the alias stays <code>gpt</code>.</li>
+  <li>When Anthropic ships Opus 4.8: change <code>model</code> on <code>claude-opus</code> from "claude-opus-4-7" to "claude-opus-4-8"; add <code>claude-opus-prev</code> if we want to keep 4-7 reachable.</li>
+  <li>When a new coding-specialist variant ships from any vendor: use <code>-codex</code> (OpenAI convention) or <code>-coder</code> (alternate).</li>
+</ul>
+<p>This is the maintenance manual baked into the source tree.</p>
+</div>
+
+<h2>Files Changed</h2>
+<div class="card">
+<table>
+<tr><th>File</th><th>Net LOC</th></tr>
+<tr><td>src/serve.c</td><td>+2 / -2 (2 entries reordered, alias renamed)</td></tr>
+<tr><td>CLAUDE.md</td><td>+40 (new naming convention section)</td></tr>
+</table>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Code committed (serve.c + CLAUDE.md + this report)</li>
+<li>&#x2713; Hash in telemetry (backfilled)</li>
+<li>&#x2014; Board updated (no formal board; ad-hoc ~u driven by inspect findings)</li>
+<li>&#x2713; HTML report saved</li>
+<li>&#x2713; Index updated</li>
+<li>&#x2713; Pushed to remote</li>
+<li>&#x2713; No prior damage (other 28 entries untouched; grok-prev/grok-fast still work)</li>
+<li>&#x2713; Production verified (3/3 grok aliases resolve correctly via live WS probe)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r136 &middot; 2026-05-26 01:50 &middot; nous-desktop &middot; ~u provider naming</div>
+</div></body></html>
