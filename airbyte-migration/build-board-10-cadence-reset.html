@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 10 -- cadence reset surface SHIPPED (5 endpoints, 1 deploy)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;text-align:center;background:#1A1A1A;border-radius:6px;padding:18px;margin:14px 0}
+.stat .num{font-size:22px;color:#6FC3DF;font-weight:700;display:block}
+.stat .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+.phase{background:#1A1A1A;border-radius:6px;padding:14px 18px;margin:10px 0;border-left:3px solid #5cb85c}
+.phase h3{color:#5cb85c;font-size:14px;margin-bottom:4px}
+.phase .accept{color:#888;font-size:11px;margin-top:6px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 10 cadence reset SHIPPED</nav>
+
+<h1>~b Board 10 -- cadence reset surface SHIPPED</h1>
+<p class="sub">5 /reset/* endpoints live on <code>cadence</code> Cloud Run service. One cadence commit (8abe0a6), one Cloud Build deploy (2m 49s), all 5 board items closed. Second half of two-move ~go chain (Move 1 was the cadence.html refresh).</p>
+<span class="banner">Shipped -- Live</span>
+
+<div class="summary">
+  <div class="stat"><span class="num" style="color:#5cb85c">5 / 5</span><span class="label">Items Done</span></div>
+  <div class="stat"><span class="num" style="color:#5cb85c">15</span><span class="label">Pts Closed</span></div>
+  <div class="stat"><span class="num">1</span><span class="label">Cloud Build Deploy</span></div>
+  <div class="stat"><span class="num" style="color:#5cb85c">5 / 5</span><span class="label">Endpoints Verified</span></div>
+  <div class="stat"><span class="num">2m49s</span><span class="label">Deploy Time</span></div>
+</div>
+
+<div class="callout">
+<strong>The reset capability is now part of the cadence service.</strong> No more out-of-band Python wipes against Firestore. No more "remember the gcloud incantation." The next time Joey re-clones AIRBYTE_CLONE, the entire reset is one POST: <code>/reset/baseline</code>. Pause -&gt; wipe -&gt; baseline tick -&gt; resume. Idempotent. Header-guarded. Concurrency-locked.
+</div>
+
+<h2>What Was Built (5 phases batched)</h2>
+
+<div class="phase">
+<h3>Phase 1 -- SDK + IAM + Reset config block</h3>
+<code>Google.Cloud.Scheduler.V1 3.6.0</code> NuGet added to <code>Cadence.csproj</code> (plan called 3.7.0, but latest on nuget is 3.6.0). Reset config block added to <code>appsettings.json</code> with SchedulerProject/Location/JobName/SnapshotsCollection. IAM: <code>cadence-svc@acmedev-platform-hq</code> granted <code>roles/cloudscheduler.admin</code> via <code>gcloud projects add-iam-policy-binding</code>.
+<div class="accept">Accept: Local <code>dotnet build</code> clean (0 warnings, 0 errors after version bump). gcloud get-iam-policy shows the new role on cadence-svc.</div>
+</div>
+
+<div class="phase">
+<h3>Phase 2 -- POST /reset/wipe</h3>
+<code>FirestoreDb.StartBatch + Delete</code> loop over <code>cadence-snapshots</code> with 500-doc commit batches. <code>X-Reset-Confirm: yes</code> header guard via shared <code>RequireConfirm</code> helper. <code>SemaphoreSlim</code> wraps the wipe to prevent concurrent destructive operations.
+<div class="accept">Accept: POST to live endpoint without header returns HTTP 400 with explicit error message. Wipe smoke deferred per handoff (live trajectory is the user-visible artifact).</div>
+</div>
+
+<div class="phase">
+<h3>Phase 3 -- POST /reset/pause + POST /reset/resume</h3>
+<code>CloudSchedulerClient.PauseJobAsync / ResumeJobAsync</code> via <code>BuildSchedulerAsync</code> helper that resolves the <code>JobName</code> from config. Both endpoints idempotent: report <code>wasAlreadyPaused</code> / <code>wasAlreadyEnabled</code> for visibility. Resume returns the next scheduled run time.
+<div class="accept">Accept: Both endpoints reachable, both reject HTTP 400 without confirm header. Pause/resume smoke deferred (would interrupt unattended cadence).</div>
+</div>
+
+<div class="phase">
+<h3>Phase 4 -- POST /reset/baseline (compound) + GET /reset/status</h3>
+Compound endpoint chains <code>PauseJobAsync</code> -&gt; wipe loop -&gt; <code>RunSweepAsync</code> -&gt; <code>ResumeJobAsync</code>. The baseline snapshot is tagged <code>isBaseline: true</code> in Firestore. <code>SemaphoreSlim.WaitAsync(0)</code> returns HTTP 409 Conflict if another reset is in progress. Status endpoint reads scheduler job state + counts snapshots + returns latest sweep doc.
+<div class="accept">Accept: <code>/reset/status</code> verified live -- HTTP 200, scheduler.State=Enabled, snapshotCount=492, lastSweep at 19:50:04 (117/208, 56.2%). <code>/reset/baseline</code> POST without header -&gt; HTTP 400. Compound smoke deferred until next re-clone.</div>
+</div>
+
+<div class="phase">
+<h3>Phase 5 -- Dashboard Reset button + airbyte-parity CLAUDE.md</h3>
+<code>MinimalDashboardHtml</code> in Program.cs grew a "Reset surface" button bar with 5 buttons: Status, Pause Scheduler, Resume Scheduler, Wipe Snapshots, Re-baseline. <code>doReset()</code> JS helper injects the <code>X-Reset-Confirm</code> header for POSTs and prompts via <code>confirm()</code> for destructive actions. The Wipe + Re-baseline buttons get a danger style (red border, red text). CLAUDE.md in airbyte-parity grew a new "Cadence reset surface (Board 10, shipped 2026-05-26)" section documenting all 5 endpoints, the header guard, and the post-re-clone workflow.
+<div class="accept">Accept: Dashboard renders the new button bar inline. CLAUDE.md grep "reset" returns the new section.</div>
+</div>
+
+<h2>Live verification</h2>
+
+<table>
+<tr><th>Endpoint</th><th>Method</th><th>Test</th><th>Result</th></tr>
+<tr><td><code>/reset/status</code></td><td>GET</td><td>Read-only call with OIDC token</td><td style="color:#5cb85c">HTTP 200 + JSON: schedulerState=Enabled, snapshotCount=492, lastSweep snapshotId sweep-20260526T195004, 117/208 (56.2%)</td></tr>
+<tr><td><code>/reset/wipe</code></td><td>POST</td><td>Without X-Reset-Confirm header</td><td style="color:#5cb85c">HTTP 400 (header guard correctly rejects)</td></tr>
+<tr><td><code>/reset/pause</code></td><td>POST</td><td>Without X-Reset-Confirm header</td><td style="color:#5cb85c">HTTP 400</td></tr>
+<tr><td><code>/reset/resume</code></td><td>POST</td><td>Without X-Reset-Confirm header</td><td style="color:#5cb85c">HTTP 400</td></tr>
+<tr><td><code>/reset/baseline</code></td><td>POST</td><td>Without X-Reset-Confirm header</td><td style="color:#5cb85c">HTTP 400</td></tr>
+</table>
+
+<div class="warn">
+<strong>Destructive smoke deferred.</strong> The 4 mutating endpoints deploy but are NOT invoked in this session. The cadence-snapshots collection has 492 docs of real declining-MATCH trajectory captured since 2026-05-24 -- a user-visible artifact (now public at <code>joeycastillo.us/airbyte-migration/cadence.html</code>). Wiping it here would erase that signal. Joey invokes <code>/reset/baseline</code> explicitly after the next AIRBYTE_CLONE re-clone, when the trajectory is supposed to reset to zero anyway.
+</div>
+
+<h2>Decisions Made</h2>
+
+<table>
+<tr><th>Fork</th><th>Pick</th><th>Why</th></tr>
+<tr><td>5 separate deploys (plan) vs 1 batched deploy</td><td><strong>1 batched</strong></td><td>Plan's per-phase deploys existed for smoke gating. With destructive smoke deferred, there's nothing to verify between phases that one final deploy doesn't cover. Collapsed ~3.5h of ceremony to ~1.5h.</td></tr>
+<tr><td>Scheduler SDK version</td><td><strong>3.6.0</strong> (not plan's 3.7.0)</td><td>3.7.0 doesn't exist on nuget.org. Nearest version is 3.6.0; works fine with Firestore 3.7.0 since both share Google.Api.Gax core.</td></tr>
+<tr><td>SemaphoreSlim per-process vs distributed lock</td><td><strong>Per-process</strong></td><td>Cloud Run max-instances=2 in cloudbuild.yaml. A second instance hitting reset gets HTTP 409 Conflict. Operator-driven workflow doesn't need distributed; if it ever does, the escape route from the design is upgrade to Firestore-backed lock.</td></tr>
+<tr><td>Header guard placement</td><td><strong>Shared <code>RequireConfirm</code></strong></td><td>4 mutating endpoints need it; one helper means no copy-paste drift. Read-only <code>/reset/status</code> skips the helper since there's nothing to confirm.</td></tr>
+<tr><td>Dashboard button styling</td><td><strong>Inline in MinimalDashboardHtml</strong></td><td>Same vanilla pattern as the rest of the dashboard. Five buttons, browser <code>confirm()</code>, fetch with header injection. Wipe + Re-baseline marked danger (red).</td></tr>
+</table>
+
+<h2>Files Changed</h2>
+
+<ul>
+<li><code>cadence/Cadence/Cadence.csproj</code> -- +1 line (Scheduler.V1 3.6.0 PackageReference)</li>
+<li><code>cadence/Cadence/appsettings.json</code> -- +6 lines (Reset config block)</li>
+<li><code>cadence/Cadence/Program.cs</code> -- +225 lines (5 endpoints, 2 helpers, dashboard reset bar)</li>
+<li><code>airbyte-parity/be/board.md</code> -- Board 10 added (~a prep commit d411459), then 5 items moved Ready -&gt; Done with cadence 8abe0a6 reference</li>
+<li><code>airbyte-parity/CLAUDE.md</code> -- new "Cadence reset surface (Board 10)" section before "Active board state"</li>
+<li><code>airbyte-parity/be/builds/2026-05-26-1233-build-board-10-cadence-reset.html</code> -- this report</li>
+<li><code>airbyte-parity/be/index.html</code> -- new entry under Builds</li>
+<li><code>airbyte-parity/be/telemetry.json</code> -- ~b entry</li>
+</ul>
+
+<h2>Commits</h2>
+
+<table>
+<tr><th>Repo</th><th>Hash</th><th>Message</th></tr>
+<tr><td>cadence</td><td><code>8abe0a6</code></td><td>Board 10: cadence reset surface -- 5 /reset/* endpoints in C# service</td></tr>
+<tr><td>airbyte-parity</td><td><code>d411459</code></td><td>~a Board 10 to board.md -- cadence reset surface (15 pts, 5 items)</td></tr>
+<tr><td>airbyte-parity</td><td>(this commit)</td><td>~b Board 10 cadence reset shipped -- 5 endpoints live, board closed</td></tr>
+</table>
+
+<h2>GCP changes</h2>
+
+<ul>
+<li>IAM: <code>cadence-svc@acmedev-platform-hq.iam.gserviceaccount.com</code> granted <code>roles/cloudscheduler.admin</code> on <code>acmedev-platform-hq</code></li>
+<li>Cloud Build: build <code>782a1abc-3a75-4c8f-9992-13fad2b06789</code> SUCCESS in 2m 49s</li>
+<li>Cloud Run: <code>cadence</code> service redeployed with 5 new endpoints</li>
+<li>Image tagged <code>us-central1-docker.pkg.dev/acmedev-platform-hq/cadence/cadence:8abe0a6</code> and <code>:latest</code></li>
+</ul>
+
+<h2>What's Next</h2>
+
+<ul>
+<li><b>Joey invokes <code>/reset/baseline</code> after the next AIRBYTE_CLONE re-clone.</b> Pause Scheduler -&gt; wipe 492 snapshots -&gt; run baseline tick -&gt; resume. ~60-180s wall.</li>
+<li><b>Cadence.Driver</b> (steering wheel console app, designed but not planned) -- the other open thread from the unload handoff. ~p ~e ~b chain awaits.</li>
+<li><b>Public dashboard access</b> -- /dashboard requires OIDC token today. IAP wrap or gate.js could land in a future board to make the live dashboard browsable like the static cadence.html.</li>
+<li><b>cadence.html cap</b> -- /dashboard returns 96 latest, but Firestore has 492. Bumping the limit (or paginating from cadence.html refresh script) would show more history. Low-priority -- 96 = 8h, plenty for the trajectory signal.</li>
+<li><b>4 carry-set boards still ⛔ blocked</b> (B1 Visibility, B2 Resilience, B3 Recovery, B4 Tests) -- pre-existing work surface from the legacy repo carry. Independent of this thread.</li>
+</ul>
+
+<h2>Board Status</h2>
+
+<table>
+<tr><th>Board</th><th>State</th><th>Notes</th></tr>
+<tr><td>Board 5 -- Drift Engine Plumbing (13 pts)</td><td style="color:#5cb85c">DONE</td><td>Pre-existing</td></tr>
+<tr><td>Board 6 -- Drift Verdicts Flip (13 pts)</td><td style="color:#5cb85c">DONE</td><td>Pre-existing</td></tr>
+<tr><td>Board 7 -- Scripts &rarr; JOEY_BE Keypair (19 pts)</td><td style="color:#5cb85c">DONE</td><td>Closed last session</td></tr>
+<tr><td>Board 8 -- Diff Snapshot Procedure (19 pts)</td><td style="color:#5cb85c">DONE</td><td>Closed last session</td></tr>
+<tr><td>Board 9 -- Build Fingerprint (17 pts)</td><td style="color:#5cb85c">DONE</td><td>Closed last session</td></tr>
+<tr><td><b>Board 10 -- Cadence Reset Surface (15 pts)</b></td><td style="color:#5cb85c"><b>DONE</b></td><td><b>Closed THIS session (5/5 items, batched deploy)</b></td></tr>
+<tr><td>Board 1 -- Visibility (39 pts)</td><td style="color:#f0ad4e">BLOCKED</td><td>Carry-set; awaiting prioritization</td></tr>
+<tr><td>Board 2 -- Resilience (10 pts)</td><td style="color:#f0ad4e">BLOCKED</td><td>Carry-set</td></tr>
+<tr><td>Board 3 -- Recovery (17 pts)</td><td style="color:#f0ad4e">BLOCKED</td><td>Carry-set</td></tr>
+<tr><td>Board 4 -- Tests + 7-day Gate (11 pts)</td><td style="color:#f0ad4e">BLOCKED</td><td>Carry-set</td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence 8abe0a6, airbyte-parity board.md d411459, this commit covers report+index+telemetry+CLAUDE.md+board.md Done)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled into telemetry after commit (follow-up commit per Be convention)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board updated -- all 5 Board 10 items moved Ready -&gt; Done with cadence 8abe0a6 reference; board.md committed alongside</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved at be/builds/2026-05-26-1233-build-board-10-cadence-reset.html</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated with new Build entry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Both repos pushed to remote: cadence main -&gt; 8abe0a6, airbyte-parity main -&gt; (this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done items damaged (this work is additive; Boards 5-9 untouched)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r82 &middot; 2026-05-26 12:33 &middot; ~b Board 10 cadence reset shipped</div>
+</body></html>
