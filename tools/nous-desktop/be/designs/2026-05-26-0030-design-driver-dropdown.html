@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~d: DRIVER dropdown (claude-opus-4-7 default, NOUS-decide fail-silent)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:900px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}h3{color:#6FC3DF;font-size:1rem;margin:18px 0 8px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}ul,ol{margin-left:22px;margin-bottom:12px}li{margin:6px 0}
+  pre{color:#ccc;font-size:0.8rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.88rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .pick{background:#6FC3DF18;font-weight:600}blockquote{border-left:3px solid #6FC3DF;padding:4px 16px;margin:12px 0;color:#bbb}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~d: DRIVER dropdown — claude-opus-4-7 default, NOUS-decide fail-silent</h1>
+<p class="subtitle">Two dropdowns in the THINKING header (DRIVER + ENGINE). Active state visible at all times. claude-opus-4-7 default for both. "Let NOUS decide" option fails silent when mesh is down. SENSE/SELECT trace stays — honest about what's happening.</p>
+
+<h2>1. Subject + Intent</h2>
+<div class="card">
+<p><strong>Subject:</strong> A new "DRIVER" dropdown in the THINKING column header that controls which provider orchestrates the main task. A second labeled "ENGINE" stays for /summarize and /advise. Both default to <code>claude-opus-4-7</code>. Active state shown as a visible status line. When DRIVER is "Let NOUS decide" and the mesh isn't doing anything, the THINKING chain fails silent (no fallback driver).</p>
+<p><strong>Intent:</strong> The current cockpit lies. Dropdown says claude-opus-4-7; the trace says gemini. The orchestrator is whoever's first in <code>g_defaults[]</code>, regardless of operator preference. Fix the lie by making the dropdown the source of truth, default it to Claude (Joey's pick for now), and surface the active driver visibly so the trace and the UI never disagree.</p>
+</div>
+
+<h2>2. Discovery</h2>
+<div class="card">
+<p><strong>Current landscape</strong> (from <a href="../plans/2026-05-26-0010-inspect-sense-select-mechanism.html">~i 2026-05-26 00:10</a>):</p>
+<ul>
+  <li><code>engine-select</code> dropdown exists, defaults to "Let NOUS decide" (empty value)</li>
+  <li>JS sends <code>set_engine</code> WS message on change — <strong>server has no handler for it</strong> (silent drop)</li>
+  <li><code>handle_task</code> picks orchestrator via first-available in g_defaults order; today = gemini</li>
+  <li>SENSE/SELECT trace strings are hardcoded literals in <code>guided_ai_thread()</code></li>
+  <li>No failover on driver error</li>
+</ul>
+<p><strong>Gut lean:</strong> Joey wants Claude as the driver, wants to see what's actually driving, and doesn't want NOUS-decide to silently fall back to gemini. "Show me, don't tell me" applies — the trace must reflect reality.</p>
+</div>
+
+<h2>3. Naming Pass</h2>
+<div class="card">
+<p>Label for the new dropdown:</p>
+<table>
+  <tr><th>Candidate</th><th>Verdict</th></tr>
+  <tr class="pick"><td><code>DRIVER</code></td><td><strong>PICK</strong> — Joey's word; 6 chars; matches the existing "THINKING" header style; clear in 1 syllable.</td></tr>
+  <tr><td><code>ORCHESTRATOR</code></td><td>Accurate but 11 chars; visually crowds the header.</td></tr>
+  <tr><td><code>DIRECTOR</code></td><td>Accurate; slight Hollywood vibe; less precise than DRIVER for tech UX.</td></tr>
+  <tr><td><code>LEAD</code></td><td>Vague — could mean lead developer, lead time, lead role.</td></tr>
+</table>
+<p>For the existing dropdown's relabel: <strong><code>ENGINE</code></strong> — matches its title attribute ("default engine for advise/summarize"), keeps the existing identifier.</p>
+</div>
+
+<h2>4. Shape</h2>
+<div class="card">
+<h3>HTML (new structure in <code>#loop-driver .driver-header</code>)</h3>
+<pre>&lt;div class="driver-header"&gt;
+  &lt;span class="driver-label"&gt;THINKING&lt;/span&gt;
+  &lt;span class="driver-active" id="driver-active"&gt;claude-opus-4-7&lt;/span&gt;
+  &lt;span class="track-badge" id="search-badge"&gt;&lt;/span&gt;
+&lt;/div&gt;
+&lt;div class="driver-controls"&gt;
+  &lt;label&gt;DRIVER  &lt;select id="driver-select"&gt;&lt;/select&gt;&lt;/label&gt;
+  &lt;label&gt;ENGINE  &lt;select id="engine-select"&gt;&lt;/select&gt;&lt;/label&gt;
+&lt;/div&gt;</pre>
+
+<h3>JS</h3>
+<ul>
+  <li>Both selects populated with: "Let NOUS decide" (value=""), then every provider name (value="claude-opus", label="claude-opus-4-7" etc.)</li>
+  <li>Default <code>selectedDriver = "claude-opus"</code>, <code>selectedEngine = "claude-opus"</code></li>
+  <li>On change: send WS <code>{type:"set_driver", driver:"claude-opus"}</code> or <code>{type:"set_engine", engine:"claude-opus"}</code></li>
+  <li>Update <code>#driver-active</code> text to show current model name on every change</li>
+  <li><code>buildEngineSelector()</code> grows into <code>buildEngineSelectors()</code> — handles both</li>
+</ul>
+
+<h3>C backend</h3>
+<ul>
+  <li>New globals: <code>char g_active_driver[64]</code>, <code>char g_active_engine[64]</code>; init to "claude-opus"</li>
+  <li>New WS message handlers: <code>set_driver</code> + <code>set_engine</code> (already-sent-but-dropped); both just <code>strncpy</code> into the globals</li>
+  <li><code>handle_task</code>: instead of "first available," look up <code>g_active_driver</code> in g_providers; if found + has key, use that; if <code>g_active_driver == ""</code> (NOUS decide), check mesh availability, emit honest SENSE/SELECT trace, no fallback</li>
+  <li>SENSE/SELECT trace remains visible — but reflects actual state, not hardcoded gemini</li>
+</ul>
+
+<h3>Out of scope</h3>
+<ul>
+  <li>Per-connection driver state (single-operator v1; one global suffices)</li>
+  <li>Real domain classifier ("pillar: GENERAL / 0.50" stays as a placeholder until NOUS sense is real)</li>
+  <li>Failover when a chosen driver errors (Joey's "fail and do nothing of course" applies — emit error, no auto-retry)</li>
+  <li>Persisting selected driver across sessions (in-memory only for v1)</li>
+</ul>
+</div>
+
+<h2>5. Choices + Consequences</h2>
+<div class="card">
+<table>
+  <tr><th>Fork</th><th>Options</th><th>Pick</th></tr>
+  <tr>
+    <td>F1 — How to represent "Let NOUS decide"</td>
+    <td>(a) empty string value (existing pattern); (b) literal "nous" string</td>
+    <td class="pick">(a) — keeps backward compat with existing engine-select; "" sentinel means "no override"</td>
+  </tr>
+  <tr>
+    <td>F2 — When driver="" + mesh down</td>
+    <td>(a) fail silent (no THINKING output); (b) fall back to first-available; (c) fall back to claude-opus default</td>
+    <td class="pick">(a) — Joey explicit: "if nous does nothing. then fail and do nothing of course"</td>
+  </tr>
+  <tr>
+    <td>F3 — When driver=specific (claude-opus) and it errors</td>
+    <td>(a) emit error, stop (current behavior); (b) failover to next available</td>
+    <td class="pick">(a) — symmetry with F2; operator picked it, operator owns the outcome; can re-fire after switching dropdown</td>
+  </tr>
+  <tr>
+    <td>F4 — Active-state visibility</td>
+    <td>(a) text label in header showing current model; (b) badge on the dropdown itself; (c) modal popup on hover</td>
+    <td class="pick">(a) — always-visible text in the header, updates on change. Most operator-glance-friendly.</td>
+  </tr>
+  <tr>
+    <td>F5 — Default driver at process startup</td>
+    <td>(a) hardcoded "claude-opus" in C; (b) read from config file; (c) read from users.dat preferences section</td>
+    <td class="pick">(a) for v1 — hardcoded. (c) for v2 when users.dat has a [user:fqdn:prefs] section. Cheap to revisit.</td>
+  </tr>
+  <tr>
+    <td>F6 — SENSE/SELECT trace strings when driver=specific</td>
+    <td>(a) keep both lines (placeholder UX for future); (b) skip SENSE, only emit SELECT with the picked provider</td>
+    <td class="pick">(b) — Joey wants honest trace. SENSE means "domain detection" — irrelevant when operator explicitly picked driver. SELECT line reflects the actual pick. When driver="" + NOUS active, both lines emit normally.</td>
+  </tr>
+</table>
+</div>
+
+<h2>6. Escape Routes</h2>
+<div class="card">
+<table>
+  <tr><th>Load-bearing choice</th><th>Reversal</th></tr>
+  <tr><td>F2 fail-silent on NOUS-decide</td><td>One line: change the early-return to fall back to <code>g_providers[0]</code>. Trivial.</td></tr>
+  <tr><td>F4 active-state in header</td><td>Remove the span. CSS only. Zero impact on backend.</td></tr>
+  <tr><td>F5 hardcoded default</td><td>Add config read in <code>load_providers()</code>. Tiny.</td></tr>
+  <tr><td>F6 skip SENSE when driver=specific</td><td>Restore both emits unconditionally. 4 lines.</td></tr>
+</table>
+</div>
+
+<h2>7. Pure Metal Test</h2>
+<div class="card">
+<p>Zero new dependencies. Vanilla HTML/JS/CSS additions; pure C state globals + 2 WS handlers. No new libraries, no new runtime requirements. <strong>Passes.</strong></p>
+</div>
+
+<h2>8. First Move</h2>
+<div class="card">
+<blockquote><strong>Add the <code>#driver-active</code> span to <code>index.html</code> and have JS update it on engine-select change.</strong> One-line HTML, ~3-line JS. Refresh the browser and see "claude-opus-4-7" appear in the THINKING header. Proves the active-state visibility plumbing works before any backend touches.</blockquote>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Code committed (this artifact)</li>
+<li>&#x2713; Hash in telemetry (backfilled after batch commit)</li>
+<li>&#x2014; Board updated (board items land via companion ~e)</li>
+<li>&#x2713; HTML report saved</li>
+<li>&#x2713; Index updated</li>
+<li>&#x2713; Pushed to remote</li>
+<li>&#x2713; No prior damage</li>
+<li>&#x2713; Production verified (will live-mirror)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r132 &middot; 2026-05-26 00:30 &middot; nous-desktop &middot; ~d driver dropdown</div>
+</div></body></html>

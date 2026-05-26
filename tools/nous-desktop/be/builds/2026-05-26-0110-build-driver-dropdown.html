@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~u: DRIVER dropdown — built, server-side state honored end-to-end</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}h3{color:#6FC3DF;font-size:1rem;margin:18px 0 8px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}
+  pre{color:#ccc;font-size:0.78rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.88rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .ok{color:#22c55e;font-weight:600}.fail{color:#ef4444;font-weight:600}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~u: DRIVER dropdown — built, server-side state honored end-to-end</h1>
+<p class="subtitle">5 board items shipped in one rebuild cycle. claude-opus-4-7 default. NOUS-decide fail-silent. SENSE/SELECT trace now honest.</p>
+
+<h2>What Was Built</h2>
+<div class="card">
+<table>
+<tr><th>idx</th><th>Change</th><th>Files</th><th>Result</th></tr>
+<tr><td>1</td><td>HTML driver-controls row + #driver-active status span</td><td>index.html + desktop.css</td><td><span class="ok">DONE</span></td></tr>
+<tr><td>2</td><td>buildEngineSelectors() — both selects, defaults to claude-opus, on-change WS + active label update; first-connect pushes defaults to server</td><td>loop.js</td><td><span class="ok">DONE</span></td></tr>
+<tr><td>3</td><td>g_active_driver + g_active_engine globals + set_driver / set_engine WS handlers</td><td>serve.c</td><td><span class="ok">DONE</span></td></tr>
+<tr><td>4</td><td>handle_task driver lookup; fail-silent on NOUS+mesh-down; operator_picked flag added to ProviderThreadCtx; SENSE skipped when operator picked</td><td>serve.c</td><td><span class="ok">DONE</span></td></tr>
+<tr><td>5</td><td>Rebuild via gcc + relaunch via launch.ps1 + WS smoke probe (3 driver states)</td><td>nous-desktop.exe</td><td><span class="ok">DONE</span></td></tr>
+</table>
+</div>
+
+<h2>Code shape</h2>
+<div class="card">
+<h3>HTML driver-header (new structure)</h3>
+<pre>&lt;div class="driver-header"&gt;
+  &lt;span class="driver-label"&gt;THINKING&lt;/span&gt;
+  &lt;span class="driver-active" id="driver-active"&gt;claude-opus-4-7&lt;/span&gt;
+  &lt;span class="track-badge" id="search-badge"&gt;&lt;/span&gt;
+&lt;/div&gt;
+&lt;div class="driver-controls"&gt;
+  &lt;label class="driver-ctl"&gt;&lt;span&gt;DRIVER&lt;/span&gt;
+    &lt;select id="driver-select"&gt;&lt;/select&gt;
+  &lt;/label&gt;
+  &lt;label class="driver-ctl"&gt;&lt;span&gt;ENGINE&lt;/span&gt;
+    &lt;select id="engine-select"&gt;&lt;/select&gt;
+  &lt;/label&gt;
+&lt;/div&gt;</pre>
+
+<h3>C handle_task selection (replaces "first available" loop)</h3>
+<pre>int driver_idx = -1;
+if (g_active_driver[0] == '\0') {
+    /* "Let NOUS decide" — require mesh up */
+    if (!(g_psk_loaded &amp;&amp; g_relay_host[0])) {
+        send_event(conn_id, "{...sense...NOUS unavailable...}");
+        send_event(conn_id, "{...search.error...mesh down...}");
+        /* fall through: no guided thread spawned; fan-out still runs */
+    } else {
+        /* mesh up — pick first available as proxy until real classifier */
+        for (...) { driver_idx = i; break; }
+    }
+} else {
+    /* Operator-picked driver — look up by name */
+    for (int i = 0; i &lt; g_provider_count; i++) {
+        if (strcmp(g_providers[i].name, g_active_driver) != 0) continue;
+        if (g_providers[i].disabled || !g_providers[i].api_key[0]) {
+            /* honest error: dropdown picked something with no key */
+            break;
+        }
+        driver_idx = i;
+        break;
+    }
+}
+if (driver_idx &gt;= 0) { /* spawn guided_ai_thread with operator_picked flag */ }</pre>
+
+<h3>C guided_ai_thread (honest SENSE)</h3>
+<pre>if (!ctx-&gt;operator_picked) {
+    /* SENSE lines only fire when no operator override —
+     * keeps the trace honest about what's happening */
+    send_event("...detecting knowledge domain...");
+    send_event("...pillar: GENERAL (confidence: 0.50)...");
+}
+/* SELECT line always emitted — shows the real expert that was picked */
+send_event("...expert: %s (%s)...", p-&gt;name, p-&gt;model);</pre>
+</div>
+
+<h2>Smoke results (live WS probe)</h2>
+<div class="card">
+<h3>Test 1 — driver=claude-opus (the new default)</h3>
+<pre>[select ] expert: claude-opus (claude-opus-4-7)
+[auth   ] ANTHROPIC_API_KEY loaded
+[prompt ] system prompt (32 chars)
+[request] POST https://api.anthropic.com/v1/messages (model: claude-opus-4-7)
+[response] HTTP 200 · 2155ms · 441 bytes
+[done   ] 28 in / 6 out · $0.0003
+[TEXT claude-opus] 'OK'
+sense=False select=True error=False  ← perfect</pre>
+<p><strong>PASS</strong> — Claude orchestrates. No SENSE noise. SELECT line is honest.</p>
+
+<h3>Test 2 — driver=claude-haiku (swap mid-session)</h3>
+<pre>[select ] expert: claude-haiku (claude-haiku-4-5-20251001)
+[response] HTTP 200 · 1986ms · 458 bytes
+[TEXT claude-haiku] 'OK'
+sense=False select=True error=False  ← perfect</pre>
+<p><strong>PASS</strong> — Dropdown swap honored immediately.</p>
+
+<h3>Test 3 — driver="" (Let NOUS decide, mesh down)</h3>
+<pre>[sense  ] NOUS unavailable (mesh down) -- no driver
+[SEARCH ERR] NOUS decide selected but mesh is down
+[TEXT claude-opus] 'OK'    ← fan-out still ran
+sense=True select=False error=True  ← perfect</pre>
+<p><strong>PASS</strong> — Fail-silent on driver side. Honest "NOUS unavailable" in SENSE. No silent fallback to gemini. Fan-out tiles still respond normally.</p>
+</div>
+
+<h2>Files Changed</h2>
+<div class="card">
+<table>
+<tr><th>File</th><th>Change</th><th>Net LOC</th></tr>
+<tr><td>wwwroot/index.html</td><td>+ driver-controls row, + #driver-active span, restructured driver-header</td><td>+10 / -1</td></tr>
+<tr><td>wwwroot/desktop.css</td><td>+ .driver-active, .driver-controls, .driver-ctl styles</td><td>+45</td></tr>
+<tr><td>wwwroot/loop.js</td><td>selectedEngine default "" → "claude-opus", added selectedDriver, buildEngineSelector → buildEngineSelectors (handles both, defaults push to server on connect)</td><td>+55 / -22</td></tr>
+<tr><td>src/serve.c</td><td>+ g_active_driver/engine globals, + set_driver/engine handlers in route_ws_message, + operator_picked field in ProviderThreadCtx, + driver lookup with fail-silent in handle_task, + conditional SENSE emit in guided_ai_thread</td><td>+95 / -28</td></tr>
+<tr><td>nous-desktop.exe</td><td>Rebuilt (~181KB, gitignored)</td><td>n/a</td></tr>
+</table>
+</div>
+
+<h2>Board status</h2>
+<div class="card">
+<p>P3-a: all 5 items move Ready → Done.</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Code committed (HTML/CSS/JS/C + this report)</li>
+<li>&#x2713; Hash in telemetry (backfilled)</li>
+<li>&#x2713; Board updated (all 5 P3-a items → Done)</li>
+<li>&#x2713; HTML report saved</li>
+<li>&#x2713; Index updated</li>
+<li>&#x2713; Pushed to remote</li>
+<li>&#x2713; No prior damage (existing 30 providers preserved, env-injection in launch.ps1 untouched)</li>
+<li>&#x2713; Production verified (3/3 smoke tests green; cockpit popped for visual)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r134 &middot; 2026-05-26 01:10 &middot; nous-desktop &middot; ~u driver dropdown</div>
+</div></body></html>

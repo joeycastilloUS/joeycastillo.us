@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~t: DRIVER dropdown — 3 scenarios, all PASS</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}
+  pre{color:#ccc;font-size:0.78rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.88rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .ok{color:#22c55e;font-weight:600}.warn{color:#f59e0b;font-weight:600}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~t: DRIVER dropdown — 3 scenarios, all PASS</h1>
+<p class="subtitle">Smoke ordering per kernel test convention: critical-path first (driver swap + fail-silent), no destructive tests needed. Each scenario verified via direct WS task probe against live server (PID 35916).</p>
+
+<h2>What Was Tested</h2>
+<div class="card">
+<table>
+<tr><th>#</th><th>Scenario</th><th>Expected</th><th>Result</th></tr>
+<tr><td>1</td><td>Default driver (claude-opus) — fresh session, dropdown default kicks in</td><td>SELECT line: claude-opus-4-7. No SENSE noise. 200 OK from Anthropic.</td><td><span class="ok">PASS</span></td></tr>
+<tr><td>2</td><td>Driver swap (claude-opus → claude-haiku via set_driver WS msg)</td><td>SELECT line: claude-haiku-4-5-20251001. Honored mid-session. No restart.</td><td><span class="ok">PASS</span></td></tr>
+<tr><td>3</td><td>Driver="" (Let NOUS decide) with mesh down — fail-silent</td><td>SENSE: "NOUS unavailable". SEARCH error fired. NO SELECT line (no driver chosen). Fan-out still runs.</td><td><span class="ok">PASS</span></td></tr>
+</table>
+</div>
+
+<h2>Results</h2>
+<div class="card">
+<h3>Test 1 — claude-opus default</h3>
+<pre>[select ] expert: claude-opus (claude-opus-4-7)
+[auth   ] ANTHROPIC_API_KEY loaded
+[prompt ] system prompt (32 chars)
+[request] POST https://api.anthropic.com/v1/messages (model: claude-opus-4-7)
+[response] HTTP 200 · 2155ms · 441 bytes
+[extract] 28 tokens in / 6 tokens out · $0.000290
+[done   ] 28 in / 6 out · $0.0003
+[TEXT claude-opus] 'OK'</pre>
+<p><strong>Confirmed:</strong> Claude is the driver. SELECT line shows the actual pick. SENSE skipped (operator_picked=1). Token usage tracked.</p>
+
+<h3>Test 2 — claude-haiku swap</h3>
+<pre>[select ] expert: claude-haiku (claude-haiku-4-5-20251001)
+[auth   ] ANTHROPIC_API_KEY loaded
+[request] POST https://api.anthropic.com/v1/messages (model: claude-haiku-4-5-20251001)
+[response] HTTP 200 · 1986ms · 458 bytes
+[done   ] 18 in / 4 out · $0.0000
+[TEXT claude-haiku] 'OK'</pre>
+<p><strong>Confirmed:</strong> set_driver WS message took effect immediately on the next task. No restart, no rebuild.</p>
+
+<h3>Test 3 — Let NOUS decide (mesh down)</h3>
+<pre>[sense  ] NOUS unavailable (mesh down) -- no driver
+[SEARCH ERR] NOUS decide selected but mesh is down
+[TEXT claude-opus] 'OK'   ← fan-out still ran
+[TEXT claude-haiku] 'OK'  ← fan-out still ran</pre>
+<p><strong>Confirmed:</strong> THINKING column fails silent (no surprise fallback to gemini). SENSE line is honest. Fan-out continues unaffected. Operator owns the choice — picking NOUS-decide when mesh is down is a no-op for the orchestrator.</p>
+</div>
+
+<h2>Fixes Applied</h2>
+<div class="card">
+<p>None — built clean on first compile. Pre-existing crypt.c warnings (L_BYTES, fe_copy) unchanged.</p>
+</div>
+
+<h2>Remaining Issues</h2>
+<div class="card">
+<ul>
+  <li><strong>(known, deferred)</strong> SENSE step is still hardcoded placeholder when active ("pillar: GENERAL (confidence: 0.50)"). Real classification awaits NOUS mesh sense skill. By design — Joey wants the placeholder visible for future.</li>
+  <li><strong>(known, deferred)</strong> Driver-side failover not implemented. If claude-opus errors mid-request, the THINKING column shows the error and stops — operator owns the retry by switching the dropdown. By design per ~d F3.</li>
+  <li><strong>(known)</strong> First-WS-connect default-push has a 1s setTimeout fallback if WS isn't open yet. Edge case: if WS takes &gt;1s to open, the C-side g_active_driver may still be at hardcoded "claude-opus" default which happens to be correct anyway. Cosmetic concern.</li>
+</ul>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Tests committed (this artifact)</li>
+<li>&#x2713; All 3 scenarios PASS (no fixes needed)</li>
+<li>&#x2713; Critical path covered: driver swap + fail-silent + default-init</li>
+<li>&#x2713; Edge cases documented (3 known/deferred items above)</li>
+<li>&#x2713; Pushed to remote</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r135 &middot; 2026-05-26 01:15 &middot; nous-desktop &middot; ~t driver dropdown</div>
+</div></body></html>
