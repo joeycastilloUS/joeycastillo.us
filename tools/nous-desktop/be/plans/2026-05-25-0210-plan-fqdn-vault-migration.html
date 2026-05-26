@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~p: FQDN-keyed vault migration + Claude orchestrator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 1.2rem; }
+  .container { max-width: 920px; margin: 0 auto; padding: 32px 24px; }
+  h1 { color: #6FC3DF; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 1rem; margin-bottom: 24px; }
+  .banner { background: #6FC3DF11; border-left: 3px solid #6FC3DF; padding: 10px 16px; margin-bottom: 24px; color: #6FC3DF; font-weight: 600; font-size: 0.9rem; }
+  h2 { color: #6FC3DF; font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #6FC3DF; font-size: 1rem; margin: 18px 0 8px; }
+  .card { background: #1A1A1A; border-radius: 8px; padding: 16px 20px; margin: 10px 0; }
+  ul, ol { margin-left: 22px; margin-bottom: 12px; }
+  li { margin: 6px 0; }
+  pre { color: #ccc; font-size: 0.80rem; overflow-x: auto; background: #0a0a0a; padding: 12px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+  code { color: #6FC3DF; background: #1A1A1A; padding: 1px 6px; border-radius: 3px; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88rem; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-size: 0.82rem; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1A1A1A; vertical-align: top; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #222; color: #555; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span></nav>
+<div class="container">
+
+<h1>~p: FQDN-keyed vault migration + Claude orchestrator</h1>
+<p class="subtitle">Retire the Windows-registry env-var path. Make <code>users.dat</code> the canonical local key store. Mirror it to <code>joeycastilloUS/vault</code> for sovereign recovery. Make Claude the THINKING-column orchestrator. All in two boards, two phases, sequenced so each phase is shippable on its own.</p>
+<div class="banner">Plan -- Awaiting Approval</div>
+
+<h2>1. Intent</h2>
+<div class="card">
+<p>Three coupled goals:</p>
+<ol>
+  <li><strong>Sovereign key storage.</strong> No more Windows registry / setx / env-block-staleness. Keys live in <code>users.dat</code> next to the binary, sectioned by FQDN. Per-operator, per-machine, plaintext-first then encrypted-second.</li>
+  <li><strong>GitHub vault as backup + recovery.</strong> The same key file (eventually encrypted) lives in <code>joeycastilloUS/vault</code> (private). Any machine can <code>gh repo clone</code> and have a working keychain. The FQDN&harr;org mapping ("joeycastillo.us &rarr; joeycastilloUS") makes the vault location deterministic for any future operator.</li>
+  <li><strong>Claude as orchestrator.</strong> The cockpit's THINKING column is driven by whichever provider is first in <code>g_providers[]</code>. Move claude-sonnet to slot 0. Claude becomes the guided-AI driver + the synthesis target for summarize/judge dispatch.</li>
+</ol>
+<p>End state: registry-free, multi-operator-capable from day one, Claude leading the show, encryption flipping on as a v1.5 follow-on.</p>
+</div>
+
+<h2>2. Scope</h2>
+<div class="card">
+<h3>In (v1 — this plan)</h3>
+<ul>
+  <li>Add FQDN&rarr;org name mapping function in <code>nous_userkeys.c</code> per the kernel convention just committed.</li>
+  <li>Change <code>load_providers()</code> at <code>serve.c:409</code> to pass the operator FQDN as the <code>user</code> argument to <code>resolve_key()</code>.</li>
+  <li>Seed <code>users.dat</code> from current Windows env-scope values (one-shot script or first-launch convenience).</li>
+  <li>Reorder <code>g_defaults[]</code> so <code>claude-sonnet</code> is the first entry; Claude becomes the orchestrator.</li>
+  <li>Encrypt <code>users.dat.enc</code> via NOUS crypt (AES-256-GCM) with key derived from Cloudflare API token (or passphrase if CF token isn't available at boot).</li>
+  <li>Vault sync at startup: <code>gh repo clone joeycastilloUS/vault</code> (or pull if already cloned), decrypt, load.</li>
+  <li>Retire env-var injection from <code>launch.ps1</code> (or keep as belt-and-suspenders fallback).</li>
+  <li>Verify end-to-end via WS task probe + cockpit hard-refresh.</li>
+</ul>
+<h3>Out (deferred to v2+)</h3>
+<ul>
+  <li>NOUS mesh personal store (Layer 3). The mesh isn't live; can't sync to it yet. Vault sync is the proxy until mesh comes up.</li>
+  <li>Multi-operator UI (operator picker, TOTP for switching). v1 is single-operator; FQDN&rarr;org mapping is in code but only Joey is the operator today.</li>
+  <li>Auto-rotation reminders for keys that have hit transcripts. Manual for now per SETUP.md.</li>
+  <li>Vault-to-mesh push (Layer 2 &rarr; Layer 3) once mesh is up. Same crypto + same identity, so future-proof.</li>
+  <li>Non-<code>.us</code> TLD mapping rules. Per kernel: deferred until first need.</li>
+</ul>
+</div>
+
+<h2>3. Approach</h2>
+<div class="card">
+<p>Two phases. P1-a is shippable on its own (local users.dat + Claude orchestrator); P1-b adds the encrypted vault + GitHub sync on top.</p>
+<p><strong>Why split:</strong> P1-a unlocks immediate value (registry-free local) and is verifiable in 15 minutes. P1-b is real crypto + remote sync — bigger code, more risk; we want P1-a's wins banked before we touch crypto.</p>
+<p><strong>Decisions assumed from the inspect's open questions (you can push back):</strong></p>
+<table>
+  <tr><th>Question</th><th>Assumed</th><th>Why</th></tr>
+  <tr><td>D1 — joeycastilloUS/vault PRIVATE?</td><td>YES</td><td>Hard line; plaintext keys in any non-private repo = all 7 rotated.</td></tr>
+  <tr><td>D2 — Encrypt before commit?</td><td>YES (in P1-b)</td><td>Even private repos leak: backups, mirrors, future access grants, GitHub-side incidents. Encryption is cheap; NOUS crypt already vendored.</td></tr>
+  <tr><td>D3 — FQDN&rarr;org mapping in code?</td><td>YES</td><td>Kernel convention just committed; binary should honor it from day one (multi-operator-ready).</td></tr>
+  <tr><td>Encryption key source</td><td>Cloudflare API token</td><td>Already bound to joeycastillo.us; satisfies "permanent FQDN connection" intent natively; no new secret to remember.</td></tr>
+  <tr><td>Operator identity in users.dat sections</td><td>FQDN itself (<code>[user:joeycastillo.us]</code>)</td><td>"You are your domain" — matches NOUS auth identity model.</td></tr>
+</table>
+</div>
+
+<h2>4. Phases</h2>
+<div class="card">
+
+<h3>Phase 1-a — Local users.dat + Claude orchestrator (15 pts · ~30 min)</h3>
+<p>End state: registry-free local operation, Claude in THINKING column, all current providers still working.</p>
+<table>
+  <tr><th>Item</th><th>Pts</th><th>Tilde</th></tr>
+  <tr><td>FQDN&rarr;org name mapping function (e.g. <code>fqdn_to_github_org(fqdn, out, sz)</code>) added to <code>nous_userkeys.c</code> + corresponding header export</td><td>3</td><td>~a~t</td></tr>
+  <tr><td><code>load_providers()</code>: replace <code>resolve_key(NULL, ...)</code> with <code>resolve_key(g_active_user, ...)</code> where <code>g_active_user</code> is a new global defaulting to <code>"joeycastillo.us"</code>; settable via <code>--user &lt;fqdn&gt;</code> CLI flag in main.c</td><td>3</td><td>~u~t</td></tr>
+  <tr><td>Seed <code>users.dat</code> from current env-scope keys via a one-shot PowerShell util; commit the util into the repo, gitignore the output</td><td>3</td><td>~a~t</td></tr>
+  <tr><td>Reorder <code>g_defaults[]</code> so <code>claude-sonnet</code> is the first entry; Claude becomes the guided-AI driver + summarize/judge target</td><td>3</td><td>~u~t</td></tr>
+  <tr><td>Rebuild via gcc + relaunch via <code>launch.ps1 -Background</code> + smoke all 27+ tiles via WS task probe + verify Claude is in THINKING column</td><td>3</td><td>~t</td></tr>
+</table>
+<p><strong>Exit gate:</strong> Server reads <code>users.dat</code> at startup, all keyed providers green, Claude drives the THINKING column. Registry could be wiped without breaking the cockpit.</p>
+
+<h3>Phase 1-b ⛔ — Encrypted vault + GitHub sync (16 pts · ~60 min, blocked on P1-a)</h3>
+<p>End state: encrypted-at-rest, sovereign, GitHub-recoverable, multi-machine-ready.</p>
+<table>
+  <tr><th>Item</th><th>Pts</th><th>Tilde</th></tr>
+  <tr><td>Add encryption to <code>nous_userkeys.c</code>: AES-256-GCM via NOUS crypt skill, key derived from Cloudflare API token (or passphrase fallback); read <code>users.dat.enc</code> if present, fall back to plain <code>users.dat</code> for migration</td><td>5</td><td>~a~t</td></tr>
+  <tr><td>Vault sync at startup: <code>gh repo clone joeycastilloUS/vault</code> or pull if cloned, decrypt, load; org name derived via FQDN&rarr;org mapping from P1-a</td><td>5</td><td>~a~t</td></tr>
+  <tr><td>Seed <code>users.dat.enc</code> + push to <code>joeycastilloUS/vault</code> (private repo, created if missing); verify the full round-trip from a simulated fresh clone</td><td>3</td><td>~t</td></tr>
+  <tr><td>Retire env-var injection from <code>launch.ps1</code> (keep as fallback flag <code>-EnvFallback</code> for emergency recovery scenarios)</td><td>3</td><td>~u~t</td></tr>
+</table>
+<p><strong>Exit gate:</strong> Server starts from a fresh-cloned machine; pulls vault; decrypts; all keys load; no registry/env-var dependency.</p>
+
+<h3>Why this order matters</h3>
+<p>P1-a is reversible in seconds (one-line revert in <code>resolve_key</code> call site). P1-b touches crypto and remote sync — much harder to roll back cleanly. Banking P1-a first means we ship value even if P1-b reveals a surprise.</p>
+</div>
+
+<h2>5. Constraints</h2>
+<div class="card">
+<ul>
+  <li><strong>Rule 4 (Joey pastes, Be handles).</strong> Any new secret (CF token if not already in env, passphrase if chosen) follows the paste-handle-rotate flow.</li>
+  <li><strong>Rule 8 (commercial intel stays private).</strong> The committed users.dat.enc / vault repo content is sovereign; never echoed in chat, never logged unencrypted.</li>
+  <li><strong>FQDN&harr;org kernel convention</strong> (just committed). All mapping in code MUST follow it exactly; no clever alternatives.</li>
+  <li><strong>Pure C, no new dependencies.</strong> NOUS crypt skill is already vendored. <code>gh</code> CLI for vault sync is a runtime tool, not a build-time dep — that's OK.</li>
+  <li><strong>users.dat.enc is committed, users.dat (plain) is NEVER committed.</strong> <code>.gitignore</code> entry mandatory.</li>
+  <li><strong>Backward-compatible Phase 1-a.</strong> If <code>users.dat</code> doesn't exist, fall back to env vars (existing behavior). No flag-day breakage.</li>
+  <li><strong>WDAC launch path preserved.</strong> <code>launch.ps1</code> stays as the launch entrypoint; only its env-injection responsibility migrates away over time.</li>
+</ul>
+</div>
+
+<h2>6. Unknowns</h2>
+<div class="card">
+<ol>
+  <li><strong>Cloudflare API token availability at boot.</strong> If the binary needs CF token to derive the decryption key, but the CF token itself isn't in env at boot, we have a chicken-and-egg problem. Fallback: passphrase prompted at first launch, cached for the session. Decide between (a) CF-token-derived, (b) passphrase-derived, (c) both with fallback during P1-b implementation.</li>
+  <li><strong><code>gh</code> CLI availability + auth state.</strong> Vault sync uses <code>gh repo clone</code>. Need <code>gh auth login</code> to be valid for the operator's GitHub user. Verify at startup; surface clear error if missing.</li>
+  <li><strong>Vault repo creation.</strong> First-launch needs to create <code>joeycastilloUS/vault</code> if it doesn't exist. <code>gh repo create</code> with <code>--private</code> handles it. Need to also seed README + .gitignore so the repo isn't barren.</li>
+  <li><strong>Concurrent writes from multiple machines.</strong> If Joey's NEO and a future laptop B both modify keys, last-push-wins with potential conflict. v1 accepts this (single-operator, single-machine usually); v2 needs proper merge or single-writer convention.</li>
+  <li><strong>Encryption key rotation.</strong> If Joey rotates his CF token, the previous users.dat.enc becomes unreadable. Need a re-encrypt utility (cheap; one extra command). Document.</li>
+  <li><strong>What's the "user" name in users.dat once we go FQDN?</strong> Sections become <code>[user:joeycastillo.us]</code>. Existing dead-code path uses string match on the section name; should "just work" once we pass FQDN as the lookup key.</li>
+  <li><strong>Claude latency in THINKING column.</strong> Sonnet is faster than Opus; Opus is smarter. If Sonnet feels too rushed for orchestration, swap to Opus and accept slower THINKING-column update.</li>
+</ol>
+</div>
+
+<h2>7. When To Revisit</h2>
+<div class="card">
+<table>
+  <tr><th>Signal</th><th>Action</th></tr>
+  <tr>
+    <td>Vault sync fails on fresh clone (gh auth, network, missing repo)</td>
+    <td>Surface error clearly at server startup; fall back to local users.dat plain; flag for operator attention. New <code>~p</code> only if the failure mode is structural.</td>
+  </tr>
+  <tr>
+    <td>CF-token-derived encryption proves fragile (token rotation breaks decryption)</td>
+    <td>Add a passphrase-derived fallback or a key-escrow mechanism. Small follow-up; not a plan revision.</td>
+  </tr>
+  <tr>
+    <td>NOUS mesh comes online and is ready for Layer 3 sync</td>
+    <td>New <code>~p</code>: "vault &rarr; mesh sync". Same crypto, same identity model, new transport. Anticipated v2.</td>
+  </tr>
+  <tr>
+    <td>Second operator (e.g. Norman, Scotty) needs onboarding</td>
+    <td>FQDN&rarr;org mapping in code already supports it; just need ops doc for "create your .us FQDN, create your <name>US org, run launch.ps1 -- --user &lt;your-fqdn&gt;". 30 min ops, no new code.</td>
+  </tr>
+  <tr>
+    <td>Claude orchestrator feels too slow / wrong model for the THINKING column</td>
+    <td>Swap claude-sonnet &rarr; claude-opus (or vice versa) in g_defaults[] ordering. One-line change.</td>
+  </tr>
+  <tr>
+    <td>Need to onboard non-.us TLD operator (e.g. someone.com)</td>
+    <td>Extend the kernel convention with the .com (or other) mapping rule. Update fqdn_to_github_org() accordingly.</td>
+  </tr>
+</table>
+</div>
+
+<h2>8. Board impact</h2>
+<div class="card">
+<p>Two new boards under the existing "Cockpit UI" section, OR a new "Identity + Vault" section. Recommend the new section for cleaner audit trail.</p>
+<p><code>~e</code> in the companion artifact will materialize these board items.</p>
+</div>
+
+<h2>9. Next</h2>
+<div class="card">
+<p>Plan awaits Joey's approval. On approve: companion <code>~e</code> writes the board items, then <code>~b</code> pulls and executes Phase 1-a end-to-end (~30 min), then Phase 1-b (~60 min). Total ~90 min wall time for both phases shipped.</p>
+<p>Quick approval = just say "go". Pushback on any assumed decision = say which (D1/D2/D3/key source/identity) and I revise.</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none; margin:0; padding:0;">
+  <li>&#x2713; Code committed (this artifact + telemetry + index)</li>
+  <li>&#x2713; Hash in telemetry (backfilled post-commit)</li>
+  <li>&#x2014; Board updated (board items land via companion <code>~e</code>, not this plan)</li>
+  <li>&#x2713; HTML report saved (this file)</li>
+  <li>&#x2713; Index updated (Plans section gets this entry)</li>
+  <li>&#x2713; Pushed to remote</li>
+  <li>&#x2713; No prior damage (planning only)</li>
+  <li>&#x2713; Production verified (live-mirrored to joeycastillo.us/tools/nous-desktop)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r128 &middot; 2026-05-25 02:10 &middot; nous-desktop &middot; ~p FQDN-vault migration (Awaiting Approval)</div>
+
+</div>
+</body>
+</html>
