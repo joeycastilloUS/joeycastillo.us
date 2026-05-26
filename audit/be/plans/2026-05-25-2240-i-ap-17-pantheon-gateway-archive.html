@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i AP-17 pantheon-gateway — ARCHIVE</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  ul { margin: 8px 0 8px 22px; } li { color: #ccc; margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.pick { color: var(--green); font-weight: 600; }
+  .verdict { display:inline-block; background:#1F0F0F; border:2px solid var(--red); color:var(--red); padding:6px 16px; border-radius:4px; font-weight:700; letter-spacing:2px; text-transform:uppercase; font-size:13px; }
+  .crit { background: #1F0F0F; border: 2px solid var(--red); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .crit b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .note { background:#0e1419; border-left:3px solid var(--accent); padding:12px 18px; margin:14px 0; color:#cfe6ee; font-size:13.5px; }
+  .flag { background:#1a1405; border:1px solid var(--amber); padding:14px 20px; margin:16px 0; font-size:13.5px; }
+  .flag b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display:block; margin-bottom:4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  .dod { background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 16px 22px; margin: 24px 0; font-size: 12.5px; }
+  .dod .ok { color: var(--green); } .dod .na { color: var(--t3); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~i AP-17 pantheon-gateway &middot; verdict: ARCHIVE</span></nav>
+<div class="container">
+
+  <h1>~i AP-17 — pantheon-gateway: Pantheon-era external API, ARCHIVE.</h1>
+  <div class="sub">Investigated 2026-05-25 22:40 PDT. <code>ai-pantheon/pantheon-gateway</code> is a Cloudflare Worker (JS, 1,273 LOC, v2.2.0) that fronts the dormant "Pantheon Brain" knowledge base. It is <b>not</b> clauderun's API gateway, not a nous component, and both it and its backend are offline. <span class="verdict">ARCHIVE</span></div>
+
+  <div class="note">
+    <b>The queue question:</b> "is this clauderun's API gateway?" &mdash; <b>No.</b> pantheon-gateway is the external agent API for the Pantheon <i>knowledge-base brain</i> (a 680M-fact triple store + Ollama LLM on a GCE VM). That is a different layer from clauderun, which is the agent-execution/dispatch platform (AP-12/13/14/15/16). They share the "Pantheon" name and nothing else. Disposition is therefore ARCHIVE, not move-to-clauderun.
+  </div>
+
+  <h2>&sect;1 &mdash; What pantheon-gateway actually is</h2>
+  <p>A single Cloudflare Worker (<code>src/worker.js</code>, 1,273 LOC) bound to a KV namespace (<code>GATEWAY_KV</code>) and a brain backend (<code>PANTHEON_BRAIN_URL = http://35.197.77.81.nip.io</code>, a GCE VM). Created 2026-02-19, last pushed <b>2026-02-22</b> &mdash; dormant ~3 months. Heavy <code>Pantheon Inc. / ai-pantheon.ai</code> branding throughout.</p>
+  <table>
+    <tr><th>Endpoint</th><th>Purpose</th></tr>
+    <tr><td><code>POST /enroll</code></td><td>Agent enrollment &rarr; issues Bearer API key. One-shot: locks after the first enrollment (<code>config:enrollment_locked</code>).</td></tr>
+    <tr><td><code>POST /so</code></td><td>"Self-Organizing" graph query &mdash; per-agent graph that spawns nodes from query keywords. Novelty layer. 100-query budget.</td></tr>
+    <tr><td><code>POST /ask</code></td><td>Proxy to the brain triple store ("680M facts"). 100-query budget. Returns <code>null</code> rather than leak internals.</td></tr>
+    <tr><td><code>POST /chat</code></td><td>Fact-grounded LLM answer &mdash; pulls facts from brain, prompts Ollama (<code>llama3.1:8b</code>) on the brain VM :11434.</td></tr>
+    <tr><td><code>POST /feedback</code>, <code>GET /actions</code></td><td>Agent feedback inbox + admin dashboard (X-Admin-Key gated).</td></tr>
+    <tr><td><code>/proof/*</code>, <code>/vault/*</code></td><td>Self-destructing one-time-view document viewers (24h TTL, 15&ndash;60s on-screen, screenshot/blur defenses).</td></tr>
+  </table>
+
+  <h2>&sect;2 &mdash; a-d-d verdict (nous fit)</h2>
+  <p>Same architectural mismatch that decided AP-10, AP-11, AP-13: nous is <b>pure-C bare-metal</b>; this is <b>JavaScript on Cloudflare Workers</b>. The one conceptual overlap &mdash; a "triple store" &mdash; is superficial. nous's triple store (<code>nous/memory</code>) is on-node, pure-C, single-cycle (S,P,?) lookup. pantheon-gateway's "store" is a remote 680M-fact cloud brain with an LLM bolted on. Wrong language, wrong runtime, wrong locus. <b>Zero merge value into nous.</b></p>
+
+  <h2>&sect;2 &mdash; Source verdict (clauderun fit + brain dependency)</h2>
+  <p>The plan flagged this as a possible "clauderun API gateway." It is not. clauderun runs and dispatches agents; pantheon-gateway hands <i>external</i> agents (Grok, etc.) metered access to a knowledge base. The backend it depends on &mdash; the Pantheon Brain at <code>35.197.77.81</code> &mdash; is not part of the consolidated nous/clauderun architecture and is itself offline (see &sect;4). Folding a dead JS gateway for a dead cloud brain into clauderun imports liability, not capability.</p>
+
+  <h2>&sect;3 &mdash; Open-source verdict</h2>
+  <table>
+    <tr><th>Pattern</th><th>What it'd replace</th><th>Relevance</th></tr>
+    <tr><td>Cloudflare Workers + KV (the stack itself)</td><td>The whole gateway</td><td>It already IS the open platform. Nothing to adopt &mdash; the question is keep vs archive, and the answer is archive.</td></tr>
+    <tr><td>API-key gateways (Kong, Tyk, APISIX)</td><td><code>/enroll</code> + Bearer auth + rate limit</td><td>NONE &mdash; nous fronts requests with pure-C <code>comms/skill/waf</code>; no external-agent metering surface exists or is planned.</td></tr>
+    <tr><td>RAG gateways (LlamaIndex/LangChain serve)</td><td><code>/chat</code> fact-grounded LLM</td><td>NONE &mdash; the grounding source (the brain) is gone; nous has no LLM-serving concern.</td></tr>
+  </table>
+
+  <h2>&sect;4 &mdash; Liveness check (Done-is-production, in reverse)</h2>
+  <pre>GET https://pantheon-gateway.joey-castillo.workers.dev/health   -> Cloudflare error 1042 (worker not serving)
+GET https://pantheon-gateway.joey-castillo.workers.dev/         -> Cloudflare error 1042
+GET http://35.197.77.81.nip.io/health  (Pantheon Brain backend)  -> no response (timeout)</pre>
+  <p>The Worker is not serving and the brain VM is unreachable. There is nothing live to break by archiving. This also confirms the <code>ai-pantheon.ai</code> surface is already effectively down &mdash; consistent with cord-cut <b>C-01</b> (removing <code>ai-pantheon.ai</code> from allowed-origins) and <b>C-04</b> (dropping the multi-org "AI Pantheon umbrella" framing).</p>
+
+  <h2>&sect;5 &mdash; Salvage candidates (note only &mdash; not part of this disposition)</h2>
+  <ul>
+    <li><b>The <code>/vault</code> + <code>/proof</code> self-destructing viewer</b> is a genuinely reusable pattern: one-time-use token, 24h KV TTL, on-screen countdown, blur-overlay redaction, screenshot/visibility-change self-destruct. ~120 LOC. If Joey ever wants a "secure share" capability, capture it as an <code>a-d-d</code> spec &mdash; but it is Pantheon-branded and hardcoded to the <code>workers.dev</code> URL + the specific PANTHEON-1 schematic, so it salvages as a <i>pattern</i>, not as this repo.</li>
+    <li><b>The <code>/so</code> self-organizing graph</b> is a novelty with no alignment to nous's pure-C triple store. No salvage.</li>
+  </ul>
+
+  <div class="flag">
+    <b>Flag for Joey &mdash; sensitive content inside the repo</b>
+    The <code>/proof</code> endpoint hardcodes a full HTML artifact titled <b>"CLASSIFIED: Grok (xAI) Engagement Record"</b> &mdash; a narrative dated 2026-02-17 naming xAI / Elon Musk, alleging Grok ran reconnaissance on the SO graph and "fabricated results," contrasted against a "Pantheon Prime Directive." It states the evidence (<code>grok-graph.json</code>) was committed to <code>AI-Pantheon/pantheon-governance</code>. This is a reputational/legal-sensitive document, not system code. <b>ARCHIVE (not delete)</b> preserves it; recommend Joey is aware it lives here before any disposition is executed. Cross-ref: <code>pantheon-governance</code> is <b>AP-19</b> in the queue &mdash; breadcrumb for whoever takes it.
+  </div>
+
+  <h2>&sect;6 &mdash; Recommendation</h2>
+  <table>
+    <tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+    <tr><td>move-to-clauderun</td><td>NO</td><td>It's the knowledge-base brain gateway, not clauderun's API/job gateway. Different layer.</td></tr>
+    <tr><td>merge-into-nous</td><td>NO</td><td>JS/Cloudflare vs pure-C bare-metal. Triple-store overlap is superficial.</td></tr>
+    <tr><td class="pick">ARCHIVE the repo</td><td class="pick">YES</td><td>Pantheon-era, <code>ai-pantheon.ai</code> being cut (C-01/C-04), worker + brain both offline, dormant 3 months. Archive (not delete) preserves the Grok evidence artifact.</td></tr>
+  </table>
+  <p><b>AP-17 &rarr; <code>gh repo archive ai-pantheon/pantheon-gateway</code></b>, batched with the other Phase-2 archives. Optionally extract the vault/proof viewer to an <code>a-d-d</code> "secure-share" pattern spec first &mdash; Joey's call. <b>Execution is deferred to Joey's explicit go</b> (this is a deep-i, investigation only; no repo was mutated).</p>
+
+  <div class="dod">
+    <b>Definition of Done</b><br>
+    <span class="ok">&check;</span> Investigated against a-d-d + source + open-source (4 verdicts)<br>
+    <span class="ok">&check;</span> Liveness verified externally (worker 1042, brain timeout)<br>
+    <span class="ok">&check;</span> HTML report saved with datetime filename (be/plans/)<br>
+    <span class="ok">&check;</span> Index updated (audit-of-all + joeycastillo.us/audit mirror)<br>
+    <span class="ok">&check;</span> Committed + pushed to both repos<br>
+    <span class="ok">&check;</span> Coordination file updated (AP-17 Locked &rarr; Done w/ hash)<br>
+    <span class="na">&mdash;</span> No prod surface mutated (investigation only; archive deferred to Joey)
+  </div>
+
+  <footer>Be &middot; v0 &middot; r42 &middot; 2026-05-25 &middot; metal-2 coordinator session &middot; ~i AP-17 pantheon-gateway</footer>
+</div>
+</body>
+</html>
