@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~P: Build Cadence.Driver -- console steering wheel for human-approved sweeps</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}
+.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}
+.phase .accept strong{color:#5cb85c}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~plan: Cadence.Driver build</nav>
+
+<h1>Build Cadence.Driver &mdash; 5 phases, 15 pts, one new project in the cadence repo</h1>
+<p class="sub">Execute the design at <code>be/designs/2026-05-24-2010-design-cadence-driver.html</code> (and the inspect at <code>be/inspects/2026-05-24-2010-inspect-mendo-dgx-steering-wheel.html</code>). Add a console steering wheel that runs a cadence sweep as a sequence of preview-and-approve steps. Cloud Run keeps doing autonomous Scheduler-fired ticks unchanged; the Driver is the human-in-the-loop investigation mode.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> Give Joey the same operator confidence with cadence that he has with mendo-dgx. Today's autonomous <code>/tick</code> reports a single number; when it feels wrong, there's no narrative. The Driver runs the same fingerprint sweep as a 10-step flow that previews each action, prompts for approval, executes, captures the result, and recovers from failures. Three modes -- Interactive (default), Auto (matches Scheduler behavior), Manual -- share the same step list. All snapshots tagged <code>source: "driver"</code> so the dashboard timeline differentiates from Scheduler-fired ticks.
+</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr>
+  <td>
+    New <code>Cadence.Driver/</code> .NET 8 console project in the cadence repo (<code>acmedevus/cadence</code>). References the existing <code>Cadence/</code> project for FingerprintPrimitive + SnowflakeConn + KeyHelper. SteeringWheel.cs adapted from mendo-dgx (~200-300 lines). IStep interface + StepResult + StepContext. 10 sweep steps + Inspector tools. Six escape hatches (Skip / Back / Inspect / Find / Dump / Quit). Failure recovery (Retry / Inspect / Skip / Quit). Three run modes (Interactive / Auto / Manual). Three ops sub-flows (SchedulerToggle, FirestoreWipe, ResetBaseline compound). <code>source: "driver"</code> field added on Driver-written Firestore docs. RunResult JSON persistence to <code>results/runs/</code>.
+  </td>
+  <td>
+    Touching the Cloud Run <code>Cadence/</code> service (other than reading its public classes). Web UI -- console-only same as mendo-dgx. New Snowflake auth modes. New fingerprint logic. <code>airbyte-parity</code>, <code>airbyte_migration_tools</code>, or any other repo. A tilde command on Be (the Driver is a normal <code>dotnet run</code> invocation). Dashboard rendering changes -- the Driver writes the same shape doc with a new field; dashboard handles whatever <code>source</code> field it sees. Distributed run state (each invocation is a fresh process).
+  </td>
+</tr>
+</table>
+
+<h2>Approach</h2>
+<ol style="margin-left:22px;font-size:14px">
+<li><b>First Move first.</b> Phase 1 stands up the project, a minimal wheel, and one step (Connect). Proves the cross-project reference + auth path work end-to-end on Joey's machine before any of the sweep ceremony.</li>
+<li><b>Wheel before steps.</b> Phase 2 builds out the full SteeringWheel (all six hatches, StepResult capture, failure recovery loop) on top of the minimal proof. After Phase 2, adding new steps becomes mechanical.</li>
+<li><b>Steps in two batches.</b> Phase 3 lands the four "resolve" steps (cheap, read-only, build up StepContext state). Phase 4 lands the six "execute" steps (build/run/compute/write -- the bulk of the actual fingerprint sweep). Same shape, separated for sane commits.</li>
+<li><b>Ops + Auto last.</b> Phase 5 layers the three ops sub-flows (SchedulerToggle, FirestoreWipe, ResetBaseline) on top of the Driver, plus Auto mode + RunResult JSON persistence. Auto mode is the dotnet-run equivalent of what Scheduler does; useful for local smoke after a clone refresh.</li>
+</ol>
+
+<h2>Pre-flight</h2>
+<div class="warn">
+<strong>Before Phase 1:</strong> verify the cadence repo is clean. Verify <code>~/.snowflake-keys/joey_be.p8</code> + passphrase exist (Driver uses the same local-file paths the Cadence service uses when <code>SECRET_NAME</code> isn't set). Verify <code>dotnet --version</code> &gt;= 8 (already confirmed: 10.0.108 in this session). Branching: same call as Board 10 -- main, no branch ceremony. The Driver is additive; it can sit unused while the rest of the system keeps running.
+</div>
+
+<h2>Phases</h2>
+
+<div class="phase">
+<h3><span class="num">1</span> First Move -- project scaffold + ConnectStep</h3>
+<div class="meta">~30 min. Stand up <code>Cadence.Driver/</code> with three files. Cross-project reference to existing Cadence. Single step proves Snowflake auth path.</div>
+<div class="code-block">cadence/
+  Cadence/                         (unchanged)
+  Cadence.Driver/                  (NEW)
+    Cadence.Driver.csproj          &lt;ProjectReference Include="..\Cadence\Cadence.csproj"/&gt;
+    Program.cs                     mode parse + minimal SteeringWheel call
+    SteeringWheel.cs               stub: single step, Preview->Prompt->Act->Done
+    Steps/
+      IStep.cs                     interface + StepResult + StepContext records
+      ConnectStep.cs               opens SnowflakeConn, runs SELECT CURRENT_USER()</div>
+<div class="accept"><strong>Accept:</strong> <code>dotnet build</code> clean from cadence/ root (both projects). <code>dotnet run --project Cadence.Driver --interactive</code> prints "Step 1/1 Connect -- Connect to JOEY_BE on DEVELOPER_WH? [Enter]=Go [Q]=Quit". Enter -&gt; "Connected as JOEY_BE / ACCOUNTADMIN / DEVELOPER_WH". Quit returns exit 0.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">2</span> SteeringWheel full hatches + failure recovery</h3>
+<div class="meta">~30 min. Expand the wheel from a one-step stub to the real loop with all six interactive hatches and the failure-recovery sub-loop. Add ANSI color helpers.</div>
+<ul style="margin-top:8px">
+<li><b>Six hatches</b>: [Enter]=Go, [S]=Skip, [B]=Back, [I]=Inspect (stub for now, fleshed out in Phase 3), [F]=Find (search StepContext + last result), [D]=Dump (write current state to <code>results/dumps/dump-{ts}.json</code>), [Q]=Quit</li>
+<li><b>Failure recovery</b>: when <code>StepResult.Status == Failed</code>, prompt [R]=Retry / [I]=Inspect / [S]=Skip / [Q]=Quit. Retry calls <code>step.Execute</code> again on the same index.</li>
+<li><b>StepResult capture</b>: index, name, status (Pending/Passed/Failed/Skipped), startTime, durationMs, error message, notes, retryCount. No screenshots (cadence is SQL not browser).</li>
+<li><b>StepContext</b>: shared state passed between steps. Holds <code>SnowflakeConn</code>, <code>CloneCreatedAt</code>, <code>StreamCursors</code>, <code>BizCols</code>, <code>ProdFingerprints</code>, <code>CloneFingerprints</code>, <code>Verdicts</code>, <code>SweepId</code>. Each step writes its outputs; later steps read.</li>
+</ul>
+<div class="accept"><strong>Accept:</strong> ConnectStep still runs in Interactive. [B] from step 1 of 1 = no-op message. [S] marks Skipped and exits flow. [Q] returns exit 0. [D] writes a JSON dump file. Forced failure (set bogus account in config) triggers retry prompt; [R] re-runs and fails again; [Q] exits.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">3</span> Resolve steps + Inspector tools</h3>
+<div class="meta">~40 min. Four read-only "resolve" steps build up StepContext. Inspector tool ([I] hatch) becomes useful.</div>
+<table>
+<tr><th>Step</th><th>Reads</th><th>Writes to StepContext</th></tr>
+<tr><td>ResolveCloneTimeStep</td><td><code>SHOW DATABASES LIKE 'AIRBYTE_CLONE'</code></td><td><code>CloneCreatedAt</code> (DateTimeOffset)</td></tr>
+<tr><td>ResolveStreamsStep</td><td><code>infra/stream-catalog.json</code> + active-schemas filter</td><td><code>StreamCursors</code> (List of (schema, table, cursor?))</td></tr>
+<tr><td>ResolveBizColsStep</td><td><code>FingerprintPrimitive.ResolveBusinessColumnsAsync</code> (one INFORMATION_SCHEMA.COLUMNS query per DB)</td><td><code>BizCols</code> (per-stream column list)</td></tr>
+<tr><td>(reuse ConnectStep)</td><td>(already in Phase 1)</td><td><code>Conn</code></td></tr>
+</table>
+<p style="font-size:13px;margin-top:8px"><b>Inspector ([I] hatch)</b> now shows:</p>
+<ul style="margin-top:6px">
+<li>Current Snowflake session: <code>SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE()</code></li>
+<li>Firestore state (if FIRESTORE_PROJECT_ID set): collection name, doc count, latest snapshot summary</li>
+<li>Scheduler state: <code>GetJobAsync</code> -&gt; State, scheduleTime, lastAttemptTime</li>
+<li>Stream catalog summary: schemas + count per schema + cursor overrides</li>
+</ul>
+<div class="accept"><strong>Accept:</strong> Full flow through Connect + 3 resolves prints meaningful preview + after-data for each. [I] mid-flow drops into inspector menu (5 options); selecting one prints its output and returns to the main prompt without losing place. StepContext at end of step 4 has all four populated.</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">4</span> Sweep steps -- build + execute + compute + write</h3>
+<div class="meta">~50 min. Six steps complete the sweep flow. After this phase the Driver runs end-to-end and matches the Cloud Run <code>/tick</code> output.</div>
+<table>
+<tr><th>Step</th><th>What it does</th><th>Preview shows</th></tr>
+<tr><td>BuildSqlStep (PROD)</td><td><code>FingerprintPrimitive.BuildBatchedFingerprintSql</code> for AIRBYTE_DB</td><td>SQL char length, first 3 lines, stream count</td></tr>
+<tr><td>ExecuteSweepStep (PROD)</td><td>Execute the SQL, parse results into prod fingerprints dictionary</td><td>Expected wall range, then: actual wall, count, 3 sample fps</td></tr>
+<tr><td>BuildSqlStep (CLONE)</td><td>(same against AIRBYTE_CLONE)</td><td>(same)</td></tr>
+<tr><td>ExecuteSweepStep (CLONE)</td><td>(same)</td><td>(same)</td></tr>
+<tr><td>ComputeVerdictsStep</td><td>208 pair comparison -&gt; MATCH/DIFFER/ERROR/SKIP</td><td>Per-schema rollup, top-5 DIFFER stream names</td></tr>
+<tr><td>WriteFirestoreStep</td><td>Write <code>cadence-snapshots/sweep-{ts}</code> with all fields + <code>source: "driver"</code></td><td>Snapshot ID, field shape, doc path</td></tr>
+</table>
+<p style="font-size:13px;margin-top:8px"><b>Critical design constraint</b>: the WriteFirestoreStep doc shape is identical to <code>Cadence/Program.cs</code> /tick's write, plus the new <code>source: "driver"</code> field. Same dashboard renders both without changes.</p>
+<div class="accept"><strong>Accept:</strong> <code>dotnet run --project Cadence.Driver --interactive</code> walks through all 10 steps. Final WriteFirestore confirms a doc was written. Pull the doc back via <code>/dashboard</code> or Firestore console: shape matches a Scheduler-fired sweep doc + has <code>source: "driver"</code>. Verdict totals within 5% of the most recent Scheduler sweep (allowing for drift between calls).</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">5</span> Auto mode + ops sub-flows + RunResult persistence</h3>
+<div class="meta">~40 min. Three sub-flows + Auto mode + JSON dump on completion. After this phase, the Driver covers every operation the Cloud Run service does, plus the Board-10 reset endpoints.</div>
+<ul style="margin-top:8px">
+<li><b>Auto mode</b>: <code>--auto</code> flag. Same step list, no prompts. Failures still pause for [R/I/S/Q] (matches mendo-dgx). Useful for local smoke after a clone refresh: <code>dotnet run --project Cadence.Driver -- --auto --flow sweep</code>.</li>
+<li><b>Manual mode</b>: <code>--manual</code> flag. For each step, show the manual guide (one paragraph of "run this SQL by hand if Snowflake is unreachable"), prompt for [P]ass/[F]ail/[N]otes. Rare-but-useful forensic mode.</li>
+<li><b>SchedulerToggleStep</b>: one parameterized step (pause | resume). Reuses <code>CloudSchedulerClient</code> + JobName resolution from Board 10's <code>BuildSchedulerAsync</code>.</li>
+<li><b>FirestoreWipeStep</b>: one step. Same wipe logic as <code>/reset/wipe</code> endpoint (500-doc batches). Preview shows current doc count.</li>
+<li><b>ResetBaselineFlow</b>: compound flow that strings SchedulerToggle(pause) -&gt; FirestoreWipe -&gt; sweep flow (steps 1-10) -&gt; SchedulerToggle(resume). Invoked via <code>--flow reset-baseline</code>.</li>
+<li><b>RunResult JSON</b>: at flow end, serialize the full run (mode + flow + steps + StepResults + final StepContext slice) to <code>results/runs/run-{ts}.json</code>. Mirrors mendo-dgx <code>ResultWriter</code>.</li>
+</ul>
+<div class="accept"><strong>Accept:</strong> <code>--auto</code> runs the full 10-step sweep end-to-end with no prompts; writes a Firestore doc with <code>source: "driver"</code>; emits a <code>results/runs/run-*.json</code> file. <code>--flow reset-baseline --interactive</code> walks through pause -&gt; wipe -&gt; sweep -&gt; resume with previews at each ops sub-step. (Smoke note below.)</div>
+</div>
+
+<h2>Sizing summary</h2>
+<table>
+<tr><th>Phase</th><th>Work</th><th>Size</th></tr>
+<tr><td>1</td><td>First Move -- project scaffold + ConnectStep + minimal wheel</td><td>3 pts</td></tr>
+<tr><td>2</td><td>SteeringWheel full hatches + StepResult + StepContext + failure recovery</td><td>3 pts</td></tr>
+<tr><td>3</td><td>Resolve steps (3) + Inspector tools ([I] hatch fleshed out)</td><td>3 pts</td></tr>
+<tr><td>4</td><td>Sweep steps (6) -- build/execute/compute/write with <code>source: "driver"</code> field</td><td>3 pts</td></tr>
+<tr><td>5</td><td>Auto + Manual modes + 3 ops sub-flows + RunResult JSON persistence</td><td>3 pts</td></tr>
+<tr><td colspan="2" style="text-align:right"><strong>Total</strong></td><td><strong>15 pts</strong></td></tr>
+</table>
+<p style="font-size:12px;color:#888;margin-top:6px">Fits 13-21 envelope. Critical path strict 1 -&gt; 2 -&gt; 3 -&gt; 4 -&gt; 5 (each phase consumes the previous). No parallelism. ~3 hours hands-on; no Cloud Build deploys (this is a console app -- runs locally).</p>
+
+<h2>Smoke strategy</h2>
+<div class="callout">
+<strong>The Driver smokes itself.</strong> Unlike Board 10 (which had destructive endpoints requiring Joey to invoke explicitly), the Driver is invoked manually from start. The first time Joey runs <code>cadence-driver --interactive</code>, he walks through every step approving each one. The Connect through Resolves are read-only and verify the auth + catalog path. The Sweep steps run against live Snowflake but only do SELECTs (no writes to AIRBYTE_DB or AIRBYTE_CLONE). The only write is the Firestore snapshot -- a new doc with <code>source: "driver"</code>, doesn't disturb the existing trajectory. Reset-baseline sub-flow IS destructive (wipes Firestore + pauses Scheduler) -- but it's gated by the interactive mode's per-step approval, so it only happens if Joey explicitly approves each ops step.
+</div>
+
+<h2>Risks + mitigations</h2>
+<table>
+<tr><th>Risk</th><th>Mitigation</th></tr>
+<tr><td>Cross-project reference breaks if Cadence project changes its public surface</td><td>Driver only uses currently-public methods from FingerprintPrimitive + SnowflakeConn. If those need to change, the change goes in Cadence first, Driver compiles against new surface.</td></tr>
+<tr><td>Snowflake key path differs locally vs cloud</td><td>Driver uses local file path only (no SecretManager) -- it's an operator-machine tool. Documented in README.</td></tr>
+<tr><td>Auto mode re-introduces the "fires autonomously, narrative-less" problem</td><td>Auto mode is for local smoke, not Scheduler replacement. The README explicitly says "Cloud Run service is the Scheduler-fired path; Driver is for human investigation." Auto exists for "I trust the steps, run it once locally for verification" usage.</td></tr>
+<tr><td>Driver and Cloud Run write to same Firestore -- timeline gets noisy</td><td><code>source: "driver"</code> field already differentiates. Dashboard can filter by source. If it becomes a real problem, the design's Escape Route 6 fork to a separate collection -- straightforward backfill since the source field already exists.</td></tr>
+<tr><td>Reset-baseline sub-flow accidentally fires the wipe in Interactive</td><td>Each ops step has its own preview + approval. Wipe step shows current doc count + warns "This deletes N docs from cadence-snapshots." Operator must press Enter to confirm.</td></tr>
+<tr><td>SteeringWheel grows beyond ~300 lines</td><td>Match mendo-dgx's 395-line ceiling. If the wheel itself exceeds ~400 lines, split: <code>SteeringWheel.Loop.cs</code> + <code>SteeringWheel.Hatches.cs</code> + <code>SteeringWheel.Inspector.cs</code>.</td></tr>
+<tr><td>RunResult JSON files accumulate in <code>results/runs/</code></td><td>Not in scope for this build, but document a cleanup convention in the README: "delete &gt;30 days old, or move to <code>results/archive/</code>." Not critical -- one run = a few KB.</td></tr>
+</table>
+
+<h2>What this unlocks</h2>
+<ul>
+<li><b>Operator confidence on cadence the same way Joey already trusts mendo-dgx.</b> When a Scheduler-fired tick returns a surprising number, fire up the Driver in Interactive, walk through the same flow, see each value as it materializes. The "makes no sense" problem from 2026-05-24 doesn't recur.</li>
+<li><b>One place to do ops.</b> Reset baseline, pause/resume Scheduler, wipe Firestore -- all available as Driver flows. Complements Board 10's HTTP endpoints; either path works.</li>
+<li><b>Forensic record per investigation.</b> <code>results/runs/run-{ts}.json</code> captures every step + result + StepContext slice. Diff two runs to see what changed.</li>
+<li><b>Reproducible local smoke after every clone refresh.</b> One <code>dotnet run -- --auto</code> from the operator's machine confirms the full sweep path works against a fresh clone, before re-enabling the Scheduler.</li>
+<li><b>Pattern reuse.</b> Future cadence ops (Top-N drift forensic, per-stream replay, schema-diff deep dive) become "add a new flow with N steps" rather than "wire a new endpoint."</li>
+</ul>
+
+<h2>Open follow-ups (not in this board)</h2>
+<ul>
+<li><b>Web UI for the Driver.</b> Console-only matches mendo-dgx. A WebSocket-served Interactive flow could land in a future board if Joey wants browser access.</li>
+<li><b>Dashboard filter by source.</b> Once <code>source: "driver"</code> docs exist, the cadence <code>/dashboard</code> can grow a filter chip (driver / scheduler / both). Out of scope here -- Driver lands the field; dashboard work is its own board.</li>
+<li><b>Per-stream drill-down step.</b> Once verdicts are in StepContext, a future step could optionally run <code>RowDeltaExplainer</code>-style EXCEPT queries on top-DIFFER streams. Forensic mode. Probably a separate flow (<code>--flow drift-explainer</code>) rather than a step in the base sweep.</li>
+<li><b>Save flows declaratively.</b> Today the SweepFlow is a hardcoded <code>List&lt;IStep&gt;</code>. Future improvement: load step list from JSON so operators can compose custom flows without recompile. Out of scope.</li>
+</ul>
+
+<h2>Path to ~b</h2>
+<p style="font-size:13px;color:#888"><code>~e</code> turns this plan into Board 11 in <code>be/board.md</code> (5 items, 3 pts each, 15 pts). <code>~b</code> chain executes -- can run phase-by-phase or batched depending on how Joey wants it. Most natural is phase-by-phase since each phase adds visible behavior; no Cloud Build cycles to amortize.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved to <code>be/plans/2026-05-26-1538-plan-cadence-driver-build.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/plan-cadence-driver-build.html</code></div>
+<div class="dod-item">&check; 5 phases sized + accept criteria + risks</div>
+<div class="dod-item">&check; Decisions inherited from ~d (6 picks); not re-debated here</div>
+<div class="dod-item">&check; First Move (Phase 1) independently testable -- one step, one auth path proof</div>
+<div class="dod-item">&check; Smoke strategy spelled out (read-only steps self-smoke; reset-baseline gated by Interactive)</div>
+<div class="dod-item">&check; Be index updated + commit + push</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r86 &middot; 2026-05-26 15:38 &middot; ~p Cadence.Driver build</div>
+</body></html>
