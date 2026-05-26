@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i: how SENSE / SELECT actually works (and why the dropdown is theatre)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 1.2rem; }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+  h1 { color: #6FC3DF; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 1rem; margin-bottom: 24px; }
+  h2 { color: #6FC3DF; font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #6FC3DF; font-size: 1rem; margin: 18px 0 8px; }
+  .card { background: #1A1A1A; border-radius: 8px; padding: 16px 20px; margin: 10px 0; }
+  ul, ol { margin-left: 22px; margin-bottom: 12px; }
+  li { margin: 6px 0; }
+  pre { color: #ccc; font-size: 0.78rem; overflow-x: auto; background: #0a0a0a; padding: 12px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+  code { color: #6FC3DF; background: #1A1A1A; padding: 1px 6px; border-radius: 3px; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88rem; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-size: 0.82rem; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1A1A1A; vertical-align: top; }
+  .ok { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .fail { color: #ef4444; font-weight: 600; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #222; color: #555; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span></nav>
+<div class="container">
+
+<h1>~i: how SENSE / SELECT actually works (and why the dropdown is theatre)</h1>
+<p class="subtitle">From the screenshot: dropdown says <code>claude-opus-4-7</code>, trace selects <code>gemini</code>, request 429s, "expert request failed". Three independent bugs stacked. Here's the mechanism, what's broken, and what to fix first.</p>
+
+<h2>Headline</h2>
+<div class="card">
+<p><strong>The "driver/director" today is whoever is first in <code>g_defaults[]</code> &mdash; currently <code>gemini</code>.</strong> Not Claude. Not what the dropdown shows. Not the result of any actual analysis.</p>
+<p><strong>The dropdown does nothing for the main task flow.</strong> It only affects <code>/summarize</code> and <code>/advise</code> side-commands. Setting it to claude-opus-4-7 has zero effect on which provider drives the THINKING column.</p>
+<p><strong>SENSE is fake.</strong> The "detecting knowledge domain..." and "pillar: GENERAL (confidence: 0.50)" strings are hardcoded literals. No classification happens. The C code just emits those two lines on every task.</p>
+<p><strong>SELECT is "first available," not "best for the job."</strong> Loops <code>g_providers[]</code> in declaration order, picks the first with an API key, breaks. That's the entire selection algorithm.</p>
+<p><strong>No failover.</strong> When the picked expert errors (e.g. Gemini 429), the THINKING column dies with "expert request failed". No retry against the next provider.</p>
+</div>
+
+<h2>1. The actual code path (serve.c)</h2>
+<div class="card">
+
+<h3>Step 1 — Task arrives via WS</h3>
+<p><code>handle_task()</code> at <code>serve.c:1708</code> runs in three phases:</p>
+<ol>
+  <li><strong>Phase 1:</strong> emit <code>phase: understand</code>, the <code>sense</code> event (with the list of providers having keys).</li>
+  <li><strong>Phase 2:</strong> attempt <code>relay_intelligence()</code> — would do real sense+select on the NOUS mesh. With mesh down (no PSK loaded), this phase is skipped entirely.</li>
+  <li><strong>Phase 3:</strong> launch one <code>guided_ai_thread</code> + fan out to every keyed provider.</li>
+</ol>
+
+<h3>Step 2 — Guided AI thread selection</h3>
+<p><code>serve.c:1782-1811</code>:</p>
+<pre>/* Launch guided AI thread — picks first available provider */
+for (int i = 0; i < g_provider_count; i++) {
+    Provider *p = &g_providers[i];
+    if (p->disabled || !p->api_key[0]) continue;
+    /* ...spawn guided_ai_thread with this provider... */
+    break; /* only one guided AI thread */
+}</pre>
+<p>That's the entire SELECT logic. Whichever provider is first in the table with an API key wins the THINKING column. <strong>No query analysis, no domain detection, no scoring, no operator preference honored.</strong></p>
+
+<h3>Step 3 — The "SENSE" and "SELECT" trace lines are theatre</h3>
+<p><code>guided_ai_thread()</code> at <code>serve.c:1532-1545</code>:</p>
+<pre>send_event(ctx->conn_id,
+    "{\"type\":\"search_step\",\"step\":\"sense\","
+    "\"detail\":\"detecting knowledge domain...\"}");
+
+send_event(ctx->conn_id,
+    "{\"type\":\"search_step\",\"step\":\"sense\","
+    "\"detail\":\"pillar: GENERAL (confidence: 0.50)\"}");
+
+/* ...then emit the "select" event with the provider that was
+   ALREADY selected (passed in via ctx->provider_idx)... */
+snprintf(step, sizeof(step),
+    "{\"type\":\"search_step\",\"step\":\"select\","
+    "\"detail\":\"expert: %s (%s)\"}",
+    p->name, p->model);</pre>
+<p>The "detecting knowledge domain..." string is a hardcoded literal. The "pillar: GENERAL (confidence: 0.50)" is also a hardcoded literal — confidence 0.50 is fixed for every task. The "SELECT: expert" event just announces which provider was already chosen by the loop above.</p>
+<p>The original design intent (per the <code>relay_intelligence()</code> comment at <code>serve.c:160</code>) was for the NOUS mesh to do <em>real</em> domain detection and route to the appropriate expert based on a <em>real</em> confidence score. The C code has the trace-emission scaffolding but no actual classifier &mdash; that's mesh-side work that doesn't exist yet locally.</p>
+</div>
+
+<h2>2. Why the dropdown shows claude-opus-4-7 but doesn't matter</h2>
+<div class="card">
+<p>The dropdown <code>&lt;select id="engine-select"&gt;</code> in <code>index.html:57</code> is wired in <code>loop.js</code>:</p>
+<pre>// loop.js:374
+sel.addEventListener('change', function() {
+    selectedEngine = sel.value;
+    if (ws &amp;&amp; ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'set_engine', engine: selectedEngine }));
+    }
+});</pre>
+<p>It sends a <code>set_engine</code> WS message to the server. <strong>The server stores this preference, but only uses it for <code>/summarize</code> and <code>/advise</code> commands</strong>:</p>
+<pre>// loop.js:715 (the /summarize command path)
+ws.send(JSON.stringify({ type: 'summarize', engine: selectedEngine }));</pre>
+<p>Main <code>task</code> flow ignores <code>set_engine</code> completely. The HTML's <code>title</code> attribute on the dropdown even gives this away: <code>title="default engine for advise/summarize"</code>. It was never claimed to drive the main orchestrator.</p>
+<p><strong>So the screenshot has two truths:</strong></p>
+<ol>
+  <li>Joey picked claude-opus-4-7 in the dropdown &mdash; that's now the engine for <code>/summarize</code> / <code>/advise</code> calls.</li>
+  <li>Joey typed a regular query, which became a <code>task</code> WS message &mdash; which goes through the loop above and picks gemini (first in table) regardless of dropdown.</li>
+</ol>
+<p>The dropdown UX is misleading. It looks like a primary control, but it's a side-channel preference.</p>
+</div>
+
+<h2>3. Why gemini errored 429 and the whole chain died</h2>
+<div class="card">
+<p>The chain in the screenshot:</p>
+<pre>SENSE     detecting knowledge domain...        (hardcoded)
+SENSE     pillar: GENERAL (confidence: 0.50)   (hardcoded)
+SELECT    expert: gemini (gemini-2.5-pro)      (first available in table)
+AUTH      GEMINI_API_KEY loaded                 (key found in users.dat or env)
+PROMPT    system prompt (32 chars)              (the "Provide a clear..." hint)
+REQUEST   POST https://...gemini-2.5-pro:generateContent
+RESPONSE  HTTP 429 — 284ms — 2739 bytes        ◀── free-tier rate limit
+ERROR     HTTP 429
+error     expert request failed                ◀── chain ends here</pre>
+<p>Gemini's free tier is small. After a few requests in a short window, the API returns HTTP 429 (Too Many Requests). <code>guided_ai_thread</code> hits the error, emits <code>error: expert request failed</code>, and <strong>does not try another provider</strong>. The THINKING column is dead for that task.</p>
+<p>Meanwhile the fan-out to the other 26+ providers still ran in parallel &mdash; they all responded normally in DATA ACCESS column. Only the THINKING-column orchestrator failed because it was pinned to gemini.</p>
+</div>
+
+<h2>4. The three independent bugs (with fix cost)</h2>
+<div class="card">
+<table>
+  <tr><th>#</th><th>Bug</th><th>Why it exists</th><th>Fix</th><th>Effort</th></tr>
+  <tr>
+    <td>B1</td>
+    <td>Dropdown does nothing for the main task</td>
+    <td><code>handle_task</code> ignores <code>selectedEngine</code>; only summarize/advise use it</td>
+    <td>Read selectedEngine in handle_task; if set, use that provider for guided AI (skip the "first available" loop). If empty, fall back to first available.</td>
+    <td>~20 LOC in serve.c + 1 line to thread the preference through. <strong>SMALL.</strong></td>
+  </tr>
+  <tr>
+    <td>B2</td>
+    <td>First-available default is gemini (not Claude)</td>
+    <td>g_defaults[] order; FREE block first, gemini first within FREE</td>
+    <td>Move claude-sonnet (or claude-opus) to slot 0 in g_defaults[]. Falls back to Claude when dropdown is "Let NOUS decide".</td>
+    <td>1 block move. <strong>TRIVIAL.</strong> (Already on the P2-a board as idx:4.)</td>
+  </tr>
+  <tr>
+    <td>B3</td>
+    <td>No failover when picked expert errors</td>
+    <td><code>guided_ai_thread</code> doesn't retry on error</td>
+    <td>Wrap the request in a try-next loop: on 429/5xx, free the body, increment provider_idx to next available, retry. Cap at 3 tries.</td>
+    <td>~30 LOC in guided_ai_thread. <strong>SMALL-MEDIUM.</strong></td>
+  </tr>
+  <tr>
+    <td>B4</td>
+    <td>SENSE is fake (hardcoded "GENERAL/0.50")</td>
+    <td>No classifier; the relay-intelligence code path is unused (mesh down)</td>
+    <td>Two options: (a) drop the fake SENSE lines so the trace doesn't lie. (b) add a real local classifier (small heuristic or model call).</td>
+    <td>(a) trivial; (b) is a half-day's work and an architectural question. <strong>OPTIONAL for now.</strong></td>
+  </tr>
+</table>
+</div>
+
+<h2>5. What "fixing sense/select first" should mean</h2>
+<div class="card">
+<p>Joey's instinct: fix this BEFORE the FQDN-vault migration. Reasonable &mdash; the sense/select bugs are user-visible every time the cockpit is used; the vault work is plumbing.</p>
+<p><strong>Minimal viable fix (smallest possible patch, biggest UX win):</strong></p>
+<ol>
+  <li><strong>B2</strong> &mdash; move claude-sonnet to slot 0. Now Claude is the default driver when dropdown is "Let NOUS decide".</li>
+  <li><strong>B1</strong> &mdash; honor the dropdown. When operator picks claude-opus-4-7, the main task uses claude-opus-4-7 (not gemini, not sonnet). The dropdown UX finally tells the truth.</li>
+  <li><strong>B3</strong> &mdash; failover on error. When Claude rate-limits (or any picked expert errors), try the next provider. THINKING column never dies on a single provider's hiccup.</li>
+  <li><strong>B4</strong> &mdash; drop the fake SENSE strings. The trace shouldn't lie about what's happening. Replace with honest "selecting expert..." or just remove the SENSE step entirely until real classification exists.</li>
+</ol>
+<p><strong>Estimated total effort:</strong> ~60-90 LOC in serve.c, ~30 min wall time, one rebuild + smoke. Roughly the same size as P2-a but more focused on the operator's main interaction surface.</p>
+<p><strong>Recommendation:</strong> do B1+B2+B3 in one shot (call it P2-c "real orchestrator selection"). Defer B4 until later because honest SENSE requires actual classification work, which deserves its own design pass (could even be the first real use case for Claude-as-orchestrator: "Claude, what domain is this query in, and which other providers should weigh in?").</p>
+</div>
+
+<h2>6. Which AI is the driver/director (definitive answer)</h2>
+<div class="card">
+<p><strong>Today (with current g_defaults[] order):</strong> gemini-2.5-pro is the driver. First in the FREE block. The dropdown doesn't change this.</p>
+<p><strong>After P2-a idx:4 (claude-sonnet to slot 0):</strong> claude-sonnet becomes the default driver. Dropdown still ignored.</p>
+<p><strong>After this proposed fix (B1+B2+B3):</strong> dropdown determines the driver. Default is claude-sonnet. Failover walks the table if the picked driver errors.</p>
+<p><strong>Long-term (NOUS mesh-side classifier):</strong> a real SENSE step classifies the query into a pillar (CODING, FACTUAL, CREATIVE, MATH, etc.) with a real confidence score, then SELECT picks the best-for-that-pillar expert. The dropdown becomes an override rather than a default.</p>
+</div>
+
+<h2>7. Suggested next action</h2>
+<div class="card">
+<p>Two paths, your call:</p>
+<table>
+  <tr><th>Option</th><th>What it is</th><th>When</th></tr>
+  <tr>
+    <td>A. Fix orchestrator selection NOW</td>
+    <td>New <code>~p</code> for P2-c: B1+B2+B3 in one tight phase. Defer the FQDN-vault migration until after.</td>
+    <td>If the cockpit's main flow being wrong feels worse than the registry-fragility being annoying.</td>
+  </tr>
+  <tr>
+    <td>B. Roll the orchestrator fix into P2-a</td>
+    <td>P2-a already moves claude-sonnet to slot 0 (idx:4). Add B1 (honor dropdown) and B3 (failover) as new items, bumping P2-a from 15 pts &rarr; 21 pts (still in range).</td>
+    <td>If you want one big "fix everything" pass and accept slightly longer total wall-time.</td>
+  </tr>
+</table>
+<p>My recommendation: <strong>B</strong>. P2-a is already in flight; bolting on 6 pts of orchestrator fixes keeps the audit trail clean and ships both wins together.</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none; margin:0; padding:0;">
+  <li>&#x2713; Code committed (this artifact + telemetry + index)</li>
+  <li>&#x2713; Hash in telemetry (backfilled post-commit)</li>
+  <li>&#x2014; Board updated (this is an inspect; fix items will land via the chosen path A or B)</li>
+  <li>&#x2713; HTML report saved (this file)</li>
+  <li>&#x2713; Index updated (Plans section gets this entry)</li>
+  <li>&#x2713; Pushed to remote</li>
+  <li>&#x2713; No prior damage (read-only audit + source reads)</li>
+  <li>&#x2713; Production verified (artifact live-mirrored to joeycastillo.us/tools/nous-desktop)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r130 &middot; 2026-05-26 00:10 &middot; nous-desktop &middot; ~i sense/select mechanism</div>
+
+</div>
+</body>
+</html>
