@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~p: add every remaining AI provider (incl. MiniMax) — sequenced</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  .banner{background:#6FC3DF11;border-left:3px solid #6FC3DF;padding:10px 16px;margin-bottom:20px;color:#6FC3DF;font-weight:600;font-size:0.9rem}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}h3{color:#6FC3DF;font-size:1rem;margin:18px 0 8px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}
+  pre{color:#ccc;font-size:0.78rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.86rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .ok{color:#22c55e;font-weight:600}.warn{color:#f59e0b;font-weight:600}.fail{color:#ef4444;font-weight:600}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~p: add every remaining AI provider — sequenced</h1>
+<p class="subtitle">Brings the cockpit from 30 providers to ~42 with the right mix of cheap-Chinese (MiniMax, GLM, Kimi, Qwen), specialized (Codestral, codex variants), and fast-aggregator (Groq+Llama). Sequenced by lift — quickest wins first. Includes Rudi's MiniMax pick. Excludes OpenClaw per Joey. Lays the foundation (but does not build) for Claude-as-integral-employee.</p>
+<div class="banner">Plan — Awaiting Approval</div>
+
+<h2>1. Intent</h2>
+<div class="card">
+<p>Three goals:</p>
+<ol>
+  <li><strong>Close the "could add" list from the ~i 2026-05-26 01:40 audit</strong> — every named provider becomes a real working tile in the cockpit, or gets explicitly skipped with reason.</li>
+  <li><strong>Add MiniMax</strong> (Rudi's pick — close-to-Claude quality at ~$10/mo) as the centerpiece of a cheap-Chinese-open-weights cohort: MiniMax + GLM + Kimi + Qwen.</li>
+  <li><strong>Set up the seam</strong> for "Claude as integral employee" — Rudi's framing for a persistent AI agent. <em>This plan does not build it</em>; it makes sure the cockpit can grow into it without rework.</li>
+</ol>
+</div>
+
+<h2>2. Scope</h2>
+<div class="card">
+<h3>In</h3>
+<ul>
+  <li>~12 new provider entries in <code>g_defaults[]</code> (MiniMax × 2-3, GLM, Kimi, Qwen, Codestral, Cohere Command R+, Llama via Groq, plus the deferred OpenAI codex-max/mini if accessible).</li>
+  <li>1-2 new <code>format</code> types only if a vendor's API doesn't fit openai-compatible chat-completions (most don't — they all expose OAI-compatible endpoints now).</li>
+  <li>Vendor signup steps documented per vendor; Joey pastes keys per Rule 4 (Joey pastes, Be handles).</li>
+  <li>MAX_PROVIDERS bump from 32 → 64 (current 30 plus ~12 = 42; headroom for future).</li>
+  <li>Cost analysis per vendor: monthly subscription, per-request, free-tier limits.</li>
+  <li>Smoke probe for each new tile.</li>
+</ul>
+<h3>Out (explicit non-goals)</h3>
+<ul>
+  <li><strong>OpenClaw</strong> — Joey said no. We are not running a multi-agent agent-runner. The cockpit's fan-out + driver IS our orchestration layer.</li>
+  <li><strong>OpenCode CLI</strong> — separate tool, not a model. Could be added as a developer-facing utility later, but not in this plan.</li>
+  <li><strong>Firecrawl integration</strong> — Joey raised it via Rudi. Web scraping/search is a TOOL not a provider. Worth a separate <code>~p</code> if Claude-as-employee gets prioritized.</li>
+  <li><strong>OpenRouter aggregator</strong> — Rudi mentioned it adds up cost-wise. We hit providers directly with our own keys; no aggregator middleman.</li>
+  <li><strong>Local-runtime models (Ollama, llama.cpp)</strong> — would unlock Qwen/Gemma/Devstral fully local. Separate plan (Pure Metal Test passes but needs new format type).</li>
+  <li><strong>Claude-as-integral-employee</strong> — design phase only here; build is a separate <code>~d</code> + <code>~p</code>. See Phase F below.</li>
+  <li><strong>Removing existing 30 providers</strong> — none get removed. The DRIVER dropdown lets the operator pick which to use; fan-out becomes broader but no slower per-tile.</li>
+</ul>
+</div>
+
+<h2>3. Approach</h2>
+<div class="card">
+<p><strong>Sequenced by lift, not by name.</strong> Quickest wins first:</p>
+<ol>
+  <li><strong>Phase A — Closeout existing-key candidates</strong> (no signup): codestral (after Mistral key), maybe codex-max/mini retry, gpt-5-search-api.</li>
+  <li><strong>Phase B — MiniMax</strong> (Rudi's pick, one signup, $10/mo). Should be OpenAI-compatible.</li>
+  <li><strong>Phase C — Chinese open-weight cohort</strong>: GLM (Zhipu), Kimi (Moonshot), Qwen (Alibaba DashScope). 3 signups; mostly OAI-compatible. Net cost low.</li>
+  <li><strong>Phase D — Western additions</strong>: Cohere Command R+ (one signup, free tier). Reka Core (one signup, modest pricing).</li>
+  <li><strong>Phase E — Fast Llama via Groq</strong>: one signup, super-cheap inference; Llama 3.x/4 available.</li>
+  <li><strong>Phase F — Claude-as-integral-employee seam</strong> (design only, no build): identify what cockpit needs to grow into that role. Inventory: persistent memory, task queue, tool registry, decision authority. Set up the empty hooks; defer full build to a separate <code>~p</code>.</li>
+</ol>
+<p>Each phase ships independently, in this order. Joey can stop after any phase.</p>
+</div>
+
+<h2>4. Phases (detailed)</h2>
+<div class="card">
+
+<h3>Phase A — Existing-key wins (~5 pts, no new signups)</h3>
+<table>
+  <tr><th>Add</th><th>Why</th><th>Notes</th></tr>
+  <tr><td><code>codestral</code> → codestral-latest</td><td>#1 LMSys Copilot Arena, best fast inline coding</td><td>Pending Mistral key regen (~3 dead Mistral entries become alive too)</td></tr>
+  <tr><td><code>gpt-codex-max</code> → gpt-5.1-codex-max</td><td>OpenAI coding specialist, mid-tier</td><td>Empty error on responses probe before; retry with longer timeout</td></tr>
+  <tr><td><code>gpt-codex-mini</code> → gpt-5.1-codex-mini</td><td>Cheap coding variant</td><td>Same; retry</td></tr>
+  <tr><td><code>gpt-search</code> → gpt-5-search-api</td><td>Search-augmented chat (OpenAI's hosted)</td><td>May need a small endpoint variant; chat-completions compatible</td></tr>
+  <tr><td><code>grok-agents</code> → grok-4.20-multi-agent-0309</td><td>xAI multi-agent variant</td><td>Different endpoint; would need new format. <strong>Defer — significant lift for one model.</strong></td></tr>
+</table>
+
+<h3>Phase B — MiniMax (Rudi's pick, ~5 pts, 1 signup, $10/mo)</h3>
+<table>
+  <tr><th>Add</th><th>Model</th><th>Notes</th></tr>
+  <tr><td><code>minimax</code></td><td>MiniMax-M2.7 or whatever current flagship</td><td>"Close to Claude quality, cheap w/ good limits" per Rudi. Endpoint: <code>https://api.minimax.io/v1/text/chatcompletion_v2</code>. OAI-compatible body.</td></tr>
+  <tr><td><code>minimax-mini</code></td><td>smaller variant if available</td><td>Probably yes; check at signup</td></tr>
+  <tr><td colspan="3"><strong>Joey:</strong> sign up at minimax.io, paste key, Be runs setx + adds entries.</td></tr>
+</table>
+
+<h3>Phase C — Chinese open-weight cohort (~10 pts, 3 signups)</h3>
+<table>
+  <tr><th>Add</th><th>Model</th><th>Vendor / Endpoint</th></tr>
+  <tr><td><code>glm</code></td><td>GLM-5.1 (current flagship)</td><td>Zhipu AI · <code>open.bigmodel.cn/api/paas/v4</code> · OAI-compatible</td></tr>
+  <tr><td><code>kimi</code></td><td>kimi-k2.6 or moonshot-v1</td><td>Moonshot AI · <code>api.moonshot.cn/v1</code> · OAI-compatible · MIT license backed</td></tr>
+  <tr><td><code>qwen</code></td><td>qwen3-coder-plus or qwen3.6-instruct</td><td>Alibaba DashScope · <code>dashscope.aliyuncs.com/compatible-mode/v1</code> · OAI-compatible</td></tr>
+  <tr><td colspan="3"><strong>Joey:</strong> 3 signups (Zhipu, Moonshot, Alibaba). Each has a free tier; pricing comparable to DeepSeek (cheap).</td></tr>
+</table>
+
+<h3>Phase D — Western additions (~5 pts, 2 signups)</h3>
+<table>
+  <tr><th>Add</th><th>Model</th><th>Vendor / Endpoint</th></tr>
+  <tr><td><code>cohere</code></td><td>command-r-plus-08-2026</td><td>Cohere · <code>api.cohere.com/v2/chat</code> · own format (slight wrapper variation)</td></tr>
+  <tr><td><code>reka</code></td><td>reka-core</td><td>Reka AI · <code>api.reka.ai/v1/chat</code> · OAI-compatible</td></tr>
+  <tr><td colspan="3"><strong>Joey:</strong> 2 signups. Cohere has a generous free tier; Reka may need a small monthly commitment.</td></tr>
+</table>
+
+<h3>Phase E — Fast Llama via Groq (~3 pts, 1 signup, ~free)</h3>
+<table>
+  <tr><th>Add</th><th>Model</th><th>Notes</th></tr>
+  <tr><td><code>llama</code></td><td>llama-3.3-70b-versatile or current Llama 4 if available</td><td>Groq · <code>api.groq.com/openai/v1</code> · OAI-compatible · super fast inference; free tier generous</td></tr>
+  <tr><td><code>llama-mini</code></td><td>llama-3.1-8b-instant</td><td>Groq · same endpoint; fastest possible (sub-second responses)</td></tr>
+</table>
+
+<h3>Phase F — Claude-as-integral-employee seam (design only, 0 pts here)</h3>
+<p>Joey relayed Rudi: "if I had an active business, my AI agent would be an integral employee. Work that into the plan too."</p>
+<p>The cockpit today is per-task fan-out + one orchestrator. Claude IS the orchestrator; that's progress. But it isn't yet an "employee" because it lacks:</p>
+<ul>
+  <li><strong>Persistent memory</strong> — Claude remembers what it learned across sessions (current cockpit is per-task; no cross-session state)</li>
+  <li><strong>Task queue / autonomous run</strong> — Claude can pick up multi-step work and run with it (today: each query is one-shot)</li>
+  <li><strong>Tool access</strong> — Claude can browse web (Firecrawl), run code, edit files, query stores</li>
+  <li><strong>Decision authority + delegation</strong> — Claude decides what to do and delegates parts to fan-out tiles or specific specialists (today: fan-out hits all tiles for the same prompt)</li>
+</ul>
+<p><strong>What this plan does:</strong> name those gaps; ensure the new providers slot in without blocking the future build (e.g., MiniMax as a delegated specialist; Kimi/Qwen as alt-orchestrator options).</p>
+<p><strong>What this plan doesn't do:</strong> build any of those four. Each is a substantial <code>~d</code> + <code>~p</code> in its own right. Recommend pulling the first one (persistent memory) into a new plan after Phase E lands.</p>
+
+<h3>Total effort estimate</h3>
+<table>
+  <tr><th>Phase</th><th>Pts</th><th>Wall time</th><th>Joey involvement</th></tr>
+  <tr><td>A — Existing-key wins</td><td>5</td><td>20 min</td><td>Mistral key regen only</td></tr>
+  <tr><td>B — MiniMax</td><td>5</td><td>15 min</td><td>1 signup + 1 key paste</td></tr>
+  <tr><td>C — Chinese cohort (GLM + Kimi + Qwen)</td><td>10</td><td>30 min</td><td>3 signups + 3 key pastes</td></tr>
+  <tr><td>D — Western (Cohere + Reka)</td><td>5</td><td>20 min</td><td>2 signups + 2 key pastes</td></tr>
+  <tr><td>E — Llama via Groq</td><td>3</td><td>10 min</td><td>1 signup + 1 key paste</td></tr>
+  <tr><td>F — Employee seam (design)</td><td>(0)</td><td>—</td><td>conversation only</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>28 pts</strong></td><td><strong>~95 min</strong></td><td><strong>7 signups + 8 key pastes</strong></td></tr>
+</table>
+<p>Splits into 2 boards: P5-a (A + B + part of C = 13-18 pts), P5-b (rest = 13-15 pts).</p>
+</div>
+
+<h2>5. Constraints</h2>
+<div class="card">
+<ul>
+  <li><strong>OpenClaw stays out.</strong> Joey's explicit no. Multi-agent runners aren't our path; fan-out + driver IS.</li>
+  <li><strong>OpenAI-compatible API preferred.</strong> Most new vendors expose <code>v1/chat/completions</code>-style endpoints; we reuse the <code>openai</code> format type. Cohere is the one exception (their format is similar but needs a tiny wrapper — could add <code>cohere</code> format type or massage payload).</li>
+  <li><strong>Rule 4 — Joey pastes, Be handles.</strong> Each new key follows the existing flow: Joey signs up, pastes once in chat, Be installs via setx (or eventually users.dat per P2-a), updates <code>users.dat</code> when that lands, never logs the value.</li>
+  <li><strong>Cost ceiling.</strong> Combined monthly new cost estimate: $10 (MiniMax) + free tiers everywhere else = ~$10-30/mo on top of existing Anthropic/OpenAI/Google. Joey can disable any tile that gets expensive.</li>
+  <li><strong>MAX_PROVIDERS bump.</strong> Currently 32 in serve.c <code>#define</code>; bump to 64 to allow ~12 additions with headroom.</li>
+  <li><strong>Honor the naming convention</strong> just documented in nous-desktop/CLAUDE.md. Each addition uses <code>&lt;vendor&gt;</code> for current flagship, <code>-mini</code> / <code>-fast</code> / etc. for variants.</li>
+  <li><strong>No fan-out per-query cost explosion.</strong> 42 tiles × per-query cost = real $$$ if Joey runs a lot of tasks. The DRIVER concept already mitigates (only one tile drives THINKING). For fan-out: add a <code>g_disabled</code> tracking + <code>set_disabled</code> WS handler so Joey can mute expensive tiles when not testing them. Already partially there; verify in Phase E.</li>
+</ul>
+</div>
+
+<h2>6. Unknowns</h2>
+<div class="card">
+<ol>
+  <li><strong>MiniMax exact API shape.</strong> Their docs claim OAI-compatible but the endpoint differs (<code>chatcompletion_v2</code>). Need to verify the request body format at first probe. May need small wrapper.</li>
+  <li><strong>Cohere format incompatibility.</strong> Their <code>v2/chat</code> endpoint accepts a different message format. Either add a <code>cohere</code> format type or transform payload at request-build time. Decide at implementation.</li>
+  <li><strong>Free-tier limits.</strong> Each new vendor has different free-tier ceilings. Hard to estimate cost until we run real traffic.</li>
+  <li><strong>Account-tier gating.</strong> Some models may require paid tier (saw this with gpt-5.5-pro). Mitigation: probe each one before committing to the table.</li>
+  <li><strong>Latency variance.</strong> Adding 12 tiles to the fan-out adds parallel HTTP calls. With Cohere or Reka having higher latency, the overall task feels slower (last response = total time). May need a "fan-out subset" feature.</li>
+  <li><strong>Tile organization in the UI.</strong> 42 tiles in DATA ACCESS column gets crowded. May need a per-vendor grouping or scroll affordance. Out of scope for v1.</li>
+  <li><strong>Claude-as-employee specifics (Phase F).</strong> Persistent memory is the first piece. Could be: (a) NOUS mesh memory skill, (b) local SQLite, (c) JSON file. Each has implications. Defer to its own <code>~d</code>.</li>
+</ol>
+</div>
+
+<h2>7. When To Revisit</h2>
+<div class="card">
+<table>
+  <tr><th>Signal</th><th>Action</th></tr>
+  <tr><td>MiniMax M2.8 (or M3) ships</td><td>Update <code>model</code> field on the <code>minimax</code> entry. Alias stays. Per the naming convention.</td></tr>
+  <tr><td>Cockpit gets noisy at 42 tiles</td><td>New <code>~d</code> for tile grouping or per-vendor collapsible sections.</td></tr>
+  <tr><td>Joey wants the Phase F employee build</td><td>New <code>~d</code> for persistent memory first; iterate.</td></tr>
+  <tr><td>OpenRouter / aggregator approach becomes attractive</td><td>Cost ceiling decision; would add a single "openrouter" format type wrapping all. Punt for now.</td></tr>
+  <tr><td>Firecrawl or another infra tool becomes urgent</td><td>Separate <code>~p</code> for tool registry. Not a provider question.</td></tr>
+  <tr><td>An added provider returns junk responses or has security issues</td><td><code>set_disabled</code> from the cockpit (no code change). Document in retros.</td></tr>
+</table>
+</div>
+
+<h2>8. Recommendation</h2>
+<div class="card">
+<p><strong>Execute Phase A + B + C as one stretch</strong> (~13 pts, 65 min, 4 signups). That gets: codestral (after Mistral fix), MiniMax (Rudi's pick), and the full Chinese open-weight cohort (GLM, Kimi, Qwen). The cockpit goes from 30 → ~38 tiles with the most interesting additions.</p>
+<p>D + E in a second stretch (~8 pts, 30 min, 3 signups). That's Cohere + Reka + Llama-via-Groq.</p>
+<p>F deferred — name the four gaps now, build them later when each becomes load-bearing.</p>
+</div>
+
+<h2>9. Next</h2>
+<div class="card">
+<p>Plan awaits Joey's approval. Three things on approve:</p>
+<ol>
+  <li><code>~e</code> sizes Phase A-C into a P5-a board (probably 5 items at 3-pt each).</li>
+  <li>Joey starts the signup flow: minimax.io first (Rudi's strongest endorsement).</li>
+  <li>Be executes each item as the key paste lands.</li>
+</ol>
+<p>If you want to scope down (just MiniMax for now, defer the rest), say which phase(s). If you want to scope up (also build Phase F now), say "employee build" and I'll add the persistent-memory <code>~d</code> queue.</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Code committed (this artifact)</li>
+<li>&#x2713; Hash in telemetry (backfilled)</li>
+<li>&#x2014; Board updated (board items land via companion ~e)</li>
+<li>&#x2713; HTML report saved</li>
+<li>&#x2713; Index updated</li>
+<li>&#x2713; Pushed to remote</li>
+<li>&#x2713; No prior damage (planning only)</li>
+<li>&#x2713; Production verified (live-mirror)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r137 &middot; 2026-05-26 02:20 &middot; nous-desktop &middot; ~p add all providers</div>
+</div></body></html>
