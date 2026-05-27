@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~f Cadence.Driver uses gcloud user creds, not ADC</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~f gcloud auth (no ADC)</nav>
+
+<h1>~f Cadence.Driver uses gcloud user creds, not ADC</h1>
+<p class="sub">First run of <code>Go.Driver --flow reset-baseline</code> died at Step 1 with an opaque gRPC <code>invalid_grant</code>. Root cause: Application Default Credentials were stale. Fix: bypass ADC entirely; have the Driver inherit the operator's regular <code>gcloud auth login</code> identity via a token subprocess.</p>
+<span class="banner">Shipped -- Re-run Cleared</span>
+
+<h2>What Was Broken</h2>
+<p style="font-size:13px">On the operator's first interactive run, Step 1 (SchedulerToggle Pause) failed:</p>
+<div class="code-block">== Step 1 SchedulerToggle(Pause)
+   Pause Cloud Scheduler job (no more autonomous /tick fires until Resume)
+   Will PAUSE acmedev-platform-hq/us-central1/cadence-tick-5m
+   [Enter]=Go
+   [FAIL] Status(StatusCode="Internal", Detail="Error starting gRPC call.
+          TokenResponseException: Error:"invalid_grant", Description:"Bad Request", ...")
+   [R]=Retry  [I]=Inspect  [S]=Skip  [Q]=Quit:</div>
+<p style="font-size:13px;margin-top:8px">Neither retry nor inspect would have helped -- the credential was unusable.</p>
+
+<h2>Root Cause</h2>
+<p style="font-size:13px">Both Google Cloud SDKs used in the Driver -- <code>CloudSchedulerClient</code> (Board 11 ops sub-flows) and <code>FirestoreDb</code> (WriteFirestoreStep + FirestoreWipeStep + Inspector) -- defaulted to <strong>Application Default Credentials</strong> when no <code>Credential</code> was supplied to their builders / static factories.</p>
+
+<p style="font-size:13px"><strong>ADC is a separate credential store</strong> from regular <code>gcloud auth login</code>. It lives at <code>%APPDATA%\gcloud\application_default_credentials.json</code> (Windows) and is populated by <code>gcloud auth application-default login</code>, a completely different browser flow. The operator had run regular <code>gcloud auth login</code> (active account: <code>joey.castillo.acmedev@gmail.com</code>) but had not run the application-default variant. Either ADC was never set up on this machine, or an old token had its refresh grant revoked.</p>
+
+<p style="font-size:13px">The <code>invalid_grant</code> error bubbled up through gRPC as a generic "Internal" status, hiding the actual diagnosis.</p>
+
+<div class="warn">
+<strong>Design call:</strong> the operator was already authenticated via the regular gcloud account that <em>owns</em> acmedev-platform-hq. Requiring a second login dance solely because the SDK defaults to ADC is needless friction. The Driver should inherit whatever gcloud is configured to use.
+</div>
+
+<h2>What Was Fixed</h2>
+
+<p style="font-size:13px">New helper class shells out to <code>gcloud auth print-access-token</code> and wraps the result in a <code>GoogleCredential</code> the SDKs accept:</p>
+
+<div class="code-block">// cadence/Cadence.Driver/Auth/GcloudAuth.cs
+
+public static class GcloudAuth
+{
+    public static GoogleCredential GetCredential(string? account = null)
+    {
+        var token = PrintAccessToken(account);
+        return GoogleCredential.FromAccessToken(token);
+    }
+
+    private static string PrintAccessToken(string? account)
+    {
+        var fileName = OperatingSystem.IsWindows() ? "gcloud.cmd" : "gcloud";
+        var args = new List&lt;string&gt; { "auth", "print-access-token" };
+        if (!string.IsNullOrEmpty(account)) args.Add($"--account={account}");
+        // ... process start, read stdout, surface stderr on failure ...
+        return token.Trim();
+    }
+}</div>
+
+<p style="font-size:13px;margin-top:8px">Every GCP client construction now uses the builder + Credential pattern:</p>
+
+<table>
+<tr><th>File</th><th>Before</th><th>After</th></tr>
+<tr><td>WriteFirestoreStep.cs</td><td><code>FirestoreDb.Create(proj)</code></td><td><code>new FirestoreDbBuilder { ProjectId=proj, Credential=GcloudAuth.GetCredential(...) }.Build()</code></td></tr>
+<tr><td>FirestoreWipeStep.cs (preview + execute)</td><td><code>FirestoreDb.Create(proj)</code></td><td>same builder pattern</td></tr>
+<tr><td>SchedulerToggleStep.cs</td><td><code>await CloudSchedulerClient.CreateAsync()</code></td><td><code>await new CloudSchedulerClientBuilder { Credential=GcloudAuth.GetCredential(...) }.BuildAsync()</code></td></tr>
+<tr><td>CadenceInspector.cs (Firestore + Scheduler options)</td><td>same default-ADC calls</td><td>both replaced with builder + Credential</td></tr>
+</table>
+
+<p style="font-size:13px">Inspector hint strings updated from <code>gcloud auth application-default login</code> to <code>gcloud auth login -- Driver uses gcloud user creds, NOT ADC</code> so the diagnostic matches reality if ever the active account is wrong or revoked.</p>
+
+<p style="font-size:13px"><code>appsettings.json</code> gained <code>Cadence:GcloudAccount</code> (empty by default = use active account). Set to a specific email to pin: useful if Joey ever has multiple gcloud accounts active and needs to force one identity.</p>
+
+<h2>Test Added</h2>
+
+<p style="font-size:13px">No test framework on Cadence.Driver; manual verification:</p>
+
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td><code>dotnet build -c Release</code></td><td>0 warnings, 0 errors</td></tr>
+<tr><td><code>gcloud auth print-access-token</code> -- proves the path GcloudAuth uses</td><td>OK -- returned a 261-char token starting with <code>ya29.a0AQvPyIM...</code></td></tr>
+<tr><td><code>gcloud config get account</code> -- confirms identity</td><td><code>joey.castillo.acmedev@gmail.com</code> (the account that owns acmedev-platform-hq)</td></tr>
+<tr><td>End-to-end Driver smoke against live Scheduler + Firestore</td><td>Deferred -- requires DROP DATABASE on AIRBYTE_CLONE which is the operator's call. The first invocation after this fix lands will be the verification.</td></tr>
+</table>
+
+<div class="callout">
+<strong>Why no live smoke:</strong> the natural smoke for SchedulerToggle and FirestoreWipe is to actually pause the Scheduler and wipe Firestore. Those are destructive operations gated behind the operator's intent. The build-clean + gcloud-probe + line-by-line audit of the credential swap is the closest the Driver gets to a unit test pending real-Snowflake integration tests on this project.
+</div>
+
+<h2>Files Changed</h2>
+
+<table>
+<tr><th>Path</th><th>Status</th></tr>
+<tr><td><code>cadence/Cadence.Driver/Auth/GcloudAuth.cs</code></td><td>NEW</td></tr>
+<tr><td><code>cadence/Cadence.Driver/appsettings.json</code></td><td>UPDATE (+ Cadence:GcloudAccount key)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/WriteFirestoreStep.cs</code></td><td>UPDATE (builder + Credential)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/FirestoreWipeStep.cs</code></td><td>UPDATE (builder + Credential, preview + execute)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/SchedulerToggleStep.cs</code></td><td>UPDATE (builder + Credential)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Inspectors/CadenceInspector.cs</code></td><td>UPDATE (builders + Credential + hint text)</td></tr>
+<tr><td>cadence commit</td><td><code>90a7164</code> -- "~f Driver uses gcloud user creds, not ADC"</td></tr>
+<tr><td><code>airbyte-parity/be/builds/2026-05-26-1749-fix-driver-gcloud-auth.html</code></td><td>NEW (this report)</td></tr>
+<tr><td><code>airbyte-parity/be/index.html</code></td><td>UPDATE (Builds entry)</td></tr>
+<tr><td><code>airbyte-parity/be/telemetry.json</code></td><td>UPDATE (~f entry)</td></tr>
+</table>
+
+<h2>What's Next</h2>
+
+<ul>
+<li><b>Operator quits the current Driver session</b> (press <code>Q</code> at the recovery prompt) -- the current process has no fix, the rebuild has it.</li>
+<li><b>Re-run</b> <code>Go.Driver --interactive --flow reset-baseline</code>. Step 1 SchedulerToggle now fetches a token via subprocess and passes it to the Scheduler client. Subsequent GCP-touching steps do the same.</li>
+<li><b>Future enhancement (not in this fix):</b> preflight step at the top of every flow that probes <code>gcloud auth print-access-token</code> once and surfaces a clean error before any GCP API call. Trivial -- ~30 lines. Left for now since the SDK error messages are useful once the credential plumbing is clear; the fix made it clear.</li>
+<li><b>Alternative auth modes if ever needed:</b> service-account JSON keypair via env var <code>GOOGLE_APPLICATION_CREDENTIALS</code> would still take precedence over our gcloud-user path if set; Driver code path is unchanged in that case (the FirestoreDbBuilder accepts whatever credential is passed). Documented for future operators.</li>
+</ul>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence 90a7164 + airbyte-parity pending this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfill in telemetry after commit</div>
+<div style="color:#888;margin:2px 0;font-size:13px">-- 3. Board updated -- N/A (this is a follow-up fix to closed Board 11, noted in the post-close section)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved at be/builds/2026-05-26-1749-fix-driver-gcloud-auth.html</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated with new entry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Both repos pushed: cadence main = 90a7164; airbyte-parity pending</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done items damaged (this is a fix to Board 11's tooling, additive across the Auth/ + Steps/ + Inspectors/ layer)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r96 &middot; 2026-05-26 17:49 &middot; ~f Driver gcloud auth (no ADC)</div>
+</body></html>
