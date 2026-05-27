@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~u: THINKING + MAIN AI collapsed — verb-as-label inline with dropdown</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}
+  pre{color:#ccc;font-size:0.78rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.88rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .ok{color:#22c55e;font-weight:600}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~u: THINKING + MAIN AI collapsed</h1>
+<p class="subtitle">Shipped per <a href="../designs/2026-05-26-0420-design-collapse-thinking-mainai.html">~d 2026-05-26 04:20</a>. Verb-as-label inline with dropdown. One concept, one row, one control. Active badge removed (dropdown shows active state already). Frontend-only.</p>
+
+<h2>What Built</h2>
+<div class="card">
+<table>
+<tr><th>Component</th><th>Before</th><th>After</th></tr>
+<tr><td>Header</td><td>THINKING + subtitle + claude-opus-4-7 badge</td><td><strong>removed entirely</strong></td></tr>
+<tr><td>Row 1</td><td>MAIN AI + subtitle + dropdown</td><td><code>THINKING:</code> [dropdown]<br><small>↑ the AI working on your chat</small></td></tr>
+<tr><td>Row 2</td><td>SUMMARY AI + subtitle + dropdown</td><td><code>SUMMARIZING:</code> [dropdown]<br><small>↑ the AI for /summarize and /advise</small></td></tr>
+<tr><td>Empty state</td><td>"...The MAIN AI works on it live..."</td><td>"Type your question below. The trace appears here as THINKING works."</td></tr>
+<tr><td>JS updateActiveLabel</td><td>Updated #driver-active text color + value</td><td>No-op stub (called sites kept; #driver-active element gone)</td></tr>
+</table>
+</div>
+
+<h2>Verification</h2>
+<div class="card">
+<p>curl-grep against the running server confirms:</p>
+<pre>$ curl http://127.0.0.1:5050/index.html | grep ctl-verb
+&lt;span class="ctl-verb"&gt;THINKING:&lt;/span&gt;
+&lt;span class="ctl-verb"&gt;SUMMARIZING:&lt;/span&gt;
+
+$ curl http://127.0.0.1:5050/index.html | grep track-empty
+&lt;span class="track-empty"&gt;Type your question below. The trace appears here as THINKING works.&lt;/span&gt;
+
+$ curl http://127.0.0.1:5050/desktop.css | grep -E "driver-active|driver-label-block"
+(no matches — removed)</pre>
+<p><span class="ok">PASS</span> — new layout served, deleted rules gone.</p>
+</div>
+
+<h2>Files Changed</h2>
+<div class="card">
+<table>
+<tr><th>File</th><th>Change</th><th>Net LOC</th></tr>
+<tr><td>wwwroot/index.html</td><td>driver-header + #driver-active removed; driver-controls restructured with ctl-verb inline; empty-state hint reworded</td><td>+11 / -17</td></tr>
+<tr><td>wwwroot/desktop.css</td><td>.driver-label-block + .driver-sub + .driver-active + .ctl-text + .ctl-label rules removed; .ctl-verb added; .driver-controls + .driver-ctl + .ctl-hint trimmed for tighter layout</td><td>+30 / -70</td></tr>
+<tr><td>wwwroot/loop.js</td><td>updateActiveLabel becomes no-op stub (callers kept compiling; #driver-active element removed in HTML)</td><td>+6 / -10</td></tr>
+</table>
+<p>Net: -50 LOC. Less is more.</p>
+</div>
+
+<h2>What Joey sees on hard-refresh</h2>
+<div class="card">
+<pre>┌───────────────────────────────────────────────────────────┐
+│ THINKING:    [claude-opus — claude-opus-4-7 ▼]            │
+│ ↑ the AI working on your chat                              │
+│                                                            │
+│ SUMMARIZING: [claude-opus — claude-opus-4-7 ▼]            │
+│ ↑ the AI for /summarize and /advise                       │
+├───────────────────────────────────────────────────────────┤
+│ Type your question below. The trace appears here as       │
+│ THINKING works.                                            │
+│                                                            │
+│ (live trace fills in: SENSE → SELECT → REQUEST → ...      │
+└───────────────────────────────────────────────────────────┘</pre>
+<p>Behavior unchanged. Just clearer.</p>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Code committed (index.html + desktop.css + loop.js + this report)</li>
+<li>&#x2713; Hash in telemetry (backfilled)</li>
+<li>&#x2014; Board updated (ad-hoc ~u from ~d; no formal board)</li>
+<li>&#x2713; HTML report saved</li>
+<li>&#x2713; Index updated</li>
+<li>&#x2713; Pushed to remote</li>
+<li>&#x2713; No prior damage (functionality unchanged; only labels + layout)</li>
+<li>&#x2713; Production verified (curl confirms new layout served on localhost:5050)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r147 &middot; 2026-05-26 04:30 &middot; nous-desktop &middot; ~u collapse THINKING + MAIN AI</div>
+</div></body></html>
