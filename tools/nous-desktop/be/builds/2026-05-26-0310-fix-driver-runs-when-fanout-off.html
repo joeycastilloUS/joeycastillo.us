@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~f: driver runs when fan-out is OFF (master toggle bug)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}h3{color:#6FC3DF;font-size:1rem;margin:18px 0 8px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}
+  pre{color:#ccc;font-size:0.78rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.88rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .ok{color:#22c55e;font-weight:600}.fail{color:#ef4444;font-weight:600}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~f: driver runs when fan-out is OFF (master toggle bug)</h1>
+<p class="subtitle">Joey's report: "off button for AI still uses all AI to handle my chat requests. instead I would think the driver or engine would deal with it when I turn off the AI sections and all providers." Root-caused, fixed, verified. Driver now always answers; fan-out tiles obey the off button.</p>
+
+<h2>The Bug</h2>
+<div class="card">
+<p><strong>Symptom:</strong> when the master "AI OFF" toggle is clicked (or every per-tile toggle is OFF), Joey expected the DRIVER (operator-picked Claude-Opus-4-7) to keep answering — only the fan-out tiles should go dark. Instead the THINKING column also died with "driver 'claude-opus' has no key or is disabled" while every fan-out tile was correctly muted. Net: no AI responded.</p>
+
+<p><strong>Root cause:</strong> the master toggle in <code>loop.js</code> (<code>toggleAllProviders()</code>) sends <code>set_disabled</code> for <strong>every</strong> provider, including the one selected as driver. <code>handle_task</code>'s driver-lookup at <code>serve.c:1834-1841</code> then refused to use it:</p>
+<pre>// BEFORE
+for (int i = 0; i &lt; g_provider_count; i++) {
+    if (strcmp(g_providers[i].name, g_active_driver) != 0) continue;
+    if (g_providers[i].disabled || !g_providers[i].api_key[0]) {
+        // emits error -- THINKING column dies
+        break;
+    }
+    driver_idx = i; break;
+}</pre>
+<p>The disabled check applied universally — including to the operator's explicit dropdown choice. That's wrong: the dropdown is supposed to be the authoritative override.</p>
+</div>
+
+<h2>The Fix</h2>
+<div class="card">
+<p><strong>The operator-picked driver bypasses the disabled flag.</strong> Only the missing-key check still refuses (a provider with no key literally cannot run). When the driver is "on despite master-off", emit an honest trace line so the operator sees what's happening.</p>
+<pre>// AFTER (serve.c handle_task, around line 1834)
+for (int i = 0; i &lt; g_provider_count; i++) {
+    if (strcmp(g_providers[i].name, g_active_driver) != 0) continue;
+    if (!g_providers[i].api_key[0]) {
+        // refuses only when there's no key
+        send_event(...,"driver '%s' has no key");
+        break;
+    }
+    if (g_providers[i].disabled) {
+        // honest trace: driver runs anyway because operator picked it
+        send_event(..., "search_step", "sense",
+            "driver '%s' runs despite master-off (operator pick wins)");
+    }
+    driver_idx = i;
+    break;
+}</pre>
+<p>NOUS-decide path (when driver is "Let NOUS decide") still respects the disabled flag — there's no operator override to honor, so the first-available-non-disabled selection is correct.</p>
+</div>
+
+<h2>Verification</h2>
+<div class="card">
+<p>WS task probe: set driver to <code>claude-opus</code>, then disable ALL 30 providers via <code>set_disabled</code>, then fire a task. Expected: driver responds; fan-out stays dark.</p>
+<pre>=== TASK FIRED with all providers disabled
+    (driver=claude-opus operator-picked) ===
+  [sense  ] driver 'claude-opus' runs despite master-off
+            (operator pick wins)
+  [select ] expert: claude-opus (claude-opus-4-7)
+  [request] POST https://api.anthropic.com/v1/messages
+            (model: claude-opus-4-7)
+  [response] HTTP 200 · 2371ms · 441 bytes
+  [done   ] 28 in / 6 out · $0.0003
+
+  fan-out tiles that fired:  0   ← all properly muted</pre>
+<p><span class="ok">PASS</span> — driver responds, fan-out muted, honest trace line surfaces the override.</p>
+</div>
+
+<h2>What Joey will see in the cockpit</h2>
+<div class="card">
+<ol>
+  <li>Click master AI OFF button (top-right of DATA ACCESS column). Every fan-out tile goes dark.</li>
+  <li>The DRIVER badge in the THINKING header still shows <code>claude-opus-4-7</code> (green).</li>
+  <li>Type a query. The trace fires:
+    <ul>
+      <li>SENSE: "driver 'claude-opus' runs despite master-off (operator pick wins)" — honest disclosure</li>
+      <li>SELECT: expert claude-opus (claude-opus-4-7) — actual driver</li>
+      <li>REQUEST → RESPONSE → DONE — Claude answers normally</li>
+    </ul>
+  </li>
+  <li>The fan-out tiles (DATA ACCESS column) stay dark — they're properly muted.</li>
+</ol>
+<p>To switch the driver while master is OFF: use the DRIVER dropdown as usual. The dropdown selection always wins over disabled state.</p>
+</div>
+
+<h2>Files Changed</h2>
+<div class="card">
+<table>
+<tr><th>File</th><th>Change</th><th>Net LOC</th></tr>
+<tr><td><code>src/serve.c</code></td><td><code>handle_task</code> driver-lookup: remove the disabled check for operator-picked driver; refuse only on missing key; emit honest "runs despite master-off" trace line when driver is disabled-but-operator-picked</td><td>+15 / -5</td></tr>
+<tr><td><code>nous-desktop.exe</code></td><td>Rebuilt (gitignored)</td><td>n/a</td></tr>
+</table>
+</div>
+
+<h2>What's NOT changed</h2>
+<div class="card">
+<ul>
+  <li><strong>Fan-out behavior</strong> still skips disabled providers (unchanged) — so the off button does what it should for tiles.</li>
+  <li><strong>NOUS-decide</strong> path still picks the first non-disabled provider (unchanged) — when there's no operator override to honor, the disabled state is meaningful.</li>
+  <li><strong>The per-tile toggle</strong> still toggles individual tiles (unchanged).</li>
+  <li><strong>The master toggle in JS</strong> still sends <code>set_disabled</code> for every provider including the driver (unchanged) — the override happens server-side. Could be cleaner to skip the driver client-side too, but server-side override is the more robust place (works even if JS state and server state drift).</li>
+</ul>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Code committed (serve.c + this report)</li>
+<li>&#x2713; Hash in telemetry (backfilled)</li>
+<li>&#x2014; Board updated (no board; ad-hoc ~f thread per Joey's "separate thread" framing)</li>
+<li>&#x2713; HTML report saved</li>
+<li>&#x2713; Index updated</li>
+<li>&#x2713; Pushed to remote</li>
+<li>&#x2713; No prior damage (fan-out behavior preserved; NOUS-decide preserved; only operator-picked driver has new override)</li>
+<li>&#x2713; Production verified (WS probe with all 30 providers disabled: driver fired, fan-out zero)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r140 &middot; 2026-05-26 03:10 &middot; nous-desktop &middot; ~f driver-runs-when-fanout-off</div>
+</div></body></html>
