@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>~refactor catalog_server → prime · finish the 2026-04-14 cutover</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --purple:#B084F2; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; position: sticky; top: 0; z-index: 10; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--accent); font-size: 16px; margin: 20px 0 8px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; font-family: 'Consolas', monospace; font-size: 12px; }
+  td.id { color: var(--purple); font-weight: 700; white-space: nowrap; }
+  td.del { color: var(--red); }
+  td.add { color: var(--green); }
+  td.keep { color: var(--t2); }
+  .keep-box { background: #0F1F0F; border: 2px solid var(--green); padding: 12px 18px; margin: 12px 0; font-size: 13.5px; font-family: 'Helvetica Neue', sans-serif; }
+  .keep-box b { color: var(--green); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .change-box { background: #1F1A0F; border: 2px solid var(--amber); padding: 12px 18px; margin: 12px 0; font-size: 13.5px; font-family: 'Helvetica Neue', sans-serif; }
+  .change-box b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  ol li, ul li { color: #ccc; font-size: 13.5px; margin: 6px 0; font-family: 'Helvetica Neue', sans-serif; }
+  .dod { background: var(--surface); padding: 14px 20px; margin: 20px 0; border-radius: 3px; font-family: 'Helvetica Neue', sans-serif; }
+  .dod h3 { color: var(--accent); margin-bottom: 6px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .dod ul { list-style: none; padding: 0; font-size: 12.5px; line-height: 1.7; }
+  .dod li.pass { color: var(--green); }
+  .dod li.pend { color: var(--amber); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all · ~refactor catalog_server → prime · finish the 2026-04-14 cutover</span></nav>
+<div class="container">
+
+<h1>~refactor catalog_server → prime.</h1>
+<p class="sub">Finish the rename Board 71a started 2026-04-14 (source-side done, deploy-side blocked on operator.key recovery — UNBLOCKED today 2026-05-26 when fresh keypair landed). Align binary + service + paths with the role names Joey already uses everywhere else (prime/relay).</p>
+
+<div class="keep-box">
+<b>What stays — the word "catalog" is correct in these places</b>
+<strong>HTTP endpoints</strong> at <code>/catalog/...</code> (the API serves a catalog of triples — that's literally what it returns; renaming would break every client).
+<strong>Data directory</strong> <code>/var/nous/catalog/</code> (the on-disk triple store IS the catalog the prime serves).
+<strong>Historical artifacts</strong> in <code>be/builds/</code>, <code>be/plans/</code>, <code>be/retros/</code> (records of past work; renaming rewrites history).
+</div>
+
+<div class="change-box">
+<b>What changes — the word "catalog" is misleading in these places</b>
+<strong>Binary name</strong> <code>catalog_server</code> → <code>prime</code> (it IS the prime, not a server "of catalogs")
+<strong>Systemd unit</strong> <code>nous-catalog.service</code> → <code>prime.service</code>
+<strong>Deployed path</strong> <code>/opt/nous/catalog_server</code> → <code>/opt/nous/prime</code>
+<strong>5 source-side stragglers</strong> (comments, CI workflow filename) that escaped the 2026-04-14 sweep
+<strong>2 a-d-d docs</strong> still using old framing (one of which I wrote)
+</div>
+
+<h2>§1 — The naming model after the refactor</h2>
+
+<table>
+<thead><tr><th>Layer</th><th>Name</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>VM role (already canonical)</td><td>prime / relay</td><td>What the node IS in the mesh</td></tr>
+<tr><td>Binary on prime VMs</td><td><code>prime</code></td><td>It IS the prime — runs the whole node</td></tr>
+<tr><td>Binary on relay VMs</td><td><code>relay</code></td><td>It IS the relay — auth + forward</td></tr>
+<tr><td>Systemd unit on prime</td><td><code>prime.service</code></td><td>Single source of name</td></tr>
+<tr><td>Systemd unit on relay</td><td><code>relay.service</code></td><td>Same</td></tr>
+<tr><td>Binary path on prime</td><td><code>/opt/nous/prime</code></td><td>Matches name</td></tr>
+<tr><td>Binary path on relay</td><td><code>/opt/nous/relay</code></td><td>Matches name</td></tr>
+<tr><td>Source on disk</td><td><code>nous/intelligence/tool/prime-server/prime.c</code></td><td>(already <code>prime_server.c</code>; we can drop <code>_server</code> suffix optionally)</td></tr>
+<tr><td>Data dir (triple store)</td><td><code>/var/nous/catalog/</code></td><td>KEEP — the data IS a catalog</td></tr>
+<tr><td>HTTP endpoints</td><td><code>/catalog/*</code></td><td>KEEP — public API serving a catalog</td></tr>
+<tr><td>Process namespace</td><td>"a prime serves a catalog"</td><td>Honest separation</td></tr>
+</tbody>
+</table>
+
+<h2>§2 — Source-side stragglers (5 files, single-line edits)</h2>
+
+<table>
+<thead><tr><th>ID</th><th>File</th><th>Line</th><th>Change</th></tr></thead>
+<tbody>
+<tr><td class="id">R-01</td><td>nous/comms/Makefile</td><td>83</td><td><span class="del">── E2E tests (requires catalog_server compiled) ──</span><br><span class="add">── E2E tests (requires prime compiled) ──</span></td></tr>
+<tr><td class="id">R-02</td><td>nous/comms/Makefile</td><td>105</td><td><span class="del">@echo "=== E2E Tests (requires catalog_server) ==="</span><br><span class="add">@echo "=== E2E Tests (requires prime) ==="</span></td></tr>
+<tr><td class="id">R-03</td><td>nous/intelligence/BASICI_WIRE_SCHEMATIC.html</td><td>620</td><td><span class="del">catalog_server &mdash; dispatches on atoms, 5 verbs</span><br><span class="add">prime &mdash; dispatches on atoms, 5 verbs</span></td></tr>
+<tr><td class="id">R-04</td><td>nous/tool/mesh-roster-build/main.c</td><td>26</td><td><span class="del">* Verifier (will live in catalog_server, MESH-UP-C):</span><br><span class="add">* Verifier (will live in prime, MESH-UP-C):</span> (this is my comment, my fix)</td></tr>
+<tr><td class="id">R-05</td><td>nous/.github/workflows/catalog-server-compile.yml</td><td>30</td><td>RENAME file: <code>catalog-server-compile.yml</code> → <code>prime-compile.yml</code>; update any internal refs to old workflow name</td></tr>
+</tbody>
+</table>
+
+<h2>§3 — a-d-d updates (2 docs)</h2>
+
+<table>
+<thead><tr><th>ID</th><th>File</th><th>Lines</th><th>Change</th></tr></thead>
+<tbody>
+<tr><td class="id">R-06</td><td>ks-add/nous/CLOUD_NODE.md<br>(I wrote the recent update — my fix)</td><td>10, 32, 45, 137, 174, 183 + headings</td><td>ASCII art header "CATALOG SERVER :8080" → "PRIME :8080"; "CATALOG STORE" box → "TRIPLE STORE"; "/var/nous/catalog/" stays (it IS the catalog dir); "full catalog node" → "full prime node"; "catalog serve" → "catalog query serve"</td></tr>
+<tr><td class="id">R-07</td><td>ks-add/nous/MESH_STATUS.md<br>(I wrote this too)</td><td>49, 69</td><td>References to OLD tag names <code>nous-catalog</code> as historical context — KEEP for accuracy ("old tags were <code>nous-catalog</code>/<code>nous-mesh</code>"). No change needed; the doc is reporting history correctly.</td></tr>
+</tbody>
+</table>
+
+<h2>§4 — Production VM cutover (the long-blocked step, now unblocked)</h2>
+
+<p>This is the work the WTF audit from 2026-05-20 flagged as blocked on operator.key recovery. We have a fresh operator.key as of today 2026-05-26 13:03 PDT. The block is gone.</p>
+
+<table>
+<thead><tr><th>ID</th><th>VM</th><th>Steps</th></tr></thead>
+<tbody>
+<tr><td class="id">R-08</td><td>All 5 prime VMs<br>(ashburn, las-vegas, singapore, hong-kong)<br>+ relay LA</td><td>
+  <ol style="margin-left:14px;">
+    <li>scp new <code>prime</code> binary to <code>/tmp/prime</code></li>
+    <li>scp <code>mesh.sealed</code> to <code>/var/nous/mesh.sealed</code> (chown nous:nous, mode 0644)</li>
+    <li><code>sudo systemctl stop nous-catalog.service</code></li>
+    <li><code>sudo mv /opt/nous/catalog_server /opt/nous/catalog_server.bak</code> (rollback safety)</li>
+    <li><code>sudo install -m 0755 -o pantheon-0 -g pantheon-0 /tmp/prime /opt/nous/prime</code></li>
+    <li>Write new unit file <code>/etc/systemd/system/prime.service</code> (content shown in §5)</li>
+    <li><code>sudo systemctl daemon-reload</code></li>
+    <li><code>sudo systemctl disable nous-catalog.service</code></li>
+    <li><code>sudo systemctl enable --now prime.service</code></li>
+    <li><code>sudo systemctl status prime.service</code> + <code>journalctl -u prime.service -n 50</code></li>
+    <li>Verify mesh_roster loaded: look for "mesh: 25 triples loaded; signature verified" in journal</li>
+    <li>If healthy after 5 minutes: <code>sudo rm /etc/systemd/system/nous-catalog.service /opt/nous/catalog_server.bak</code></li>
+    <li>If sick: <code>sudo systemctl stop prime; sudo mv /opt/nous/catalog_server.bak /opt/nous/catalog_server; sudo systemctl start nous-catalog</code> (rollback)</li>
+  </ol>
+</td></tr>
+</tbody>
+</table>
+
+<h2>§5 — The new prime.service systemd unit</h2>
+<pre>[Unit]
+Description=NOUS Prime
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/nous/prime
+Environment=NOUS_KEY_FILE=/var/nous/triples.key
+Environment=NOUS_STORE_DIR=/var/nous/catalog
+Environment=NOUS_DATA_DIR=/var/nous/data
+Environment=NOUS_CATALOG_PORT=8080
+Environment=NOUS_MESH_ROSTER=/var/nous/mesh.sealed
+User=pantheon-0
+Group=pantheon-0
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target</pre>
+
+<p>Changes from <code>nous-catalog.service</code>: Description renamed; ExecStart path updated; new <code>NOUS_MESH_ROSTER</code> env var pointing at the sealed roster file; <code>User=/Group=pantheon-0</code> made explicit (catalog_server inherited it implicitly). <code>NOUS_CATALOG_PORT</code> env var KEEPS its name (the port serves the /catalog/ HTTP namespace).</p>
+
+<h2>§6 — Execution order + dependencies</h2>
+
+<ol>
+<li><strong>R-01..R-04</strong> in <code>kastil-systems/nous</code> repo — single commit, mechanical sed</li>
+<li><strong>R-05</strong> rename CI workflow file — separate commit (file move + content edit)</li>
+<li><strong>R-06</strong> in <code>kastil-systems/a-d-d</code> repo — single commit, my own writing to fix</li>
+<li><strong>R-07</strong> no change (historical context accurate)</li>
+<li><strong>Build the <code>prime</code> binary</strong> via fixed <code>build_linux.sh</code> (needs the script repair we hit earlier — missing wire/qr/translate/execute objects)</li>
+<li><strong>R-08</strong> 5 VM cutovers — do them ONE AT A TIME, watch journal, only proceed to next when previous is green for 5 min</li>
+</ol>
+
+<h2>§7 — Risks + rollback</h2>
+
+<table>
+<thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>New prime binary crashes</td><td>Step 12 rollback restores old binary + service in &lt;30 sec</td></tr>
+<tr><td>mesh_roster_load() reads bad file</td><td>Loader is graceful-degrade (Claude-2's design) — missing/forged file → 0 triples loaded → boot continues, mesh-less but functional</td></tr>
+<tr><td>Wrong operator.pub compiled in</td><td>Pre-flight verify: <code>strings /tmp/prime | grep -o 'a61bdace' </code> should match operator.pub fingerprint before scp</td></tr>
+<tr><td>HTTP /catalog/* endpoint clients break</td><td>NOT TOUCHED — public API unchanged</td></tr>
+<tr><td>Build script drift (wire/qr/translate/execute missing)</td><td>Step 5 above — fix script before any deploy attempt; verify a clean prime binary builds on Ashburn before scp'ing to any other VM</td></tr>
+<tr><td>Cascading VM failure during fan-out</td><td>One VM at a time; watch journal for 5 min between; rollback immediately if any unhealthy</td></tr>
+</tbody>
+</table>
+
+<h2>§8 — DoD checklist</h2>
+
+<div class="dod">
+<h3>Definition of Done — this refactor</h3>
+<ul>
+  <li class="pend">⏳ R-01..R-04 committed + pushed to kastil-systems/nous</li>
+  <li class="pend">⏳ R-05 CI workflow file renamed + committed</li>
+  <li class="pend">⏳ R-06 a-d-d CLOUD_NODE.md updated + committed + pushed</li>
+  <li class="pend">⏳ build_linux.sh repaired; clean <code>prime</code> binary builds on Ashburn</li>
+  <li class="pend">⏳ 5 VMs cut over to prime.service one at a time</li>
+  <li class="pend">⏳ Each VM's journal shows "mesh: 25 triples loaded; signature verified"</li>
+  <li class="pend">⏳ Old <code>nous-catalog.service</code> + <code>catalog_server.bak</code> removed from all 5 after 5-min healthy window</li>
+  <li class="pend">⏳ Grep across kastil-systems repos confirms zero active-surface <code>catalog_server</code> references (be/* historical artifacts retained)</li>
+  <li class="pend">⏳ HTML report saved + index updated + pushed to joeycastillo.us/audit</li>
+</ul>
+</div>
+
+<h2>§9 — Open question for ratification</h2>
+
+<ol>
+<li><strong>Source file rename optional</strong> — <code>prime_server.c</code> is already-named. We could optionally drop the <code>_server</code> suffix to land at <code>prime.c</code>. Pure cosmetic, breaks no symbols since file content stays the same. Same for <code>relay_server.c</code> → <code>relay.c</code>. <strong>Recommendation: skip for now</strong> — too low value vs the directory hierarchy already in place (<code>intelligence/tool/prime-server/prime_server.c</code> is fine; renaming both file and dir is bigger churn).</li>
+<li><strong>nous-catalog.service file</strong> — leave on disk as <code>.disabled</code> backup for 7 days, then delete? Or delete immediately on cutover? Recommendation: backup for 7 days (matches the migration rollback pattern we used for VM cleanup).</li>
+</ol>
+
+<footer>v0 · 2026-05-26 18:10 PDT · ~refactor catalog_server → prime · joeycastilloUS/audit-of-all</footer>
+</div>
+</body>
+</html>
