@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~f: cockpit label clarity — plain-English DRIVER/ENGINE/THINKING</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}
+  pre{color:#ccc;font-size:0.78rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.88rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~f: cockpit label clarity</h1>
+<p class="subtitle">Joey: "I have no clue what DRIVER OR ENGINE means. THINKING what does that mean. I see a lot of claude-opus-4-7 but tell me in my own terms." Fix: renamed to MAIN AI + SUMMARY AI with explanatory subtitles. THINKING gets a one-liner. Empty state is a guide, not a vibe.</p>
+
+<h2>What Changed (plain English)</h2>
+<div class="card">
+<table>
+<tr><th>Old label</th><th>New label + subtitle</th><th>What it actually picks</th></tr>
+<tr><td><code>THINKING</code></td><td><code>THINKING</code> · <em>live trace of the AI working on your question</em></td><td>The pane that shows SENSE → SELECT → REQUEST → RESPONSE → DONE as the AI works.</td></tr>
+<tr><td><code>DRIVER</code></td><td><code>MAIN AI</code> · <em>answers your chat &amp; runs the THINKING pipeline above</em></td><td>Picks which AI answers when you type a regular question. Default <code>claude-opus-4-7</code>.</td></tr>
+<tr><td><code>ENGINE</code></td><td><code>SUMMARY AI</code> · <em>handles /summarize and /advise commands only</em></td><td>Picks which AI runs the side-commands. Default <code>claude-opus-4-7</code>.</td></tr>
+<tr><td><em>"waiting..."</em></td><td><em>"Type a question below. The MAIN AI works on it live in this pane."</em></td><td>Empty-state hint in the THINKING pane when nothing is happening.</td></tr>
+</table>
+</div>
+
+<h2>Why two dropdowns?</h2>
+<div class="card">
+<p>Both default to <strong>claude-opus-4-7</strong>, so you see the same model name twice. They're two independent settings — change one without affecting the other.</p>
+<ul>
+  <li><strong>MAIN AI</strong> — the headline. When you type "explain this code" or any normal question, this AI handles it. The full SENSE/SELECT/REQUEST trace fires in the THINKING pane.</li>
+  <li><strong>SUMMARY AI</strong> — the sidekick. When you type <code>/summarize</code> (compare responses across all the fan-out tiles) or <code>/advise</code> (have one AI advise on another's response), this AI handles those specific commands. Doesn't fire on regular questions.</li>
+</ul>
+<p>You can have MAIN AI = claude-opus-4-7 (smart, slow) and SUMMARY AI = gpt-mini (fast, cheap) — that's why the split exists. Or have them both be Claude if you don't care.</p>
+</div>
+
+<h2>What "Let NOUS decide" means</h2>
+<div class="card">
+<p>Both dropdowns have a "Let NOUS decide" option. When picked: the NOUS mesh (your home-rack brain) decides which AI based on the query. <strong>But the mesh isn't live yet</strong> — so picking "Let NOUS decide" for MAIN AI today = THINKING pane fails silent with "NOUS unavailable (mesh down) — no driver". That's intentional honesty: when NOUS does nothing, the cockpit does nothing rather than secretly fall back to gemini.</p>
+<p>Default of claude-opus-4-7 is the right pick until NOUS is real.</p>
+</div>
+
+<h2>Files Changed</h2>
+<div class="card">
+<table>
+<tr><th>File</th><th>Change</th><th>Net LOC</th></tr>
+<tr><td>wwwroot/index.html</td><td>Header restructured: driver-label-block (THINKING + subtitle); ctl-text per label with ctl-label + ctl-hint; empty-state hint updated</td><td>+12 / -6</td></tr>
+<tr><td>wwwroot/desktop.css</td><td>New <code>.driver-label-block</code>, <code>.driver-sub</code>, <code>.ctl-text</code>, <code>.ctl-label</code>, <code>.ctl-hint</code> rules; tweaked <code>.driver-active</code> + <code>.driver-controls</code> layout (column instead of row, more breathing room)</td><td>+45 / -15</td></tr>
+</table>
+<p>No C changes. No rebuild needed. Hard-refresh the browser and the new labels appear.</p>
+</div>
+
+<h2>How the cockpit now reads</h2>
+<div class="card">
+<pre>┌────────────────────────────────────────────────────────────┐
+│ THINKING                          [ claude-opus-4-7 ]      │
+│ live trace of the AI working on your question              │
+├────────────────────────────────────────────────────────────┤
+│ MAIN AI       [ claude-opus-4-7 ▼ ]                        │
+│ answers your chat &amp; runs the THINKING pipeline above       │
+│                                                             │
+│ SUMMARY AI    [ claude-opus-4-7 ▼ ]                        │
+│ handles /summarize and /advise commands only               │
+├────────────────────────────────────────────────────────────┤
+│ Type a question below. The MAIN AI works on it live in    │
+│ this pane.                                                  │
+│                                                             │
+│ (this fills with SENSE/SELECT/REQUEST/RESPONSE/DONE        │
+│ events as the MAIN AI works)                                │
+└────────────────────────────────────────────────────────────┘</pre>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Code committed (index.html + desktop.css + this report)</li>
+<li>&#x2713; Hash in telemetry (backfilled)</li>
+<li>&#x2014; Board updated (ad-hoc UX fix; no board)</li>
+<li>&#x2713; HTML report saved</li>
+<li>&#x2713; Index updated</li>
+<li>&#x2713; Pushed to remote</li>
+<li>&#x2713; No prior damage (functionality unchanged; only labels + layout)</li>
+<li>&#x2713; Production verified (curl confirms new labels served on localhost:5050)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r142 &middot; 2026-05-26 03:40 &middot; nous-desktop &middot; ~f cockpit labels</div>
+</div></body></html>
