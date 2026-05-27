@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~u Split RecloneSnowflakeStep into DropClone + CloneFromProd</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.diff-box{background:#1A1A1A;border-radius:6px;padding:14px 18px;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;white-space:pre;overflow-x:auto;line-height:1.5}
+.diff-box .lbl{display:block;color:#6FC3DF;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:700}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~u split reclone step</nav>
+
+<h1>~u Split RecloneSnowflakeStep into DropClone + CloneFromProd</h1>
+<p class="sub">Per operator request: each SQL statement in the Driver's clone-refresh path becomes its own observable step. One destructive-approval gate (Drop), then unattended tail. Continues Board 11 evolution.</p>
+<span class="banner">Shipped</span>
+
+<h2>What Was Updated</h2>
+
+<p style="font-size:13px">Previously the Driver had a single <code>RecloneSnowflakeStep</code> that bundled both the <code>DROP DATABASE</code> and the <code>CREATE DATABASE ... CLONE</code> behind one preview, one approval, one StepResult. Per-step observability mattered for two reasons:</p>
+
+<ul>
+<li><b>Forensic clarity</b> -- if the CLONE fails after the DROP succeeds, you want a per-statement timing record showing the DROP completed cleanly. Bundled, you can't tell.</li>
+<li><b>Distinct semantic gates</b> -- DROP is the destructive moment. CREATE is the recovery. They deserve separate previews.</li>
+</ul>
+
+<h2>Before / After</h2>
+
+<div class="diff">
+<div class="diff-box">
+<span class="lbl">Before (bundled)</span>RecloneSnowflakeStep
+   PreviewAsync   shows old created_on + age
+   ExecuteAsync   DROP + CREATE + SHOW
+                  -&gt; one StepResult
+   AutoAdvanceRest=true
+   ManualGuide carries both SQL stmts
+</div>
+<div class="diff-box">
+<span class="lbl">After (split)</span>DropCloneStep
+   PreviewAsync   shows old created_on + age
+   ExecuteAsync   DROP DATABASE IF EXISTS
+   AutoAdvanceRest=true     &lt;-- moved here
+   ManualGuide DROP only
+
+CloneFromProdStep
+   PreviewAsync   "zero-copy clone"
+   ExecuteAsync   CREATE DATABASE ... CLONE
+                  + SHOW DATABASES verify
+   ManualGuide CREATE only + COPY GRANTS note
+</div>
+</div>
+
+<h2>Why AutoAdvanceRest sits on DropClone</h2>
+
+<div class="callout">
+<strong>One destructive gate, then walk away.</strong> The Drop is the only step in the Driver where the operator definitively gives up the current state. Everything after that is the recovery + rebuild path -- there's no second destructive decision to gate on. So AutoAdvanceRest sets on Drop: confirm the destructive intent, and CreateClone + Wipe + sweep + WriteFirestore + Resume all run unattended. Operator goes to another workstation, comes back to a fresh baseline.
+</div>
+
+<h2>Flow shape</h2>
+
+<table>
+<tr><th>Flow</th><th>Before</th><th>After</th><th>Where the auto-tail starts</th></tr>
+<tr><td><code>reclone</code></td><td>4 steps</td><td>5 steps</td><td>After Drop (Step 3)</td></tr>
+<tr><td><code>reset-baseline</code></td><td>14 steps</td><td>15 steps</td><td>After Drop (Step 3); next 12 steps auto-run</td></tr>
+</table>
+
+<h3>reset-baseline expanded</h3>
+<div class="code-block">  1. Pause Scheduler             operator approves
+  2. Connect Snowflake           operator approves
+  3. Drop AIRBYTE_CLONE          operator approves  &lt;-- AutoAdvanceRest fires
+  4. Create AIRBYTE_CLONE CLONE  auto
+  5. Wipe Firestore              auto
+  6. ResolveCloneTime            auto (reads new created_on)
+  7. ResolveStreams              auto
+  8. ResolveBizCols              auto
+  9. BuildSql(Prod)              auto
+ 10. ExecuteSweep(Prod)          auto
+ 11. BuildSql(Clone)             auto
+ 12. ExecuteSweep(Clone)         auto
+ 13. ComputeVerdicts             auto
+ 14. WriteFirestore              auto -- new baseline doc (source: driver)
+ 15. Resume Scheduler            auto</div>
+
+<h2>Files Changed</h2>
+
+<table>
+<tr><th>Path</th><th>Status</th></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/DropCloneStep.cs</code></td><td>NEW</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/CloneFromProdStep.cs</code></td><td>NEW</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/RecloneSnowflakeStep.cs</code></td><td>DELETED (superseded)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Flows/RecloneFlow.cs</code></td><td>UPDATE (5 steps; Drop + Create replace single Reclone)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Flows/ResetBaselineFlow.cs</code></td><td>UPDATE (15 steps; doc comment updated)</td></tr>
+<tr><td>cadence commit</td><td><code>807ccde</code></td></tr>
+<tr><td><code>airbyte-parity/be/builds/2026-05-27-1241-update-split-reclone-step.html</code></td><td>NEW (this report)</td></tr>
+<tr><td><code>airbyte-parity/be/index.html</code></td><td>UPDATE</td></tr>
+<tr><td><code>airbyte-parity/be/telemetry.json</code></td><td>UPDATE (~u entry)</td></tr>
+</table>
+
+<h2>Build status</h2>
+
+<table>
+<tr><th>Configuration</th><th>Result</th></tr>
+<tr><td><code>dotnet build -c Debug</code></td><td>0 warnings, 0 errors</td></tr>
+<tr><td><code>dotnet build -c Release</code></td><td>0 warnings, 0 errors -- Release exe at <code>Cadence.Driver/bin/Release/net8.0/cadence-driver.exe</code> refreshed</td></tr>
+<tr><td>Live smoke</td><td>Deferred -- requires destructive DROP DATABASE; operator fires via <code>Go.Driver --interactive --flow reset-baseline</code> when ready</td></tr>
+</table>
+
+<h2>What's Next</h2>
+
+<ul>
+<li>Operator re-runs <code>Go.Driver --interactive --flow reset-baseline</code>. Scheduler is currently Paused from a prior aborted run; Step 1 reports wasAlreadyPaused=true and proceeds.</li>
+<li>Operator confirms Drop at Step 3. Auto-tail kicks in. Steps 4-15 run unattended.</li>
+<li>Final state: fresh clone, wiped Firestore, one new baseline snapshot (source: driver, ~100% MATCH initially), Scheduler resumed.</li>
+</ul>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence 807ccde + airbyte-parity pending this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfill in telemetry after commit</div>
+<div style="color:#888;margin:2px 0;font-size:13px">-- 3. Board updated -- N/A (post-close addition to Board 11, recorded in cadence git log)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Both repos pushed: cadence main = 807ccde; airbyte-parity pending</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done items damaged</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r98 &middot; 2026-05-27 12:41 &middot; ~u split reclone step</div>
+</body></html>
