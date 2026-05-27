@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~f: tile name parity + AI-section OFF button actually mutes the fan-out</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px}.brand{color:#6FC3DF;font-weight:700;font-size:1.2rem}
+  .container{max-width:920px;margin:0 auto;padding:32px 24px}h1{color:#6FC3DF;font-size:1.7rem;margin-bottom:8px}.subtitle{color:#888;margin-bottom:20px}
+  h2{color:#6FC3DF;font-size:1.15rem;margin:28px 0 12px;border-bottom:1px solid #333;padding-bottom:6px}h3{color:#6FC3DF;font-size:1rem;margin:18px 0 8px}
+  .card{background:#1A1A1A;border-radius:8px;padding:16px 20px;margin:10px 0}
+  pre{color:#ccc;font-size:0.78rem;background:#0a0a0a;padding:12px;border-radius:4px;border:1px solid #222;overflow-x:auto;line-height:1.4}
+  code{color:#6FC3DF;background:#1A1A1A;padding:1px 6px;border-radius:3px;font-size:0.85rem}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.88rem}th{color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:0.82rem;text-align:left}td{padding:6px 8px;border-bottom:1px solid #1A1A1A;vertical-align:top}
+  .ok{color:#22c55e;font-weight:600}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #222;color:#555;font-size:0.8rem;text-align:center}
+</style></head><body><nav><span class="brand">Be</span></nav><div class="container">
+
+<h1>~f: tile name parity + AI-section OFF actually mutes the fan-out</h1>
+<p class="subtitle">Two bugs caught in rapid sequence. Both frontend-only. Fixed in one pass.</p>
+
+<h2>Bug 1 — Tile name ≠ status bar name (parity issue)</h2>
+<div class="card">
+<p><strong>Joey:</strong> "see how you call it perplexity-deep but also sonar-deep-research. I'm confused. maybe call it both in the area with all the engines. I need some parity."</p>
+<p><strong>Before:</strong> tile header showed the MODEL name only (<code>sonar-deep-research</code>); status bar showed the TOOL name only (<code>PERPLEXITY-DEEP</code>). Same provider, two different identities depending on where you looked.</p>
+<p><strong>After:</strong> tile header shows BOTH — tool name prominent, model name as a smaller subtitle. Status bar continues to show tool names. Now you can ID either way.</p>
+<pre>BEFORE                          AFTER
+─────                          ─────
+sonar-deep-research            perplexity-deep   sonar-deep-research
+                               (bold)            (dim, smaller, monospace)</pre>
+<p><strong>Also applied parity to:</strong></p>
+<ul>
+  <li>MAIN AI + SUMMARY AI dropdown options: now show <code>tool-name — model-name</code> per row.</li>
+  <li>THINKING active badge: now shows <code>tool-name · model-name</code> (was just model name).</li>
+</ul>
+</div>
+
+<h2>Bug 2 — AI-section OFF row didn't actually mute the fan-out</h2>
+<div class="card">
+<p><strong>Joey:</strong> "I disable the ON button on the AI line and when I type something in the anything goes box, all AI are used instead of my thinking and main AI."</p>
+<p><strong>Symptom:</strong> The DATA ACCESS column has section dividers (LOCAL, CATALOG, WEB, AI) each with an ON/OFF button. Clicking AI → OFF visually dimmed the tile column but providers still fired on the next task.</p>
+<p><strong>Root cause:</strong> <code>applyDapSectionState('AI')</code> at <code>loop.js:1414</code> only hid the panels visually:</p>
+<pre>// BEFORE
+if (label === 'AI') {
+  providers.forEach(function(name) {
+    var panel = providerPanels[name];
+    if (panel) panel.style.display = dapEnabled['AI'] ? '' : 'none';
+  });
+}</pre>
+<p>No <code>set_disabled</code> WS message was sent. Server-side providers stayed enabled, fan-out hit them all.</p>
+<p><strong>Fix:</strong> When the section toggles, ALSO send <code>set_disabled</code> for every provider in the section + sync the per-tile toggle visual state + update the master toggle indicator:</p>
+<pre>// AFTER
+if (label === 'AI') {
+  var isDisabled = !dapEnabled['AI'];
+  providers.forEach(function(name) {
+    var panel = providerPanels[name];
+    if (panel) {
+      panel.style.display = dapEnabled['AI'] ? '' : 'none';
+      // Sync per-tile toggle button visual state
+      var btn = panel.querySelector('.prov-toggle');
+      if (btn) {
+        btn.classList.toggle('enabled', !isDisabled);
+        btn.classList.toggle('disabled', isDisabled);
+      }
+    }
+    disabledProviders[name] = isDisabled;
+    // Tell the server to actually disable / re-enable
+    if (ws &amp;&amp; ws.readyState === 1) {
+      ws.send(JSON.stringify({
+        type: 'set_disabled',
+        provider: name,
+        disabled: isDisabled
+      }));
+    }
+  });
+  updateMasterToggle();
+}</pre>
+<p>Combined with yesterday's <code>~f driver-runs-when-fanout-off</code> fix, the operator now gets the right behavior end-to-end:</p>
+<ul>
+  <li>Click AI section OFF → all 30 provider tiles disabled server-side. Fan-out goes silent.</li>
+  <li>Type a question → MAIN AI (claude-opus-4-7 by default) still answers via the THINKING column (operator-picked driver overrides the disabled flag).</li>
+  <li>Honest trace: SENSE line says "driver runs despite master-off (operator pick wins)".</li>
+</ul>
+</div>
+
+<h2>Files Changed</h2>
+<div class="card">
+<table>
+<tr><th>File</th><th>Change</th><th>Net LOC</th></tr>
+<tr><td>wwwroot/loop.js</td><td>Tile head: prov-tool + prov-model dual span. Dropdown: <code>tool — model</code> per row. Active label: <code>tool · model</code>. <code>applyDapSectionState('AI')</code>: send set_disabled for every provider + sync per-tile UI + call updateMasterToggle.</td><td>+35 / -8</td></tr>
+<tr><td>wwwroot/desktop.css</td><td><code>.prov-name</code> flex layout. <code>.prov-tool</code> bold primary. <code>.prov-model</code> dim subtitle, monospace.</td><td>+18</td></tr>
+</table>
+<p>No C changes. No rebuild. Hard-refresh the browser.</p>
+</div>
+
+<h2>What Joey will see</h2>
+<div class="card">
+<h3>In each fan-out tile header:</h3>
+<pre>perplexity-deep   sonar-deep-research
+(tool name bold)  (model name dim, smaller, monospace)</pre>
+
+<h3>In the MAIN AI / SUMMARY AI dropdowns:</h3>
+<pre>claude-opus — claude-opus-4-7
+claude-sonnet — claude-sonnet-4-6
+perplexity-deep — sonar-deep-research
+...</pre>
+
+<h3>In the THINKING active badge:</h3>
+<pre>claude-opus · claude-opus-4-7
+(tool · model)</pre>
+
+<h3>When AI section OFF is clicked:</h3>
+<ul>
+  <li>All tiles in DATA ACCESS column visually hide (panel.display = none).</li>
+  <li>Server-side: every provider gets <code>set_disabled: true</code>.</li>
+  <li>Per-tile toggle buttons sync to disabled state.</li>
+  <li>Master AI toggle indicator updates to "OFF".</li>
+  <li>Next task: only MAIN AI (claude-opus-4-7) responds in THINKING; fan-out is genuinely silent.</li>
+</ul>
+</div>
+
+<h2>DoD checklist</h2>
+<div class="card">
+<ul style="list-style:none;margin:0;padding:0">
+<li>&#x2713; Code committed (loop.js + desktop.css + this report)</li>
+<li>&#x2713; Hash in telemetry (backfilled)</li>
+<li>&#x2014; Board updated (ad-hoc UX fixes; no formal board)</li>
+<li>&#x2713; HTML report saved</li>
+<li>&#x2713; Index updated</li>
+<li>&#x2713; Pushed to remote</li>
+<li>&#x2713; No prior damage (server unchanged; existing functionality preserved)</li>
+<li>&#x2713; Production verified (curl confirms new prov-tool / prov-model / set_disabled handler in served JS+CSS)</li>
+</ul>
+</div>
+
+<div class="footer">v0 &middot; r145 &middot; 2026-05-26 04:00 &middot; nous-desktop &middot; ~f parity + ai-section-off</div>
+</div></body></html>
