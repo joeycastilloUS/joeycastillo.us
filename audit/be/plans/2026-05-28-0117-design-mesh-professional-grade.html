@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~d Mesh → Professional Grade</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 25px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 30px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 14px; margin: 16px 0 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 22px; }
+  p { color: #ccc; margin: 8px 0; } ul { margin: 8px 0 8px 22px; } li { color: #ccc; margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.pick { color: var(--green); font-weight: 600; }
+  .note { background:#0e1419; border-left:3px solid var(--accent); padding:12px 18px; margin:14px 0; color:#cfe6ee; font-size:13.5px; }
+  .tension { background:#1a1405; border:1px solid var(--amber); padding:14px 20px; margin:16px 0; font-size:13.5px; }
+  .tension b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display:block; margin-bottom:4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~d mesh → professional grade &middot; the target architecture</span></nav>
+<div class="container">
+
+  <h1>~d Mesh → Professional Grade</h1>
+  <div class="sub">The target-state architecture that closes the lifecycle gaps from the 2026-05-28 deep audit and takes the Sealed-IDS mesh from "honest v1" to production-hardened — without losing what makes it good (pure-C, tiny TCB, offline-capable, FQDN-keyed, no third-party identity).</div>
+
+  <h2>&sect;1 — Intent (what "professional grade" means HERE)</h2>
+  <p>Not "copy Nebula." We already have Nebula's trust model. Professional grade for THIS system means the trust model gains a <b>lifecycle</b> — freshness, expiry, revocation, mutual proof, rotation — while keeping the four things that make it ours:</p>
+  <ul>
+    <li><b>Pure C, no malloc, tiny TCB</b> — every addition is static-buffer C linking <code>libsecurity</code>, no new deps.</li>
+    <li><b>Offline-capable</b> — a field node may be dark for days; the design cannot assume always-online renewal.</li>
+    <li><b>FQDN/operator-key as identity</b> — the operator key stays the one root; no third-party CA, no cloud IdP.</li>
+    <li><b>Verifiable from outside</b> — every property provable with <code>dig</code>/<code>curl</code>/a signature check, not trust-us.</li>
+  </ul>
+
+  <h2>&sect;2 — The shape of the gap (from the audit)</h2>
+  <p>Today the mesh authenticates <i>origin</i> (operator signed it) and <i>integrity</i> (untampered). It does not yet reason about <i>time</i> (freshness/expiry), <i>life</i> (revocation/rotation), or <i>the peer on the other end of the wire</i> (mutual auth). Professional grade = adding the time/life/peer axes.</p>
+
+  <div class="tension">
+    <b>The central design tension — name it before deciding</b>
+    SPIFFE makes revocation unnecessary with <i>minutes-long</i> certs auto-rotated online. That is wrong for us: a field node offline for 3 days with a 1-hour cert is bricked. WireGuard/Nebula assume always-reachable peers; we don't. <b>So we cannot just copy any one model.</b> The design must choose a TTL long enough to survive realistic offline windows AND add explicit revocation for the compromise case (because long TTL means a leaked key is live for a while). This is the load-bearing decision; everything else follows from it.
+  </div>
+
+  <h2>&sect;3 — Design decisions</h2>
+  <table>
+    <tr><th>#</th><th>Decision</th><th>Choice</th><th>Precedent / why</th></tr>
+    <tr><td>D1</td><td>Roster freshness</td><td class="pick">Monotonic <code>version</code> + <code>signed_at</code>, enforced on load — reject any roster ≤ last seen.</td><td>TUF rollback protection. Closes the one real hole. The fields already exist in <code>mesh.sealed</code>; just enforce them.</td></tr>
+    <tr><td>D2</td><td>Cert + roster expiry</td><td class="pick"><code>valid_until</code> baked in + checked on load. TTL = <b>30 days</b> (offline-tolerant), not minutes.</td><td>Nebula NotAfter. 30d survives field-offline windows; pairs with D3 for the leak case. Operator re-issues on a cron.</td></tr>
+    <tr><td>D3</td><td>Revocation</td><td class="pick">Operator-signed <b>revocation list</b> (revoked node pubkeys + min-version), shipped with the roster, version-checked.</td><td>Needed because TTL is long (D2). Small signed blob; a node refuses any peer whose pubkey is on the list.</td></tr>
+    <tr><td>D4</td><td>Per-peer mutual auth</td><td class="pick"><b>Challenge-response</b>: each peer proves it holds the <code>node.key</code> matching its operator-signed <code>node.cert</code>, both directions, before trusting the channel. Replaces IP+shared-PSK trust.</td><td>Nebula/WireGuard Noise mutual handshake. This is the spec'd v2 "actual peer comms." Kills the MITM-by-IP gap.</td></tr>
+    <tr><td>D5</td><td>Roster confidentiality</td><td class="pick">Encrypt the roster payload with <code>seal</code> v2 key-envelope (already in tree). Sign-then-encrypt.</td><td>Stops topology leak if a node's disk is read. Low cost — <code>seal_file_v2</code> exists.</td></tr>
+    <tr><td>D6</td><td>Operator key rotation</td><td class="pick">Operator key <b>versioning</b>: nodes hold an array of N currently-valid operator pubkeys + a signed "rollover" record; grace window where old+new both verify.</td><td>Removes the "recompile-the-world atomically" hazard. Standard key-rollover; matches TUF root rotation.</td></tr>
+    <tr><td>D7</td><td>Verification</td><td class="pick">Unit tests for <b>every</b> tool (incl. keygen, roster-build) + one <b>in-memory end-to-end</b> chain test + a <b>fuzz/property</b> harness on the roster parser.</td><td>Trust-root code with 0 tests is unacceptable at pro grade. Mirrors the security skill's existing test-deep + fuzz_seal pattern.</td></tr>
+    <tr><td>D8</td><td>Transport mesh (<code>mesh.c</code>)</td><td>DEFER (explicit) — keep on the shelf; document it as v2-transport, not dead.</td><td>It's good code but the live fleet is HTTP-connected primes/relay. Wiring it needs transport backends (BLE/LoRa) — out of scope for hardening the live trust layer.</td></tr>
+  </table>
+
+  <h2>&sect;4 — Target trust model (after D1–D7)</h2>
+  <pre>PROVISION  operator-keygen -> operator.key (root, offline)        [versioned: D6]
+           operator-sign-node -> node.cert = sign(node.pub‖role‖valid_until)  [D2]
+           mesh-roster-build -> mesh.sealed = sign(version‖signed_at‖valid_until‖
+                                                   triples) then seal-encrypt   [D1,D2,D5]
+           + revocation.sealed = sign(version‖revoked_pubkeys[])               [D3]
+BOOT       node verifies cert (sig + valid_until) ............................ [D2]
+           node loads roster: verify sig, decrypt, reject if version<=seen
+                              or now>valid_until ............................. [D1,D2,D5]
+           node loads revocation list (version-checked) ..................... [D3]
+CONNECT    peer A <-> peer B: each presents node.cert; each sends a nonce;
+           each signs the other's nonce with node.key; both verify against
+           operator pubkey AND check peer not in revocation list ............ [D4,D3]
+           -> only then is the AES-GCM channel trusted (not IP+PSK)
+ROTATE     operator signs rollover(old_pub -> new_pub); nodes accept both
+           during grace window; old retired after all nodes re-provisioned .. [D6]</pre>
+
+  <h2>&sect;5 — Consequences (trace them honestly)</h2>
+  <ul>
+    <li><b>Roster + cert formats gain fields</b> (<code>valid_until</code>, explicit <code>version</code> as signed header not just a triple). The loader (<code>mesh_roster.c</code>) and <code>relay_verify_self</code> must read them. Backward-compat: bump magic to <code>MESHROSTER2</code> or version-gate; old <code>mesh.sealed</code> v1 rejected after cutover.</li>
+    <li><b>Mutual auth (D4) is the big lift</b> — it adds a handshake round-trip to every peer connection and needs a small state machine in the relay/prime wire path. Everything else is localized to parsing/verification.</li>
+    <li><b>Operator workflow changes</b>: re-issuing rosters/certs becomes a periodic act (TTL expiry), not one-and-done. Needs a tiny re-issue script/cron. This is the cost of revocation-by-expiry — accept it.</li>
+    <li><b>The operator key is now even more critical</b> (it can revoke + rotate). Hardening its storage (Windows ACL, off shared drives) graduates from "nice" to "required."</li>
+  </ul>
+
+  <h2>&sect;6 — Alternatives considered + rejected</h2>
+  <ul>
+    <li><b>SPIFFE-style minutes-TTL + no revocation</b> — rejected: assumes online renewal, bricks offline field nodes (the §2 tension).</li>
+    <li><b>Adopt Nebula/WireGuard wholesale</b> — rejected: drags a Go runtime + large TCB; abandons pure-C + FQDN-key identity. We keep the model, not the implementation.</li>
+    <li><b>mTLS (TLS 1.3) for peer auth</b> — viable (tls13.c exists) but heavier than a node-cert challenge-response; defer as an option for D4 if the hand-rolled handshake proves fiddly.</li>
+  </ul>
+
+  <h2>&sect;7 — a-d-d spec change (proposed — needs your approval, Rule 10/11)</h2>
+  <div class="note">
+    Architecture flows up first. This design proposes updating <code>a-d-d/nous/comms/skill/relay/CLAUDE.md</code> + a new <code>a-d-d/nous/comms/skill/mesh/SEALED-IDS-v2.md</code> to specify: roster v2 format (version/valid_until, sign-then-encrypt), the revocation-list contract, the peer challenge-response handshake, and operator-key rollover. <b>I will not write a-d-d/ without your go.</b> Approve the design → I land the spec → then code flows from it (the plan/estimate that accompany this).
+  </div>
+
+  <h2>&sect;8 — Open questions for you</h2>
+  <ul>
+    <li>TTL: is <b>30 days</b> the right offline-tolerance window, or do field nodes need 90+?</li>
+    <li>Roster encryption (D5): worth it for a private fleet, or skip and keep signed-plaintext for debuggability?</li>
+    <li>D4 handshake: hand-rolled node-cert challenge-response, or reuse <code>tls13.c</code> mTLS?</li>
+  </ul>
+
+  <footer>Be &middot; v0 &middot; r64 &middot; 2026-05-28 &middot; metal-2 &middot; ~d mesh professional grade &middot; feeds plan + estimate (same datetime)</footer>
+</div>
+</body>
+</html>

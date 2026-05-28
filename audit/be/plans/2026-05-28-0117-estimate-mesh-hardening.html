@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~e Mesh Hardening — Boards</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 25px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 15px; margin: 26px 0 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 22px; }
+  .board { background: var(--surface); border:1px solid var(--surface2); border-radius:6px; padding: 14px 18px; margin: 14px 0; }
+  .board h2 { margin-top: 0; border:0; }
+  .board .meta { color: var(--t3); font-size: 12px; margin-bottom: 8px; }
+  .blocked { color: var(--amber); font-size: 12px; font-weight:600; }
+  .triple { font-family: 'Consolas', monospace; font-size: 12.5px; color:#cfe6ee; margin: 5px 0; }
+  .pts { color: var(--accent); font-weight: 700; }
+  .cmd { color: var(--green); }
+  code { background: #0a0a0a; color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family:'Consolas',monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-size:11px; letter-spacing:1px; text-transform:uppercase; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; color:#ccc; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~e mesh hardening &middot; 5 boards · 87 pts</span></nav>
+<div class="container">
+
+  <h1>~e Mesh Hardening — Estimate</h1>
+  <div class="sub">The plan (2026-05-28 ~p mesh hardening v2) sized into Fibonacci boards. Items are 3 or 5 pts; each pairs work with its test (~a~t etc., Rule 7). <b>5 boards · 87 pts.</b></div>
+
+  <table>
+    <tr><th>Board</th><th>Phase</th><th>Pts</th><th>Depends on</th></tr>
+    <tr><td>MH-1 Freshness + trust-root tests</td><td>P0+P1</td><td>19</td><td>— (start here)</td></tr>
+    <tr><td>MH-2 Expiry</td><td>P2</td><td>16</td><td>MH-1</td></tr>
+    <tr><td>MH-3 Revocation</td><td>P3</td><td>18</td><td>MH-2</td></tr>
+    <tr><td>MH-4 Mutual auth</td><td>P4</td><td>18</td><td>MH-1 (indep. of 2/3)</td></tr>
+    <tr><td>MH-5 Rotation + confidentiality</td><td>P5</td><td>16</td><td>MH-2</td></tr>
+  </table>
+
+  <div class="board">
+    <h2>Board MH-1 — Freshness &amp; trust-root tests · 19 pts</h2>
+    <div class="meta">Unblocked. The hole + the missing tests. Ship MH-1 and the live mesh is already meaningfully safer.</div>
+    <div class="triple">{roster replay guard, add to, <code>mesh_roster.c</code> — enforce monotonic version/signed_at, persist last-seen} · <span class="pts">3</span> · <span class="cmd">~a~t</span></div>
+    <div class="triple">{operator-keygen unit test, add to, <code>tool/operator-keygen</code>} · <span class="pts">3</span> · <span class="cmd">~a~t</span></div>
+    <div class="triple">{mesh-roster-build unit test, add to, <code>tool/mesh-roster-build</code>} · <span class="pts">3</span> · <span class="cmd">~a~t</span></div>
+    <div class="triple">{end-to-end chain test, build, keygen→sign→build→load→verify in-memory} · <span class="pts">5</span> · <span class="cmd">~bt</span></div>
+    <div class="triple">{roster parser fuzz harness, add to, security tests (mirror <code>fuzz_seal</code>)} · <span class="pts">5</span> · <span class="cmd">~a~t</span></div>
+  </div>
+
+  <div class="board">
+    <h2>Board MH-2 — Expiry · 16 pts</h2>
+    <div class="meta blocked">⛔ blocked until MH-1 (tests must guard the format change)</div>
+    <div class="triple">{<code>valid_until</code> + signed version header, update, roster format → <code>MESHROSTER2</code> + signer} · <span class="pts">5</span> · <span class="cmd">~u~t</span></div>
+    <div class="triple">{valid_until + version check, add to, <code>mesh_roster.c</code> loader} · <span class="pts">3</span> · <span class="cmd">~a~t</span></div>
+    <div class="triple">{cert <code>valid_until</code>, update with, operator-sign-node + relay_verify_self} · <span class="pts">5</span> · <span class="cmd">~u~t</span></div>
+    <div class="triple">{operator re-issue script, add to, tool (cron-able roster+cert re-sign)} · <span class="pts">3</span> · <span class="cmd">~a~t</span></div>
+  </div>
+
+  <div class="board">
+    <h2>Board MH-3 — Revocation · 18 pts</h2>
+    <div class="meta blocked">⛔ blocked until MH-2 (revocation needs expiry + version baseline)</div>
+    <div class="triple">{revocation-build tool, build, signs revoked-pubkey list + min-version} · <span class="pts">5</span> · <span class="cmd">~bt</span></div>
+    <div class="triple">{<code>revocation.sealed</code> format + loader, add to, mesh_roster + relay/prime boot} · <span class="pts">5</span> · <span class="cmd">~a~t</span></div>
+    <div class="triple">{revocation enforcement, add to, peer-accept path} · <span class="pts">3</span> · <span class="cmd">~a~t</span></div>
+    <div class="triple">{revocation tests, build, revoke→reject + version-rollback→reject} · <span class="pts">5</span> · <span class="cmd">~bt</span></div>
+  </div>
+
+  <div class="board">
+    <h2>Board MH-4 — Mutual auth (the big one) · 18 pts</h2>
+    <div class="meta blocked">⛔ needs MH-1; independent of MH-2/3 (can run in parallel after MH-1)</div>
+    <div class="triple">{peer challenge-response handshake module, build, nonce + sign(node.key) + verify(cert)} · <span class="pts">5</span> · <span class="cmd">~bt</span></div>
+    <div class="triple">{handshake wired into wire path, update with, replace IP+PSK trust in relay↔prime} · <span class="pts">5</span> · <span class="cmd">~u~t</span></div>
+    <div class="triple">{revocation check in handshake, add to, peer accept} · <span class="pts">3</span> · <span class="cmd">~a~t</span></div>
+    <div class="triple">{handshake tests + on-VM verify, test across, mutual-auth OK in journal} · <span class="pts">5</span> · <span class="cmd">~t</span></div>
+  </div>
+
+  <div class="board">
+    <h2>Board MH-5 — Rotation &amp; confidentiality · 16 pts</h2>
+    <div class="meta blocked">⛔ blocked until MH-2</div>
+    <div class="triple">{operator-key versioning (N valid keys), add to, <code>operator_pub.h</code> + all loaders} · <span class="pts">5</span> · <span class="cmd">~a~t</span></div>
+    <div class="triple">{signed rollover record + grace window, build, rotation tool} · <span class="pts">5</span> · <span class="cmd">~bt</span></div>
+    <div class="triple">{roster encryption (sign-then-encrypt), update with, <code>seal</code> v2 in build+load} · <span class="pts">3</span> · <span class="cmd">~u~t</span></div>
+    <div class="triple">{operator key Windows ACL hardening, fix in, operator-keygen} · <span class="pts">3</span> · <span class="cmd">~f~t</span></div>
+  </div>
+
+  <h2>Totals &amp; sequencing</h2>
+  <p><b>87 pts across 5 boards.</b> Critical path MH-1 → MH-2 → MH-3/MH-5; MH-4 forks off after MH-1. Rough sizing (a 5 = one focused night): MH-1 alone (19 pts) is the high-value starter and closes the one real hole + all the test debt. If you only ever do one board, do MH-1.</p>
+  <p class="meta">Spec-first gate: before MH-2's format change lands, the a-d-d v2 spec (proposed in the design) must be approved + written — that's the Rule 11 "flow up before down" gate, ~included in MH-2's first item.</p>
+
+  <footer>Be &middot; v0 &middot; r64 &middot; 2026-05-28 &middot; metal-2 &middot; ~e mesh hardening &middot; 5 boards · 87 pts</footer>
+</div>
+</body>
+</html>

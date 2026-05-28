@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~p Mesh Hardening v2</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 25px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 30px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 22px; }
+  p { color: #ccc; margin: 8px 0; } ul { margin: 8px 0 8px 22px; } li { color: #ccc; margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  .ship { color: var(--green); font-weight:600; }
+  .note { background:#0e1419; border-left:3px solid var(--accent); padding:12px 18px; margin:14px 0; color:#cfe6ee; font-size:13.5px; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~p mesh hardening v2 &middot; how we get there</span></nav>
+<div class="container">
+
+  <h1>~p Mesh Hardening v2 — the build plan</h1>
+  <div class="sub">Executes the design (2026-05-28 ~d mesh professional grade). Ordered so the one real hole ships first and every phase leaves the mesh shippable.</div>
+
+  <h2>Intent</h2>
+  <p>Add the lifecycle layer (freshness, expiry, revocation, mutual auth, rotation) to the live Sealed-IDS mesh, in pure C, without a flag day — each phase is independently deployable and leaves the fleet working.</p>
+
+  <h2>Scope</h2>
+  <p><b>In:</b> <code>mesh_roster.c</code>, <code>mesh-roster-build</code>, <code>operator-sign-node</code>, <code>operator-keygen</code>, <code>relay_server.c</code> + <code>prime_server.c</code> wire/boot paths, <code>operator_pub.h</code>, security tests. New: revocation-list tool + format, peer-handshake module.
+  <br><b>Out:</b> wiring the transport <code>mesh.c</code> routing stack (D8 defer); BLE/LoRa backends; any non-mesh repo.</p>
+
+  <h2>Approach</h2>
+  <p>Spec-first (Rule 11): land the a-d-d v2 spec, then code flows from it. Format changes bump the roster magic to <code>MESHROSTER2</code> so v1/v2 can't be confused; cutover re-issues <code>mesh.sealed</code> + certs once per node (same scp path already proven). Every change ships with its test (Rule 7). Each phase = one board.</p>
+
+  <h2>Phases</h2>
+  <table>
+    <tr><th>Phase</th><th>Delivers</th><th>Design refs</th><th>Ship state after</th></tr>
+    <tr><td><b>P0 — Plug the hole</b></td><td>Roster replay/rollback guard: loader enforces monotonic <code>version</code>/<code>signed_at</code> (persist last-seen). ~20 LOC + test.</td><td>D1</td><td class="ship">Replay closed. Ships today, no format break.</td></tr>
+    <tr><td><b>P1 — Trust-root tests</b></td><td>Unit tests for <code>operator-keygen</code> + <code>mesh-roster-build</code>; in-memory end-to-end chain test (keygen→sign→build→load→verify); fuzz harness on roster parser.</td><td>D7</td><td class="ship">No more untested key tools. Regression-safe.</td></tr>
+    <tr><td><b>P2 — Expiry</b></td><td><code>valid_until</code> in roster + node.cert (signed); checked on load/boot; <code>MESHROSTER2</code> format; 30-day TTL + operator re-issue script.</td><td>D2</td><td class="ship">Stale rosters/certs auto-reject. Revocation-by-expiry live.</td></tr>
+    <tr><td><b>P3 — Revocation</b></td><td><code>revocation-build</code> tool + <code>revocation.sealed</code> format (signed revoked-pubkey list + min-version); nodes load + enforce at boot and at connect.</td><td>D3</td><td class="ship">Compromised node/key can be killed without recompiling the world.</td></tr>
+    <tr><td><b>P4 — Mutual auth</b></td><td>Peer challenge-response handshake module (nonce + sign-with-node.key + verify-cert + revocation-check), wired into relay↔prime wire path, replacing IP+PSK trust.</td><td>D4</td><td class="ship">MITM-by-IP closed. The big one. Peers prove identity.</td></tr>
+    <tr><td><b>P5 — Rotation + confidentiality</b></td><td>Operator-key versioning (N valid keys + signed rollover record + grace window); optional roster encryption via <code>seal</code> v2.</td><td>D6, D5</td><td class="ship">Operator key rotatable without a flag day; topology not leaked at rest.</td></tr>
+  </table>
+
+  <h2>Constraints</h2>
+  <ul>
+    <li>Pure C99, no malloc, static buffers, link <code>libsecurity</code>, constant-time on secrets, zero-after-use — non-negotiable house style.</li>
+    <li>No flag day: every phase deploys node-by-node (Ashburn-first, like the live cutover) and degrades gracefully if a peer is still on the old format during rollout.</li>
+    <li>Offline-tolerant: nothing may assume a node can reach the operator or a peer to stay valid (drives the 30-day TTL, not minutes).</li>
+    <li>Done = production (Rule 8): each phase verified on a real VM (self-verify OK / replay-rejected / handshake-OK in the journal), not just unit-green.</li>
+  </ul>
+
+  <h2>Unknowns (what I don't know yet — named)</h2>
+  <ul>
+    <li><b>TTL value.</b> 30 days is a guess at the offline window. Real field behavior may need 90+. Unknown until we know the longest expected dark period.</li>
+    <li><b>Handshake cost.</b> Whether the extra round-trip per peer connection matters at the relay's connection rate — unmeasured.</li>
+    <li><b>D4 build-vs-reuse.</b> Hand-rolled node-cert challenge-response vs reusing <code>tls13.c</code> mTLS — won't know which is cleaner until P4 spike.</li>
+    <li><b>Clock trust.</b> Expiry (D2) assumes nodes have a roughly-correct clock; field nodes without NTP could false-reject. May need a signed time anchor.</li>
+  </ul>
+
+  <h2>When to revisit (the signal that triggers v3)</h2>
+  <ul>
+    <li>First time a field node is dark longer than the TTL → revisit D2 (TTL or offline-grace).</li>
+    <li>First measured handshake latency hit at scale → revisit D4 (session resumption / caching).</li>
+    <li>First real key compromise or near-miss → pressure-test D3/D6 against an actual incident, not a hypothetical.</li>
+    <li>The moment BLE/LoRa transport lands → D8 un-defers; wire <code>mesh.c</code> and re-plan peer auth over a non-IP transport.</li>
+  </ul>
+
+  <div class="note"><b>Sequencing logic:</b> P0 first because it's a live hole and costs ~nothing. P1 before format changes so the tests guard P2+. P2→P3 because revocation only matters once TTL is long. P4 last of the security work because it's the largest and depends on nothing above it. P5 is operational polish. Stop after any phase and the mesh is still strictly better than today.</div>
+
+  <footer>Be &middot; v0 &middot; r64 &middot; 2026-05-28 &middot; metal-2 &middot; ~p mesh hardening v2 &middot; estimate: same datetime</footer>
+</div>
+</body>
+</html>
