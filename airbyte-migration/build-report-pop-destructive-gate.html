@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Driver HTML report-pop + destructive gate</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+.destructive{background:#2a1414;border-left:3px solid #f06e6e;padding:12px 16px;margin:12px 0;color:#f0a0a0;font-size:13px;border-radius:0 4px 4px 0}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b report-pop + destructive gate</nav>
+
+<h1>~b Driver HTML report-pop + destructive gate</h1>
+<p class="sub">Two operator features, ~go. Every Driver flow now pops a Be-style HTML report at the end. Destructive steps (DROP, wipe) are flagged and gated -- type 'yes' interactively, or pre-ack with 'iknow' for unattended runs.</p>
+<span class="banner">Shipped</span>
+
+<h2>Feature 1 -- HTML report pops at flow end</h2>
+<p style="font-size:13px">New <code>Cadence.Driver/Results/ReportWriter.cs</code> renders the RunResult to a self-contained Be-style HTML report (dark + tron blue, no external deps). Program.cs writes it to <code>results/reports/report-{ts}.html</code> and opens it via <code>Process.Start(UseShellExecute=true)</code> after every flow.</p>
+<p style="font-size:13px">Report sections: summary stats (steps passed, match/total, %, differ, wall), destructive-actions-executed banner (if any), step trail (per-step status/timing/detail), per-stream verdicts (DIFFER list + ERROR list + full collapsible 208-stream table).</p>
+<table>
+<tr><th>Token / flag</th><th>Effect</th></tr>
+<tr><td>(default)</td><td>report renders + opens in default browser</td></tr>
+<tr><td><code>quiet</code> / <code>--no-report</code></td><td>skip the report entirely</td></tr>
+</table>
+
+<div class="callout">
+<strong>Verified live.</strong> <code>Go.Sweep go dry</code> -&gt; wrote <code>report-20260528T040845.html</code> (29.6 KB), opened in browser. Sections present: step trail, per-stream verdicts, DIFFER list. Sweep was 183/208 (88%), 25 DIFFER (all ETHER high-write streams: BARISTA_LOGINS, CART_PRODUCTS, CARTS, ...). <code>Go.Sweep go dry quiet</code> wrote no report (token works).
+</div>
+
+<h2>Feature 2 -- destructive-step gate</h2>
+<p style="font-size:13px">New <code>IStep.IsDestructive</code> flag (default false). <code>DropCloneStep</code> + <code>FirestoreWipeStep</code> set it true. The SteeringWheel:</p>
+<ul>
+<li>Prints <code>!! DESTRUCTIVE STEP -- this deletes data !!</code> in the step header.</li>
+<li><b>Interactive:</b> after <code>[Enter]=Go</code>, requires typing <code>yes</code> (not just Enter). Anything else halts the flow before the destructive SQL runs.</li>
+<li><b>Unattended</b> (auto / auto-tail / walk-after-gate): <b>HALTS</b> unless the operator pre-acknowledged with the <code>iknow</code> token. With it: proceeds, logs <code>(destructive pre-acknowledged via iknow)</code>.</li>
+</ul>
+
+<div class="destructive">
+<strong>The point:</strong> an unattended <code>Go.Rebaseline go</code> can no longer silently DROP the clone. It halts at the Drop step with "needs acknowledgement: re-run with the 'iknow' token." To actually run hands-off through a destructive step you must say so up front: <code>Go.Rebaseline go iknow</code>.
+</div>
+
+<div class="warn">
+<strong>Destructive gate live-test deferred.</strong> Reaching DropClone in any flow means the Pause step runs first; Joey's cadence is actively rebuilding its post-reclone trajectory and a test pause would inject a gap. The gate is code-reviewed: auto-mode + no iknow -&gt; <code>ConfirmDestructive</code> returns false -&gt; halt BEFORE the DROP. Interactive -&gt; type-'yes' gate. It will exercise on Joey's next real Reclone/Rebaseline.
+</div>
+
+<h2>Launcher tokens added</h2>
+<table>
+<tr><th>Token</th><th>-&gt; flag</th><th>Meaning</th></tr>
+<tr><td><code>iknow</code></td><td><code>--iknow</code> / <code>--yes</code></td><td>pre-acknowledge destructive steps for unattended runs</td></tr>
+<tr><td><code>quiet</code></td><td><code>--no-report</code></td><td>skip the HTML report pop</td></tr>
+</table>
+<p style="font-size:13px">Added to Go.Sweep / Go.Reclone / Go.Rebaseline. Go.Driver --help updated.</p>
+
+<h2>Example invocations</h2>
+<div class="code-block">Go.Sweep                       sweep, report pops
+Go.Sweep dry                   forensic sweep, report pops
+Go.Sweep go dry quiet          unattended forensic sweep, no report
+Go.Rebaseline                  interactive -- Drop prompts "type yes"
+Go.Rebaseline walk             confirm Drop (type yes), then unattended tail
+Go.Rebaseline go               HALTS at Drop (no iknow)
+Go.Rebaseline go iknow         fully unattended, destructive pre-acknowledged</div>
+
+<h2>Files Changed</h2>
+<table>
+<tr><th>Path</th><th>Status</th></tr>
+<tr><td><code>cadence/Cadence.Driver/Results/ReportWriter.cs</code></td><td>NEW (HTML render)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/IStep.cs</code></td><td>UPDATE (IsDestructive flag)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/DropCloneStep.cs</code></td><td>UPDATE (IsDestructive=true)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Steps/FirestoreWipeStep.cs</code></td><td>UPDATE (IsDestructive=true)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/SteeringWheel.cs</code></td><td>UPDATE (destructive banner + ConfirmDestructive gate)</td></tr>
+<tr><td><code>cadence/Cadence.Driver/Program.cs</code></td><td>UPDATE (--iknow/--no-report flags, report-pop, help)</td></tr>
+<tr><td><code>cadence/Go.Sweep.bat, Go.Reclone.bat, Go.Rebaseline.bat</code></td><td>UPDATE (iknow + quiet tokens)</td></tr>
+<tr><td>cadence commit</td><td><code>a7f0f48</code></td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence a7f0f48 + airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 13 -- 2 items Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Both repos pushed</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (additive)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r104 &middot; 2026-05-27 21:10 &middot; ~b report-pop + destructive gate</div>
+</body></html>
