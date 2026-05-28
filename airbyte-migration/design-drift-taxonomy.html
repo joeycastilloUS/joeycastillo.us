@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~d Cadence drift taxonomy -- clean / cosmetic / benign / signal</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}
+.choice .fork{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}.choice .opts{color:#888;font-size:12px;margin-bottom:6px}
+.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}
+.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.candidate .name{color:#6FC3DF;font-weight:700;font-family:'Consolas',monospace}.candidate .gut{color:#888;font-size:11px}
+.candidate.winner{border-color:#5cb85c}.candidate.winner .name{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+.verdict{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase}
+.v-clean{background:#0d2818;color:#5cb85c}.v-cos{background:#1a2438;color:#6FC3DF}.v-ben{background:#1f1f0a;color:#f0ad4e}.v-sig{background:#2a1414;color:#f06e6e}
+.pmt-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:13px}.pmt-row .lb{color:#f06e6e;font-weight:700}.pmt-row .rp{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~d drift taxonomy</nav>
+
+<h1>Cadence drift taxonomy &mdash; make "signal" mean something</h1>
+<p class="sub">Every diff cadence sees must land in one of four buckets so an alert is only an alert when it should be. Three of them are explainable: timing lag, the old-vs-new-Airbyte version gap, and acknowledged differences. Only the fourth is a real problem. Adopt the verdict vocabulary the parity engine already shipped.</p>
+<span class="banner">Design &mdash; Pure Metal</span>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> A classification model that turns every cadence per-stream diff into one of four verdicts -- <span class="verdict v-clean">clean</span> <span class="verdict v-cos">cosmetic</span> <span class="verdict v-ben">benign</span> <span class="verdict v-sig">signal</span> -- backed by three explanation sources (sync-lag windowing, old/new-Airbyte version awareness, operator acknowledgements). <strong>Intent:</strong> "183/208" today means nothing -- it's mostly sync lag. After this, a stream is only red when it's genuinely wrong; everything else carries a one-line reason. And the names match the parity engine (Board 6) so the two systems speak one language.</div>
+
+<h2>Discovery</h2>
+<ul>
+<li>From <code>~i ETHER sync cadence</code>: ETHER drift = uniform 4h sync-generation lag. Windowing on the business cursor collapses it to a match. (Source 1: timing.)</li>
+<li><b>New input from operator:</b> the clone will be rebuilt on the NEW Airbyte (airbyte-philz, Destinations-V2). Prod is OLD Airbyte (<code>_AIRBYTE_AB_ID</code>, <code>_AIRBYTE_EMITTED_AT</code>, basic-normalization). New emits <code>_airbyte_raw_id</code>, <code>_airbyte_extracted_at</code>, <code>_airbyte_meta</code>, typing-and-deduping. So the clone can <b>legitimately differ</b> in metadata shape, normalization, and possibly column typing -- not corruption, not lag. (Source 2: version/migration.)</li>
+<li>The parity engine (airbyte-parity Cloud Run, Board 6) already shipped a verdict set: <b>Clean / Cosmetic / Benign / Signal</b> with a DriftClassifier. Board 1 (carry-set) defines an ack workflow with a Firestore <code>acknowledgements</code> collection. (Source 3 + reuse.)</li>
+<li>cadence is the cheap 5-min HASH_AGG heartbeat. It should classify what it can cheaply and escalate ambiguity to <span class="verdict v-sig">signal</span> -- not reimplement the L3-L5 engine.</li>
+</ul>
+
+<h2>Naming Pass</h2>
+<div class="candidate"><span class="name">clean / lag / version / signal (new, cadence-only)</span><span class="gut">descriptive &middot; but forks the vocabulary from the parity engine &middot; two languages</span></div>
+<div class="candidate"><span class="name">match / explained / unexplained</span><span class="gut">3-state &middot; too coarse -- loses cosmetic vs benign &middot; rejected</span></div>
+<div class="candidate winner"><span class="name">Clean / Cosmetic / Benign / Signal (adopt engine's)</span><span class="gut">winner &middot; one vocabulary across cadence + parity engine &middot; already has a classifier to mirror</span></div>
+<p style="font-size:13px;color:#ccc;margin-top:8px">Adopt the engine's words. Map cadence's three explanation sources onto them rather than inventing a parallel set. One language; the dashboard pills already exist.</p>
+
+<h2>Shape -- the four verdicts and what feeds them</h2>
+<table>
+<tr><th>Verdict</th><th>Means</th><th>Fed by</th><th>Alert?</th></tr>
+<tr><td><span class="verdict v-clean">Clean</span></td><td>Windowed business fingerprints match.</td><td>cursor-windowed HASH_AGG (lag removed)</td><td>no</td></tr>
+<tr><td><span class="verdict v-cos">Cosmetic</span></td><td>Differs only in metadata / normalization shape -- the old-vs-new Airbyte format gap. Business columns align.</td><td>column-set + meta-prefix comparison (old _AIRBYTE_* vs new _airbyte_*)</td><td>no</td></tr>
+<tr><td><span class="verdict v-ben">Benign</span></td><td>Differs for a known, accepted reason: sync lag within tolerance, OR an operator-acknowledged version/value difference.</td><td>lag-vs-tolerance + ack store</td><td>no (info)</td></tr>
+<tr><td><span class="verdict v-sig">Signal</span></td><td>Windowed business data differs and is NOT explained by lag, cosmetic format, or an ack. A human looks.</td><td>fallthrough</td><td>YES</td></tr>
+</table>
+
+<h3>Decision flow per stream</h3>
+<div style="background:#0a0a0a;border:1px solid #1f3540;border-radius:6px;padding:14px 18px;margin:10px 0;font-family:Consolas,monospace;font-size:12px;color:#9fdfff;white-space:pre;line-height:1.6">
+windowed business fingerprints equal?
+  yes -> lag == 0 ? CLEAN : BENIGN (lag-explained, within tolerance)
+  no  -> business column SETS differ (old vs new airbyte shape)?
+           yes -> COSMETIC (version/format gap)
+           no  -> matches an accepted ack?
+                    yes -> BENIGN (acknowledged version/value diff)
+                    no  -> lag &gt; tolerance ? SIGNAL (stuck) : SIGNAL (unexplained)
+</div>
+
+<h2>Choices + Consequences</h2>
+<div class="choice">
+<div class="fork">1. Verdict vocabulary -- adopt engine's vs cadence-native</div>
+<div class="opts">a) Adopt Clean/Cosmetic/Benign/Signal. b) New cadence words (clean/lag/version/signal).</div>
+<div class="conseq">a) One language across both systems; dashboard pills + DriftClassifier already exist to mirror. b) More literal to cadence's sources but forks the vocabulary; operator learns two dialects.</div>
+<div class="pick">PICK: (a) -- adopt the engine's four.</div>
+<div class="why">Consistency beats literal. The engine already classifies into these; cadence becomes the cheap front-line screen using the same labels. Lag maps to Benign, version-format maps to Cosmetic, accepted diffs map to Benign-via-ack.</div>
+</div>
+<div class="choice">
+<div class="fork">2. How does cadence recognize a version/Cosmetic difference cheaply?</div>
+<div class="opts">a) Business column-SET comparison (names/types from INFORMATION_SCHEMA) + meta-prefix detection. b) Full L3 column-signal analysis. c) Don't -- call everything unwindowed a Signal.</div>
+<div class="conseq">a) Cheap (one INFORMATION_SCHEMA read, already done for biz cols), catches schema-shape drift from the Airbyte upgrade. b) Accurate but heavy -- that's the parity engine's job. c) Floods Signal with migration noise; defeats the purpose.</div>
+<div class="pick">PICK: (a) -- column-set + meta-prefix screen.</div>
+<div class="why">cadence already resolves business columns per stream. Comparing the SETS (prod vs clone) is nearly free and directly flags "new airbyte changed the shape." Value-level version diffs that pass the column-set check fall to the ack path or Signal.</div>
+</div>
+<div class="choice">
+<div class="fork">3. Accepting a known version/value difference -- ack store</div>
+<div class="opts">a) New cadence-acks Firestore collection (stream + reason + ts + by). b) Reuse the parity engine's acknowledgements collection. c) Static drift-policy.json in the repo.</div>
+<div class="conseq">a) cadence owns its acks, simple, matches Board 1 shape. b) Shared truth but couples the two services' data. c) Versioned + reviewable but redeploy to change; no runtime ack.</div>
+<div class="pick">PICK: (a) for runtime acks + (c) for durable policy.</div>
+<div class="why">A <code>cadence-acks</code> Firestore collection for operator "I accept this diff" (runtime, mirrors Board 1). A committed <code>drift-policy.json</code> for the durable knobs (tolerances, per-schema sync intervals, known-version-difference rules). Two layers: policy is code-reviewed; acks are operational.</div>
+</div>
+<div class="choice">
+<div class="fork">4. Where does the classifier run -- cadence or defer to the parity engine</div>
+<div class="opts">a) cadence classifies cheaply (windowing + column-set + ack); escalates true ambiguity to Signal. b) cadence calls the parity engine's /parity/l3 for every diff. c) Merge the two services.</div>
+<div class="conseq">a) cadence stays a fast heartbeat; Signal volume is low + meaningful; deep analysis stays in the engine on demand. b) Couples the 5-min loop to the heavy engine; latency + cost. c) Big rewrite, out of scope.</div>
+<div class="pick">PICK: (a) -- cheap classify, escalate to Signal.</div>
+<div class="why">cadence answers "is this worth a human?" cheaply. When the answer is yes (Signal), the human (or the parity engine's L3-L5) investigates. Keeps the heartbeat cheap and the signal rare.</div>
+</div>
+<div class="choice">
+<div class="fork">5. Cursor-less / NUMBER-cursor streams (TRANSACTIONS_V3, TAX_RATES)</div>
+<div class="opts">a) Whole-table compare + row-count tolerance band, flagged "unwindowed". b) Force a synthetic cursor. c) Skip them.</div>
+<div class="conseq">a) Honest -- can't window without a timestamp cursor; a small row-count delta within lag tolerance reads Benign. b) Fragile. c) Blind spots.</div>
+<div class="pick">PICK: (a) -- whole-table + row-count band, marked unwindowed.</div>
+<div class="why">Per the ~i, some streams have no timestamp cursor. For those, compare whole-table and treat a row-count delta proportional to lag as Benign; a structural/large delta is Signal. Mark them so the operator knows windowing wasn't applied.</div>
+</div>
+
+<h2>Escape Routes</h2>
+<div class="escape"><strong>From PICK 1 (engine vocabulary):</strong> if cadence needs a distinction the engine's four don't capture, add a sub-reason field rather than a fifth verdict -- keeps the top-level language stable.</div>
+<div class="escape"><strong>From PICK 2 (column-set screen):</strong> if shape-only screening misclassifies, escalate that stream to the parity engine's L3 column-signal for the real call; cadence caches the result.</div>
+<div class="escape"><strong>From PICK 3 (two-layer acks):</strong> if the split is confusing, collapse to policy-only (no runtime acks) -- slower to accept a diff but fully versioned.</div>
+<div class="escape"><strong>From PICK 4 (cheap classify):</strong> if Signal volume is too noisy, wire the optional /parity/l3 escalation for borderline cases.</div>
+
+<h2>Pure Metal Test</h2>
+<div class="pmt-row"><span>cursor-windowed HASH_AGG (existing primitive)</span><span class="rp">replaceable -- already in FingerprintPrimitive</span></div>
+<div class="pmt-row"><span>INFORMATION_SCHEMA column-set read (existing)</span><span class="rp">already done for biz cols -- free</span></div>
+<div class="pmt-row"><span>Firestore cadence-acks + drift-policy.json</span><span class="lb">load-bearing -- Firestore (already a dep) + a committed JSON</span></div>
+<div class="pmt-row"><span>verdict vocabulary</span><span class="rp">shared strings with the engine; no dep</span></div>
+<p style="font-size:13px;margin-top:8px"><strong>Load-bearing: 1</strong> (Firestore, already in use). Everything else reuses what cadence + the engine already have. No new external dependency.</p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>The smallest proof</strong>
+Add the column-set comparison to the existing sweep: for each stream, diff the business column NAMES prod vs clone. Emit a per-stream <code>shapeMatch: true|false</code> into the /tick doc. On ETHER today (old airbyte both sides, frozen clone) shapeMatch is true everywhere -- proving the screen is correct and quiet. The day the clone flips to new airbyte, shapeMatch goes false on format-changed streams and we have caught the version gap with one cheap field, before building the full classifier.
+</div>
+
+<h2>What this does NOT do</h2>
+<ul>
+<li>Reimplement the parity engine's L3-L5 (column-signal, row-delta-explainer). cadence screens; the engine explains on demand.</li>
+<li>Change the Airbyte sync schedules or the migration plan.</li>
+<li>Auto-accept version differences -- a human acks them (or a policy rule does, explicitly).</li>
+<li>Replace the raw match% -- it stays, with the verdict breakdown beside it.</li>
+</ul>
+
+<h2>Path to plan + build</h2>
+<p style="font-size:13px"><code>~p</code> phases this (watermark+lag, windowing, column-set screen, classifier+policy, ack store, explain). <code>~e</code> sizes into a board. The schedule-aware ~p (2026-05-28-0026) folds in as the lag source.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved + published</div>
+<div class="dod-item">&check; 3 naming candidates, winner: adopt engine's Clean/Cosmetic/Benign/Signal</div>
+<div class="dod-item">&check; 5 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Decision flow diagram (4 verdicts, 3 explanation sources)</div>
+<div class="dod-item">&check; Incorporates operator input: new-Airbyte legitimate differences = Cosmetic/Benign, not Signal</div>
+<div class="dod-item">&check; First Move: column-set shapeMatch field, cheap + catches the version gap</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r112 &middot; 2026-05-28 00:32 &middot; ~d drift taxonomy</div>
+</body></html>

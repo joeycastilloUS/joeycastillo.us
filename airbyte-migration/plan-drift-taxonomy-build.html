@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~p Build the cadence drift taxonomy</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}.phase .accept strong{color:#5cb85c}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~p drift taxonomy build</nav>
+
+<h1>Build the cadence drift taxonomy</h1>
+<p class="sub">Execute <code>be/designs/2026-05-28-0032-design-drift-taxonomy.html</code>. Classify every per-stream diff Clean / Cosmetic / Benign / Signal from three explanation sources -- sync lag, old/new-Airbyte version gap, operator acks. Folds in the schedule-aware ~p (2026-05-28-0026) as the lag source.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> Turn "183/208, looks broken" into "208/208 windowed-clean; 25 Benign (ETHER 4h sync lag); 0 Signal." A stream goes red only when it's genuinely wrong. Names match the parity engine. cadence stays the cheap heartbeat; deep cases escalate to Signal.</p></div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td>Per-stream watermark + lag (business cursor). Column-set shapeMatch screen (old vs new Airbyte). Cursor-type-aware windowed fingerprint. Verdict classifier Clean/Cosmetic/Benign/Signal. drift-policy.json (tolerances, sync intervals, known-version rules). cadence-acks Firestore store. Verdict + lag surfaced in /tick, /firstdiff, reports, Go.Status. Cloud Run deploy.</td><td>Reimplementing the parity engine L3-L5. Auto-accepting version diffs. Changing sync schedules. Merging cadence + parity service. UI beyond the HTML reports.</td></tr>
+</table>
+
+<h2>Phases</h2>
+<div class="phase"><h3><span class="num">1</span> Watermark + lag + shapeMatch (First Move, additive)</h3>
+<div class="meta">Per-stream MAX(business cursor) prod+clone -> lagHours. Column-set NAME diff prod vs clone -> shapeMatch bool. Emit both into the /tick doc next to drifts. No verdict change yet.</div>
+<div class="accept"><strong>Accept:</strong> /tick writes lagHours + shapeMatch per stream. ETHER shows uniform lag, shapeMatch=true (old airbyte both sides). Zero behavior change to existing match%.</div></div>
+
+<div class="phase"><h3><span class="num">2</span> Cursor-type-aware windowed fingerprint</h3>
+<div class="meta">Re-enable WHERE cursor &le; clone_wm for TIMESTAMP cursors only; NUMBER/none fall back to whole-table + unwindowed flag. Fixes the old NUMBER-vs-TIMESTAMP / 'GRANTS' crash by detecting type from INFORMATION_SCHEMA first.</div>
+<div class="accept"><strong>Accept:</strong> ETHER windowed fingerprints MATCH (lag rows removed). Cursor-less streams fall back cleanly, no SQL error.</div></div>
+
+<div class="phase"><h3><span class="num">3</span> Verdict classifier + drift-policy.json</h3>
+<div class="meta">Decision flow from the design: windowed-equal -> Clean/Benign(lag); else shapeMatch=false -> Cosmetic; else ack? -> Benign; else Signal. Tolerances + per-schema sync intervals + known-version rules in committed drift-policy.json. Store verdict on the snapshot doc.</div>
+<div class="accept"><strong>Accept:</strong> ETHER frozen-clone classifies Benign within tolerance, Signal past it. A forced windowed mismatch = Signal. A column-set change = Cosmetic.</div></div>
+
+<div class="phase"><h3><span class="num">4</span> cadence-acks store</h3>
+<div class="meta">Firestore cadence-acks {stream, reason, columns?, by, ts}. A windowed-diff matching an ack classifies Benign. Minimal: an ack endpoint or a Go.Ack helper to record one. Mirrors Board 1 ack workflow shape.</div>
+<div class="accept"><strong>Accept:</strong> Acking a Signal stream flips it to Benign on the next tick with the reason attached; clearing the ack flips it back.</div></div>
+
+<div class="phase"><h3><span class="num">5</span> Explain it -- reports + readers</h3>
+<div class="meta">Verdict breakdown + lag narrative in /tick response, /firstdiff, the HTML run report, Go.Status. "208 windowed-clean / 0 cosmetic / 25 benign / 0 signal -- ETHER 4h lag, hourly."</div>
+<div class="accept"><strong>Accept:</strong> A human reads the report and knows in one glance whether anything needs attention.</div></div>
+
+<h2>Constraints / risks</h2>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td>New-Airbyte value diffs that pass the column-set screen but are legit</td><td>Fall to the ack path; operator accepts -> Benign. Unacked -> Signal (correctly surfaced for review).</td></tr>
+<tr><td>emitted_at not cross-comparable</td><td>Window on business cursor only (per ~i).</td></tr>
+<tr><td>Signal noise during the actual migration cutover</td><td>drift-policy.json known-version rules can pre-classify expected migration shapes as Cosmetic/Benign before cutover.</td></tr>
+<tr><td>Classifier creep into the parity engine's job</td><td>Hard boundary: cadence screens cheaply, escalates ambiguity to Signal. No L3-L5 here.</td></tr>
+</table>
+
+<h2>Boards (see ~e)</h2>
+<p style="font-size:13px">~e splits this into <b>Board 16</b> (the now board: phases 1-3 + explain = the classifier end-to-end) and <b>Board 17</b> (acks + escalation + retention, after 16). Board 16 is what to review.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved + published</div>
+<div class="dod-item">&check; 5 phases with accept criteria</div>
+<div class="dod-item">&check; Inherits ~d decisions + folds in schedule-aware ~p as the lag source</div>
+<div class="dod-item">&check; Risks incl. new-Airbyte legitimate differences</div>
+<div class="dod-item">&check; Hands to ~e for the board</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r112 &middot; 2026-05-28 00:34 &middot; ~p drift taxonomy build</div>
+</body></html>

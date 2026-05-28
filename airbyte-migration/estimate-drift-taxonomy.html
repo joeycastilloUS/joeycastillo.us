@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~e Drift taxonomy -- Board 16 + 17</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.board{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}.board.blocked{border-left-color:#f0ad4e;opacity:0.92}
+.board h3{color:#6FC3DF;font-size:18px;margin-bottom:8px}
+.item{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:6px 0;font-size:13px}
+.item .pts{display:inline-block;background:#6FC3DF;color:#111;padding:2px 8px;border-radius:3px;font-weight:700;margin-right:8px;min-width:28px;text-align:center}
+.item .cmd{display:inline-block;background:#222;color:#5cb85c;padding:2px 6px;border-radius:3px;font-size:11px;margin-left:8px;font-family:'Consolas',monospace}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~e drift taxonomy</nav>
+
+<h1>Sizing: cadence drift taxonomy</h1>
+<p class="sub">Plan: <code>be/plans/2026-05-28-0034-plan-drift-taxonomy-build.html</code>. Two boards. <b>Board 16</b> ships the classifier end-to-end (16 pts) -- review this one. <b>Board 17</b> (13 pts, blocked on 16) adds acks, escalation, retention.</p>
+<span class="banner">Estimate &mdash; Ready for ~b</span>
+
+<h2>Sizing rationale</h2>
+<table>
+<tr><th>Mass</th><th>Pts</th><th>Why</th></tr>
+<tr><td>Watermark + lag + column-set shapeMatch, emitted into /tick (First Move)</td><td>5</td><td>Per-stream MAX(cursor) x2 batched into the sweep + column-name set diff (cols already resolved). Additive write. The proving step.</td></tr>
+<tr><td>Cursor-type-aware windowed fingerprint</td><td>5</td><td>Re-enable windowing safely: detect TIMESTAMP vs NUMBER/none, window the first, fall back the rest. Fixes the prior crash. Core engine change + redeploy.</td></tr>
+<tr><td>Verdict classifier + drift-policy.json</td><td>3</td><td>Decision flow into Clean/Cosmetic/Benign/Signal; tolerances + sync intervals + known-version rules in committed JSON.</td></tr>
+<tr><td>Explain in reports/readers</td><td>3</td><td>Verdict breakdown + lag narrative in /tick, /firstdiff, HTML report, Go.Status.</td></tr>
+<tr><td>cadence-acks Firestore store + Go.Ack</td><td>5</td><td>Ack collection + record/clear; windowed-diff matching an ack -> Benign. Board 17.</td></tr>
+<tr><td>Optional parity-engine /parity/l3 escalation for borderline Signal</td><td>5</td><td>Hook ambiguous streams to the deep engine; cache the result. Board 17.</td></tr>
+<tr><td>Snapshot retention / TTL</td><td>3</td><td>Bound the timeline between re-baselines. Board 17.</td></tr>
+</table>
+
+<h2 id="board16">Board 16 -- Drift taxonomy classifier (16 pts) -- REVIEW THIS</h2>
+<div class="board">
+<h4 style="color:#5cb85c;margin-top:0">Ready</h4>
+<div class="item"><span class="pts">5</span>{per-stream watermark (MAX business cursor prod+clone) -> lagHours + column-set shapeMatch (prod vs clone biz column NAMES) emitted into the /tick snapshot doc; additive, no verdict change, add to, cadence/Cadence/Program.cs + FingerprintPrimitive}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">5</span>{cursor-type-aware windowed fingerprint -- WHERE cursor &le; clone_wm for TIMESTAMP cursors, NUMBER/none fall back to whole-table + unwindowed flag; detect type from INFORMATION_SCHEMA first (fixes prior NUMBER-vs-TIMESTAMP crash), add to, cadence/Cadence/Fingerprint/FingerprintPrimitive.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{verdict classifier Clean/Cosmetic/Benign/Signal per the design decision flow + drift-policy.json (per-schema syncIntervalHours, maxLagGenerations, known-version rules); verdict stored on snapshot doc, add to, cadence/Cadence/ + drift-policy.json}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{explain -- verdict breakdown + lag narrative in /tick response, /firstdiff, HTML run report, Go.Status (208 windowed-clean / 0 cosmetic / 25 benign / 0 signal), update in, cadence/Cadence/Program.cs + Go.Status.ps1 + ReportWriter}<span class="cmd">~u</span></div>
+</div>
+<p style="font-size:12px;color:#888">Critical path 1 -&gt; 2 -&gt; 3 -&gt; 4. One Cloud Build deploy after item 2 (or batch). Verifiable: ETHER goes from "25 DIFFER" to "25 Benign (sync lag), 0 Signal".</p>
+
+<h2>Board 17 -- Acks + escalation + retention (13 pts) &#9203; blocked on 16</h2>
+<div class="board blocked">
+<h4 style="color:#f0ad4e;margin-top:0">Ready (blocked)</h4>
+<div class="item"><span class="pts">5</span>{cadence-acks Firestore store {stream, reason, columns?, by, ts} + Go.Ack helper to record/clear; windowed-diff matching an ack classifies Benign with the reason attached, add to, cadence/Cadence/ + Go.Ack.bat}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">5</span>{optional /parity/l3 escalation -- borderline Signal streams call the parity engine's deep column-signal/row-delta and cache the verdict, add to, cadence/Cadence/}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{snapshot retention / TTL so the timeline stays bounded between re-baselines, add to, cadence/Cadence/}<span class="cmd">~a</span></div>
+</div>
+
+<h2>What Board 16 delivers</h2>
+<p style="font-size:13px">After Board 16, cadence answers the real question: <b>is anything actually wrong?</b> ETHER's hourly sync lag reads Benign with a one-line reason; a new-Airbyte column-shape change reads Cosmetic; only genuinely unexplained data diffs read Signal. The migration to new Airbyte can proceed with cadence telling you, in plain language, when a difference is the expected version gap vs a real problem.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Board 16 (16 pts) + Board 17 (13 pts) added to be/board.md</div>
+<div class="dod-item">&check; Items 3-5 pts each, Fibonacci</div>
+<div class="dod-item">&check; Board 16 in the 13-21 envelope; critical path documented</div>
+<div class="dod-item">&check; Estimate published</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r112 &middot; 2026-05-28 00:36 &middot; ~e drift taxonomy</div>
+</body></html>
