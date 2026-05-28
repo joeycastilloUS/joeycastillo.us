@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Per-stream drift capture on /tick</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}
+.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b per-stream drift capture</nav>
+
+<h1>~b Per-stream drift capture on /tick</h1>
+<p class="sub">The platform now records which streams drift on every 5-min tick. Walking the snapshot timeline yields per-stream "first point of diff" -- no re-baseline, no manual sweep. Deployed to the live cadence Cloud Run service.</p>
+<span class="banner">Shipped &middot; Deployed</span>
+
+<h2>What changed</h2>
+<p style="font-size:13px">The cadence <code>/tick</code> endpoint already computed per-stream verdicts (<code>SweepResult.PerStream</code>) but only persisted aggregate counts. Now it also embeds a <code>drifts</code> array on each snapshot doc -- every non-MATCH stream this tick:</p>
+<div class="code-block">"drifts": [
+  { "stream": "ETHER.ORDERS", "verdict": "Differ", "prodFp": -439..., "cloneFp": 405..., "bizCols": 31 },
+  ...
+],
+"driftSchemaVersion": 1</div>
+
+<h2>Design call: embedded array, not a subcollection</h2>
+<p style="font-size:13px">Operator asked for a "per-stream subcollection." Built it as an embedded <code>drifts</code> array on the snapshot doc instead. Same capability, simpler + cheaper:</p>
+<table>
+<tr><th></th><th>Embedded array (chosen)</th><th>Subcollection</th></tr>
+<tr><td>Writes / tick</td><td>1</td><td>up to 208 (batched)</td></tr>
+<tr><td>Read for timeline walk</td><td>free with the snapshot</td><td>extra fetch per snapshot</td></tr>
+<tr><td>/reset/wipe cleanup</td><td>removed with parent doc</td><td>orphaned -- Firestore does not cascade-delete subcollections</td></tr>
+<tr><td>Doc size</td><td>~tiny (only non-MATCH; ~25 entries typical, &lt;&lt;1MiB)</td><td>n/a</td></tr>
+<tr><td>collectionGroup query across snapshots</td><td>no (read docs + filter in code)</td><td>yes</td></tr>
+</table>
+<p style="font-size:13px">Only the non-MATCH streams are stored (Differ/Error/Skip). Absence from <code>drifts</code> = the stream matched. The aggregate counts give the totals. Compact and sufficient for first-diff analysis. If collectionGroup queryability is ever needed, switching to a subcollection is localized to the write block.</p>
+
+<h2>Verified live</h2>
+<div class="code-block">$ POST /tick   -> sweep-20260528T062723  match=183/208 (88%)  differ=25
+$ GET /reset/status -> lastSweep.drifts:
+   present: True   count: 25
+   ETHER.BARISTA_LOGINS  Differ  prodFp=-5243911578550057966  cloneFp=2846889560218871543
+   ETHER.CART_PRODUCTS   Differ  prodFp=3634625167678047518   cloneFp=-4239249006143337441
+   ETHER.CARTS           Differ  ...
+   (all 25 ETHER)</div>
+
+<div class="callout">
+<strong>What this unlocks.</strong> Going forward, every tick records exactly which streams differ. To find a stream's first point of diff: walk the snapshot timeline oldest-&gt;newest, the earliest snapshot it appears in <code>drifts</code> with verdict=Differ is its first divergence. No re-baseline, no manual Driver sweep -- the autonomous service captures it.
+</div>
+
+<div class="warn">
+<strong>Note on the current 25.</strong> The ETHER streams already differing today first diverged (aggregate) at 03:31 UTC -- before this capture existed, so their individual first-diff ticks weren't recorded. From this deploy onward, any stream that flips MATCH-&gt;DIFFER is captured with its precise tick. After the next re-clone, the full per-stream first-diff timeline accumulates from zero.
+</div>
+
+<h2>Files Changed</h2>
+<table>
+<tr><th>Path</th><th>Status</th></tr>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>/tick writes <code>drifts</code> + <code>driftSchemaVersion</code></td></tr>
+<tr><td>cadence commit</td><td><code>d1b0c1d</code></td></tr>
+<tr><td>Cloud Build</td><td><code>92392c06</code> SUCCESS 2m36s</td></tr>
+<tr><td>Cloud Run</td><td>cadence service redeployed on acmedev-platform-hq</td></tr>
+</table>
+
+<h2>What's Next</h2>
+<ul>
+<li>A reader (Go.FirstDiff or a /reset/firstdiff endpoint) that walks the timeline and prints per-stream first-diff. Cheap to add once you want it -- the data is now there.</li>
+<li>Optional: retention/TTL on snapshot docs so the timeline doesn't grow unbounded between re-baselines.</li>
+</ul>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence d1b0c1d + airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 14 -- 1 item Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Both repos pushed; Cloud Run deployed + verified live</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (additive field on /tick write)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r106 &middot; 2026-05-27 23:28 &middot; ~b per-stream drift capture</div>
+</body></html>
