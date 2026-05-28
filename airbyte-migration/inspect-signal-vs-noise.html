@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~i Signal vs noise -- what's really out of whack</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.key{background:#1a2438;border-left:3px solid #6FC3DF;padding:12px 16px;margin:12px 0;color:#cfe8f5;font-size:13px;border-radius:0 4px 4px 0}.key strong{color:#6FC3DF}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~i signal vs noise</nav>
+
+<h1>~i Signal vs noise -- what's really out of whack</h1>
+<p class="sub">Resumed cadence at 5-min and ran a tick to ground the final board in reality. The verdict split exposes the exact problem to solve: 51 "Signals" that are mostly staleness, burying the one that's real. The fix is a signal-first, noise-filtered view + one classifier refinement.</p>
+<span class="banner">Inspect &mdash; Grounded in a live tick</span>
+
+<h2>Current tick (16:46 UTC, clone frozen)</h2>
+<div class="code-block">clean=122   cosmetic=0   benign=35   signal=51</div>
+<p style="font-size:13px">122 streams identical, 35 explained sync lag, 0 version/format gaps -- and <b>51 flagged Signal</b>. On the surface that looks like 51 problems. It is not.</p>
+
+<h2>The 51 "Signals" are almost all staleness, not corruption</h2>
+<table>
+<tr><th>Stream</th><th>lag</th><th>note</th><th>what it really is</th></tr>
+<tr><td>ECOMM.SPREE_ADDRESSES</td><td>16.4h</td><td><b>windowed-match clean</b></td><td>data identical, just behind</td></tr>
+<tr><td>ECOMM.PURCHASED_GIFT_CARDS</td><td>21.9h</td><td><b>windowed-match clean</b></td><td>data identical, just behind</td></tr>
+<tr><td>ECOMM.SPREE_LOG_ENTRIES</td><td>23.8h</td><td><b>windowed-match clean</b></td><td>data identical, just behind</td></tr>
+<tr><td>ECOMM.SPREE_ADJUSTMENTS</td><td>23.9h</td><td>(no window match)</td><td>stale; needs a look</td></tr>
+<tr><td>ECOMM.SPREE_CMS_SECTIONS</td><td><b>367.9h</b></td><td>(15 days!)</td><td><b>genuinely stuck sync -- REAL signal</b></td></tr>
+</table>
+
+<div class="key">
+<strong>The insight.</strong> "lag &gt; tolerance" currently lumps together two very different things:
+<ul style="margin:6px 0 0 18px">
+<li><b>Stale-but-clean</b> -- <code>windowed-match clean</code> + high lag = the data the clone HAS is identical to prod; it's just behind because nothing is feeding it. Pure staleness. <b>Noise</b> when the clone is intentionally frozen (or just needs airbyte-philz running).</li>
+<li><b>Genuinely divergent</b> -- windowed-differ, or absurd lag (SPREE_CMS_SECTIONS at 15 days = a sync that died). <b>The real signal.</b></li>
+</ul>
+Collapsing these is what buries the one stream you actually care about under 50 that just need the clone fed.
+</div>
+
+<h2>What's already built (the what / when / why / mark)</h2>
+<table>
+<tr><th>You want to...</th><th>Status</th><th>Where</th></tr>
+<tr><td>Run at 5 minutes</td><td>&check; LIVE</td><td>Scheduler resumed, Enabled, next run on the :00/:05</td></tr>
+<tr><td>Know WHAT is out of whack</td><td>&check; built</td><td>classifier verdict per stream; <code>/escalate</code> Signal worklist</td></tr>
+<tr><td>Know WHEN it started</td><td>&check; built</td><td><code>/firstdiff</code> + <code>Go.FirstDiff</code> (first point of diff per stream)</td></tr>
+<tr><td>Know WHY</td><td>&check; built</td><td>per-stream reason string (lag Nh / shape / windowed-match / etc.)</td></tr>
+<tr><td>Mark explainable / not</td><td>&check; built</td><td><code>cadence-acks</code> + <code>Go.Ack</code> (Signal -&gt; Benign with reason)</td></tr>
+<tr><td><b>Filter the noise, signal-first</b></td><td>&cross; GAP</td><td>no single view that hides Benign/Cosmetic/stale and leads with the genuinely-divergent</td></tr>
+</table>
+
+<h2>The gap (what the final board builds)</h2>
+<ol style="margin-left:22px;font-size:14px">
+<li><b>One classifier refinement</b> -- split "lag &gt; tolerance" into <b>Stale</b> (windowed-match clean, just behind -> noise/feed-the-clone) vs <b>Signal</b> (windowed-divergent or absurd lag -> real). So the filter has something honest to filter on.</li>
+<li><b>A signal-first, noise-filtered VIEW</b> -- the thing you asked for: leads with what's genuinely out of whack, shows when (first-diff) + why inline, collapses the explainable (Benign/Cosmetic/Stale) behind a toggle, ack right there. As the public HTML dashboard AND a one-line <code>Go.Signal</code> terminal command.</li>
+</ol>
+
+<h2>Operational note (not a tooling gap)</h2>
+<div class="warn">
+<strong>The clone is frozen.</strong> Most of the 51 are staleness because nothing is feeding AIRBYTE_CLONE right now. Once airbyte-philz feeds it (or you rebaseline), lag stays small and the Stale bucket empties -- leaving only true Signal. The tooling is correctly surfacing that the clone isn't being fed; SPREE_CMS_SECTIONS at 15 days is a genuinely dead sync worth chasing regardless.
+</div>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Cadence resumed to 5-min; grounded in a live tick</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Verdict split measured: clean=122 cosmetic=0 benign=35 signal=51</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Identified the noise problem: stale-but-clean conflated with real divergence</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Mapped what/when/why/mark = built; filter = the gap</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Feeds the final board ~p</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r118 &middot; 2026-05-28 09:53 &middot; ~i signal vs noise</div>
+</body></html>
