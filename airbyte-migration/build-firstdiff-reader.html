@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b /firstdiff endpoint + Go.FirstDiff narrative reader</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b /firstdiff + Go.FirstDiff</nav>
+
+<h1>~b /firstdiff endpoint + Go.FirstDiff narrative reader</h1>
+<p class="sub">Reads the per-stream drift timeline and tells the STORY of when each stream first broke from prod -- with schema context, not a table of codes. Caught two streams diverging live on its first run.</p>
+<span class="banner">Shipped &middot; Deployed</span>
+
+<h2>Two parts</h2>
+<table>
+<tr><th>Part</th><th>What</th></tr>
+<tr><td><code>GET /firstdiff</code> (service)</td><td>Walks all snapshots ordered by generatedAt, over the per-tick <code>drifts</code> arrays. Returns per stream: <code>firstSeenAt, firstVerdict, firstSnapshot, stillDrifting</code> (oldest-first) + window + counts. Server-side because the service has FirestoreDb; the launcher just renders.</td></tr>
+<tr><td><code>Go.FirstDiff</code> (launcher)</td><td>Calls /firstdiff, prints a narrative + pops an HTML report. <code>quiet</code> token = console only.</td></tr>
+</table>
+
+<h2>"More context" -- speaks in operator language</h2>
+<p style="font-size:13px">Per the request, the output is a story, not codes. It opens with what was walked, states how many streams diverged and how many still differ, lists each with minutes-since-clone, then a "WHAT THIS MEANS" rollup that annotates each schema in plain English (ETHER = the live POS/ordering app, highest write volume; etc.) and names the lead cause.</p>
+<div class="code-block">CADENCE -- first point of diff
+Walked 45 snapshots (8 with per-stream drift data), 03:25 -> 07:00 UTC (3.6h).
+
+THE STORY: 27 streams have diverged from prod. 27 still differing now.
+When each one first broke (oldest first):
+  +182m  06:27:45  ETHER.ORDERS              Differ  (still differing)
+  ...
+  +192m  06:37:03  ETHER.ORDERS_PROMOTIONS   Differ  (still differing)
+  +192m  06:37:03  ETHER.REFUNDS             Differ  (still differing)
+
+WHAT THIS MEANS:
+  ETHER  27 streams -- the live POS/ordering app. Highest write volume.
+Lead cause: ETHER. A frozen clone falls behind high-write schemas first.
+Expected drift, not a bug.</div>
+
+<div class="callout">
+<strong>Caught a real first-diff on run one.</strong> 25 ETHER streams show 06:27:45 -- that's when per-stream capture went live; they were already drifting. But <code>ETHER.ORDERS_PROMOTIONS</code> and <code>ETHER.REFUNDS</code> show 06:37:03 -- +10 min later. Those two genuinely flipped MATCH-&gt;DIFFER after capture started. The reader recorded their true first point of diff. Going forward, every flip is captured precisely; after the next re-clone the whole picture builds from a clean 208/208.
+</div>
+
+<h2>Verified</h2>
+<ul>
+<li><code>GET /firstdiff</code> live: walked 45 snapshots, 8 with drift data, returned 27 streams.</li>
+<li><code>Go.FirstDiff quiet</code>: narrative printed with schema context + lead-cause rollup.</li>
+<li><code>Go.FirstDiff</code>: HTML report rendered + popped (<code>firstdiff-20260528T000519.html</code>).</li>
+</ul>
+
+<h2>Files Changed</h2>
+<table>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>/firstdiff endpoint (timeline walk)</td></tr>
+<tr><td><code>cadence/Go.FirstDiff.ps1 + .bat</code></td><td>narrative reader + HTML report</td></tr>
+<tr><td>cadence commit</td><td><code>a95d70b</code></td></tr>
+<tr><td>Cloud Build</td><td><code>84439793</code> SUCCESS 2m35s, redeployed</td></tr>
+</table>
+
+<h2>Note on names / user stories</h2>
+<p style="font-size:13px">Kept the verb-launcher naming (Go.FirstDiff joins Go.Sweep/Reclone/Rebaseline/Status/Diff). The "user story" ask is served by the OUTPUT now carrying narrative context -- what was walked, what it means, why it's expected -- rather than the bare verdict tables the other commands print. If you want the same narrative treatment retrofitted onto Go.Status / Go.Diff output, that's a quick follow-up.</p>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence a95d70b + airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 15 -- 1 item Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Pushed + Cloud Run deployed + verified live</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (additive read-only endpoint + new launcher)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r108 &middot; 2026-05-28 00:05 &middot; ~b /firstdiff + Go.FirstDiff</div>
+</body></html>
