@@ -1,301 +1,34 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>cadence -- live drift heartbeat -- airbyte-migration</title>
+﻿<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cadence -- AIRBYTE_DB vs AIRBYTE_CLONE drift</title>
 <link rel="stylesheet" href="/airbyte-migration/gate.css">
 <script src="/airbyte-migration/gate.js" data-hash="1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa"></script>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65}
-nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;z-index:100;display:flex;justify-content:space-between;align-items:center}
-nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}
-nav .meta{color:#666;font-size:12px;font-family:'Consolas',monospace}
-nav a{color:#6FC3DF;text-decoration:none}
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
+nav .brand{color:#6FC3DF;font-weight:700;font-size:18px}nav .meta{color:#666;font-size:12px;font-family:Consolas,monospace}
 .container{max-width:920px;margin:0 auto;padding:32px 24px}
-h1{color:#fff;font-size:32px;margin-bottom:6px;letter-spacing:-0.5px}
-.subtitle{color:#6FC3DF;font-size:15px;margin-bottom:24px}
-h2{color:#6FC3DF;font-size:22px;margin:40px 0 14px;border-bottom:1px solid #333;padding-bottom:8px}
-h3{color:#fff;font-size:16px;margin:24px 0 8px}
-.hero{background:linear-gradient(135deg,#0a1f24 0%,#1A1A1A 100%);border-radius:12px;padding:24px 28px;margin-bottom:28px;border:1px solid #1f3540}
-.hero .label{color:#6FC3DF;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;font-weight:700}
-.summary-box{background:#1A1A1A;border-radius:10px;padding:22px;margin:18px 0;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
-.stat{text-align:center}
-.stat .num{font-size:28px;font-weight:700;color:#6FC3DF;display:block;font-variant-numeric:tabular-nums;letter-spacing:-0.5px}
-.stat .num.green{color:#5cb85c}
-.stat .num.yellow{color:#f0ad4e}
-.stat .num.red{color:#f06e6e}
-.stat .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.6px;margin-top:6px;font-weight:600}
-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;font-variant-numeric:tabular-nums}
-th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
-td{padding:10px 12px;border-bottom:1px solid #1e1e1e;vertical-align:middle}
-tr:hover{background:#1A1A1A}
-td.num{text-align:right;font-variant-numeric:tabular-nums}
-td.ts{font-family:'Consolas',monospace;font-size:12px;color:#888}
-.pill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-variant-numeric:tabular-nums}
-.pill-100{background:#0d2818;color:#5cb85c}
-.pill-90{background:#0d2818;color:#5cb85c}
-.pill-80{background:#1f1f0a;color:#f0ad4e}
-.pill-70{background:#2a1414;color:#f06e6e}
-.pill-60{background:#2a1414;color:#f06e6e}
-.pill-cold{background:#1a2438;color:#6FC3DF}
-.pill-warm{background:#1A1A1A;color:#888}
-code{background:#222;padding:2px 7px;border-radius:3px;font-size:12px;color:#6FC3DF}
-.callout{background:#0d2818;border-left:4px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 6px 6px 0}
-.callout strong{color:#5cb85c}
-.warn{background:#1f1410;border-left:4px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 6px 6px 0}
-.warn strong{color:#f0ad4e}
-.chart-box{background:#1A1A1A;border-radius:10px;padding:24px 28px;margin:18px 0}
-.chart-box h3{color:#6FC3DF;margin-top:0;font-size:14px;letter-spacing:0.5px;text-transform:uppercase}
-svg{width:100%;height:240px;display:block}
-ul{margin:8px 0 8px 24px}li{margin:5px 0;font-size:14px}
-.footer{margin-top:40px;padding-top:18px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
-.cost-tile{background:#1A1A1A;border-radius:8px;padding:18px 24px;display:inline-block;margin:8px 8px 8px 0}
-.cost-tile .v{font-size:24px;color:#fff;font-weight:700;display:block;font-variant-numeric:tabular-nums}
-.cost-tile .l{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px}
-.diff-arrow{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;margin-right:4px}
-.diff-up{border-bottom:7px solid #5cb85c}
-.diff-down{border-top:7px solid #f06e6e}
-details{margin:14px 0}
-details summary{cursor:pointer;color:#6FC3DF;font-size:13px;padding:8px 0;font-weight:600;letter-spacing:0.3px}
-details[open] summary{margin-bottom:8px}
-</style>
-</head>
-<body>
-<nav>
-  <span class="brand">cadence &middot; AIRBYTE_DB &harr; AIRBYTE_CLONE drift heartbeat</span>
-  <span class="meta">live data &middot; refreshes every 5 min</span>
-</nav>
+h1{color:#fff;font-size:30px;margin-bottom:6px}.subtitle{color:#6FC3DF;font-size:14px;margin-bottom:22px}
+.hero{border-radius:12px;padding:26px 28px;margin-bottom:24px;text-align:center}
+.hero.green{background:linear-gradient(135deg,#0a2418 0%,#1A1A1A 100%);border:1px solid #1f5540}
+.hero.red{background:linear-gradient(135deg,#2a1414 0%,#1A1A1A 100%);border:1px solid #5a2828}
+.hero .big{font-size:46px;font-weight:700;letter-spacing:-1px;display:block}
+.hero.green .big{color:#5cb85c}.hero.red .big{color:#f06e6e}
+.hero .lbl{font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+h2{color:#6FC3DF;font-size:18px;margin:28px 0 10px;border-bottom:1px solid #333;padding-bottom:6px}
+.sig{background:#1a0e0e;border-left:4px solid #f06e6e;border-radius:0 6px 6px 0;padding:14px 18px;margin:10px 0}
+.sig .name{color:#f06e6e;font-weight:700;font-size:15px;font-family:Consolas,monospace}
+.sig .row{font-size:13px;color:#ccc;margin-top:4px}.sig .row b{color:#888;font-weight:600}
+.sig .ack{font-family:Consolas,monospace;font-size:12px;color:#6FC3DF;background:#0a0a0a;padding:6px 10px;border-radius:4px;margin-top:8px;display:block}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center;background:#1A1A1A;border-radius:8px;padding:18px;margin:14px 0}
+.counts .n{font-size:26px;font-weight:700;display:block;font-variant-numeric:tabular-nums}.counts .l{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+.c-clean{color:#5cb85c}.c-cos{color:#6FC3DF}.c-ben{color:#f0ad4e}.c-sig{color:#f06e6e}
+details{margin:10px 0}details summary{cursor:pointer;color:#6FC3DF;font-size:13px;padding:6px 0;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;font-variant-numeric:tabular-nums}
+th{text-align:left;color:#6FC3DF;border-bottom:1px solid #333;padding:6px 8px;font-size:10px;text-transform:uppercase}
+td{padding:4px 8px;border-bottom:1px solid #1e1e1e;color:#bbb}
+.footer{margin-top:36px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+</style></head><body>
+<nav><span class="brand">cadence &middot; drift verdicts</span><span class="meta">5-min &middot; signal-first</span></nav>
 <div class="container">
-
-<h1>cadence -- live drift heartbeat</h1>
-<p class="subtitle">Column-pruned HASH_AGG fingerprint sweep across 208 active streams, every 5 minutes. Source: Cloud Run service <code>cadence</code> on acmedev-platform-hq. Storage: Firestore <code>cadence-snapshots</code>.</p>
-
-<div class="hero">
-<div class="label">Current state &middot; as of 2026-05-26 19:20:23 UTC</div>
-<div class="summary-box" style="margin-top:14px;background:none">
-  <div class="stat"><span class="num red">117 / 208</span><span class="label">Match (latest)</span></div>
-  <div class="stat"><span class="num red">56.2%</span><span class="label">Match %</span></div>
-  <div class="stat"><span class="num red">91</span><span class="label">Differ</span></div>
-  <div class="stat"><span class="num">36.3s</span><span class="label">Avg Wall</span></div>
-  <div class="stat"><span class="num">96</span><span class="label">Sweeps Shown</span></div>
-</div>
-</div>
-
-<h2>Drift trajectory &mdash; 7.9h window</h2>
-
-<div class="chart-box">
-<h3>Match count over time (96 sweeps, oldest left to newest right)</h3>
-<svg viewBox="0 0 860 220" preserveAspectRatio="none">
-  <line x1="60" y1="30.0" x2="830" y2="30.0" stroke="#5cb85c" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-  <text x="52" y="33.0" fill="#5cb85c" font-size="10" text-anchor="end" font-family="Consolas, monospace">208 baseline</text>
-  <line x1="60" y1="107.0" x2="830" y2="107.0" stroke="#666" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-  <text x="52" y="110.0" fill="#666" font-size="10" text-anchor="end" font-family="Consolas, monospace">160</text>
-  <line x1="60" y1="184.0" x2="830" y2="184.0" stroke="#666" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-  <text x="52" y="187.0" fill="#666" font-size="10" text-anchor="end" font-family="Consolas, monospace">112</text>
-  <polyline points="60.0,159.9 68.1,159.9 76.2,159.9 84.3,159.9 92.4,159.9 100.5,159.9 108.6,159.9 116.7,159.9 124.8,159.9 132.9,159.9 141.1,159.9 149.2,159.9 157.3,159.9 165.4,159.9 173.5,159.9 181.6,159.9 189.7,159.9 197.8,159.9 205.9,159.9 214.0,159.9 222.1,159.9 230.2,159.9 238.3,159.9 246.4,159.9 254.5,159.9 262.6,161.5 270.7,161.5 278.8,161.5 286.9,161.5 295.1,161.5 303.2,161.5 311.3,161.5 319.4,161.5 327.5,161.5 335.6,161.5 343.7,161.5 351.8,161.5 359.9,161.5 368.0,161.5 376.1,161.5 384.2,161.5 392.3,161.5 400.4,161.5 408.5,161.5 416.6,161.5 424.7,161.5 432.8,161.5 440.9,161.5 449.1,161.5 457.2,161.5 465.3,163.1 473.4,163.1 481.5,163.1 489.6,163.1 497.7,163.1 505.8,163.1 513.9,163.1 522.0,163.1 530.1,163.1 538.2,163.1 546.3,163.1 554.4,163.1 562.5,163.1 570.6,163.1 578.7,163.1 586.8,163.1 594.9,163.1 603.1,163.1 611.2,163.1 619.3,163.1 627.4,163.1 635.5,163.1 643.6,163.1 651.7,166.4 659.8,171.2 667.9,171.2 676.0,171.2 684.1,171.2 692.2,171.2 700.3,171.2 708.4,171.2 716.5,171.2 724.6,171.2 732.7,171.2 740.8,171.2 748.9,172.8 757.1,176.0 765.2,176.0 773.3,176.0 781.4,176.0 789.5,176.0 797.6,176.0 805.7,176.0 813.8,176.0 821.9,176.0 830.0,176.0" fill="none" stroke="#6FC3DF" stroke-width="2"/>
-  <circle cx="60.0" cy="159.9" r="3.5" fill="#e89441"/>
-  <circle cx="124.8" cy="159.9" r="3.5" fill="#e89441"/>
-  <circle cx="189.7" cy="159.9" r="3.5" fill="#e89441"/>
-  <circle cx="254.5" cy="159.9" r="3.5" fill="#e89441"/>
-  <circle cx="319.4" cy="161.5" r="3.5" fill="#e89441"/>
-  <circle cx="384.2" cy="161.5" r="3.5" fill="#e89441"/>
-  <circle cx="449.1" cy="161.5" r="3.5" fill="#e89441"/>
-  <circle cx="513.9" cy="163.1" r="3.5" fill="#e89441"/>
-  <circle cx="578.7" cy="163.1" r="3.5" fill="#e89441"/>
-  <circle cx="643.6" cy="163.1" r="3.5" fill="#e89441"/>
-  <circle cx="708.4" cy="171.2" r="3.5" fill="#f06e6e"/>
-  <circle cx="773.3" cy="176.0" r="3.5" fill="#f06e6e"/>
-  <circle cx="830.0" cy="176.0" r="3.5" fill="#f06e6e"/>
-  <circle cx="830.0" cy="176.0" r="6" fill="#f06e6e" stroke="#fff" stroke-width="1.5"/>
-  <text x="822.0" y="166.0" fill="#fff" font-size="11" text-anchor="end" font-weight="700">117</text>
-  <circle cx="60.0" cy="159.9" r="6" fill="#e89441" stroke="#fff" stroke-width="1.5"/>
-  <text x="70.0" y="149.9" fill="#fff" font-size="11" font-weight="700">127</text>
-  <text x="60" y="210" fill="#666" font-size="10" font-family="Consolas, monospace">05-26 11:25Z</text>
-  <text x="830" y="210" fill="#666" font-size="10" text-anchor="end" font-family="Consolas, monospace">05-26 19:20Z</text>
-</svg>
-<p style="font-size:12px;color:#888;margin-top:10px;text-align:center">
-Net change: <span style="color:#f06e6e;font-weight:700"><span class="diff-arrow diff-down"></span>-10 matches (-4.9%)</span> over 7.9 hours &middot;
-Range: 117 (min) &harr; 127 (max) &middot;
-Avg: 124.3
-</p>
-</div>
-
-<div class="warn">
-<strong>Trajectory: declining.</strong>
-MATCH count went from <b>127</b> (61.1%) at 05-26 11:25Z to <b>117</b> (56.2%) at 05-26 19:20Z. The clone is frozen at 05-26 state; every Airbyte sync to prod widens the gap. This is the steady-decline signal the engine was built to surface.
-</div>
-
-<h2>Recent 24 sweeps</h2>
-<table>
-<tr><th>UTC Time</th><th>Snapshot ID</th><th class='num'>Match / Total</th><th class='num'>Match %</th><th class='num'>Differ</th><th class='num'>Wall</th></tr>
-<tr><td class="ts">05-26 19:20:23Z</td><td class="ts">sweep-20260526T192004</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">19.5s</td></tr>
-<tr><td class="ts">05-26 19:15:44Z</td><td class="ts">sweep-20260526T191522</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">21.4s</td></tr>
-<tr><td class="ts">05-26 19:10:52Z</td><td class="ts">sweep-20260526T191025</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">27.2s</td></tr>
-<tr><td class="ts">05-26 19:05:31Z</td><td class="ts">sweep-20260526T190504</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">26.9s</td></tr>
-<tr><td class="ts">05-26 19:01:09Z</td><td class="ts">sweep-20260526T190052</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">17.5s</td></tr>
-<tr><td class="ts">05-26 18:55:32Z</td><td class="ts">sweep-20260526T185514</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">17.0s</td></tr>
-<tr><td class="ts">05-26 18:50:41Z</td><td class="ts">sweep-20260526T185024</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">17.0s</td></tr>
-<tr><td class="ts">05-26 18:45:37Z</td><td class="ts">sweep-20260526T184519</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">17.9s</td></tr>
-<tr><td class="ts">05-26 18:40:28Z</td><td class="ts">sweep-20260526T184010</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">18.4s</td></tr>
-<tr><td class="ts">05-26 18:37:05Z</td><td class="ts">sweep-20260526T183509</td><td class="num">117 / 208</td><td class="num"><span class="pill pill-60">56.2%</span></td><td class="num">91</td><td class="num">116.6s</td></tr>
-<tr><td class="ts">05-26 18:32:35Z</td><td class="ts">sweep-20260526T183031</td><td class="num">119 / 208</td><td class="num"><span class="pill pill-60">57.2%</span></td><td class="num">89</td><td class="num">123.7s</td></tr>
-<tr><td class="ts">05-26 18:25:31Z</td><td class="ts">sweep-20260526T182513</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">18.4s</td></tr>
-<tr><td class="ts">05-26 18:20:37Z</td><td class="ts">sweep-20260526T182020</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">16.4s</td></tr>
-<tr><td class="ts">05-26 18:15:37Z</td><td class="ts">sweep-20260526T181521</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">16.9s</td></tr>
-<tr><td class="ts">05-26 18:10:37Z</td><td class="ts">sweep-20260526T181015</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">22.5s</td></tr>
-<tr><td class="ts">05-26 18:05:32Z</td><td class="ts">sweep-20260526T180515</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">16.4s</td></tr>
-<tr><td class="ts">05-26 18:00:33Z</td><td class="ts">sweep-20260526T180010</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">23.1s</td></tr>
-<tr><td class="ts">05-26 17:55:21Z</td><td class="ts">sweep-20260526T175505</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">16.4s</td></tr>
-<tr><td class="ts">05-26 17:50:24Z</td><td class="ts">sweep-20260526T175004</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">20.4s</td></tr>
-<tr><td class="ts">05-26 17:45:21Z</td><td class="ts">sweep-20260526T174504</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">17.1s</td></tr>
-<tr><td class="ts">05-26 17:40:32Z</td><td class="ts">sweep-20260526T174004</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">28.5s</td></tr>
-<tr><td class="ts">05-26 17:37:03Z</td><td class="ts">sweep-20260526T173504</td><td class="num">120 / 208</td><td class="num"><span class="pill pill-60">57.7%</span></td><td class="num">88</td><td class="num">119.0s</td></tr>
-<tr><td class="ts">05-26 17:32:06Z</td><td class="ts">sweep-20260526T173003</td><td class="num">123 / 208</td><td class="num"><span class="pill pill-60">59.1%</span></td><td class="num">85</td><td class="num">123.1s</td></tr>
-<tr><td class="ts">05-26 17:25:21Z</td><td class="ts">sweep-20260526T172504</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">17.0s</td></tr>
-</table>
-
-<details>
-<summary>&#9656; Show older sweeps (72 more)</summary>
-<table>
-<tr><th>UTC Time</th><th>Snapshot ID</th><th class='num'>Match / Total</th><th class='num'>Match %</th><th class='num'>Differ</th><th class='num'>Wall</th></tr>
-<tr><td class="ts">05-26 17:20:27Z</td><td class="ts">sweep-20260526T172004</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">22.9s</td></tr>
-<tr><td class="ts">05-26 17:15:21Z</td><td class="ts">sweep-20260526T171503</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">17.3s</td></tr>
-<tr><td class="ts">05-26 17:10:22Z</td><td class="ts">sweep-20260526T171004</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">18.4s</td></tr>
-<tr><td class="ts">05-26 17:05:23Z</td><td class="ts">sweep-20260526T170504</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">19.1s</td></tr>
-<tr><td class="ts">05-26 17:00:57Z</td><td class="ts">sweep-20260526T170040</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">17.0s</td></tr>
-<tr><td class="ts">05-26 16:55:19Z</td><td class="ts">sweep-20260526T165504</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">14.4s</td></tr>
-<tr><td class="ts">05-26 16:50:37Z</td><td class="ts">sweep-20260526T165011</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">26.0s</td></tr>
-<tr><td class="ts">05-26 16:45:38Z</td><td class="ts">sweep-20260526T164517</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">20.4s</td></tr>
-<tr><td class="ts">05-26 16:40:39Z</td><td class="ts">sweep-20260526T164022</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">17.2s</td></tr>
-<tr><td class="ts">05-26 16:37:24Z</td><td class="ts">sweep-20260526T163509</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">134.9s</td></tr>
-<tr><td class="ts">05-26 16:32:30Z</td><td class="ts">sweep-20260526T163032</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">117.9s</td></tr>
-<tr><td class="ts">05-26 16:25:24Z</td><td class="ts">sweep-20260526T162510</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">13.9s</td></tr>
-<tr><td class="ts">05-26 16:20:37Z</td><td class="ts">sweep-20260526T162019</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">18.0s</td></tr>
-<tr><td class="ts">05-26 16:15:30Z</td><td class="ts">sweep-20260526T161515</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">15.2s</td></tr>
-<tr><td class="ts">05-26 16:10:38Z</td><td class="ts">sweep-20260526T161018</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">20.4s</td></tr>
-<tr><td class="ts">05-26 16:05:24Z</td><td class="ts">sweep-20260526T160503</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">20.9s</td></tr>
-<tr><td class="ts">05-26 16:00:41Z</td><td class="ts">sweep-20260526T160004</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">37.5s</td></tr>
-<tr><td class="ts">05-26 15:55:19Z</td><td class="ts">sweep-20260526T155504</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">15.3s</td></tr>
-<tr><td class="ts">05-26 15:50:29Z</td><td class="ts">sweep-20260526T155003</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">26.1s</td></tr>
-<tr><td class="ts">05-26 15:45:22Z</td><td class="ts">sweep-20260526T154504</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">18.1s</td></tr>
-<tr><td class="ts">05-26 15:40:32Z</td><td class="ts">sweep-20260526T154008</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">23.2s</td></tr>
-<tr><td class="ts">05-26 15:37:03Z</td><td class="ts">sweep-20260526T153504</td><td class="num">125 / 208</td><td class="num"><span class="pill pill-60">60.1%</span></td><td class="num">83</td><td class="num">118.8s</td></tr>
-<tr><td class="ts">05-26 15:32:08Z</td><td class="ts">sweep-20260526T153004</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">124.4s</td></tr>
-<tr><td class="ts">05-26 15:25:20Z</td><td class="ts">sweep-20260526T152503</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">16.6s</td></tr>
-<tr><td class="ts">05-26 15:20:32Z</td><td class="ts">sweep-20260526T152008</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">23.6s</td></tr>
-<tr><td class="ts">05-26 15:15:49Z</td><td class="ts">sweep-20260526T151532</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">16.5s</td></tr>
-<tr><td class="ts">05-26 15:10:48Z</td><td class="ts">sweep-20260526T151017</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">30.6s</td></tr>
-<tr><td class="ts">05-26 15:05:32Z</td><td class="ts">sweep-20260526T150511</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">20.7s</td></tr>
-<tr><td class="ts">05-26 15:00:55Z</td><td class="ts">sweep-20260526T150037</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">17.9s</td></tr>
-<tr><td class="ts">05-26 14:55:31Z</td><td class="ts">sweep-20260526T145517</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">14.4s</td></tr>
-<tr><td class="ts">05-26 14:50:36Z</td><td class="ts">sweep-20260526T145017</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">18.2s</td></tr>
-<tr><td class="ts">05-26 14:45:24Z</td><td class="ts">sweep-20260526T144507</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">16.2s</td></tr>
-<tr><td class="ts">05-26 14:40:30Z</td><td class="ts">sweep-20260526T144003</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">26.7s</td></tr>
-<tr><td class="ts">05-26 14:36:57Z</td><td class="ts">sweep-20260526T143503</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">114.1s</td></tr>
-<tr><td class="ts">05-26 14:32:12Z</td><td class="ts">sweep-20260526T143004</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">128.5s</td></tr>
-<tr><td class="ts">05-26 14:25:23Z</td><td class="ts">sweep-20260526T142504</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">19.4s</td></tr>
-<tr><td class="ts">05-26 14:20:25Z</td><td class="ts">sweep-20260526T142004</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">21.1s</td></tr>
-<tr><td class="ts">05-26 14:15:24Z</td><td class="ts">sweep-20260526T141504</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">20.1s</td></tr>
-<tr><td class="ts">05-26 14:10:30Z</td><td class="ts">sweep-20260526T141004</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">26.1s</td></tr>
-<tr><td class="ts">05-26 14:05:24Z</td><td class="ts">sweep-20260526T140503</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">20.3s</td></tr>
-<tr><td class="ts">05-26 14:01:00Z</td><td class="ts">sweep-20260526T140035</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">25.1s</td></tr>
-<tr><td class="ts">05-26 13:55:17Z</td><td class="ts">sweep-20260526T135503</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">14.1s</td></tr>
-<tr><td class="ts">05-26 13:50:41Z</td><td class="ts">sweep-20260526T135022</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">19.3s</td></tr>
-<tr><td class="ts">05-26 13:45:40Z</td><td class="ts">sweep-20260526T134524</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">16.1s</td></tr>
-<tr><td class="ts">05-26 13:42:07Z</td><td class="ts">sweep-20260526T134013</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">114.1s</td></tr>
-<tr><td class="ts">05-26 13:37:08Z</td><td class="ts">sweep-20260526T133516</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">111.6s</td></tr>
-<tr><td class="ts">05-26 13:32:20Z</td><td class="ts">sweep-20260526T133022</td><td class="num">126 / 208</td><td class="num"><span class="pill pill-60">60.6%</span></td><td class="num">82</td><td class="num">118.5s</td></tr>
-<tr><td class="ts">05-26 13:25:28Z</td><td class="ts">sweep-20260526T132510</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">17.1s</td></tr>
-<tr><td class="ts">05-26 13:20:41Z</td><td class="ts">sweep-20260526T132025</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">15.2s</td></tr>
-<tr><td class="ts">05-26 13:15:32Z</td><td class="ts">sweep-20260526T131517</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">15.2s</td></tr>
-<tr><td class="ts">05-26 13:10:23Z</td><td class="ts">sweep-20260526T131004</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">19.5s</td></tr>
-<tr><td class="ts">05-26 13:05:31Z</td><td class="ts">sweep-20260526T130514</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">17.5s</td></tr>
-<tr><td class="ts">05-26 13:00:51Z</td><td class="ts">sweep-20260526T130031</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">19.7s</td></tr>
-<tr><td class="ts">05-26 12:55:20Z</td><td class="ts">sweep-20260526T125504</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">16.5s</td></tr>
-<tr><td class="ts">05-26 12:50:35Z</td><td class="ts">sweep-20260526T125020</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">15.1s</td></tr>
-<tr><td class="ts">05-26 12:45:58Z</td><td class="ts">sweep-20260526T124541</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">16.6s</td></tr>
-<tr><td class="ts">05-26 12:40:35Z</td><td class="ts">sweep-20260526T124019</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">16.0s</td></tr>
-<tr><td class="ts">05-26 12:37:08Z</td><td class="ts">sweep-20260526T123515</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">113.9s</td></tr>
-<tr><td class="ts">05-26 12:32:28Z</td><td class="ts">sweep-20260526T123019</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">128.4s</td></tr>
-<tr><td class="ts">05-26 12:25:22Z</td><td class="ts">sweep-20260526T122506</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">15.6s</td></tr>
-<tr><td class="ts">05-26 12:20:27Z</td><td class="ts">sweep-20260526T122011</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">15.9s</td></tr>
-<tr><td class="ts">05-26 12:15:33Z</td><td class="ts">sweep-20260526T121515</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">17.9s</td></tr>
-<tr><td class="ts">05-26 12:10:30Z</td><td class="ts">sweep-20260526T121014</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">16.7s</td></tr>
-<tr><td class="ts">05-26 12:05:39Z</td><td class="ts">sweep-20260526T120512</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">26.7s</td></tr>
-<tr><td class="ts">05-26 12:00:58Z</td><td class="ts">sweep-20260526T120017</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">41.0s</td></tr>
-<tr><td class="ts">05-26 11:55:18Z</td><td class="ts">sweep-20260526T115503</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">14.9s</td></tr>
-<tr><td class="ts">05-26 11:50:20Z</td><td class="ts">sweep-20260526T115004</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">15.7s</td></tr>
-<tr><td class="ts">05-26 11:45:21Z</td><td class="ts">sweep-20260526T114504</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">16.6s</td></tr>
-<tr><td class="ts">05-26 11:40:23Z</td><td class="ts">sweep-20260526T114003</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">19.7s</td></tr>
-<tr><td class="ts">05-26 11:35:36Z</td><td class="ts">sweep-20260526T113521</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">15.5s</td></tr>
-<tr><td class="ts">05-26 11:32:01Z</td><td class="ts">sweep-20260526T113003</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">117.9s</td></tr>
-<tr><td class="ts">05-26 11:25:21Z</td><td class="ts">sweep-20260526T112504</td><td class="num">127 / 208</td><td class="num"><span class="pill pill-60">61.1%</span></td><td class="num">81</td><td class="num">16.9s</td></tr>
-</table>
-</details>
-
-<h2>Cost so far (live measurements)</h2>
-
-<div class="cost-tile">
-<span class="v">3487s</span>
-<span class="l">Total compute time (96 sweeps)</span>
-</div>
-<div class="cost-tile">
-<span class="v">~0.969</span>
-<span class="l">Credits used</span>
-</div>
-<div class="cost-tile">
-<span class="v">~$3.39</span>
-<span class="l">$ spent (Enterprise @ $3.50)</span>
-</div>
-<div class="cost-tile">
-<span class="v">~36.3s</span>
-<span class="l">Avg sweep</span>
-</div>
-
-<div class="callout">
-<strong>Daily projection at observed cadence:</strong> 36.3s avg &times; 288 sweeps/day = 10461s = 2.91 credits/day. At Enterprise ~$3.50/credit: <strong>~$10.17/day = ~$305/month</strong>. Cost continues to track well below the $420-500 v2 plan estimate.
-</div>
-
-<h2>How to read the signal</h2>
-<ul>
-<li><b>MATCH count near 208</b> = clone and prod are aligned. Healthy frozen-clone state right after a fresh clone.</li>
-<li><b>MATCH count drops sharply</b> = an Airbyte sync run just landed on prod and bulk-UPSERTed many streams.</li>
-<li><b>MATCH count slowly drifts down</b> over hours = steady prod writes accumulate while clone stays frozen. <b>What you see above.</b></li>
-<li><b>MATCH count climbs back up</b> = airbyte-philz cron has resumed and clone is catching up.</li>
-<li><b>Specific streams in DIFFER for long streaks</b> = forensic candidates (per-stream subcollection drill-down coming in a future board).</li>
-</ul>
-
-<h2>Architecture</h2>
-<table>
-<tr><th>Component</th><th>Location</th></tr>
-<tr><td>Cloud Run service <code>cadence</code></td><td><code>acmedev-platform-hq</code> us-central1</td></tr>
-<tr><td>Cloud Scheduler <code>cadence-tick-5m</code></td><td><code>*/5 * * * *</code> UTC</td></tr>
-<tr><td>Service account</td><td><code>cadence-svc@acmedev-platform-hq.iam</code></td></tr>
-<tr><td>Snowflake source/target</td><td><code>AIRBYTE_DB</code> + <code>AIRBYTE_CLONE</code> on ZN77432 (philzcoffee account)</td></tr>
-<tr><td>Snowflake warehouse</td><td><code>DEVELOPER_WH</code> (X-Small)</td></tr>
-<tr><td>Snowflake user</td><td><code>JOEY_BE</code> via JWT keypair</td></tr>
-<tr><td>Storage</td><td>Firestore <code>cadence-snapshots</code> on acmedev-platform-hq</td></tr>
-<tr><td>Repo</td><td><a href="https://github.com/acmedevUS/cadence" style="color:#6FC3DF">github.com/acmedevUS/cadence</a></td></tr>
-<tr><td>Plan v2</td><td><a href="/airbyte-migration/plan-cadence-microservice-v2.html" style="color:#6FC3DF">plan-cadence-microservice-v2.html</a></td></tr>
-<tr><td>Reset design</td><td><a href="/airbyte-migration/design-cadence-reset.html" style="color:#6FC3DF">design-cadence-reset.html</a> &middot; <a href="/airbyte-migration/plan-cadence-reset-build.html" style="color:#6FC3DF">plan</a> &middot; <a href="/airbyte-migration/estimate-cadence-reset-build.html" style="color:#6FC3DF">estimate</a></td></tr>
-</table>
-
-<h2>Open follow-ups</h2>
-<ul>
-<li><b>This page is a static snapshot.</b> Live cadence dashboard at <code>https://cadence-d5vc4tye3a-uc.a.run.app/dashboard</code> requires an identity token. Public-access path: IAP wrap or gate.js. Separate board.</li>
-<li><b>Top-N DIFFER stream listing</b> &mdash; snapshot doc currently holds tallies only. Per-stream verdicts in subcollection would unlock forensic drill-down.</li>
-<li><b>/reset/* surface in C#</b> &mdash; designed + planned + estimated. Next build target (Board 10, 15 pts). Brings pause/wipe/baseline operations into the service itself, retiring out-of-band Python.</li>
-<li><b>Cadence.Driver</b> (steering wheel console) &mdash; designed; awaiting plan + estimate. Step-by-step approval mode for cadence runs.</li>
-<li><b>Live cost telemetry</b> &mdash; QUERY_HISTORY_BY_SESSION not available; switch to INFORMATION_SCHEMA.QUERY_HISTORY with query_tag filter to pull real Snowflake spend per sweep.</li>
-</ul>
-
-<div class="footer">
-cadence &middot; live since 2026-05-24 21:31 UTC &middot; 96 snapshots in current window<br>
-Generated 2026-05-26 19:27 UTC from /dashboard endpoint of acmedev-platform-hq cadence service
-</div>
-
-</div>
-</body>
-</html>
+<h1>Is anything actually wrong?</h1>
+<p class="subtitle">AIRBYTE_DB (prod) vs AIRBYTE_CLONE -- classified Clean / Cosmetic / Benign / Signal. Noise (sync lag, staleness, explained) is filtered; only genuine Signal is surfaced.</p><div class="hero red"><span class="big">1 SIGNAL</span><span class="lbl">genuinely out of whack -- needs attention</span></div><div class="counts"><div><span class="n c-clean">121</span><span class="l">Clean</span></div><div><span class="n c-cos">0</span><span class="l">Cosmetic</span></div><div><span class="n c-ben">86</span><span class="l">Benign</span></div><div><span class="n c-sig">1</span><span class="l">Signal</span></div></div><h2>Signals -- what's out of whack</h2><div class="sig"><span class="name">ECOMM.SPREE_CMS_SECTIONS</span><div class="row"><b>why</b> &nbsp;dead/stuck sync: clone 367.9h behind (>72h ceiling)</div><div class="row"><b>when</b> &nbsp;first diverged 05-28 16:53Z</div><span class="ack">Go.Ack &quot;ECOMM.SPREE_CMS_SECTIONS&quot; &quot;&lt;reason it's explainable&gt;&quot;</span></div><details><summary>&#9656; Benign -- 86 streams (sync lag / staleness / explained)</summary><table><tr><th>Stream</th><th>lag</th><th>reason</th></tr><tr><td>COMTRADE.PHYSICAL_POSITION</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +1; presumed sync lag (verify)</td></tr><tr><td>CROPSTER.INVENTORY</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta 0; presumed sync lag (verify)</td></tr><tr><td>ECOMM.ETHER_AUTHENTICATION_TOKENS</td><td>25.07h</td><td>stale 25.1h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.PURCHASED_GIFT_CARDS</td><td>21.94h</td><td>stale 21.9h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ECOMM.SPREE_ADDRESSES</td><td>16.41h</td><td>stale 16.4h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ECOMM.SPREE_ADJUSTMENTS</td><td>23.95h</td><td>stale 23.9h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_INVENTORY_UNITS</td><td>23.99h</td><td>stale 24.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_LINE_ITEMS</td><td>23.49h</td><td>stale 23.5h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_LOG_ENTRIES</td><td>23.8h</td><td>stale 23.8h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ECOMM.SPREE_OAUTH_ACCESS_TOKENS</td><td>27.69h</td><td>stale 27.7h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_ORDER_PROMOTIONS</td><td>23.95h</td><td>stale 23.9h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ECOMM.SPREE_ORDERS</td><td>23.91h</td><td>stale 23.9h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_PAYMENT_CAPTURE_EVENTS</td><td>23.99h</td><td>stale 24.0h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ECOMM.SPREE_PAYMENTS</td><td>23.8h</td><td>stale 23.8h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_REFUNDS</td><td>20h</td><td>stale 20.0h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ECOMM.SPREE_SHIPMENTS</td><td>23.8h</td><td>stale 23.8h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_SHIPPING_RATES</td><td>22.74h</td><td>stale 22.7h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_STATE_CHANGES</td><td>23.99h</td><td>stale 24.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_STOCK_MOVEMENTS</td><td>22.7h</td><td>stale 22.7h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ECOMM.SPREE_SUB_LITE_SUBSCRIPTION_SPREE_ORDERS</td><td>23.99h</td><td>stale 24.0h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ECOMM.SPREE_SUB_LITE_SUBSCRIPTION_SPREE_VARIANTS</td><td>23.97h</td><td>stale 24.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_SUB_LITE_SUBSCRIPTIONS</td><td>24.21h</td><td>stale 24.2h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ECOMM.SPREE_USERS</td><td>23.31h</td><td>stale 23.3h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.BARISTA_LOGINS</td><td>18.69h</td><td>stale 18.7h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.CART_PRODUCTS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +41257; presumed sync lag (verify)</td></tr><tr><td>ETHER.CARTS</td><td>18h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.CREDITS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +6; presumed sync lag (verify)</td></tr><tr><td>ETHER.FAVORITES</td><td>18.17h</td><td>stale 18.2h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.GIFT_CARDS</td><td>18.18h</td><td>stale 18.2h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.HIDDEN_CARDS</td><td>20.73h</td><td>stale 20.7h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.INITIAL_INVENTORY_COUNT</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +567; presumed sync lag (verify)</td></tr><tr><td>ETHER.INVENTORY</td><td>18.06h</td><td>stale 18.1h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.NOTIFICATION_DEVICES</td><td>18.01h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.ORDER_PRODUCT_ATTRIBUTE_VALUES</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +101031; presumed sync lag (verify)</td></tr><tr><td>ETHER.ORDER_PRODUCT_DISCOUNTS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +1010; presumed sync lag (verify)</td></tr><tr><td>ETHER.ORDER_PRODUCT_TAXES</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +4759; presumed sync lag (verify)</td></tr><tr><td>ETHER.ORDER_PRODUCTS</td><td>18.03h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.ORDER_TAXES</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +3427; presumed sync lag (verify)</td></tr><tr><td>ETHER.ORDERS</td><td>18h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.ORDERS_PROMOTIONS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +26; presumed sync lag (verify)</td></tr><tr><td>ETHER.PAYMENT_SOURCES</td><td>19.02h</td><td>stale 19.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.PRODUCTS</td><td>23.17h</td><td>stale 23.2h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.REACTIONS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +5548; presumed sync lag (verify)</td></tr><tr><td>ETHER.REFUNDS</td><td>18.12h</td><td>stale 18.1h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.RESERVATIONS</td><td>18.01h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.SALES_LINE_ITEMS_ALL</td><td>18.04h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.SALES_LINE_ITEMS_ATTRIBUTES</td><td>18h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.SALES_LINE_ITEMS_BAG</td><td>19.41h</td><td>stale 19.4h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.SALES_LINE_ITEMS_BEVERAGE</td><td>18.02h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.SALES_LINE_ITEMS_BOTTLE</td><td>20.89h</td><td>stale 20.9h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.SALES_LINE_ITEMS_FOOD</td><td>18.2h</td><td>stale 18.2h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.SALES_LINE_ITEMS_MERCHANDISE</td><td>15.04h</td><td>stale 15.0h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.SALES_ORDERS</td><td>18h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.STORE_ATTRIBUTE_VALUE_DISABLED</td><td>19.25h</td><td>stale 19.2h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.STORE_VARIANT_DISABLED</td><td>18.08h</td><td>stale 18.1h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.TAX_RATES</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +9112; presumed sync lag (verify)</td></tr><tr><td>ETHER.TRANSACTIONS_V3</td><td>18h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- data clean, feed the clone; windowed-match clean</td></tr><tr><td>ETHER.USERS</td><td>18.02h</td><td>stale 18.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>ETHER.USERS_ROLES</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta -5; presumed sync lag (verify)</td></tr><tr><td>ETHER.USERS_STORES</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta -4; presumed sync lag (verify)</td></tr><tr><td>GREENHOUSE.APPLICATIONS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +150; presumed sync lag (verify)</td></tr><tr><td>GREENHOUSE.CANDIDATES</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +132; presumed sync lag (verify)</td></tr><tr><td>GREENHOUSE.INTERVIEWS</td><td>25.05h</td><td>sync lag 25.1h within 48h tolerance</td></tr><tr><td>GREENHOUSE.JOBS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta 0; presumed sync lag (verify)</td></tr><tr><td>GREENHOUSE.OFFERS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +3; presumed sync lag (verify)</td></tr><tr><td>NETSUITE.CUSTOM_FULFILLMENTITEM</td><td>24.68h</td><td>stale 24.7h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>NETSUITE.CUSTOM_INVENTORY</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +705; presumed sync lag (verify)</td></tr><tr><td>NETSUITE.CUSTOM_PRODUCTION</td><td>24.1h</td><td>stale 24.1h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>NETSUITE.CUSTOM_SALES_ORDER</td><td>24.21h</td><td>stale 24.2h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr><tr><td>NETSUITE.CUSTOM_WHOLESALE</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +49; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.ACCOUNT_SUMMARY</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +882; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.CAMPAIGN_ACCOUNT</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +4395; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.CAMPAIGN_ADJUSTMENT_SUMMARY</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta 0; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.CAMPAIGN_SUMMARY</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +13; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.CHECK_HEADER</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +32461; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.LIFECYCLE_MESSAGING_INFO</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +1971; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.SCORE_CURRENT</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +3130; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.WALLET</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +10415; presumed sync lag (verify)</td></tr><tr><td>PAYTRONIX.WALLET_EXPIRATION</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta -86; presumed sync lag (verify)</td></tr><tr><td>SQUARE.CUSTOMERS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta 0; presumed sync lag (verify)</td></tr><tr><td>SQUARE.ITEMS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta 0; presumed sync lag (verify)</td></tr><tr><td>SQUARE.MODIFIER_LIST</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta 0; presumed sync lag (verify)</td></tr><tr><td>SQUARE.ORDERS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +33542; presumed sync lag (verify)</td></tr><tr><td>SQUARE.PAYMENTS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +4968; presumed sync lag (verify)</td></tr><tr><td>SQUARE.REFUNDS</td><td>-</td><td>no timestamp cursor -- unwindowed; row delta +1422; presumed sync lag (verify)</td></tr><tr><td>UBEREATS.ORDER_DETAILS</td><td>24h</td><td>stale 24.0h (>6h tol, <72h ceiling) -- unverified, feed the clone</td></tr></table></details><div class="footer">snapshot sweep-20260528T205005 &middot; raw match 121/208 (58.2%) &middot; verdicts are the truth, raw match% is just the fingerprint<br>generated 2026-05-28 20:52 UTC from cadence /reset/status + /escalate + /firstdiff</div></div></body></html>
