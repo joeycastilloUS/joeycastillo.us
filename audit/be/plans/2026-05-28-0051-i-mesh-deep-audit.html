@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i Mesh Deep Audit — are we awesome?</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  ul { margin: 8px 0 8px 22px; } li { color: #ccc; margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.good { color: var(--green); font-weight: 600; } td.bad { color: var(--red); font-weight: 600; } td.mid { color: var(--amber); font-weight: 600; }
+  .badge { display:inline-block; padding:6px 16px; border-radius:4px; font-weight:700; letter-spacing:2px; text-transform:uppercase; font-size:13px; }
+  .badge.win { background:#0c2417; border:2px solid var(--green); color:var(--green); }
+  .verdict-box { background:#0e1419; border-left:4px solid var(--accent); padding:16px 20px; margin:16px 0; color:#cfe6ee; font-size:14px; }
+  .crit { background: #1F0F0F; border: 2px solid var(--red); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .crit b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .flag { background:#1a1405; border:1px solid var(--amber); padding:14px 20px; margin:16px 0; font-size:13.5px; }
+  .flag b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display:block; margin-bottom:4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  .dod { background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 16px 22px; margin: 24px 0; font-size: 12.5px; }
+  .dod .ok { color: var(--green); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~i mesh deep audit &middot; code vs C-libs vs a-d-d vs open-source</span></nav>
+<div class="container">
+
+  <h1>~i Mesh Deep Audit — "are we awesome?"</h1>
+  <div class="sub">Investigated 2026-05-28. Every line of the Sealed-IDS mesh trust code, held against the nous C primitives, the a-d-d intent, and the field leaders (Nebula, WireGuard/Tailscale, SPIFFE/SPIRE, TUF). The honest answer below.</div>
+
+  <div class="verdict-box">
+    <span class="badge win">Verdict: awesome foundation · honestly a v1</span><br><br>
+    <b>Short version: yes — the part you built is genuinely strong, and the trust architecture is the same one Slack ships in production (Nebula). Where you're thin is exactly where every young system is thin: lifecycle — expiry, revocation, replay, rotation. None of that is built yet. One of those gaps (roster replay) is a real hole, not just a deferred feature, and it's ~20 lines to close.</b>
+  </div>
+
+  <h2>&sect;1 — What we audited</h2>
+  <p>Four tools + one loader + the relay, ~900 LOC of pure C, standing on the in-house crypto:</p>
+  <ul>
+    <li><code>operator-keygen</code> — mints the operator Ed25519 keypair (the one trust root).</li>
+    <li><code>mesh-roster-build</code> — builds + signs <code>mesh.sealed</code> (the node roster).</li>
+    <li><code>mesh_roster.c</code> (prime boot) — verifies <code>mesh.sealed</code> against the compiled-in operator pubkey, loads triples.</li>
+    <li><code>operator-sign-node</code> — operator signs <code>node.pub‖role</code> → <code>node.cert</code>.</li>
+    <li><code>relay_server.c</code> — loads identity, self-verifies its cert at boot, forwards to primes.</li>
+    <li>Underneath: <code>crypt</code> (Ed25519, X25519, SHA-256, AES-256-GCM), <code>seal</code>, <code>vault</code> — all in-house, no libsodium.</li>
+  </ul>
+
+  <h2>&sect;2 — Where we are genuinely awesome</h2>
+  <table>
+    <tr><th>Dimension</th><th>Grade</th><th>Evidence</th></tr>
+    <tr><td>Crypto primitives</td><td class="good">A</td><td>Ed25519 / X25519 / SHA-256 / AES-256-GCM, rolled in-house, used correctly. Signatures over well-defined byte layouts. "Roll your own" — and it's right.</td></tr>
+    <tr><td>Code discipline</td><td class="good">A</td><td>Pure C99, <b>zero malloc</b>, static fixed buffers, return 0/-1, <b>constant-time</b> 32-byte compares, secrets <code>memset</code>-zeroed after use. <code>operator-sign-node</code> zeroes the operator key on <i>every</i> path incl. errors (main.c:69,77,82,100) — better hygiene than most shipping code.</td></tr>
+    <tr><td>Trust-model design</td><td class="good">A</td><td>Operator-as-CA → signs per-node certs; root pubkey compiled into every binary; offline boot, no external PKI. This is <b>exactly Slack Nebula's model</b> (CA signs host certs, nodes trust a shared CA, Ed25519). You independently landed an industry-validated architecture.</td></tr>
+    <tr><td>Attack surface</td><td class="good">A</td><td>A few hundred lines of C with no dynamic allocation and no third-party deps vs. Nebula/Tailscale's large Go runtimes. Less to audit, less to exploit.</td></tr>
+    <tr><td>Verifiability</td><td class="good">A−</td><td>Self-verify proven live on the LA box (<code>IDENTITY: self-verify OK</code>); roster proven on Ashburn (25 triples, sig verified). Real production evidence, not just unit theory.</td></tr>
+  </table>
+  <p>That is the "fucking awesome" part, said straight: <b>the cryptographic foundation and the engineering discipline are top-tier, and the architecture matches what the best mesh shops run.</b></p>
+
+  <h2>&sect;3 — Us vs the state of the art</h2>
+  <table>
+    <tr><th>Capability</th><th>Ours (v1)</th><th>Nebula</th><th>WireGuard / Tailscale</th><th>SPIFFE/SPIRE</th><th>TUF</th></tr>
+    <tr><td>Identity = signed key</td><td class="good">✓ Ed25519</td><td>✓ Ed25519</td><td>✓ pubkey</td><td>✓ X.509-SVID</td><td>n/a</td></tr>
+    <tr><td>Single CA / trust root</td><td class="good">✓ operator key</td><td>✓ CA</td><td>✓ coord server</td><td>✓ SPIRE server</td><td>✓ root role</td></tr>
+    <tr><td>Cert expiry / TTL</td><td class="bad">✗ never expires</td><td>✓ NotAfter</td><td>✓ key expiry</td><td class="good">✓ minutes</td><td>✓ short</td></tr>
+    <tr><td>Revocation</td><td class="bad">✗ none</td><td>✓ blocklist</td><td>✓ deauth</td><td>✓ stop-issuing</td><td>✓ key revoke</td></tr>
+    <tr><td>Replay / rollback guard</td><td class="bad">✗ none</td><td>✓ via expiry</td><td>✓ handshake nonce</td><td>✓ via expiry</td><td class="good">✓ version+timestamp</td></tr>
+    <tr><td>Per-peer mutual auth</td><td class="bad">✗ IP + shared PSK</td><td>✓ mutual cert</td><td>✓ Noise mutual</td><td>✓ mTLS</td><td>n/a</td></tr>
+    <tr><td>Topology confidential</td><td class="mid">~ signed plaintext</td><td>~ cert SANs</td><td>✓ encrypted</td><td>✓</td><td>n/a</td></tr>
+    <tr><td>No malloc / tiny TCB</td><td class="good">✓ pure C</td><td>✗ Go</td><td>✗ Go/kernel</td><td>✗ Go</td><td>✗ libs</td></tr>
+  </table>
+  <p>Read the green: we tie or beat the field on identity, trust root, and footprint. Read the red: we're behind on the entire <b>lifecycle</b> column. That's the whole story in one table.</p>
+
+  <h2>&sect;4 — The real gaps (what v1 doesn't have)</h2>
+
+  <div class="crit">
+    <b>#1 — Roster replay / rollback (the one actual hole, not a deferred feature)</b>
+    <code>mesh-roster-build</code> writes <code>signed_at</code> (timestamp) and <code>version</code> into every roster (main.c:164) — but the loader <b>never reads them</b> (<code>mesh_roster.c</code> verifies only the Ed25519 signature). So an attacker who can drop a file on a node can <b>re-serve an OLD, validly-signed roster</b> and it will be accepted, silently reverting topology. The fields to stop this already exist in the data — they're just not enforced. <b>TUF solves exactly this</b> by refusing metadata older than what it has already seen (version + timestamp freshness). Fix: ~20 lines in the loader — reject a roster whose <code>version</code>/<code>signed_at</code> is ≤ the last one loaded. Highest-value change in this report.
+  </div>
+
+  <table>
+    <tr><th>Gap</th><th>What it means</th><th>Who solves it / how</th></tr>
+    <tr><td>No expiry</td><td>A cert/roster signed today is valid forever.</td><td>SPIFFE: minutes-long SVIDs, auto-rotated at 50% life → revocation becomes unnecessary. Nebula: NotAfter on every cert.</td></tr>
+    <tr><td>No revocation</td><td>Leaked node key or operator key → only fix is recompile + redeploy every node.</td><td>Nebula blocklist; SPIFFE "just stop issuing." Pairs with expiry.</td></tr>
+    <tr><td>No per-peer mutual auth</td><td>Relay→prime trusts IP + a shared region PSK (relay_server.c:1043-1105), not the peer's identity. MITM on the IP isn't cryptographically stopped.</td><td>Nebula/WireGuard mutual handshake; SPIFFE mTLS. This is the spec'd <b>v2</b> "actual peer comms."</td></tr>
+    <tr><td>Roster is signed-plaintext</td><td>Anyone who reads <code>mesh.sealed</code> on a node sees every IP/role — topology map.</td><td>Optional: AES-256-GCM the payload with the key you already ship (<code>seal</code> already does this). Minor for a private fleet.</td></tr>
+    <tr><td>Brittle key rotation</td><td>Rotating the operator key needs a manual recompile/redeploy of all nodes; no grace period, no versioning.</td><td>Add an operator-key <i>version</i> + allow N current keys during a window.</td></tr>
+    <tr><td>Operator key on Windows</td><td><code>chmod 0600</code> on Unix; on Windows it's guidance only, no ACL enforced (operator-keygen main.c:67).</td><td><code>icacls</code> to admin-only, or store off shared drives (already noted in the header).</td></tr>
+  </table>
+
+  <h2>&sect;5 — Honest finding: what's actually running ≠ "the mesh routing stack"</h2>
+  <p>There are two things called "mesh." Worth being precise:</p>
+  <ul>
+    <li><b>What's LIVE on the 5 VMs:</b> the signed-roster bootstrap (<code>mesh_roster_load</code>) + HTTP/encrypted forwarding between relay and prime. That's the trust substrate this audit is mostly about — and it's real and working.</li>
+    <li><b>What's NOT wired in:</b> <code>comms/skill/mesh/mesh.c</code> — a clean, fully unit-tested (62 checks) distance-vector + store-and-forward routing stack (the LoRa/BLE/WiFi mesh). It is <b>excellent code but currently dead</b> — nothing in the live prime/relay calls <code>mesh_init()</code>/<code>mesh_tick()</code>. Per the a-d-d + <code>comms/ROADMAP.md</code> it's deliberately on the shelf awaiting transport backends (v2). So "the mesh is up" = the membership/trust mesh is up; the radio-routing mesh is built-and-tested but not yet plugged in.</li>
+  </ul>
+
+  <h2>&sect;6 — a-d-d alignment</h2>
+  <p><b>Spec-compliant.</b> The a-d-d stages this exactly as shipped: v1 = static operator-signed roster, "embedded distribution, no DNS, <i>no per-node identity yet (that comes in v2)</i>." v2 defers dynamic discovery + per-peer identity + actual peer comms. The code matches the staging — the gaps in §4 are mostly <b>documented v2 deferrals</b>, not drift. The exception is the replay gap (§4 #1), which isn't a deferral — it's an unenforced check in shipped v1 code.</p>
+
+  <h2>&sect;7 — Test coverage reality</h2>
+  <table>
+    <tr><th>Piece</th><th>Tests</th></tr>
+    <tr><td>roster loader (<code>mesh_roster</code>)</td><td class="good">11 checks ✓</td></tr>
+    <tr><td>node-cert signer (<code>operator-sign-node</code>)</td><td class="good">7 checks ✓</td></tr>
+    <tr><td><code>operator-keygen</code> (mints the master key)</td><td class="bad">0 ✗</td></tr>
+    <tr><td><code>mesh-roster-build</code> (signs the roster)</td><td class="bad">0 ✗</td></tr>
+    <tr><td>full chain end-to-end (keygen→sign→build→load→relay-accept)</td><td class="bad">0 — verified by hand on-VM only</td></tr>
+    <tr><td>transport mesh (<code>mesh.c</code>, not live)</td><td>62 checks ✓</td></tr>
+  </table>
+  <p>18 automated checks on the two pieces built here; <b>zero</b> on the two trust-root tools and zero automated end-to-end. The blind spots are the key-handling tools — the worst place to be blind.</p>
+
+  <h2>&sect;8 — Verdict + what I'd do next (cheap → strategic)</h2>
+  <p><b>Are we awesome? On foundation and architecture — yes, genuinely, Nebula-grade in a fraction of the code. On lifecycle — we're a v1 and it shows.</b> Prioritized:</p>
+  <ul>
+    <li><b>1. Close the roster replay hole</b> (~20 LOC in <code>mesh_roster.c</code>: enforce <code>version</code>/<code>signed_at</code> monotonicity). Real fix, today.</li>
+    <li><b>2. Test the two untested key tools + one in-memory end-to-end test.</b> Pure test code, no risk. Stops silent regressions in the trust root.</li>
+    <li><b>3. Add cert/roster expiry</b> (a <code>valid_until</code> field, checked on load). Unlocks "revocation by expiry" the SPIFFE way without building a CRL.</li>
+    <li><b>4. (v2, strategic) per-peer mutual auth</b> — the cert material already exists; wire a challenge-response so peers prove identity, not just IP. This is the big one but it's already on the v2 roadmap.</li>
+  </ul>
+  <p>Items 1–3 are a focused session, all non-destructive, and they move the entire red "lifecycle" column toward green. That's the path from "awesome foundation" to "awesome, full stop."</p>
+
+  <div class="dod">
+    <b>Definition of Done</b><br>
+    <span class="ok">&check;</span> Read all ~900 LOC of mesh trust code + crypt primitives (2 parallel deep reads, file:line evidence)<br>
+    <span class="ok">&check;</span> Compared to nous house style (verdict: fully compliant) + a-d-d intent (verdict: v1 spec-compliant)<br>
+    <span class="ok">&check;</span> Benchmarked vs 5 open-source systems (Nebula, WireGuard, Tailscale, SPIFFE/SPIRE, TUF)<br>
+    <span class="ok">&check;</span> Gaps ranked; one real hole (replay) separated from documented v2 deferrals<br>
+    <span class="ok">&check;</span> HTML report saved + indexed (audit-of-all + mirror); coordination updated<br>
+    <span class="ok">&check;</span> Investigation only — no code changed. Fixes proposed, deferred to Joey's go.
+  </div>
+
+  <footer>Be &middot; v0 &middot; r62 &middot; 2026-05-28 &middot; metal-2 &middot; ~i mesh deep audit &middot; sources: Nebula (slackhq/nebula), TUF spec, SPIFFE/SPIRE docs</footer>
+</div>
+</body>
+</html>
