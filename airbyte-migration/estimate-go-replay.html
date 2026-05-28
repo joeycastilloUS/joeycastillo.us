@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~e Go.Replay -- Board 19</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.board{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}.board.blocked{border-left-color:#f0ad4e;opacity:0.92}
+.board h3{color:#6FC3DF;font-size:18px;margin-bottom:8px}
+.item{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:6px 0;font-size:13px}
+.item .pts{display:inline-block;background:#6FC3DF;color:#111;padding:2px 8px;border-radius:3px;font-weight:700;margin-right:8px;min-width:28px;text-align:center}
+.item .cmd{display:inline-block;background:#222;color:#5cb85c;padding:2px 6px;border-radius:3px;font-size:11px;margin-left:8px;font-family:'Consolas',monospace}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~e Go.Replay</nav>
+
+<h1>Sizing: Go.Replay</h1>
+<p class="sub">Plan: <code>be/plans/2026-05-28-2135-plan-go-replay.html</code>. One board. <b>Board 19</b> (19 pts) ships the time machine end-to-end &mdash; endpoint, three render modes, baseline cuts, publish. Unblocked; the snapshots + endpoints it reads already shipped (Boards 14-18).</p>
+<span class="banner">Estimate &mdash; Ready for ~b</span>
+
+<h2>Sizing rationale</h2>
+<table>
+<tr><th>Mass</th><th>Pts</th><th>Why</th></tr>
+<tr><td>GET /replay aggregate series + window (First Move)</td><td>3</td><td>One Firestore read ordered by time, project counts, optional from/to. Same shape as /firstdiff -- the walk primitive already exists. Cheap, proving.</td></tr>
+<tr><td>Per-stream projection (?stream=)</td><td>3</td><td>Same walk, project one stream from each tick's drifts array, infer Clean by absence, degrade pre-v2. Pure read logic.</td></tr>
+<tr><td>Aggregate renderer (inline-SVG time-lapse + terminal one-liner)</td><td>5</td><td>New launcher modeled on Go.Dash. The SVG stacked-area / multi-line over 127 points is the real work; no framework.</td></tr>
+<tr><td>Stream lane + freeze-frame</td><td>5</td><td>Two more render modes: colored verdict lane w/ flip when+why annotations, plus single-tick reconstruction. Share the endpoint.</td></tr>
+<tr><td>Baseline-cut markers + publish</td><td>3</td><td>Heuristic re-clone detection + cut marker; publish a representative replay; build report; close board.</td></tr>
+</table>
+
+<h2 id="board19">Board 19 -- Go.Replay, time machine over the verdict timeline (19 pts) -- REVIEW THIS</h2>
+<div class="board">
+<h4 style="color:#5cb85c;margin-top:0">Ready</h4>
+<div class="item"><span class="pts">3</span>{GET /replay aggregate verdict-count series -- read cadence-snapshots ordered by time, project [{snapshotId,time,clean,cosmetic,benign,signal}], optional ?from/&to window; mirrors /firstdiff walk (First Move), add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{/replay ?stream= per-tick verdict lane -- project one stream's {time,verdict,reason,lagHours} from each tick's drifts array, Clean-by-absence, pre-driftSchemaVersion-2 degrade to verdict-only + label boundary, add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">5</span>{Go.Replay aggregate time-lapse renderer -- pull /replay, build inline-SVG stacked-area of clean/cosmetic/benign/signal over time + terminal one-liner (window/ticks/first-signal), pop in browser like Go.Dash; no framework, add to, cadence/Go.Replay.ps1 + Go.Replay.bat}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">5</span>{Go.Replay &lt;stream&gt; lane + 'at &lt;time&gt;' freeze-frame -- horizontal verdict-colored timeline with flip markers (when+why) + single-tick full-picture reconstruction, both off the shared endpoint, add to, cadence/Go.Replay.ps1}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{baseline-cut markers (heuristic: clean jumps to ~total = re-clone) so the film doesn't interpolate across a baseline reset + publish a representative replay to joeycastillo.us + build report + close board, add to, joeycastillo.us/airbyte-migration + airbyte-parity be/}<span class="cmd">~a</span></div>
+</div>
+<p style="font-size:12px;color:#888">Critical path 1 &rarr; 2 feed 3 &rarr; 4; 5 last. One Cloud Build deploy after items 1-2 (the endpoint). Verifiable: <code>Go.Replay</code> pops the cascade movie; <code>Go.Replay ECOMM.SPREE_CMS_SECTIONS</code> shows its Clean&rarr;Benign&rarr;Signal flip.</p>
+
+<h2>What Board 19 delivers</h2>
+<p style="font-size:13px">After Board 19 the recorded snapshots stop being a write-only pile. You can watch the migration's drift as a film: the cascade of streams falling out as the clone freezes, and &mdash; once airbyte-philz feeds the clone &mdash; the signals collapsing back to clean. That collapse, on film, is the cutover proof. It also makes "show me from moment one to moment two" a single command instead of a manual snapshot diff.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Board 19 (19 pts) added to be/board.md</div>
+<div class="dod-item">&check; Items 3-5 pts each, Fibonacci</div>
+<div class="dod-item">&check; Board 19 in the 13-21 envelope (19); critical path documented</div>
+<div class="dod-item">&check; Estimate published</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r122 &middot; 2026-05-28 21:35 &middot; ~e Go.Replay</div>
+</body></html>

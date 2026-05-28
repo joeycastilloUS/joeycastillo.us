@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~p Build Go.Replay -- play the movie of the drift</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}.phase .accept strong{color:#5cb85c}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~p Go.Replay</nav>
+
+<h1>Build Go.Replay</h1>
+<p class="sub">Execute <code>be/designs/2026-05-28-2135-design-go-replay.html</code>. A time machine over the verdict timeline: one server endpoint projects the recorded snapshot series, one launcher renders it three ways &mdash; aggregate movie, per-stream lane, freeze-frame. Pure read over data <code>/tick</code> already writes.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> Go.Signal says what's wrong now; Go.FirstDiff says when each broke; Go.Replay shows the whole story unfold &mdash; the clone falling out of sync stream by stream, and (once fed) the signals collapsing back to clean. The cutover, on film.</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td><code>GET /replay</code> server projection of <code>cadence-snapshots</code> (aggregate series; <code>?stream=</code> lane; <code>?at=</code> frame; <code>?from/&to</code> window). <code>Go.Replay.ps1/.bat</code> renderer: inline-SVG aggregate time-lapse + terminal one-liner; per-stream verdict lane w/ flip when+why; single-tick freeze-frame. Baseline-cut markers (heuristic). Publish a representative replay; build report.</td><td>Recomputing fingerprints over history. Changing capture or the 5-min cadence. Replacing Go.Diff (last-2) / Go.FirstDiff (first-divergence). Arbitrary A-vs-B two-frame diff. Forecasting. A charting framework / CDN.</td></tr>
+</table>
+
+<h2>Phases</h2>
+<div class="phase"><h3><span class="num">1</span> GET /replay aggregate series (First Move)</h3>
+<div class="meta">Server reads <code>cadence-snapshots</code> ordered by time, projects <code>[{snapshotId, time, clean, cosmetic, benign, signal}, ...]</code>. Optional <code>?from=</code> / <code>?to=</code> window. Mirrors the /firstdiff walk. No render yet.</div>
+<div class="accept"><strong>Accept:</strong> <code>GET /replay</code> returns the full 127-point curve, time-ordered, counts summing to total per tick. The movie's data exists in one call.</div></div>
+
+<div class="phase"><h3><span class="num">2</span> Per-stream projection (?stream=)</h3>
+<div class="meta">For a given stream, walk the same series and emit <code>[{time, verdict, reason, lagHours}, ...]</code>. Clean inferred by absence from a tick's <code>drifts</code> array. Pre-<code>driftSchemaVersion=2</code> ticks degrade to verdict-only; clamp + label the boundary.</div>
+<div class="accept"><strong>Accept:</strong> <code>/replay?stream=ECOMM.SPREE_CMS_SECTIONS</code> returns its journey -- Clean ticks, then the Benign-stale stretch, then Signal -- each with reason where v2 data exists.</div></div>
+
+<div class="phase"><h3><span class="num">3</span> Go.Replay aggregate renderer</h3>
+<div class="meta">PowerShell launcher (mirrors Go.Dash): pull <code>/replay</code>, build an inline-SVG stacked-area / multi-line of clean/cosmetic/benign/signal over time, write HTML to the site path, pop it. Print a terminal one-liner: window span, tick count, first-signal time.</div>
+<div class="accept"><strong>Accept:</strong> <code>Go.Replay</code> opens an HTML time-lapse showing benign growing + the signal spike as the frozen clone ages; terminal prints the one-line summary. No framework, pure SVG.</div></div>
+
+<div class="phase"><h3><span class="num">4</span> Stream lane + freeze-frame</h3>
+<div class="meta"><code>Go.Replay &lt;stream&gt;</code>: a horizontal verdict-colored lane across the window with flip markers annotated when + why. <code>Go.Replay at &lt;time&gt;</code>: reconstruct one tick's full picture (counts + drift list). Both reuse the Phase 1/2 endpoint params.</div>
+<div class="accept"><strong>Accept:</strong> The lane shows SPREE_CMS_SECTIONS flip Clean&rarr;Benign&rarr;Signal at the right ticks with reasons; <code>at 16:53Z</code> reproduces that tick's verdict counts.</div></div>
+
+<div class="phase"><h3><span class="num">5</span> Baseline cuts + publish</h3>
+<div class="meta">Detect a re-clone heuristically (a tick where clean jumps to ~total) and draw a cut marker so the film doesn't interpolate across a baseline reset. Publish a representative replay to <code>joeycastillo.us/airbyte-migration/</code>; render build report; update index + telemetry; close Board 19.</div>
+<div class="accept"><strong>Accept:</strong> Replay marks any baseline cut in the window; a published replay is live; board closed, DoD green.</div></div>
+
+<h2>Constraints / risks</h2>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td>Pre-v2 snapshots lack per-stream reasons</td><td>Aggregate works on counts (always present); stream lane clamps to "since v2" and labels the boundary.</td></tr>
+<tr><td>Projection cost as the buffer grows</td><td><code>?from/&to</code> window in the contract; retention already caps the buffer. Downsample server-side if needed.</td></tr>
+<tr><td>A re-clone makes the timeline lie (fingerprints reset)</td><td>Heuristic cut marker now; explicit <code>baselineEpoch</code> field on the snapshot doc as the durable follow-up.</td></tr>
+<tr><td>SVG generation in PowerShell is fiddly</td><td>Escape route: fall back to a per-tick verdict-count table -- still a replay, no rewrite.</td></tr>
+</table>
+
+<h2>Board (see ~e)</h2>
+<p style="font-size:13px">~e sizes this as a single <b>Board 19</b> (~19 pts) &mdash; the five phases map to five items. One board, unblocked; the cadence engine + endpoints it reads already shipped (Boards 14-18).</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved + published</div>
+<div class="dod-item">&check; 5 phases with accept criteria</div>
+<div class="dod-item">&check; Inherits ~d decisions (server endpoint, inline SVG, three modes, baseline heuristic)</div>
+<div class="dod-item">&check; Risks incl. pre-v2 degrade + baseline-cut lying</div>
+<div class="dod-item">&check; Hands to ~e for Board 19</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r122 &middot; 2026-05-28 21:35 &middot; ~p Go.Replay</div>
+</body></html>

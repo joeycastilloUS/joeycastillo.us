@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~d Go.Replay -- a time machine over the verdict timeline</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}
+.choice .fork{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}.choice .opts{color:#888;font-size:12px;margin-bottom:6px}
+.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}
+.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.candidate .name{color:#6FC3DF;font-weight:700;font-family:'Consolas',monospace}.candidate .gut{color:#888;font-size:11px}
+.candidate.winner{border-color:#5cb85c}.candidate.winner .name{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+.verdict{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase}
+.v-clean{background:#0d2818;color:#5cb85c}.v-cos{background:#1a2438;color:#6FC3DF}.v-ben{background:#1f1f0a;color:#f0ad4e}.v-sig{background:#2a1414;color:#f06e6e}
+.pmt-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:13px}.pmt-row .lb{color:#f06e6e;font-weight:700}.pmt-row .rp{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~d Go.Replay</nav>
+
+<h1>Go.Replay &mdash; play the movie of the drift</h1>
+<p class="sub">cadence already keeps every 5-minute tick as an immutable snapshot. That pile of snapshots is a film reel nobody has watched. Go.Replay is the projector: step the timeline and watch the clone fall out of sync stream by stream &mdash; and, once it is fed, watch the signals collapse back to clean. Pure read over data that already exists.</p>
+<span class="banner">Design &mdash; Pure Metal</span>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> A time machine over the verdict timeline. cadence persists every <code>/tick</code> as a snapshot carrying verdict counts + a per-stream <code>drifts</code> array. Go.Replay reconstructs the evolution from that series &mdash; aggregate (the whole-system movie), per-stream (one stream's verdict journey), and freeze-frame (the full picture at any past moment). <strong>Intent:</strong> Go.Signal answers "what is wrong NOW." Go.FirstDiff answers "when did each break." Replay answers the question between them &mdash; "show me the whole story unfold." It is the generalization of "show me from moment one to moment two, what is the diff."</div>
+
+<h2>Discovery</h2>
+<ul>
+<li>The buffer already exists: <b>127 snapshots</b> in <code>cadence-snapshots</code>, 5&nbsp;min apart (~10.5h and growing; retention not fired). Each doc: <code>snapshotId</code>, time, <code>clean/cosmetic/benign/signal</code> counts, and a <code>drifts</code> array (non-Clean streams w/ verdict + reason + lag; <code>driftSchemaVersion=2</code>).</li>
+<li>The walk primitive already exists: <code>GET /firstdiff</code> walks the same series server-side to find each stream's first divergence. Replay generalizes that walk from "first frame of trouble" to "the whole film."</li>
+<li><code>Go.Diff</code> already diffs the last 2 sweeps; <code>Go.Dash</code> already renders live HTML from <code>/reset/status</code>. Replay is the same shape, extended over time.</li>
+<li>The story in the reel: clone frozen, prod marching &mdash; streams fall out one by one (the cascade). When airbyte-philz feeds the clone, the same reel runs in reverse: signals collapse to clean. That recovery is the cutover proof, on film.</li>
+<li>Sharp edge: a <code>/reset/baseline</code> (re-clone) is a <b>cut</b> in the film &mdash; fingerprints reset, the timeline restarts. Replay must mark the cut, not interpolate a lie across it.</li>
+</ul>
+
+<h2>Naming Pass</h2>
+<div class="candidate"><span class="name">Go.Timeline</span><span class="gut">descriptive &middot; but a timeline is a static thing; replay is an action you perform on it</span></div>
+<div class="candidate"><span class="name">Go.Rewind</span><span class="gut">VCR verb &middot; but biased to going back; the reel also plays forward (the recovery)</span></div>
+<div class="candidate"><span class="name">Go.Scrub</span><span class="gut">precise for freeze-frame &middot; too narrow -- it is only one of the three modes</span></div>
+<div class="candidate winner"><span class="name">Go.Replay</span><span class="gut">winner &middot; the operator's own word &middot; VCR verb that covers play / scrub / rewind &middot; action over the reel</span></div>
+<p style="font-size:13px;color:#ccc;margin-top:8px">Keep the operator's word. "Replay" is the action (play the recorded reel); the three modes (aggregate / stream / freeze-frame) are arguments to it, not separate launchers &mdash; one verb, like Go.Ack's list/record/clear.</p>
+
+<h2>Shape -- one verb, three modes, one endpoint</h2>
+<table>
+<tr><th>Invocation</th><th>Mode</th><th>Answers</th><th>Render</th></tr>
+<tr><td><code>Go.Replay</code></td><td>Aggregate</td><td>How did the verdict mix evolve across the window? The cascade curve.</td><td>inline-SVG area/lines of clean/cosmetic/benign/signal over time</td></tr>
+<tr><td><code>Go.Replay &lt;stream&gt;</code></td><td>Stream lane</td><td>One stream's journey: Clean &rarr; Benign &rarr; Signal, with the flip ticks + why.</td><td>horizontal verdict-colored lane + flip annotations</td></tr>
+<tr><td><code>Go.Replay at &lt;time&gt;</code></td><td>Freeze-frame</td><td>Reconstruct the full verdict picture at one past tick.</td><td>that snapshot's counts + drift list</td></tr>
+</table>
+<h3>Data flow</h3>
+<div style="background:#0a0a0a;border:1px solid #1f3540;border-radius:6px;padding:14px 18px;margin:10px 0;font-family:Consolas,monospace;font-size:12px;color:#9fdfff;white-space:pre;line-height:1.6">
+cadence-snapshots (Firestore, already written every tick)
+   |
+   v   GET /replay   [?stream=  ?from=  ?to=]      server-side projection (mirrors /firstdiff)
+   |        aggregate: [{snapshotId,time,clean,cosmetic,benign,signal}, ...]
+   |        stream:    [{time, verdict, reason, lagHours}, ...]   (Clean inferred by absence)
+   v
+Go.Replay.ps1   ->   inline-SVG HTML time-lapse  +  terminal one-liner   ->  pops in browser
+</div>
+<p style="font-size:13px"><b>Out of scope:</b> A-vs-B arbitrary two-frame diff (Go.Diff already covers last-2; generalizing is a later nicety), forecasting, and re-running fingerprints over history (replay shows recorded frames, it does not recompute them).</p>
+
+<h2>Choices + Consequences</h2>
+<div class="choice">
+<div class="fork">1. Where does the timeline walk run -- server endpoint vs PowerShell-direct-Firestore</div>
+<div class="opts">a) New <code>GET /replay</code> projects the series server-side. b) Go.Replay reads <code>cadence-snapshots</code> from PowerShell directly.</div>
+<div class="conseq">a) Reuses the service's Firestore access + the snapshot schema lives in one place; mirrors the proven /firstdiff pattern; the launcher stays a thin renderer. b) A second place that must know the schema + its own Firestore creds; drifts from how every other Go.* works (they hit HTTP).</div>
+<div class="pick">PICK: (a) -- <code>GET /replay</code> server projection.</div>
+<div class="why">/firstdiff already walks this exact series server-side. Replay is the same walk with a wider lens. One schema-owner, one auth path, thin client &mdash; consistent with the whole toolset.</div>
+</div>
+<div class="choice">
+<div class="fork">2. Output -- HTML time-lapse vs terminal sparkline</div>
+<div class="opts">a) HTML primary (the movie) + a terse terminal one-liner. b) Terminal-only ASCII sparkline. c) HTML-only.</div>
+<div class="conseq">a) The 127-point curve needs pixels to read; HTML pops in the browser like every Be artifact + Go.Dash; the one-liner gives instant in-terminal context. b) Instant but can't show a 4-series 127-point film legibly. c) Loses the quick glance.</div>
+<div class="pick">PICK: (a) -- HTML movie + terminal one-liner.</div>
+<div class="why">Mirror Go.Dash exactly: generate HTML from a live endpoint, pop it. Print one line (window, ticks, first-signal time) so the terminal still tells you something without opening a browser.</div>
+</div>
+<div class="choice">
+<div class="fork">3. The chart -- pure SVG/CSS vs a charting library</div>
+<div class="opts">a) Inline SVG polyline/area + CSS, generated in the string builder. b) Chart.js / D3 from a CDN.</div>
+<div class="conseq">a) Pure metal, no framework, no build, no network dep, ages forever -- the Be rule. b) Prettier faster but a framework + CDN dependency in a vanilla-HTML house.</div>
+<div class="pick">PICK: (a) -- inline SVG, no framework.</div>
+<div class="why">"No frameworks. Vanilla HTML/CSS/JS." A stacked-area of four verdict series is a handful of SVG <code>&lt;polygon&gt;</code> points computed in PowerShell. It is the discipline, and it never breaks.</div>
+</div>
+<div class="choice">
+<div class="fork">4. One mode or three</div>
+<div class="opts">a) Ship all three (aggregate / stream / freeze-frame) sharing one endpoint + params. b) Aggregate only for v1.</div>
+<div class="conseq">a) The stream lane is the one Joey will actually stare at (watch SPREE_CMS_SECTIONS break); aggregate alone is pretty but answers less. One endpoint with <code>?stream=</code> + <code>?at=</code> keeps it cheap. b) Faster to ship, but leaves the most useful view for "later" (= never).</div>
+<div class="pick">PICK: (a) -- all three, one endpoint, thin renderer per mode.</div>
+<div class="why">The modes are arguments, not new services. The marginal cost over aggregate is small and the stream lane is the payoff. Phase them, but ship them.</div>
+</div>
+<div class="choice">
+<div class="fork">5. Baseline cuts -- heuristic detect now vs explicit baselineEpoch field</div>
+<div class="opts">a) Heuristic: detect a tick where clean jumps to ~total (a re-clone) and draw a cut marker. b) Add a <code>baselineEpoch</code> to each snapshot and segment on it.</div>
+<div class="conseq">a) Works on the snapshots we already have, zero schema change, good enough to stop the film lying across a re-clone. b) Correct and explicit but needs a /tick write change + only helps future snapshots.</div>
+<div class="pick">PICK: (a) for v1, (b) as the follow-up.</div>
+<div class="why">The reel we want to watch right now (frozen clone) has no cut yet. Heuristic marking covers the first re-clone; the explicit field is the durable fix once we are writing new snapshots through a baseline anyway.</div>
+</div>
+
+<h2>Escape Routes</h2>
+<div class="escape"><strong>From PICK 1 (/replay endpoint):</strong> if the projection gets heavy, the <code>?from/&to</code> window (already in the contract) bounds it; retention already caps the buffer. Reversible to server-side downsampling.</div>
+<div class="escape"><strong>From PICK 3 (inline SVG):</strong> if SVG generation fights back, fall back to a per-tick verdict-count table -- still a replay, just less cinematic. No rewrite.</div>
+<div class="escape"><strong>From PICK 4 (stream lane on old ticks):</strong> pre-<code>driftSchemaVersion=2</code> snapshots lack per-stream reasons -- clamp the lane window to "since v2" and label the boundary rather than guessing.</div>
+<div class="escape"><strong>From PICK 5 (baseline heuristic):</strong> if the heuristic false-detects a cut, switch to the explicit <code>baselineEpoch</code> field (the planned follow-up). Fully reversible.</div>
+
+<h2>Pure Metal Test</h2>
+<div class="pmt-row"><span>cadence-snapshots series (already written every tick)</span><span class="rp">the data exists -- free</span></div>
+<div class="pmt-row"><span>Firestore read</span><span class="lb">load-bearing -- already a dep, same access as /firstdiff</span></div>
+<div class="pmt-row"><span>inline SVG / CSS chart</span><span class="rp">no dep -- vanilla</span></div>
+<div class="pmt-row"><span>gcloud identity token</span><span class="rp">existing -- every Go.* already uses it</span></div>
+<p style="font-size:13px;margin-top:8px"><strong>Load-bearing: 1</strong> (Firestore, already in use). No new external dependency. Replay is pure read over data the system already produces.</p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>The smallest proof</strong>
+Add <code>GET /replay</code> returning only the aggregate series &mdash; <code>[{snapshotId, time, clean, cosmetic, benign, signal}, ...]</code> ordered by time. Hit it and confirm it returns the full 127-point curve from frozen-clone start to now. That one array <em>is</em> the movie's data; every render mode is downstream of it. If the array comes back ordered and complete, the read-projection is real and the rest is presentation.
+</div>
+
+<h2>What this does NOT do</h2>
+<ul>
+<li>Recompute fingerprints over history &mdash; it replays <em>recorded</em> snapshots, it does not re-sweep the past.</li>
+<li>Change capture or the 5-minute cadence &mdash; read-only over what /tick already writes.</li>
+<li>Replace <code>Go.Diff</code> (last-2) or <code>Go.FirstDiff</code> (first divergence) &mdash; those stay as quick shortcuts; replay is the general timeline lens.</li>
+<li>Forecast &mdash; it shows the past, not the future.</li>
+</ul>
+
+<h2>Path to plan + build</h2>
+<p style="font-size:13px"><code>~p</code> phases this (aggregate endpoint &rarr; stream projection &rarr; aggregate renderer &rarr; stream lane + freeze-frame &rarr; baseline cuts + publish). <code>~e</code> sizes it into Board 19 (~19 pts).</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved + published</div>
+<div class="dod-item">&check; 4 naming candidates, winner: Go.Replay (operator's word, one verb / three modes)</div>
+<div class="dod-item">&check; 5 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Shape: one endpoint, three modes, inline-SVG render; out-of-scope named</div>
+<div class="dod-item">&check; Pure Metal: 1 load-bearing dep (Firestore, already in use), no new dependency</div>
+<div class="dod-item">&check; First Move: GET /replay aggregate series proves the read-projection before any rendering</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r122 &middot; 2026-05-28 21:35 &middot; ~d Go.Replay</div>
+</body></html>

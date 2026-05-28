@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 19 -- Go.Replay, time machine over the verdict timeline</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;background:#1A1A1A;border-radius:6px;padding:18px;margin:14px 0}
+.stat .num{font-size:20px;font-weight:700;display:block;color:#6FC3DF}.stat .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 19</nav>
+
+<h1>~b Board 19 -- Go.Replay, time machine over the verdict timeline</h1>
+<p class="sub">The recorded snapshots stopped being a write-only pile. One endpoint projects the series; one launcher plays it three ways. The migration's drift is now a film you can scrub.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified</span>
+
+<div class="summary">
+<div class="stat"><span class="num" style="color:#5cb85c">136</span><span class="label">Ticks in the reel</span></div>
+<div class="stat"><span class="num">5 / 5</span><span class="label">Items Done</span></div>
+<div class="stat"><span class="num">3</span><span class="label">Modes, one endpoint</span></div>
+<div class="stat"><span class="num">19</span><span class="label">Pts</span></div>
+</div>
+
+<div class="callout">
+<strong>It plays.</strong> <code>GET /replay</code> walks 136 recorded snapshots server-side (mirrors /firstdiff). <code>Go.Replay</code> renders the cascade movie; <code>Go.Replay ECOMM.SPREE_CMS_SECTIONS</code> shows its journey -- Unknown (pre-classifier) &rarr; Clean &rarr; <b>Signal at 16:53Z</b>, the exact tick the 15-day-dead sync first read red. <code>Go.Replay at 21:00Z</code> reconstructs that tick's full picture (clean=121 / benign=86 / signal=1). Pure read; no new capture.</div>
+
+<h2>1. GET /replay -- one endpoint, three modes</h2>
+<p style="font-size:13px">Read-only projection of <code>cadence-snapshots</code> ordered by time, with optional <code>?from/&to</code> window. The mode is an argument, not a new service:</p>
+<table>
+<tr><th>Query</th><th>Mode</th><th>Returns</th></tr>
+<tr><td><code>/replay</code></td><td>aggregate</td><td>per-tick {clean,cosmetic,benign,signal} series + firstSignalAt + baselineCuts</td></tr>
+<tr><td><code>/replay?stream=S</code></td><td>stream</td><td>S's per-tick verdict + reason + lag; Clean inferred by absence; flips list</td></tr>
+<tr><td><code>/replay?at=T</code></td><td>frame</td><td>nearest snapshot's counts + full drift list (T = ISO time or snapshotId substring)</td></tr>
+</table>
+<p style="font-size:13px">Pre-<code>driftSchemaVersion=2</code> ticks degrade honestly: aggregate works on counts (always present), the stream lane reads <b>Unknown</b> before the classifier shipped and labels the v2 boundary rather than guessing.</p>
+
+<h2>2. Go.Replay -- the projector</h2>
+<p style="font-size:13px">PowerShell launcher modeled on Go.Dash. Pulls <code>/replay</code>, renders <b>inline SVG</b> (no framework), pops the browser, and prints a terminal one-liner.</p>
+<div class="code-block">Go.Replay                      the cascade movie -- stacked-area verdict mix over time
+Go.Replay &lt;stream&gt;             one stream's verdict lane + flips (when / from-&gt;to / why)
+Go.Replay at &lt;time|snapId&gt;     freeze-frame -- counts + drift list at one past tick
+... noopen                     render without opening the browser
+
+REPLAY aggregate -- 136 ticks, 05-28 03:25Z -&gt; 21:55Z; first signal 08:34Z; 0 baseline cut(s).</div>
+<p style="font-size:13px">The aggregate render writes the public <code>replay.html</code>; stream/frame are ad-hoc and render to a temp file so exploration never clobbers the published surface.</p>
+
+<h2>3. Baseline cuts</h2>
+<p style="font-size:13px">A re-clone makes everything match, so the clean fraction jumps sharply. The aggregate walk flags that jump (&ge;0.30 to &ge;0.90 clean) as a <code>baselineCut</code> + draws a "re-clone" marker, so the film doesn't interpolate a lie across a baseline reset. On the current frozen-clone reel: <b>0 cuts</b> (correct -- no re-clone in the window; the classifier-start jump from 0 to 0.86 is below the 0.90 gate and does not false-trigger). Explicit <code>baselineEpoch</code> on the snapshot doc is the durable follow-up.</p>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>GET /replay -- aggregate / stream / frame projection, ?from/&to window, baseline-cut heuristic</td></tr>
+<tr><td><code>cadence/Go.Replay.ps1 + .bat</code></td><td>three-mode renderer: inline-SVG cascade movie, verdict lane, freeze-frame + terminal one-liner</td></tr>
+<tr><td><code>joeycastillo.us/airbyte-migration/replay.html</code></td><td>published cascade movie (site <code>ca208cb</code>)</td></tr>
+<tr><td>cadence commit / build</td><td><code>b5ef90f</code> / Cloud Build <code>5240ade3</code></td></tr>
+</table>
+
+<h2>The operator surface now</h2>
+<div class="code-block">Go.Signal                               the worklist: ONLY what's out of whack + why/when/ack
+Go.Replay [stream|at T] [noopen]        play the recorded reel: movie / lane / freeze-frame
+Go.Dash [noopen]                        regenerate + open the public signal-first dashboard
+Go.Status / Go.Diff / Go.FirstDiff      live state / last-2 diff / when-each-first-broke
+Go.Ack list | "<stream>" "<reason>" | clear <stream>   mark a diff explainable
+Go.Sweep / Go.Reclone / Go.Rebaseline   run sweeps / refresh clone / full reset
+HTTP: /tick /firstdiff /replay /escalate /reset/{status,pause,resume,wipe,baseline,retention}</div>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence b5ef90f; site ca208cb; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 19 -- 5 items Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Pushed + deployed (Cloud Build 5240ade3) + verified live (3 modes, 136 ticks)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (additive endpoint + new launcher; /tick unchanged)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r124 &middot; 2026-05-28 21:57 &middot; ~b Board 19</div>
+</body></html>
