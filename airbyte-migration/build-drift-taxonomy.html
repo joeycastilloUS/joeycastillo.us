@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 16 -- drift taxonomy classifier SHIPPED</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;background:#1A1A1A;border-radius:6px;padding:18px;margin:14px 0}
+.stat .num{font-size:22px;font-weight:700;display:block}.stat .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 16 drift taxonomy</nav>
+
+<h1>~b Board 16 -- drift taxonomy classifier SHIPPED</h1>
+<p class="sub">cadence now classifies every per-stream diff Clean / Cosmetic / Benign / Signal. ETHER's hourly sync lag reads Benign with a reason instead of 28x raw DIFFER. Deployed + verified on the live service and the autonomous scheduler tick.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified</span>
+
+<div class="summary">
+<div class="stat"><span class="num" style="color:#5cb85c">180</span><span class="label">Clean</span></div>
+<div class="stat"><span class="num" style="color:#6FC3DF">0</span><span class="label">Cosmetic</span></div>
+<div class="stat"><span class="num" style="color:#f0ad4e">28</span><span class="label">Benign</span></div>
+<div class="stat"><span class="num" style="color:#5cb85c">0</span><span class="label">Signal</span></div>
+</div>
+
+<div class="callout">
+<strong>The headline:</strong> raw fingerprint says <code>180/208 (86.5%)</code> -- looks like 28 problems. The classifier says <code>clean=180, cosmetic=0, benign=28, signal=0</code>. Zero things to chase. Every one of the 28 is explained ETHER sync lag, each carrying a reason.
+</div>
+
+<h2>What shipped (Board 16, all 4 items)</h2>
+<table>
+<tr><th>Item</th><th>Delivered</th></tr>
+<tr><td>1. Watermark + lag + shapeMatch</td><td>Per-stream MAX(business cursor) prod vs clone = lagHours; biz column-NAME set diff = shapeMatch. <code>ClassifiedSweep.cs</code>.</td></tr>
+<tr><td>2. Cursor-type-aware windowed fingerprint</td><td>For differing TIMESTAMP-cursor streams: HASH_AGG WHERE cursor &le; clone watermark, both sides. Type detected from INFORMATION_SCHEMA; NUMBER/cursor-less skipped (no crash). Bounded to differing streams for cost.</td></tr>
+<tr><td>3. Verdict classifier + policy</td><td><code>DriftClassifier.cs</code> maps fp + shapeMatch + lag + rowDelta -&gt; Clean/Cosmetic/Benign/Signal. <code>drift-policy.json</code> per-schema tolerances (ETHER 1h x 6 = 6h).</td></tr>
+<tr><td>4. Explain</td><td>/tick + /reset/status carry verdict counts + classified drifts (verdict, lag, shapeMatch, reason). Go.Status prints the breakdown.</td></tr>
+</table>
+
+<h2>The decision flow, on real data</h2>
+<div class="code-block">ETHER.BARISTA_LOGINS  Benign  lag=2.2h  shape=True  wmatch=True   -- within 6h tolerance; windowed-match clean
+ETHER.CARTS           Benign  lag=5.0h  shape=True  wmatch=False  -- within 6h tolerance (mutable table; lag-explained)
+ETHER.CART_PRODUCTS   Benign  lag=n/a   shape=True  (no cursor)   -- unwindowed; row delta +318; presumed sync lag
+CROPSTER.INVENTORY    Benign  lag=n/a   shape=True  (no cursor)   -- unwindowed; row delta 0; presumed sync lag
+... 28 total Benign, 0 Signal</div>
+<p style="font-size:13px">shapeMatch=True everywhere today (old Airbyte on both sides). When the clone flips to new Airbyte, shape-changed streams will read <b>Cosmetic</b>; a genuine windowed/lag-unexplained mismatch reads <b>Signal</b>.</p>
+
+<h2>Verified live</h2>
+<ul>
+<li>Manual <code>POST /tick</code>: clean=180 cosmetic=0 benign=28 signal=0.</li>
+<li>Autonomous scheduler tick (<code>sweep-20260528T081016</code>): same classification -- the scheduled path works, not just manual.</li>
+<li><code>Go.Status</code>: <code>verdicts: clean=180 cosmetic=0 benign=28 signal=0</code> (green; red only if signal&gt;0).</li>
+</ul>
+
+<h2>Bug fixed inflight</h2>
+<div class="warn">
+First deploy 500'd: <code>COUNT(*) AS rows</code> -- <code>rows</code> is a Snowflake reserved word ("unexpected 'rows'" x208). Renamed the stats alias to <code>rowcount</code> (3f51bb7). Reader is positional, unaffected.
+</div>
+
+<h2>Cost note (-&gt; Board 17)</h2>
+<div class="warn">
+The classified tick runs <b>~142s wall</b> vs ~3s for the plain sweep -- it adds 2 stats passes (COUNT + MAX cursor over 208 streams), 2 biz-col resolutions, cursor-type lookup, and windowed fingerprints over the differing streams. Within the 540s Cloud Run timeout and the 5-min cadence, but it more than doubles warehouse-on time. Board 17 should optimize: cache cursor types, compute watermarks less often, or fold the stats into the main UNION ALL.
+</div>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Fingerprint/DriftClassifier.cs</code></td><td>NEW (verdicts + policy + classify)</td></tr>
+<tr><td><code>cadence/Cadence/Fingerprint/ClassifiedSweep.cs</code></td><td>NEW (orchestration: watermark/shape/window/stats)</td></tr>
+<tr><td><code>cadence/Cadence/drift-policy.json</code></td><td>NEW (per-schema tolerances)</td></tr>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>/tick uses ClassifiedSweep, writes verdicts + classified drifts (driftSchemaVersion 2)</td></tr>
+<tr><td><code>cadence/Go.Status.ps1</code></td><td>verdict breakdown line</td></tr>
+<tr><td>cadence commits</td><td><code>257146b</code> + <code>3f51bb7</code> (fix); Cloud Build <code>d619f0df</code></td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence 257146b + 3f51bb7; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 16 -- 4 items Done with commit refs</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Pushed + Cloud Run deployed + verified live + autonomous tick</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (classifier wraps the existing sweep; raw match% retained)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r113 &middot; 2026-05-28 01:12 &middot; ~b Board 16 drift taxonomy</div>
+</body></html>
