@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~D: Cadence.Driver CLI -- human-friendly verb surface</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:12px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.55}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}
+.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.section{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:18px 0;border-left:3px solid #6FC3DF}
+.section h3{color:#6FC3DF;margin:0 0 8px;font-size:17px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}
+.choice .fork{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}
+.choice .opts{color:#888;font-size:12px;margin-bottom:6px}
+.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}
+.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}
+.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}
+.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.candidate .name{color:#6FC3DF;font-weight:700;font-family:'Consolas',monospace}
+.candidate .gut{color:#888;font-size:11px}
+.candidate.winner{border-color:#5cb85c}
+.candidate.winner .name{color:#5cb85c}
+.pmt-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:13px}
+.pmt-row .lb{color:#f06e6e;font-weight:700}
+.pmt-row .rp{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}
+.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+.before-after{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.before-after .col{background:#1A1A1A;border-radius:6px;padding:14px 18px;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;white-space:pre;line-height:1.6}
+.before-after .col .lbl{display:block;color:#6FC3DF;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:700}
+.before-after .col.bad .lbl{color:#f06e6e}
+.before-after .col.good .lbl{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~d Driver CLI human-friendly</nav>
+
+<h1>Cadence.Driver CLI &mdash; human-friendly verb surface</h1>
+<p class="sub">Today's CLI is a tangle of flags inherited from the build-up phases. Operator just called them shit. Re-shape around verb launchers that match the existing <code>Go.X.bat</code> family, drop the negative flags, collapse three competing &quot;trust mode&quot; flags into one explicit token.</p>
+<span class="banner">Design &mdash; Pure Metal</span>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> Replace the current <code>Go.Driver --flow X --skip-write --unattended -i</code> surface with verb-first launchers (<code>Go.Sweep</code>, <code>Go.Reclone</code>, <code>Go.Rebaseline</code>, <code>Go.Status</code>, <code>Go.Diff</code>, etc.) so the operator types verbs, not switches. Eliminate negative flags (<code>--skip-write</code>); collapse the three trust-mode flags (<code>-i</code>, <code>-a</code>, <code>-u</code>) into one positional token. <strong>Intent:</strong> The Driver should feel like <code>Go.Sign</code>, <code>Go.Be</code>, <code>Go.Status</code> &mdash; verbs you remember, no man page required.
+</div>
+
+<h2>Discovery</h2>
+
+<p>Today's surface, dumped from <code>Go.Driver --help</code>:</p>
+
+<div class="code-block">  -i, --interactive     approve each step (default)
+  -a, --auto            run end-to-end without prompts (failures pause)
+  -m, --manual          operator runs each step by hand, AI records P/F/N
+  -u, --unattended      activate AutoAdvanceRest (after Drop, rest auto-runs)
+      --skip-write      omit WriteFirestoreStep (no doc written)
+  -f, --flow &lt;name&gt;     sweep (default) | reclone | reset-baseline
+  -h, --help            this help</div>
+
+<p>And the actual invocations the operator has had to type this session:</p>
+
+<div class="code-block">Go.Driver --interactive --flow reset-baseline
+Go.Driver --auto --skip-write --flow sweep
+Go.Driver --interactive --flow reclone
+Go.Driver --interactive --flow reset-baseline --unattended
+Go.Driver --flow sweep --skip-write</div>
+
+<p>Pain points found by inspection:</p>
+
+<ul>
+<li><b>Verbs hidden behind a generic flag.</b> The verb of the command is <code>reset-baseline</code> or <code>reclone</code>, but the operator types <code>--flow X</code>. The flag adds zero meaning &mdash; it's pure boilerplate before the actual verb.</li>
+<li><b>Three competing flags for one axis.</b> <code>-i</code>, <code>-a</code>, <code>-u</code>, <code>-m</code> all sit on the &quot;how much do I babysit&quot; axis. Four flags, but the values are mutually exclusive. One axis, one slot.</li>
+<li><b>Negative flag.</b> <code>--skip-write</code> reads as &quot;don't do X&quot; &mdash; the operator has to mentally invert. Worse, the flag is named after the implementation (<code>WriteFirestoreStep</code>) not the operator intent (&quot;don't pollute the timeline&quot;).</li>
+<li><b>Flag combos that should be one-liners.</b> The most common forensic command is <code>Go.Driver --interactive --flow sweep --skip-write</code>. Five tokens for &quot;dry sweep, ask me.&quot; Should be one or two.</li>
+<li><b>Inconsistent style across the launcher family.</b> <code>Go.Status</code> takes a positional integer. <code>Go.Diff</code> takes <code>-List</code> and positional paths. <code>Go.Driver</code> takes <code>--flag</code> + value. Three different conventions.</li>
+<li><b>No discoverability via tab completion.</b> Operator types <code>Go.</code>, hits Tab &mdash; sees <code>Go.Driver</code>, <code>Go.Status</code>, <code>Go.Diff</code>. The verbs the Driver can actually do (sweep, reclone, rebaseline) aren't there. They're hidden inside the <code>--flow</code> flag's value space.</li>
+</ul>
+
+<h2>Naming Pass</h2>
+
+<p>Five candidates for the shape of the new surface:</p>
+
+<div class="candidate"><span class="name">Go.Driver --flow X (current)</span><span class="gut">keep flags &middot; ergonomic for scripts, awful for humans &middot; what we have now</span></div>
+<div class="candidate"><span class="name">Go.Driver sweep dry ask</span><span class="gut">subcommand + positional &middot; git-style &middot; one launcher, many verbs &middot; flat but reads OK</span></div>
+<div class="candidate winner"><span class="name">Go.Sweep, Go.Reclone, Go.Rebaseline, ...</span><span class="gut">winner &middot; matches Go.Status / Go.Diff / Go.Sign family &middot; tab-discoverable &middot; one verb = one launcher</span></div>
+<div class="candidate"><span class="name">Go.Driver ~s, ~r, ~b</span><span class="gut">tilde-mirror &middot; namespace collision with Be tildes (~s = ship, ~r = retro) &middot; rejected</span></div>
+<div class="candidate"><span class="name">Go do=sweep mode=dry trust=ask</span><span class="gut">property-bag &middot; cute &middot; nobody types like this &middot; rejected</span></div>
+
+<p style="font-size:13px;color:#ccc;margin-top:8px">
+The winning surface (per-verb launchers) maps to the existing <code>Go.X.bat</code> family Joey already has muscle memory for. <code>Go.Sign</code>, <code>Go.Be</code>, <code>Go.Status</code>, <code>Go.Diff</code> are all already in this convention. Adding <code>Go.Sweep</code>, <code>Go.Reclone</code>, <code>Go.Rebaseline</code> is a continuation, not an invention. Each launcher is a thin .bat wrapper around <code>cadence-driver.exe</code>.
+</p>
+
+<h2>Shape</h2>
+
+<div class="section">
+<h3>Launcher set</h3>
+<table>
+<tr><th>Launcher</th><th>What it does</th><th>Replaces</th></tr>
+<tr><td><code>Go.Sweep</code></td><td>Run one fingerprint sweep against current AIRBYTE_DB vs AIRBYTE_CLONE. Writes a Firestore doc by default.</td><td><code>Go.Driver --flow sweep</code></td></tr>
+<tr><td><code>Go.Reclone</code></td><td>Pause Scheduler -&gt; DROP + CREATE CLONE -&gt; Resume. No Firestore changes. The Snowflake-only refresh.</td><td><code>Go.Driver --flow reclone</code></td></tr>
+<tr><td><code>Go.Rebaseline</code></td><td>Full reset: Pause + Reclone + Wipe Firestore + Sweep + Write baseline + Resume. The post-re-clone canonical move.</td><td><code>Go.Driver --flow reset-baseline</code></td></tr>
+<tr><td><code>Go.Status</code></td><td>Print current state from <code>/reset/status</code> (already exists; keeps current behavior).</td><td>unchanged</td></tr>
+<tr><td><code>Go.Diff</code></td><td>Diff per-stream verdicts between two captured RunResults (already exists; keeps current behavior).</td><td>unchanged</td></tr>
+<tr><td><code>Go.Pause</code> / <code>Go.Resume</code></td><td>Standalone Scheduler controls. Single-step convenience for &quot;just pause&quot; or &quot;just resume.&quot;</td><td>Driver Inspector or HTTP /reset/pause /reset/resume</td></tr>
+<tr><td><code>Go.Driver</code></td><td>Kept as the low-level escape hatch. All flags still work for unusual cases or scripted automation.</td><td>itself</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h3>Modifier tokens (positional, after the verb)</h3>
+
+<p style="font-size:13px">Each launcher accepts up to two positional modifier tokens. No <code>--flags</code> in the common cases.</p>
+
+<table>
+<tr><th>Token</th><th>Effect</th><th>Default when absent</th></tr>
+<tr><td><code>ask</code></td><td>Prompt before each step (current --interactive).</td><td><b>default</b></td></tr>
+<tr><td><code>go</code></td><td>No prompts, run end-to-end. Failures still pause (matches mendo-dgx). Equivalent to current --auto.</td><td>off</td></tr>
+<tr><td><code>walk</code></td><td>Hybrid: prompt up to and including the load-bearing gate step (e.g. DropClone in Rebaseline), then unattended. Equivalent to current --unattended.</td><td>off</td></tr>
+<tr><td><code>manual</code></td><td>Operator does each step by hand, Driver records P/F/N. Equivalent to current --manual.</td><td>off</td></tr>
+<tr><td><code>dry</code></td><td>Don't write to Firestore. Replaces --skip-write with positive name.</td><td>off (writes are live by default)</td></tr>
+<tr><td><code>live</code></td><td>Explicit live mode -- does nothing today since live is default; reserved for future when default flips.</td><td>n/a</td></tr>
+</table>
+
+<p style="font-size:13px;margin-top:8px">Rule: tokens are positional, order-independent, lowercase. Operator types verbs, not flags.</p>
+</div>
+
+<div class="section">
+<h3>Before / After</h3>
+<div class="before-after">
+<div class="col bad"><span class="lbl">Before</span>Go.Driver --interactive --flow reset-baseline
+Go.Driver --interactive --flow reclone
+Go.Driver --interactive --flow sweep --skip-write
+Go.Driver --auto --flow sweep --skip-write
+Go.Driver --interactive --flow reset-baseline --unattended
+Go.Driver --interactive --flow sweep
+Go.Driver --manual --flow sweep --skip-write</div>
+<div class="col good"><span class="lbl">After</span>Go.Rebaseline
+Go.Reclone
+Go.Sweep dry
+Go.Sweep go dry
+Go.Rebaseline walk
+Go.Sweep
+Go.Sweep manual dry</div>
+</div>
+<p style="font-size:13px;margin-top:8px">The most common forensic command goes from <b>Go.Driver --interactive --flow sweep --skip-write</b> (6 tokens) to <b>Go.Sweep dry</b> (2 tokens).</p>
+</div>
+
+<div class="section">
+<h3>Help discovery</h3>
+
+<p style="font-size:13px">Each launcher's <code>--help</code> (or just running with <code>?</code> as the only arg) prints:</p>
+
+<div class="code-block">Go.Sweep -- run one cadence fingerprint sweep.
+
+Usage:
+  Go.Sweep                    interactive, writes to Firestore
+  Go.Sweep dry                interactive, no write (forensic)
+  Go.Sweep go                 unattended, writes
+  Go.Sweep go dry             unattended, no write
+  Go.Sweep manual             operator runs steps by hand, AI records
+
+Hatches (interactive): [Enter]=Go [S]=Skip [B]=Back [I]=Inspect ...</div>
+
+<p style="font-size:13px">Plus a top-level discovery: typing <code>Go.</code> + Tab in PowerShell already lists all .bat launchers in C:\cadence. That becomes the man page.</p>
+</div>
+
+<h2>Choices + Consequences</h2>
+
+<div class="choice">
+<div class="fork">1. One launcher with subcommands vs per-verb launchers</div>
+<div class="opts">a) Per-verb launchers (Go.Sweep, Go.Reclone, ...). b) One Go.Driver with subcommand: Go.Driver sweep. c) Both: per-verb wrappers + Go.Driver low-level.</div>
+<div class="conseq">a) Maximum discoverability via tab completion; one .bat per verb is light. b) One launcher, less file noise, but loses tab discoverability. c) Best of both with mild redundancy.</div>
+<div class="pick">PICK: (c) -- per-verb launchers PLUS Go.Driver retained.</div>
+<div class="why">Go.X family is already the muscle memory; new verbs match. Go.Driver stays as escape hatch for unusual flags or scripts. Per-verb launchers are thin shells that just shell out to Go.Driver with the right flags filled in -- one source of truth, multiple ergonomic faces.</div>
+</div>
+
+<div class="choice">
+<div class="fork">2. Positional tokens vs flags for modifiers</div>
+<div class="opts">a) Positional bare words (Go.Sweep dry go). b) Flags (Go.Sweep --dry --go). c) Single mode token (Go.Sweep ask-dry).</div>
+<div class="conseq">a) Reads like English; no flag prefix overhead. b) Standard but verbose for common cases. c) Combinatorial explosion of mode names.</div>
+<div class="pick">PICK: (a) -- positional words, lowercase, order-independent.</div>
+<div class="why">"Go.Sweep dry" is one less character class to type than "Go.Sweep --dry" and reads cleaner. Order independence (dry go == go dry) removes a thing to remember. Validation rejects unknown words with a clear list of what was expected.</div>
+</div>
+
+<div class="choice">
+<div class="fork">3. Negative flag (--skip-write) vs positive (dry)</div>
+<div class="opts">a) Rename --skip-write to dry (positive token). b) Invert default (writes off by default) + add live token. c) Keep --skip-write (status quo).</div>
+<div class="conseq">a) Positive name; same default behavior (writes live). b) Safe default but autonomous cadence + Driver default split confuses ops. c) Operator complains every time.</div>
+<div class="pick">PICK: (a) -- positive name, default unchanged.</div>
+<div class="why">"dry" reads cleaner than "skip-write" and isn't named after the implementation. Default stays live so the Driver and the autonomous Cloud Run tick produce the same shape of data. Operator opts into dry runs explicitly for forensic captures (which is what they were already doing). No behavior change, just a name change.</div>
+</div>
+
+<div class="choice">
+<div class="fork">4. Trust mode -- collapse -i / -a / -u / -m</div>
+<div class="opts">a) Single positional token (ask | go | walk | manual). b) Keep 4 flags. c) Pick one default + drop the rest.</div>
+<div class="conseq">a) One axis, one slot, mutually exclusive enforced. b) Operator picks the right flag from a menu. c) Loses real flexibility (manual mode is rare but useful).</div>
+<div class="pick">PICK: (a) -- single token.</div>
+<div class="why">The 4 current flags ARE one axis. The new surface enforces that. "ask" is the safest default (prompts), "go" is "trust me, run it", "walk" is the hybrid (prompt up to gate, then unattended), "manual" is the forensic outlier. No combinations allowed (the wheel ignores any conflicting second mode token).</div>
+</div>
+
+<div class="choice">
+<div class="fork">5. Where do the per-verb launchers live -- C:\cadence or PATH-installed</div>
+<div class="opts">a) C:\cadence\*.bat (current Go.Status, Go.Diff pattern). b) %USERPROFILE%\bin\*.bat with PATH entry. c) Both.</div>
+<div class="conseq">a) Operator must cd to C:\cadence (or have it on PATH). b) Type from anywhere; one-time PATH setup. c) Mild duplication.</div>
+<div class="pick">PICK: (a) -- C:\cadence, no PATH change.</div>
+<div class="why">Joey already runs Go.Driver / Go.Status / Go.Diff from C:\cadence; new launchers join the same family. PATH installation can be a future enhancement (single line in a Go.Be.Setup or similar). Don't add PATH ceremony in this design.</div>
+</div>
+
+<div class="choice">
+<div class="fork">6. What about Go.Pause / Go.Resume / Go.Wipe -- ship them now or defer</div>
+<div class="opts">a) Ship the verb set Joey actively uses (Sweep, Reclone, Rebaseline). Defer Pause/Resume/Wipe to follow-up. b) Ship the full set. c) Defer everything; just rename existing.</div>
+<div class="conseq">a) Smallest scope; covers the painful cases. b) Complete but more files to ship. c) Doesn't address the actual complaint.</div>
+<div class="pick">PICK: (a) -- ship Sweep/Reclone/Rebaseline first.</div>
+<div class="why">Those three are the verbs that map to multi-step flows where the flag-flag-flag pattern was worst. Pause/Resume are single HTTP calls; the operator has them via /reset/pause already. Wipe is destructive and rare; should stay behind the Driver. Ship the three that fix the noise.</div>
+</div>
+
+<h2>Escape Routes</h2>
+
+<div class="escape"><strong>Escape from PICK 1 (per-verb + retained Go.Driver):</strong> if the launcher count grows beyond ~6-7, consolidate. The Go.Driver subcommand form (b) can absorb them later. Each per-verb launcher is ~10 lines of .bat; deleting one is trivial.</div>
+<div class="escape"><strong>Escape from PICK 2 (positional tokens):</strong> if operators want to script the Driver and prefer explicit flags, the underlying cadence-driver.exe still accepts --interactive / --auto / --skip-write. Per-verb launchers translate positional words to flags; scripts can bypass and use Go.Driver directly.</div>
+<div class="escape"><strong>Escape from PICK 3 (dry default unchanged):</strong> if "dry should be default" becomes obvious in practice, flip the default and have the existing live launchers default to dry. One config switch.</div>
+<div class="escape"><strong>Escape from PICK 4 (single mode token):</strong> if a true combination needs to exist (e.g. "go + per-step delay"), add a separate positional token rather than re-introducing two trust-mode tokens at once. Keeps the mutual exclusion intact.</div>
+<div class="escape"><strong>Escape from PICK 5 (C:\cadence only):</strong> a future Go.Be.Setup launcher can add C:\cadence to PATH on one command. Out of scope for this design.</div>
+<div class="escape"><strong>Escape from PICK 6 (ship 3 not 6):</strong> if Pause/Resume/Wipe earn their place, add them in a follow-up. Each one is a few lines of .bat.</div>
+
+<h2>Pure Metal Test</h2>
+
+<p style="font-size:13px">Can this be built with no frameworks, no external runtime, no vendor lock?</p>
+
+<div class="pmt-row"><span>.bat launchers</span><span class="rp">replaceable -- pure Windows batch, no deps</span></div>
+<div class="pmt-row"><span>Argument parsing inside .bat</span><span class="rp">trivial -- positional %1 %2 %3 with case-folding</span></div>
+<div class="pmt-row"><span>Underlying cadence-driver.exe (already exists)</span><span class="lb">load-bearing -- still does the actual work</span></div>
+<div class="pmt-row"><span>PowerShell wrappers for Go.Status / Go.Diff</span><span class="rp">already in use; not new dep</span></div>
+<div class="pmt-row"><span>Token-to-flag translation</span><span class="rp">~5 lines of batch logic per launcher</span></div>
+
+<p style="font-size:13px;margin-top:10px"><strong>Load-bearing count: 1.</strong> The Driver itself is the underlying tool; launchers are thin shells. Each launcher: 10-15 lines of .bat. Total new code: ~80 lines across 3-4 files.</p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>The smallest concrete proof</strong>
+Ship <code>Go.Sweep.bat</code> alone. ~15 lines: parse positional words (ask|go|walk|manual, dry|live), translate to <code>--interactive</code>/<code>--auto</code>/<code>--unattended</code>/<code>--manual</code> + <code>--skip-write</code>, invoke <code>Go.Driver --flow sweep ...</code>. Test all four common invocations: <code>Go.Sweep</code>, <code>Go.Sweep dry</code>, <code>Go.Sweep go</code>, <code>Go.Sweep go dry</code>. If the translation pattern works for Sweep, the same skeleton clones to Reclone and Rebaseline. No code in cadence-driver.exe changes for the First Move.
+</div>
+
+<h2>What this design does NOT do</h2>
+<ul>
+<li>Modify cadence-driver.exe's underlying flag parser. The .NET CLI surface stays as-is; launchers translate positional words to existing flags. (Optional future polish.)</li>
+<li>Add PATH installation. Launchers live in C:\cadence; operator runs them from there or invokes via full path.</li>
+<li>Change defaults (writes are still live, prompts are still default). Just renames and restructures.</li>
+<li>Ship Pause/Resume/Wipe verbs in this round. Those are easy follow-ons if wanted.</li>
+<li>Add tab-completion meta-data. PowerShell discovery by typing <code>Go.</code> + Tab already works for .bat files.</li>
+<li>Touch <code>Go.Status</code> or <code>Go.Diff</code> -- they're already in the right shape.</li>
+</ul>
+
+<h2>Path to plan + build</h2>
+<p style="font-size:13px"><code>~p</code> formalizes this into 3-4 phases (Go.Sweep First Move; Go.Reclone + Go.Rebaseline; help-output unification; optional cadence-driver.exe flag deprecation). <code>~e</code> sizes into one board (probably 9-12 pts since each launcher is small). <code>~b</code> chain. No Cloud Build cycles -- pure local launcher work.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved to <code>be/designs/2026-05-27-1905-design-driver-cli.html</code></div>
+<div class="dod-item">&check; Published at <code>joeycastillo.us/airbyte-migration/design-driver-cli.html</code></div>
+<div class="dod-item">&check; 5 naming candidates, winner: <strong>per-verb launchers (Go.Sweep, Go.Reclone, Go.Rebaseline) plus retained Go.Driver as escape hatch</strong></div>
+<div class="dod-item">&check; 6 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Pure Metal Test: 1 load-bearing dep (cadence-driver.exe, existing)</div>
+<div class="dod-item">&check; First Move named: <strong>Go.Sweep.bat alone</strong></div>
+<div class="dod-item">&check; Before/After contrast included (6 tokens -&gt; 2 for the most common case)</div>
+<div class="dod-item">&check; Be index updated</div>
+<div class="dod-item">&check; Both repos committed + pushed</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r100 &middot; 2026-05-27 19:05 &middot; ~d Driver CLI human-friendly</div>
+</body></html>
