@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~P: Build human-friendly Driver CLI -- verb launchers</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}
+.lede strong{color:#6FC3DF}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}
+.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}
+.phase .accept strong{color:#5cb85c}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~plan: Driver CLI</nav>
+
+<h1>Build human-friendly Driver CLI &mdash; verb launchers</h1>
+<p class="sub">Execute <code>be/designs/2026-05-27-1905-design-driver-cli.html</code>. Per-verb <code>.bat</code> launchers translate positional mode tokens to existing Go.Driver flags. ~11 pts, one board, no cadence-driver.exe parser change (only a help pointer).</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> Replace <code>Go.Driver --flow X --skip-write --unattended -i</code> with <code>Go.Sweep</code>, <code>Go.Reclone</code>, <code>Go.Rebaseline</code> + positional tokens (<code>ask</code>|<code>go</code>|<code>walk</code>|<code>manual</code>, <code>dry</code>|<code>live</code>). Each launcher is a thin .bat shell that maps words to flags and calls Go.Driver. One source of truth (the .exe), multiple ergonomic faces.
+</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr>
+<td>Go.Sweep.bat, Go.Reclone.bat, Go.Rebaseline.bat in C:\cadence. Positional token parser (ask/go/walk/manual + dry/live), unknown-token rejection with expected-list, per-launcher help. Go.Driver --help pointer to the new launchers. All shell out to the existing Go.Driver.bat -> cadence-driver.exe.</td>
+<td>Rewriting the cadence-driver.exe flag parser (kept; launchers translate to it). PATH installation. Changing defaults (writes live, prompts default). Go.Pause/Go.Resume/Go.Wipe launchers (deferred). Touching Go.Status/Go.Diff (already right shape).</td>
+</tr>
+</table>
+
+<h2>Approach</h2>
+<ol style="margin-left:22px;font-size:14px">
+<li><b>Go.Sweep first (First Move).</b> Build the token parser skeleton once. Prove the translation end-to-end with a real read-only run (<code>go dry</code>).</li>
+<li><b>Clone to Reclone + Rebaseline.</b> Same skeleton, different FLOW/VERB/DESC. Help + validation smoke (real runs are destructive).</li>
+<li><b>Discoverability.</b> Point Go.Driver --help at the verb launchers so the flag form is clearly the escape hatch.</li>
+</ol>
+
+<h2>Phases</h2>
+
+<div class="phase">
+<h3><span class="num">1</span> Go.Sweep.bat -- token parser skeleton (First Move)</h3>
+<div class="meta">Parse ask/go/walk/manual + dry/live -> --interactive/--auto/(--interactive --unattended)/--manual + --skip-write. Capture %~dp0 before parse. Unknown-token guard. Help text.</div>
+<div class="accept"><strong>Accept:</strong> <code>Go.Sweep help</code> prints usage. <code>Go.Sweep zonk</code> exits 2 with expected-list. <code>Go.Sweep go dry</code> runs a real read-only sweep end-to-end (translation = --auto --skip-write).</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">2</span> Go.Reclone.bat + Go.Rebaseline.bat</h3>
+<div class="meta">Clone the Sweep skeleton. FLOW=reclone / reset-baseline. Tailored help (dry inert on reclone, discouraged on rebaseline).</div>
+<div class="accept"><strong>Accept:</strong> help + bad-token verified on both. Skeleton identical to the proven Sweep template; real runs deferred (destructive).</div>
+</div>
+
+<div class="phase">
+<h3><span class="num">3</span> Go.Driver --help pointer</h3>
+<div class="meta">Add a "Friendlier verb launchers (preferred)" block to the exe --help listing Go.Sweep/Reclone/Rebaseline/Status/Diff. Flag form labelled the low-level escape hatch.</div>
+<div class="accept"><strong>Accept:</strong> <code>Go.Driver --help</code> shows the launcher block. Release exe rebuilt.</div>
+</div>
+
+<h2>Constraints</h2>
+<ul>
+<li>No new dependencies -- pure .bat + the existing .exe. Pure Metal Test from the design: 1 load-bearing dep (cadence-driver.exe).</li>
+<li>%~dp0 must be captured before any <code>shift</code> (shift also shifts %0).</li>
+<li>Launchers live in C:\cadence alongside the Go.X family. No PATH change.</li>
+<li>Defaults unchanged: interactive prompts, live Firestore writes.</li>
+</ul>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved + published</div>
+<div class="dod-item">&check; 3 phases sized with accept criteria</div>
+<div class="dod-item">&check; Decisions inherited from ~d (6 picks) -- not re-debated</div>
+<div class="dod-item">&check; First Move (Go.Sweep) independently testable via go dry</div>
+<div class="dod-item">&check; Be index updated + commit + push</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r101 &middot; 2026-05-27 19:10 &middot; ~p Driver CLI</div>
+</body></html>
