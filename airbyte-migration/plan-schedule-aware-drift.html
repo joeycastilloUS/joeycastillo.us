@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~p Schedule-aware drift classification</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}.phase .accept strong{color:#5cb85c}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.verdict{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase}
+.v-clean{background:#0d2818;color:#5cb85c}.v-exp{background:#1f1f0a;color:#f0ad4e}.v-sig{background:#2a1414;color:#f06e6e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~p schedule-aware drift</nav>
+
+<h1>Schedule-aware drift classification</h1>
+<p class="sub">Make cadence separate EXPECTED drift (the clone just hasn't gotten prod's latest hourly syncs yet) from SIGNAL drift (data that should match but doesn't, or a clone that's fallen too far behind). Window the comparison by the business cursor to the clone's last-synced generation; classify and explain the rest.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> Built on <code>be/inspects/2026-05-28-0023-inspect-ether-sync-cadence.html</code>. ETHER drift is uniform 4h sync-generation lag, not corruption. Today cadence flags all of it as DIFFER. The fix: compare only the sync generations the clone actually has (window by business cursor &le; clone watermark), then label each stream <span class="verdict v-clean">clean</span> / <span class="verdict v-exp">expected-lag</span> / <span class="verdict v-sig">signal</span> and show the lag in plain English.
+</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td>Per-stream freshness watermark (MAX business cursor, prod + clone) -> lag in hours/generations. Cursor-windowed fingerprint (WHERE cursor &le; clone watermark, both sides). 3-state verdict (clean / expected-lag / signal) with a configurable tolerance. Cursor-type-aware handling (timestamp vs NUMBER vs none). Explanation surfaced in /tick + reports + Go.FirstDiff. Per-schema watermark optimization where a schema syncs atomically (ETHER).</td><td>Re-architecting the fingerprint primitive. Changing the airbyte sync schedules. Feeding the clone (that's airbyte-philz's job). Replacing the L1-L5 engine in the parity service. A UI beyond the existing HTML reports.</td></tr>
+</table>
+
+<h2>Approach -- the model</h2>
+<ol style="margin-left:22px;font-size:14px">
+<li><b>Watermark.</b> For each stream, read <code>clone_wm = MAX(cursor)</code> on the clone and <code>prod_wm = MAX(cursor)</code> on prod. <code>lag = prod_wm - clone_wm</code>. (Use the business cursor -- UPDATED_AT/CREATED_AT -- NOT _AIRBYTE_EMITTED_AT, which isn't cross-comparable. Per the inspect.)</li>
+<li><b>Window.</b> Fingerprint both sides <code>WHERE cursor &le; clone_wm</code>. This drops the rows the clone hasn't received yet -- the expected-lag rows -- so we compare the same source generation on both sides.</li>
+<li><b>Classify.</b>
+  <ul>
+  <li><span class="verdict v-clean">clean</span> -- windowed fingerprints match. The data the clone has is identical to prod. Healthy.</li>
+  <li><span class="verdict v-exp">expected-lag</span> -- windowed match, but lag &gt; 0 and within tolerance. Differs from the naive whole-table compare only because prod has newer syncs. Explained, not alarming.</li>
+  <li><span class="verdict v-sig">signal</span> -- windowed fingerprints still DIFFER (data that should match doesn't), OR lag exceeds tolerance (clone stuck / sync broken). This is what a human should look at.</li>
+  </ul>
+</li>
+<li><b>Explain.</b> Every report line carries the lag: "ETHER 4 syncs / 4.0h behind -- within tolerance -- windowed match: clean."</li>
+</ol>
+
+<h2>The tolerance ("period to filter")</h2>
+<p style="font-size:13px">This is the time-window Joey described. Two knobs, per-schema (defaults shown):</p>
+<table>
+<tr><th>Knob</th><th>Meaning</th><th>ETHER default</th></tr>
+<tr><td><code>syncIntervalHours</code></td><td>Expected sync cadence (from the schedule / measured)</td><td>1.0 (hourly, confirmed)</td></tr>
+<tr><td><code>maxLagGenerations</code></td><td>How many syncs the clone may trail before SIGNAL</td><td>2 (i.e. clone may be up to ~2h behind once airbyte-philz runs)</td></tr>
+</table>
+<p style="font-size:13px">Lag &le; <code>syncIntervalHours x maxLagGenerations</code> + a grace for sync-completion time = expected. Beyond = signal. While the clone is a frozen Snowflake clone (current state) every stream will exceed tolerance over time -- correct, because a frozen clone IS stale; the report should say "clone frozen N h, re-clone or resume airbyte-philz."</p>
+
+<h2>Phases</h2>
+<div class="phase">
+<h3><span class="num">1</span> Watermark + lag (read-only, additive)</h3>
+<div class="meta">Compute per-stream clone_wm/prod_wm/lag using the business cursor from stream-catalog (cursorField) or a per-schema override. Emit lag into the /tick snapshot doc alongside the existing drift data. No verdict change yet -- just measure + store.</div>
+<div class="accept"><strong>Accept:</strong> /tick writes per-stream lagHours; /firstdiff + report show "N h behind". ETHER shows ~uniform lag. Zero behavior change to existing verdicts.</div>
+</div>
+<div class="phase">
+<h3><span class="num">2</span> Cursor-windowed fingerprint (type-aware)</h3>
+<div class="meta">Re-enable windowing in the fingerprint: WHERE cursor &le; clone_wm, but only for timestamp cursors. NUMBER cursors + cursor-less streams fall back to whole-table (flagged "unwindowed"). Fixes the earlier 'GRANTS'/NUMBER-vs-TIMESTAMP errors by detecting cursor type first.</div>
+<div class="accept"><strong>Accept:</strong> ETHER windowed fingerprints MATCH (the lag rows removed). Cursor-less streams (TRANSACTIONS_V3, TAX_RATES) cleanly fall back without error. No SQL compilation failures.</div>
+</div>
+<div class="phase">
+<h3><span class="num">3</span> 3-state classifier + tolerance</h3>
+<div class="meta">Combine windowed verdict + lag-vs-tolerance into clean / expected-lag / signal. Tolerance config per schema in appsettings or a small drift-policy.json. Store the verdict in the snapshot doc.</div>
+<div class="accept"><strong>Accept:</strong> ETHER (frozen-clone, 4h) classifies expected-lag while within tolerance, flips to signal past it. A deliberately corrupted row (windowed mismatch) classifies signal immediately.</div>
+</div>
+<div class="phase">
+<h3><span class="num">4</span> Explain it -- reports + readers</h3>
+<div class="meta">Surface the classification + lag narrative in the HTML run report, /firstdiff, and Go.Status. "183/208 raw -> 208/208 windowed; 25 expected-lag (ETHER 4h behind, hourly sync); 0 signal."</div>
+<div class="accept"><strong>Accept:</strong> A human reading the report sees "all green except expected sync lag, nothing to chase" without knowing the internals.</div>
+</div>
+
+<h2>What the dashboard says, before vs after</h2>
+<div class="code-block">BEFORE:  183/208 match (88%)  -- 25 DIFFER  (looks like a problem)
+AFTER:   208/208 windowed-clean
+         25 expected-lag (ETHER, 4.0h / 4 syncs behind, hourly cadence)
+         0 signal
+         => healthy; clone trailing prod by the normal sync gap</div>
+
+<h2>Constraints / risks</h2>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td>emitted_at not cross-comparable between the two Airbyte instances</td><td>Window on the business cursor (source-owned), never on _AIRBYTE_EMITTED_AT. emitted_at is for the lag explanation only.</td></tr>
+<tr><td>NUMBER / cursor-less streams (the old 'GRANTS' + NUMBER-vs-TIMESTAMP errors)</td><td>Detect cursor type from INFORMATION_SCHEMA first; window only TIMESTAMP cursors; others fall back to whole-table + "unwindowed" flag.</td></tr>
+<tr><td>Clone is frozen now (not airbyte-philz-fed)</td><td>Model handles both: frozen clone simply exceeds tolerance over time -> report says "frozen N h, re-clone/resume". When airbyte-philz feeds it, lag stays small.</td></tr>
+<tr><td>Per-stream watermark cost (208 MAX queries)</td><td>Batch into the existing UNION ALL sweep (one extra SELECT per stream, same round trip). ETHER's atomic sync allows a single schema-level watermark.</td></tr>
+<tr><td>Windowing hides a real bug if the bug is in newer-than-clone rows</td><td>Acceptable: those rows aren't in the clone yet, so they can't be validated until they are. They get validated next generation. Document it.</td></tr>
+</table>
+
+<h2>Sizing hint (for ~e)</h2>
+<p style="font-size:13px">~13-16 pts: Phase 1 watermark+lag (5), Phase 2 type-aware windowing (5), Phase 3 classifier+tolerance (3), Phase 4 explain (3). Touches the cadence service (/tick + FingerprintPrimitive) -> Cloud Build deploy. The Driver + readers inherit the new fields.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved + published</div>
+<div class="dod-item">&check; Built on the ~i findings (cursor windowing key, atomic ETHER sync, 4h lag)</div>
+<div class="dod-item">&check; 4 phases with accept criteria + a tolerance model</div>
+<div class="dod-item">&check; Before/after dashboard framing</div>
+<div class="dod-item">&check; Risks enumerated (cursor type, frozen vs fed, emitted vs business cursor)</div>
+<div class="dod-item">&check; Be index updated + commit + push</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r110 &middot; 2026-05-28 00:26 &middot; ~p schedule-aware drift &mdash; Awaiting Approval</div>
+</body></html>

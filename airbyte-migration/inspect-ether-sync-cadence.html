@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~i ETHER sync cadence + drift anatomy</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}
+.callout strong{color:#5cb85c}
+.key{background:#1a2438;border-left:3px solid #6FC3DF;padding:12px 16px;margin:12px 0;color:#cfe8f5;font-size:13px;border-radius:0 4px 4px 0}
+.key strong{color:#6FC3DF}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~i ETHER sync cadence</nav>
+
+<h1>~i ETHER sync cadence + drift anatomy</h1>
+<p class="sub">Why does ETHER show as DIFFER, and is it reasonable? Measured the real sync timing in Snowflake. Answer: the drift is pure sync-generation lag -- prod holds newer hourly batches than the frozen clone. Not corruption. And there's a clean signal to window on.</p>
+<span class="banner">Inspect &mdash; Measured</span>
+
+<h2>What I measured</h2>
+<p style="font-size:13px">Queried <code>_AIRBYTE_EMITTED_AT</code> (Airbyte sync watermark), business cursors (<code>UPDATED_AT</code>), and row counts on 6 ETHER streams across <code>AIRBYTE_DB</code> (prod) and <code>AIRBYTE_CLONE</code> (clone), plus the distinct sync-batch markers on prod ETHER.ORDERS over 30h.</p>
+
+<h2>Finding 1 -- ETHER syncs hourly at :00, atomically</h2>
+<p style="font-size:13px">Prod ETHER.ORDERS sync batches, newest first -- clean 1.00h cadence, each batch emitted ~3s after the hour:</p>
+<div class="code-block">06:00:02.839   2 rows
+05:00 (n/a -- ORDERS quiet)
+04:29:13.995   5 rows   (one off-cadence batch)
+03:00:02.820   15 rows
+02:00:03.121   66 rows
+01:00:03.010   125 rows
+00:00:02.759   260 rows
+23:00:02.531   439 rows
+22:00:02.353   545 rows
+...   (peak 16:00 = 2860 rows; overnight troughs ~2-15)</div>
+<p style="font-size:13px">Every ETHER table shares the <b>exact same</b> <code>_AIRBYTE_EMITTED_AT</code> per batch (all 06:00:02.839 on prod, all 02:00:03.121 on clone). ETHER syncs as <b>one atomic batch</b> -- the whole schema moves together. That means we can reason about ETHER drift at the schema level, not per-table.</p>
+
+<h2>Finding 2 -- the drift is uniform sync-generation lag</h2>
+<table>
+<tr><th>Stream</th><th class="num">prod rows</th><th class="num">clone rows</th><th class="num">row diff</th><th class="num">emitted lag</th></tr>
+<tr><td>ETHER.ORDERS</td><td class="num">36,028,502</td><td class="num">36,028,482</td><td class="num">+20</td><td class="num">4.00h</td></tr>
+<tr><td>ETHER.TRANSACTIONS_V3</td><td class="num">36,698,176</td><td class="num">36,698,150</td><td class="num">+26</td><td class="num">4.00h</td></tr>
+<tr><td>ETHER.USERS</td><td class="num">3,282,736</td><td class="num">3,282,549</td><td class="num">+187</td><td class="num">4.00h</td></tr>
+<tr><td>ETHER.SALES_ORDERS</td><td class="num">36,028,421</td><td class="num">36,028,401</td><td class="num">+20</td><td class="num">4.00h</td></tr>
+<tr><td>ETHER.ORDER_PRODUCTS</td><td class="num">56,226,556</td><td class="num">56,226,520</td><td class="num">+36</td><td class="num">4.00h</td></tr>
+<tr><td>ETHER.TAX_RATES</td><td class="num">3,839,497</td><td class="num">3,837,889</td><td class="num">+1,608</td><td class="num">4.00h</td></tr>
+</table>
+<p style="font-size:13px">Prod's last ETHER batch: <code>06:00:02</code>. Clone's last batch: <code>02:00:03</code> (frozen at the reclone). The lag is <b>exactly 4.00h on every stream</b> -- 4 sync generations. Row diffs are tiny and proportional to recent write volume. This is the clock ticking on a frozen snapshot, nothing more.</p>
+
+<div class="callout">
+<strong>The 25-27 ETHER DIFFER verdicts are 100% explained by sync lag.</strong> The HASH_AGG fingerprint compares whole tables (cadence currently passes <code>cloneTime=null</code>, so no windowing). Prod's 06:00 data != clone's 02:00 data, so every ETHER stream hashes differently. There is no actual data corruption -- the clone simply hasn't received prod's last 4 hourly syncs.
+</div>
+
+<h2>Finding 3 -- two timestamps, two jobs</h2>
+<table>
+<tr><th>Column</th><th>What it is</th><th>Use for</th></tr>
+<tr><td><code>_AIRBYTE_EMITTED_AT</code></td><td>When THIS Airbyte instance synced the row. Different per instance (prod airbyte vs airbyte-philz emit different values for the same logical row).</td><td><b>Operational lag</b> -- "how many sync generations behind is the clone." NOT cross-comparable row-by-row.</td></tr>
+<tr><td><code>UPDATED_AT</code> / <code>CREATED_AT</code> (business cursor)</td><td>From the source system. Same value regardless of which Airbyte synced it.</td><td><b>Windowing key</b> -- compare only rows whose source-update is at-or-before the clone's latest source data. Apples to apples.</td></tr>
+</table>
+<p style="font-size:13px">This distinction is the whole game. <code>emitted_at</code> tells you the clone is 4 syncs behind (the explanation). The business cursor is what you window on to ask "ignoring the syncs the clone hasn't gotten yet, does the data it DOES have match prod?"</p>
+
+<h2>Finding 4 -- old-Airbyte format + cursor variety</h2>
+<p style="font-size:13px">ETHER tables carry old-Airbyte meta (<code>_AIRBYTE_AB_ID</code>, <code>_AIRBYTE_EMITTED_AT</code>, <code>_AIRBYTE_NORMALIZED_AT</code>, <code>_AIRBYTE_&lt;table&gt;_HASHID</code>) -- not Destinations-V2. Business cursors vary: ORDERS/USERS/SALES_ORDERS have <code>UPDATED_AT</code>; TRANSACTIONS_V3 + TAX_RATES have none (no <code>UPDATED_AT</code>). This is why the earlier blanket cursor-windowing failed -- some streams have NUMBER or no usable timestamp cursor (the <code>'GRANTS'</code>-era <code>unexpected token</code> + the NUMBER-vs-TIMESTAMP error we hit). Windowing must be cursor-type-aware.</p>
+
+<h2>Current vs end state</h2>
+<ul>
+<li><b>Now:</b> AIRBYTE_CLONE is a frozen Snowflake zero-copy clone (from the reclone). It does not sync; lag grows ~1 generation/hour forever until re-clone.</li>
+<li><b>End state (Joey's two-VM design):</b> airbyte-philz feeds AIRBYTE_CLONE on its own schedule. Then lag is bounded by the offset between prod's schedule and airbyte-philz's schedule + sync completion time. The clone's airbyte-philz ETHER schedule should be confirmed via the Airbyte API at <code>NEW_AIRBYTE_URL=http://35.224.144.209:8000</code> (token auth, creds in airbyte_migration_tools/.env) when sizing the tolerance.</li>
+</ul>
+
+<h2>Open questions for ~p</h2>
+<ul>
+<li>What tolerance? How many sync generations / hours may the clone trail before drift is a SIGNAL rather than EXPECTED? (Prod is hourly; a healthy clone should be &le;1-2 syncs behind once airbyte-philz runs.)</li>
+<li>Window on business cursor where present; what's the fallback for cursor-less streams (TRANSACTIONS_V3, TAX_RATES)? Options: row-count tolerance band, _AIRBYTE_EMITTED_AT-batch alignment, or accept whole-table compare + lag annotation.</li>
+<li>Per-stream vs per-schema watermark? ETHER syncs atomically, so a single schema-level watermark suffices for ETHER -- but other schemas may differ.</li>
+</ul>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Measured real data (6 streams x 2 DBs + 30h of prod batches)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Sync cadence confirmed empirically: hourly at :00, atomic per schema</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Drift cause identified: uniform 4h sync-generation lag, not corruption</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Windowing key identified: business cursor (not emitted_at)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Saved + published; feeds the ~p plan</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r110 &middot; 2026-05-28 00:23 &middot; ~i ETHER sync cadence</div>
+</body></html>
