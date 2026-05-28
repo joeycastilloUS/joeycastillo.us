@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i AP-18 pantheon-dispatch — ARCHIVE</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 26px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 24px; }
+  p { color: #ccc; margin: 8px 0; }
+  ul { margin: 8px 0 8px 22px; } li { color: #ccc; margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.pick { color: var(--green); font-weight: 600; }
+  .verdict { display:inline-block; background:#1F0F0F; border:2px solid var(--red); color:var(--red); padding:6px 16px; border-radius:4px; font-weight:700; letter-spacing:2px; text-transform:uppercase; font-size:13px; }
+  .note { background:#0e1419; border-left:3px solid var(--accent); padding:12px 18px; margin:14px 0; color:#cfe6ee; font-size:13.5px; }
+  .flag { background:#1a1405; border:1px solid var(--amber); padding:14px 20px; margin:16px 0; font-size:13.5px; }
+  .flag b { color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display:block; margin-bottom:4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; line-height: 1.4; }
+  .dod { background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 16px 22px; margin: 24px 0; font-size: 12.5px; }
+  .dod .ok { color: var(--green); } .dod .na { color: var(--t3); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~i AP-18 pantheon-dispatch &middot; verdict: ARCHIVE</span></nav>
+<div class="container">
+
+  <h1>~i AP-18 — pantheon-dispatch: unfinished Pantheon-era orchestrator, ARCHIVE.</h1>
+  <div class="sub">Investigated 2026-05-27. <code>ai-pantheon/pantheon-dispatch</code> (internal name "pantheon-core") is a Cloudflare Worker job orchestrator — a <b>stubbed prototype</b> that never deployed. Sibling to AP-17's gateway (same Feb-2026 era, dormant since Feb 22). <span class="verdict">ARCHIVE</span></div>
+
+  <div class="note">
+    <b>The queue question:</b> "clauderun's job dispatcher?" &mdash; <b>No — and there is nothing functional to move.</b> It is the Pantheon-platform-era job-orchestrator <i>vision</i> ("receives anonymized requests from Privacy Layer, routes jobs to workers"), implemented only as a scaffold: no persistence (DB binding commented out), job-status "not yet implemented", and the dispatch callback URL is a literal <code>https://pantheon-core.YOUR_WORKER.workers.dev</code> placeholder. <code>/health</code> returns 404 — it was never deployed. ARCHIVE, not move-to-clauderun.
+  </div>
+
+  <h2>&sect;1 &mdash; What pantheon-dispatch actually is</h2>
+  <p>A single Cloudflare Worker (<code>src/index.ts</code>, 245 LOC TypeScript) that accepts jobs and fans them to GitHub Actions via <code>repository_dispatch</code>. Created 2026-02-19, last pushed <b>2026-02-22</b> — dormant ~3 months. Private, not archived. Pantheon-branded throughout.</p>
+  <table>
+    <tr><th>Endpoint</th><th>Purpose</th></tr>
+    <tr><td><code>POST /jobs</code></td><td>Submit a job → round-robin pick a worker repo → <code>repository_dispatch</code> (<code>event_type: execute-job</code>). Returns a job id.</td></tr>
+    <tr><td><code>GET /jobs/:id</code></td><td>Job status — <b>stub</b> ("status lookup not yet implemented").</td></tr>
+    <tr><td><code>POST /jobs/:id/{started,complete,failed}</code></td><td>Worker callbacks, API-key gated. Each is a <b>TODO</b> ("Update database") — logs only.</td></tr>
+    <tr><td><code>GET /workers</code></td><td>Lists the configured worker repos as "available" (hard-coded, no real status).</td></tr>
+    <tr><td><code>GET /health</code></td><td>Returns "OK" — but the worker is not deployed (live check: 404).</td></tr>
+  </table>
+  <p>Fan-out targets (from <code>wrangler.toml</code> <code>WORKER_REPOS</code>): <code>ai-pantheon/pantheon-worker-{alpha,beta,gamma}</code> — each is a GitHub-Actions runner repo that would receive the dispatched job. Job types envisaged: <code>dotnet | cli | python | nodejs</code>; providers: <code>github-actions | gcp | cloud-run</code>.</p>
+
+  <h2>&sect;2 &mdash; a-d-d / nous verdict</h2>
+  <p>Same mismatch as AP-10/11/13/17: nous is <b>pure-C bare-metal</b>; this is <b>TypeScript on Cloudflare Workers</b>. nous has no job-orchestration concern — it is a synchronous request/reply mesh (now LIVE: 4 primes + 1 relay on the operator trust root). There is no nous home for a multi-tenant cloud job dispatcher. <b>Zero merge value into nous.</b></p>
+
+  <h2>&sect;3 &mdash; clauderun verdict (move?)</h2>
+  <p>The repo's purpose (orchestrate distributed job execution) is clauderun-shaped, so it was worth checking as a move candidate. It is not one:</p>
+  <ul>
+    <li><b>Non-functional.</b> No persistence, status lookups unimplemented, callbacks are logging stubs, callback URL is a placeholder. There is no working orchestrator to relocate — only a scaffold.</li>
+    <li><b>Pantheon-platform era.</b> The "anonymized requests from Privacy Layer → route to Cloud Run / GCP workers" model is the same multi-tenant-cloud vision being retired (cf. AP-13 sentinel ARCHIVE).</li>
+    <li><b>Better as a fresh design.</b> If clauderun needs a dispatcher, the <code>repository_dispatch</code> fan-out pattern is captured here for reference; that's cheaper to re-derive than to carry a dead CF-Worker stub.</li>
+  </ul>
+
+  <h2>&sect;4 &mdash; Liveness</h2>
+  <pre>GET https://pantheon-core.joey-castillo.workers.dev/health  -> HTTP 404 (worker not deployed)
+src/index.ts dispatch callback_url                          -> "https://pantheon-core.YOUR_WORKER.workers.dev" (TODO placeholder)
+last push                                                   -> 2026-02-22 (dormant ~3 months)</pre>
+  <p>404 + placeholder URL = this never reached production. Nothing live to break by archiving.</p>
+
+  <h2>&sect;5 &mdash; Cluster + secret findings</h2>
+  <p><b>New cluster surfaced.</b> pantheon-dispatch is the hub of a 4-repo Pantheon-era cluster not previously catalogued:</p>
+  <table>
+    <tr><th>Repo</th><th>Role</th><th>Last push</th><th>State</th></tr>
+    <tr><td><code>pantheon-dispatch</code> (this)</td><td>orchestrator</td><td>2026-02-22</td><td>dormant, not archived</td></tr>
+    <tr><td><code>pantheon-worker-alpha</code></td><td>GH-Actions runner</td><td>2026-02-22</td><td>dormant, not archived</td></tr>
+    <tr><td><code>pantheon-worker-beta</code></td><td>GH-Actions runner</td><td>2026-02-22</td><td>dormant, not archived</td></tr>
+    <tr><td><code>pantheon-worker-gamma</code></td><td>GH-Actions runner</td><td>2026-02-22</td><td>dormant, not archived</td></tr>
+  </table>
+  <p>Recommend the 3 worker repos get AP-IDs (AP-25/26/27) and archive as a batch with this one — they have no purpose without the orchestrator. (Worth a 5-min deep-i each to confirm they're empty runner shells, but the disposition is near-certain.)</p>
+
+  <div class="flag">
+    <b>Flag for Joey &mdash; committed credential</b>
+    <code>.env.local</code> is <b>tracked in git</b> and contains <code>API_KEY=&lt;32-byte hex&gt;</code> (generated by <code>deploy.sh</code> via <code>openssl rand -hex 32</code>). <code>.gitignore</code> lists <code>.dev.vars</code> but <b>not</b> <code>.env.local</code> — so the generated key was committed by oversight. The worker was never deployed (404), so the key gated nothing live; still, treat it as <b>burned</b> — if that value was ever reused elsewhere, rotate it. Archiving (private repo) is acceptable; a scrub is optional since nothing live depends on it.
+  </div>
+
+  <h2>&sect;6 &mdash; Recommendation</h2>
+  <table>
+    <tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+    <tr><td>move-to-clauderun</td><td>NO</td><td>Non-functional scaffold; nothing operational to relocate. Pattern captured here if clauderun wants it later.</td></tr>
+    <tr><td>merge-into-nous</td><td>NO</td><td>TS/Cloudflare vs pure-C; no orchestration concern in nous.</td></tr>
+    <tr><td class="pick">ARCHIVE the repo</td><td class="pick">YES</td><td>Pantheon-era, never deployed (404), dormant 3 months, stub-only. Batch with the 3 worker repos.</td></tr>
+  </table>
+  <p><b>AP-18 &rarr; <code>gh repo archive ai-pantheon/pantheon-dispatch</code></b>, batched with <code>pantheon-worker-{alpha,beta,gamma}</code> (new AP-25/26/27). Treat the committed <code>API_KEY</code> as burned. <b>Execution deferred to Joey's explicit go</b> — this is a deep-i (investigation only; no repo mutated).</p>
+
+  <div class="dod">
+    <b>Definition of Done</b><br>
+    <span class="ok">&check;</span> Investigated vs a-d-d + nous + clauderun (3 verdicts) + read all 245 LOC of the worker<br>
+    <span class="ok">&check;</span> Liveness verified externally (worker /health 404; placeholder callback URL)<br>
+    <span class="ok">&check;</span> Cluster mapped (3 worker repos surfaced) + committed-credential flagged<br>
+    <span class="ok">&check;</span> HTML report saved with datetime filename (be/plans/)<br>
+    <span class="ok">&check;</span> Index updated (audit-of-all + joeycastillo.us/audit mirror)<br>
+    <span class="ok">&check;</span> Committed + pushed to both repos<br>
+    <span class="ok">&check;</span> Coordination file updated (AP-18 Locked &rarr; Done w/ hash)<br>
+    <span class="na">&mdash;</span> No prod surface mutated (investigation only; archive deferred to Joey)
+  </div>
+
+  <footer>Be &middot; v0 &middot; r59 &middot; 2026-05-27 &middot; metal-2 coordinator session &middot; ~i AP-18 pantheon-dispatch</footer>
+</div>
+</body>
+</html>
