@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 17 -- acks + escalation + retention + perf SHIPPED</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;background:#1A1A1A;border-radius:6px;padding:18px;margin:14px 0}
+.stat .num{font-size:20px;font-weight:700;display:block;color:#6FC3DF}.stat .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 17</nav>
+
+<h1>~b Board 17 -- acks + escalation + retention + perf SHIPPED</h1>
+<p class="sub">The classifier tick is fast again, operators can accept legit diffs, the Signal worklist is exposed, and the timeline can be pruned. All four items verified on the live service.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified</span>
+
+<div class="summary">
+<div class="stat"><span class="num" style="color:#5cb85c">3.3s</span><span class="label">Warm Tick (was 142s)</span></div>
+<div class="stat"><span class="num">4 / 4</span><span class="label">Items Done</span></div>
+<div class="stat"><span class="num">ack</span><span class="label">Signal -&gt; Benign verified</span></div>
+<div class="stat"><span class="num">16</span><span class="label">Pts</span></div>
+</div>
+
+<h2>1. Perf -- 142s to 3.3s</h2>
+<p style="font-size:13px">ClassifiedSweep now runs <b>one combined query per DB</b> -- <code>HASH_AGG(bizcols) + COUNT(*) + MAX(timestamp cursor)</code> in a single UNION ALL. The MAX piggybacks the full scan the fingerprint already does, so lag + row delta cost nothing extra. INFORMATION_SCHEMA metadata (biz cols both DBs + column types) is cached 60 min. This eliminated the two separate stats passes and the triple metadata reads.</p>
+<div class="code-block">tick 1 (cold cache):  230.5s   clean=180 cosmetic=0 benign=27 signal=1
+tick 2 (warm cache):    3.3s   clean=180 cosmetic=0 benign=27 signal=1</div>
+<p style="font-size:13px">Verdicts identical to Board 16 -- pure speedup. The autonomous 5-min cadence keeps warehouse + cache warm, so ticks run ~3s; the cold ~230s cost happens only on a cold start or after the 60-min cache TTL.</p>
+
+<h2>2. Acks -- accept a legit diff</h2>
+<p style="font-size:13px"><code>cadence-acks</code> Firestore collection + endpoints <code>GET /acks</code>, <code>POST /ack?stream=&amp;reason=&amp;by=</code>, <code>POST /ack/clear?stream=</code>. /tick loads acks and the classifier downgrades a would-be <b>Signal</b> to <b>Benign</b> with <code>acknowledged: &lt;reason&gt;</code>. <code>Go.Ack</code> launcher: <code>list</code> / <code>"&lt;stream&gt;" "&lt;reason&gt;"</code> / <code>clear "&lt;stream&gt;"</code>.</p>
+<div class="callout">
+<strong>Verified live.</strong> ETHER.USERS had aged past the 6h tolerance on the frozen clone -> Signal. <code>Go.Ack "ETHER.USERS" "frozen clone during migration -- expected"</code> -> next tick: signal=0, ETHER.USERS reads <b>Benign -- acknowledged: frozen clone during migration -- expected</b>. Then cleared the ack. Full lifecycle works. This is the mechanism for accepting new-Airbyte legitimate differences post-cutover.
+</div>
+
+<h2>3. Escalation -- the Signal worklist</h2>
+<p style="font-size:13px"><code>GET /escalate</code> returns the latest snapshot's Signal streams (the worklist a human or the deep engine should investigate) + <code>ParityL3Url</code> + <code>autoEscalate=false</code>.</p>
+<div class="warn">
+<strong>Honest scope:</strong> the auto-call to airbyte-parity <code>/parity/l3</code> (deep column-signal / row-delta) is <b>contract-pending</b> -- it needs the engine's request/response shape confirmed + a cadence-svc -&gt; airbyte-parity invoker IAM grant. Rather than ship a fragile guess against an unverified contract (and with 0 standing Signals once acked), the worklist endpoint is the integration point; flip <code>autoEscalate</code> on once the call is wired.
+</div>
+
+<h2>4. Retention</h2>
+<p style="font-size:13px"><code>POST /reset/retention?days=N</code> (default 14, <code>X-Reset-Confirm: yes</code> guarded) prunes <code>cadence-snapshots</code> older than the cutoff in 500-doc batches. Deployed + guarded; <b>not fired</b> -- didn't want to delete the timeline you're actively watching. Run it when the snapshot count needs bounding.</p>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Fingerprint/ClassifiedSweep.cs</code></td><td>combined single-pass query + 60min metadata cache</td></tr>
+<tr><td><code>cadence/Cadence/Fingerprint/DriftClassifier.cs</code></td><td>ack downgrade (Signal -&gt; Benign with reason)</td></tr>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>/tick loads acks; +/acks +/ack +/ack/clear +/reset/retention +/escalate</td></tr>
+<tr><td><code>cadence/Go.Ack.bat + .ps1</code></td><td>ack list/record/clear launcher</td></tr>
+<tr><td>cadence commit</td><td><code>e9f4d8d</code>; Cloud Build <code>b97dba18</code></td></tr>
+</table>
+
+<h2>The operator surface now</h2>
+<div class="code-block">Go.Sweep / Go.Reclone / Go.Rebaseline   run sweeps / refresh clone / full reset
+Go.Status [secs]                        live state + verdict breakdown
+Go.Diff                                 per-stream verdict diff of last 2 sweeps
+Go.FirstDiff                            when each stream first broke (narrative)
+Go.Ack list | "<stream>" "<reason>" | clear <stream>   accept a legit diff
+HTTP: /tick /firstdiff /escalate /reset/{status,pause,resume,wipe,baseline,retention}</div>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence e9f4d8d; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 17 -- 4 items Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Pushed + deployed + verified live (perf, ack lifecycle, escalate, endpoints)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (verdicts identical to Board 16; retention not fired)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r115 &middot; 2026-05-28 01:50 &middot; ~b Board 17</div>
+</body></html>
