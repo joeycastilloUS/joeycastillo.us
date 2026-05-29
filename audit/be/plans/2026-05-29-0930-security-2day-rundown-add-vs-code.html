@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security 2-Day Rundown — a-d-d vs code handoff</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 24px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 30px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 22px; }
+  p { color: #ccc; margin: 8px 0; } ul { margin: 6px 0 6px 22px; } li { color: #ccc; margin: 3px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12px; }
+  th { text-align: left; color: var(--accent); padding: 7px 9px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 6px 9px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.good { color: var(--green); font-weight:600; } td.bad { color: var(--red); font-weight:600; } td.mid { color: var(--amber); font-weight:600; }
+  .paste { background:#0a0a0a; border:1px dashed var(--accent); border-radius:6px; padding:16px 18px; margin:14px 0; font-size:13px; color:#cfe6ee; }
+  .paste b { color: var(--accent); }
+  .note { background:#0e1419; border-left:3px solid var(--accent); padding:12px 18px; margin:14px 0; color:#cfe6ee; font-size:13px; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; SECURITY 2-day rundown &middot; handoff to a-d-d-vs-code auditor</span></nav>
+<div class="container">
+
+  <h1>Security — 2-Day Rundown (2026-05-27 → 05-29)</h1>
+  <div class="sub">Everything metal-2 changed in security / the nous C-library stack / a-d-d over the last two days, with commit hashes + file paths + test status. Built so a fresh session can audit <b>a-d-d spec vs. implemented code</b>. Copy the block below to brief the auditor.</div>
+
+  <div class="paste">
+    <b>// PASTE TO THE AUDITOR //</b><br><br>
+    You are auditing <b>a-d-d spec vs. shipped code</b> for the kastil-systems Sealed-IDS mesh trust layer + nous security skills. Trust model: operator Ed25519 key = the CA; each node holds its own keypair; operator signs <code>node.cert = ed25519_sign(operator.priv, node.pub‖role)</code> (role = "prime"/"relay", 5 bytes → 37-byte msg); node self-verifies at boot vs compiled-in <code>OPERATOR_PUB = a61bdace…</code>. Roster = operator-signed <code>mesh.sealed</code> (MESHROSTER1), loaded + replay-guarded at boot. Repos: code in <code>kastil-systems/nous</code>, specs in <code>kastil-systems/a-d-d</code>, analysis in <code>joeycastilloUS/audit-of-all/be/plans/</code>. Start from the deep audit (<code>2026-05-28-0051-i-mesh-deep-audit</code>) + this rundown. Known spec-vs-code deltas + open gaps are in §3/§4 below — verify them and find more.
+  </div>
+
+  <h2>&sect;1 — Security work shipped (kastil-systems/nous)</h2>
+  <table>
+    <tr><th>Item</th><th>What / where</th><th>Hash</th><th>Tests</th></tr>
+    <tr><td>MESH-UP-C roster loader</td><td><code>intelligence/tool/prime-server/mesh_roster.{c,h}</code> + <code>security/operator_pub.h</code> (stub) — verify operator-signed mesh.sealed, parse triples, graceful-degrade</td><td><code>1acdbf5</code></td><td class="good">10/10</td></tr>
+    <tr><td><b>reveal</b> security skill</td><td><code>security/skill/reveal/{reveal.c,reveal.h,skill.json,test_reveal.c}</code> — ephemeral one-time-view self-revoking disclosure; SHA-256 token-at-rest, constant-time lookup, no malloc; in <code>libsecurity.a</code> + <code>test-deep</code></td><td><code>7aa70d6</code></td><td class="good">24/24</td></tr>
+    <tr><td>build_linux.sh drift fix</td><td>prime build: <code>http.o</code> +crypt include (Linux tls13 path); link wire/qr/translate/execute. Build hygiene for the prime binary</td><td><code>fdf580d</code></td><td class="good">verified</td></tr>
+    <tr><td>TASK #40 — node-cert signer + LA integration</td><td><code>tool/operator-sign-node/</code> (signs node.pub‖role → node.cert); re-signed LA relay to today's operator key, planted (old <code>.bak</code>'d), restarted, <b>self-verify OK on-VM</b>, renamed <code>relay.service</code></td><td><code>7472a8c</code></td><td class="good">6/6 +E2E +on-VM</td></tr>
+    <tr><td><b>MH-1</b> roster replay/rollback guard</td><td><code>mesh_roster.c</code>: <code>mesh_roster_meta</code> + <code>mesh_roster_freshness_check</code> (signed_at monotonic vs <code>&lt;path&gt;.seen</code> sidecar) — a validly-signed OLDER roster can no longer roll the mesh back. + e2e chain test + 20k-iteration parser fuzz</td><td><code>db58b2d</code></td><td class="good">27 +fuzz</td></tr>
+  </table>
+  <p class="note"><b>Context (Claude-1's, not metal-2):</b> operator-keygen <code>1407918</code>, mesh-roster-build <code>8ae588d</code>, operator_pub.h planted with real key <code>5408b56</code>. The 5-VM mesh (4 primes <code>prime.service</code> + LA <code>relay.service</code>) is LIVE on operator root <code>a61bdace…</code>.</p>
+
+  <h2>&sect;2 — a-d-d changes (kastil-systems/a-d-d)</h2>
+  <table>
+    <tr><th>Item</th><th>Path</th><th>Hash</th></tr>
+    <tr><td>reveal skill spec</td><td><code>nous/security/skill/reveal/CLAUDE.md</code></td><td><code>ca2884e</code></td></tr>
+    <tr><td>marketing positioning (#marketing)</td><td><code>_marketing/2026-05-28-pki-zero-trust-positioning.md</code> (PKI/machine-identity/zero-trust claim + sourced evidence)</td><td><code>80c5e81</code></td></tr>
+    <tr><td>SEALED-IDS v2 spec</td><td><b>APPROVED, NOT YET WRITTEN</b> — `nous/comms/skill/mesh/SEALED-IDS-v2.md` + relay update. Params locked: 30d TTL, sign-then-encrypt roster, hand-rolled challenge-response.</td><td class="mid">pending</td></tr>
+  </table>
+
+  <h2>&sect;3 — a-d-d spec ↔ nous code map (the auditor's core diff)</h2>
+  <table>
+    <tr><th>security/skill</th><th>a-d-d spec</th><th>nous code</th><th>Note for auditor</th></tr>
+    <tr><td>crypt</td><td class="good">✓</td><td class="good">✓</td><td>Ed25519/X25519/SHA-256/AES-GCM. Heavily tested.</td></tr>
+    <tr><td>auth</td><td class="good">✓</td><td class="good">✓</td><td>verify both sides match.</td></tr>
+    <tr><td>seal</td><td class="good">✓</td><td class="good">✓</td><td>v1 passphrase + v2 X25519 envelope.</td></tr>
+    <tr><td>vault</td><td class="good">✓</td><td class="good">✓</td><td>KV seal/unseal + brute-force lockout.</td></tr>
+    <tr><td>reveal</td><td class="good">✓ (new, ca2884e)</td><td class="good">✓ (new, 7aa70d6)</td><td>spec + code landed together this cycle. Verify they agree.</td></tr>
+    <tr><td>policy</td><td class="mid">✓ (reserved)</td><td class="mid">~ NOTE.md only</td><td>spec'd as tear-line/revocation; implementation is a placeholder. <b>Delta.</b></td></tr>
+    <tr><td><b>wipe</b></td><td class="bad">✓ spec exists</td><td class="bad">✗ NO CODE</td><td><b>DELTA — spec'd in a-d-d, not implemented in nous.</b> Auditor: confirm + decide build/defer.</td></tr>
+    <tr><td>mesh roster trust</td><td class="mid">relay/CLAUDE.md (v1)</td><td class="good">✓ mesh_roster + tools</td><td>code is ahead of spec on MH-1 freshness guard; v2 spec pending. <b>Delta.</b></td></tr>
+  </table>
+
+  <h2>&sect;4 — Known open security gaps (from the deep audit)</h2>
+  <p>The mesh trust layer is "Nebula-grade foundation, honestly v1." Built: authenticity + integrity + (MH-1) replay/rollback guard. <b>Not built</b> (designed + estimated, MH-2..MH-5):</p>
+  <ul>
+    <li><b>No cert/roster expiry</b> — certs live forever (MH-2: <code>valid_until</code>, 30d TTL).</li>
+    <li><b>No revocation</b> — can't kill a leaked node/key without recompiling all (MH-3: signed revocation list).</li>
+    <li><b>No per-peer mutual auth</b> — relay↔prime trust by IP + shared PSK, not identity (MH-4: hand-rolled challenge-response).</li>
+    <li><b>No key rotation ceremony</b> + roster is signed-plaintext (MH-5: operator-key versioning + sign-then-encrypt).</li>
+    <li><b>Test system gaps</b> — 70 test files, ~480 asserts, but no unified runner / CI / coverage (see test ~i/~p). keygen + roster-build had 0 standalone unit tests (now covered by e2e interop).</li>
+    <li><b>Operator key on Windows</b> — <code>chmod 0600</code> Unix-only; no ACL enforced on Windows.</li>
+  </ul>
+
+  <h2>&sect;5 — Where to look (canonical)</h2>
+  <ul>
+    <li><b>Deep security audit:</b> <code>audit-of-all/be/plans/2026-05-28-0051-i-mesh-deep-audit.html</code> (vs Nebula/WireGuard/Tailscale/SPIFFE/TUF)</li>
+    <li><b>Hardening design/plan/estimate:</b> <code>…/2026-05-28-0117-{design,plan,estimate}-*</code> (MH-1..5, 87 pts)</li>
+    <li><b>Test audit + strategy:</b> <code>…/2026-05-28-1815-{i-test-coverage-audit,p-test-strategy-pro-grade}</code> (TEST-1..5, 84 pts)</li>
+    <li><b>Code:</b> nous <code>security/skill/*</code>, <code>intelligence/tool/prime-server/mesh_roster.*</code>, <code>tool/operator-{keygen,sign-node}</code>, <code>tool/mesh-roster-build</code>, <code>comms/skill/relay/relay_server.c</code></li>
+    <li><b>Coordination:</b> <code>joeycastilloUS/audit-of-all/be/coordination/mesh.md</code></li>
+  </ul>
+
+  <h2>&sect;6 — Audit this (checklist for the new session)</h2>
+  <ul>
+    <li>Diff every <code>a-d-d/nous/security/skill/*/CLAUDE.md</code> against the matching <code>nous/security/skill/*</code> — confirm the <b>wipe</b> (spec, no code) and <b>policy</b> (spec, placeholder) deltas; find others.</li>
+    <li>Verify the cert/roster byte layouts in the spec match <code>operator-sign-node</code> / <code>mesh-roster-build</code> / <code>mesh_roster.c</code> exactly (msg = node.pub‖role = 37B; MESHROSTER1 framing).</li>
+    <li>Confirm MH-1 replay guard is real (signed_at monotonic; <code>.seen</code> sidecar) and that the spec needs updating to document it (code-ahead-of-spec).</li>
+    <li>Validate the §4 gaps are still open and not silently half-built.</li>
+    <li>Check the operator private key handling (zeroization, file perms, Windows ACL).</li>
+  </ul>
+
+  <footer>Be &middot; v0 &middot; r71 &middot; 2026-05-29 &middot; metal-2 &middot; security 2-day rundown &middot; handoff for a-d-d-vs-code audit</footer>
+</div>
+</body>
+</html>
