@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 20 -- signal disposition: honest escalation + risk register</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;background:#1A1A1A;border-radius:6px;padding:18px;margin:14px 0}
+.stat .num{font-size:20px;font-weight:700;display:block;color:#6FC3DF}.stat .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+.disp{display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:700;text-transform:uppercase}
+.d-exp{background:#1a2438;color:#6FC3DF}.d-acc{background:#1f1f0a;color:#f0ad4e}.d-blk{background:#2a1414;color:#f06e6e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 20</nav>
+
+<h1>~b Board 20 -- signal disposition: honest escalation + risk register</h1>
+<p class="sub">Story D, done honestly. The cutover stops being "signal=0 and hope" -- now every red is dug into, then explained, accepted with a comment, or marked a blocker. All five items verified on the live service.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified</span>
+
+<div class="summary">
+<div class="stat"><span class="num" style="color:#5cb85c">5 / 5</span><span class="label">Items Done</span></div>
+<div class="stat"><span class="num">12</span><span class="label">Cols localized (SPREE)</span></div>
+<div class="stat"><span class="num">3</span><span class="label">Dispositions</span></div>
+<div class="stat"><span class="num">19</span><span class="label">Pts</span></div>
+</div>
+
+<div class="callout">
+<strong>The honest result.</strong> Board 17 deferred the cadence&rarr;parity deep call as "contract-pending" rather than ship a guess. Item 1 resolved that honestly: <code>/parity/l3</code> is live, <code>allUsers</code>-invokable (no IAM grant for cadence-svc), contract verified from source. <code>Go.Escalate ECOMM.SPREE_CMS_SECTIONS</code> then proved it end-to-end live: <b>L3 verdict Diff, 12/12 columns drifted (rowCount + hash), row delta prod=392 / clone=393</b>. Real column-level localization, no guess.</div>
+
+<h2>1. Verify the contract (the honest gate)</h2>
+<p style="font-size:13px">Inspected the parity engine's real deep-diff endpoint + IAM before writing any escalation code. Verdict: <b>wireable for real, no fallback needed.</b> See <a href="https://joeycastillo.us/airbyte-migration/inspect-l3-contract.html" style="color:#6FC3DF">inspect-l3-contract.html</a>. <code>POST /parity/l3</code> body <code>{schema, table, nonMetaColumns, primaryKeyColumns?}</code> &rarr; <code>L3Result{columns[]: per-column prod/clone profile + match flags, verdict}</code>; <code>/parity/l1</code> = row delta.</p>
+
+<h2>2. Disposition store + vocabulary (3-state)</h2>
+<p style="font-size:13px">Evolved <code>cadence-acks</code> to <code>{disposition, comment, by, ts}</code> (<code>reason</code> kept as a legacy alias; old acks read as <span class="disp d-exp">explained</span>). The classifier maps each disposition on a would-be Signal:</p>
+<table>
+<tr><th>Disposition</th><th>Effect</th><th>Verified live</th></tr>
+<tr><td><span class="disp d-exp">explained</span></td><td>&rarr; Benign "explained: ..."</td><td>tick &rarr; signal drops</td></tr>
+<tr><td><span class="disp d-acc">accepted-risk</span></td><td>&rarr; Benign "accepted risk: ..."</td><td>tick &rarr; <b>signal=0, gate GREEN</b></td></tr>
+<tr><td><span class="disp d-blk">blocker</span></td><td>stays Signal, reason "BLOCKER: ..."</td><td>tick &rarr; <b>stays red, gate "1 blocker"</b></td></tr>
+</table>
+<p style="font-size:13px">A comment is mandatory &mdash; every disposition is justified on the record. (All three paths were exercised live, then cleared, so SPREE_CMS_SECTIONS is left un-dispositioned for the operator to decide.)</p>
+
+<h2>3. Go.Risk -- the register</h2>
+<div class="code-block">Go.Risk                                 list the register (grouped by disposition)
+Go.Risk &lt;stream&gt; accept  "&lt;comment&gt;"    real diff, accepted for cutover (-> Benign)
+Go.Risk &lt;stream&gt; block   "&lt;comment&gt;"    real diff, must fix first (stays RED)
+Go.Risk &lt;stream&gt; explain "&lt;comment&gt;"    not a real diff -- noise (-> Benign)
+Go.Risk &lt;stream&gt; clear                  remove the disposition</div>
+<p style="font-size:13px">Rejects an empty comment. Supersedes <code>Go.Ack</code> (which maps to <code>explain</code>).</p>
+
+<h2>4. Honest escalation wiring</h2>
+<p style="font-size:13px"><code>POST /escalate/run?stream=SCHEMA.TABLE</code> resolves the stream's business columns (cadence already caches them) and calls the verified <code>/parity/l3</code> (+ <code>/parity/l1</code>), returning which columns drifted and the row delta. <code>autoEscalate</code> stays <b>opt-in</b> &mdash; the 5-min tick never fires it, because each call is a live multi-column Snowflake scan on both DBs.</p>
+<div class="code-block">Go.Escalate                 cutover gate + signals needing triage
+Go.Escalate &lt;stream&gt;        deep-diff one signal: which columns drifted (+ row delta)
+
+L3 verdict: Diff   (12 columns profiled, parity /parity/l3 (verified contract))
+  12 column(s) drifted:  ID, FIT, NAME, TYPE, CONTENT, POSITION, SETTINGS, ...
+  rows: prod=392 clone=393 delta=1 (Diff)</div>
+
+<h2>5. Surface + cutover gate</h2>
+<p style="font-size:13px">The disposition + gate are surfaced in three places:</p>
+<ul>
+<li><code>GET /escalate</code> &mdash; <code>cutoverGate</code>, <code>blockers</code>, <code>undispositioned</code>, <code>green</code>, plus each signal's disposition.</li>
+<li><code>Go.Signal</code> &mdash; prints the gate line + tags each signal <code>[BLOCKER]</code> or <code>[needs triage]</code> + the Go.Escalate / Go.Risk next steps.</li>
+<li>Public dashboard hero &mdash; "ALL CLEAR" vs "N SIGNAL" already IS the gate verdict (green &hArr; signal=0).</li>
+</ul>
+<div class="callout"><strong>The gate.</strong> Green = <b>0 un-dispositioned AND 0 blockers</b>. You can only reach it by digging into each red and either explaining it, accepting the risk with a comment, or fixing it. A blocker stays red on purpose. That is a cutover you can defend.</div>
+<div class="warn"><strong>Security note (flagged, not actioned):</strong> the parity engine's <code>/parity/*</code> endpoints are <code>allUsers</code>-invokable and each runs live Snowflake queries. Pre-existing config; logged for a future security pass. Not changed in this board.</div>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Fingerprint/DriftClassifier.cs</code></td><td>Disposition record + 3-state MakeMaybeAcked (explained/accepted-risk &rarr; Benign; blocker &rarr; Signal "BLOCKER:")</td></tr>
+<tr><td><code>cadence/Cadence/Fingerprint/ClassifiedSweep.cs</code></td><td>dispositions dict; GetBizColumnsAsync helper for escalation</td></tr>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>/tick loads dispositions; /ack accepts disposition+comment; /escalate gate; +/escalate/run</td></tr>
+<tr><td><code>cadence/Go.Risk.* , Go.Escalate.*</code></td><td>register launcher + deep-diff launcher</td></tr>
+<tr><td><code>cadence/Go.Signal.ps1</code></td><td>gate line + disposition tags + Go.Escalate/Go.Risk hints</td></tr>
+<tr><td>cadence commits / build</td><td><code>9047af4</code> + <code>c88ba88</code> / Cloud Build <code>65f44827</code></td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence 9047af4 + c88ba88; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 20 -- 5 items Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Pushed + deployed (Cloud Build 65f44827) + verified live (3 dispositions, deep-diff 12 cols, gate GREEN/RED)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (acks backward-compatible; test dispositions cleared; SPREE left un-dispositioned)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r132 &middot; 2026-05-29 01:50 &middot; ~b Board 20</div>
+</body></html>

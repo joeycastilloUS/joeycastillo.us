@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~i Parity engine deep-diff contract -- verified (Board 20 item 1)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:27px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:26px 0 10px;font-size:18px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:16px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.v{display:inline-block;padding:1px 8px;border-radius:9px;font-size:10px;font-weight:700}.ok{background:#0d2818;color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~i L3 contract</nav>
+
+<h1>Parity engine deep-diff contract &mdash; verified</h1>
+<p class="sub">Board 20 item 1, the honest gate. Board 17 deferred the cadence&rarr;parity auto-call as "contract-pending" rather than ship a guess. This resolves the deferral: read the engine's real endpoints, probe the live service, check IAM. Verdict: <b>wireable for real, no fallback needed.</b></p>
+<span class="banner">Inspect &middot; Contract VERIFIED</span>
+
+<div class="lede">
+<strong>Bottom line:</strong> <code>POST /parity/l3</code> is deployed, reachable, and <code>allUsers</code>-invokable &mdash; cadence-svc needs <b>no IAM grant</b>. The request/response shape is confirmed from source. L3 localizes <em>which column</em> drifted; L1 gives the <em>row-count delta</em>. cadence already resolves the business columns needed to build the request. Story D wires for real.</div>
+
+<h2>The contract (from source)</h2>
+<p style="font-size:13px"><code>AirbyteParity/Endpoints/ParityEndpoints.cs</code> + <code>Engine/Models/ParityResult.cs</code>. Prod/clone DB pair comes from the server's <code>ParityOptions</code> &mdash; the caller only describes the stream.</p>
+<div class="code-block">POST /parity/l3            (also /parity/l1 for row-count delta; same body)
+body  ParityRequest {
+  schema:            "ECOMM",
+  table:             "SPREE_CMS_SECTIONS",
+  nonMetaColumns:    ["ID","TITLE","BODY", ...],   // required -- the business columns
+  primaryKeyColumns: ["ID"]                          // optional
+}                            // sinceUtc / limit ignored for L3
+
+200  L3Result {
+  stream:  { ... },
+  columns: [ ColumnProfilePair {
+      column:           "BODY",
+      prod:             { column, rowCount, nullCount, hash, min, max },
+      cloneSide:        { column, rowCount, nullCount, hash, min, max },
+      rowCountMatches, nullCountMatches, hashMatches, minMatches, maxMatches
+  }, ... ],
+  verdict: "Match" | "Diff" | "Missing" | "Inconclusive"
+}</div>
+<p style="font-size:13px">The per-column match flags are the localization: a Signal stream's drifted column is the one with <code>hashMatches=false</code> (or min/max/null mismatch). That is the "which column, how bad" answer Story D needs.</p>
+
+<h2>Live probe (unauthenticated)</h2>
+<table>
+<tr><th>Route</th><th>Code</th><th>Reading</th></tr>
+<tr><td><code>GET /parity/l3</code></td><td><span class="v ok">405</span></td><td>route is LIVE (POST-only; 405 = method not allowed, not missing)</td></tr>
+<tr><td><code>GET /dashboard</code></td><td><span class="v ok">200</span></td><td>service healthy + serving</td></tr>
+<tr><td><code>GET /dashboard/data</code></td><td><span class="v ok">200</span></td><td>data endpoint up</td></tr>
+<tr><td><code>GET /healthz</code></td><td>404</td><td>not in deployed revision 00027 (newer in repo); cosmetic, not load-bearing</td></tr>
+</table>
+<p style="font-size:13px">Service: <code>airbyte-parity</code> @ <code>https://airbyte-parity-d5vc4tye3a-uc.a.run.app</code>, revision <code>airbyte-parity-00027-zbj</code>. Probes returned the app's own responses (200/405) with <b>no token</b> &mdash; confirming reachability.</p>
+
+<h2>IAM</h2>
+<div class="callout"><strong>Open &mdash; no grant required.</strong> <code>roles/run.invoker</code> on <code>airbyte-parity</code> includes <code>allUsers</code>. cadence (or anyone) can POST <code>/parity/l3</code> directly; cadence-svc does <b>not</b> need an invoker binding. Calls work with or without an identity token.</div>
+<div class="warn"><strong>Note (not this board's job):</strong> <code>allUsers</code> invoker means the parity engine's <code>/parity/*</code> endpoints are publicly callable, and each call runs live Snowflake HASH_AGG/profile queries against prod+clone. Pre-existing config; flag it for a future security pass, but it is what makes Story D trivially wireable today. Do not change IAM as part of Board 20.</div>
+
+<h2>What this means for item 4 (escalation wiring)</h2>
+<ul>
+<li><b>No fallback path needed.</b> The design's Escape 1 (manual passthrough on unverified contract) is unused &mdash; the contract is verified and reachable.</li>
+<li><code>Go.Escalate &lt;stream&gt;</code> &rarr; resolve the stream's business columns (cadence already caches these in ClassifiedSweep) &rarr; <code>POST /parity/l3</code> (+ optional <code>/parity/l1</code>) &rarr; report the drifted columns + row delta.</li>
+<li><code>autoEscalate</code> stays opt-in: the 5-min tick must NOT fire L3 per Signal (each L3 is a live multi-column Snowflake scan on two DBs). Operator-triggered only.</li>
+<li>End-to-end response shape will be confirmed with a real stream's columns during item 4 (one live L3 call), not in this no-code inspect.</li>
+</ul>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Inspect saved + (to be) published</div>
+<div class="dod-item">&check; Contract verified from source (request + response types)</div>
+<div class="dod-item">&check; Live reachability probed (405/200, unauth)</div>
+<div class="dod-item">&check; IAM resolved: allUsers invoker, no cadence-svc grant needed</div>
+<div class="dod-item">&check; Gates item 4: no-fallback path confirmed; autoEscalate stays opt-in</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r130 &middot; 2026-05-29 01:30 &middot; ~i L3 contract verified</div>
+</body></html>
