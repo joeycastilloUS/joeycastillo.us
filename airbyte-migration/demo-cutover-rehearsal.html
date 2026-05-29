@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~demo Cutover rehearsal -- the procedure, run live</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.7}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;z-index:100;display:flex;justify-content:space-between;align-items:center}
+.brand{color:#6FC3DF;font-weight:700;font-size:18px}
+.container{max-width:880px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:30px;margin-bottom:6px;letter-spacing:-0.5px}
+.subtitle{color:#6FC3DF;font-size:15px;margin-bottom:24px}
+h2{color:#6FC3DF;font-size:20px;margin:30px 0 12px;border-bottom:1px solid #333;padding-bottom:8px}
+h3{color:#fff;font-size:15px;margin:16px 0 6px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;font-variant-numeric:tabular-nums}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px 10px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 7px;border-radius:3px;font-size:12px;color:#6FC3DF}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+.hero{background:linear-gradient(135deg,#1a3a2a 0%,#0d2818 100%);border-radius:10px;padding:22px 26px;margin:16px 0 28px;border:1px solid #1f3d28}
+.hero strong{color:#5cb85c;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:8px}
+.step{background:#1A1A1A;border-radius:6px;padding:16px 20px;margin:12px 0;border-left:3px solid #6FC3DF}
+.step h3{color:#6FC3DF;margin-top:0;display:flex;align-items:center;gap:10px}
+.step h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-size:12px;font-weight:700;flex-shrink:0}
+.step.danger{border-left-color:#f06e6e}.step.danger h3{color:#f06e6e}.step.danger h3 .num{background:#f06e6e}
+.step.ext{border-left-color:#f0ad4e}.step.ext h3{color:#f0ad4e}.step.ext h3 .num{background:#f0ad4e}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:14px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+.danger-box{background:#1a0e0e;border-left:3px solid #f06e6e;padding:14px 18px;margin:14px 0;color:#e6b0b0;font-size:14px;border-radius:0 4px 4px 0}.danger-box strong{color:#f06e6e}
+ul{margin:8px 0 8px 22px}li{margin:4px 0;font-size:14px}
+.footer{margin-top:36px;padding-top:16px;border-top:1px solid #333;font-size:12px;color:#666;text-align:center}
+.disp{display:inline-block;padding:1px 8px;border-radius:9px;font-size:10px;font-weight:700}
+.d-exp{background:#1a2438;color:#6FC3DF}.d-blk{background:#2a1414;color:#f06e6e}
+</style></head><body>
+<nav><span class="brand">Be &middot; airbyte-parity</span><span style="color:#666;font-size:12px">~demo cutover rehearsal</span></nav>
+<div class="container">
+
+<h1>Cutover Rehearsal</h1>
+<p class="subtitle">The cutover procedure, run live against the current frozen-clone state with the full operator toolset. Read-only + disposition steps were exercised for real (then restored); the destructive + external steps are documented and gated.</p>
+
+<div class="hero">
+<strong>What this rehearsal proved</strong>
+The loop works end to end on live data: <b>see it</b> (Go.Status / Go.Replay) &rarr; <b>triage</b> (Go.Signal) &rarr; <b>dig</b> (Go.Escalate &rarr; verified /parity/l3) &rarr; <b>decide on the record</b> (Go.Risk) &rarr; <b>gate</b> (green only at 0 un-dispositioned + 0 blockers). Two live signals showed two different truths, and the tooling told them apart.
+</div>
+
+<h2>The two signals, told apart</h2>
+<table>
+<tr><th>Stream</th><th>L3 deep-diff</th><th>Rows</th><th>Reading</th><th>Disposition</th></tr>
+<tr><td><code>ECOMM.SPREE_CMS_SECTIONS</code></td><td>12/12 cols drift (rowCount + hash everywhere)</td><td>prod 392 / clone <b>393</b> (+1 stray)</td><td>368h dead; clone has a row prod doesn't; everything differs &rarr; <b>genuine divergence</b></td><td><span class="disp d-blk">blocker</span></td></tr>
+<tr><td><code>ETHER.OFFLINE_STORES</code></td><td>9 cols drift incl. MAX on id/timestamp cols</td><td>prod 18943 / clone <b>18937</b> (-6 behind)</td><td>windowed-match clean; clone trails by 6 newest rows, older maxes &rarr; <b>stale lag</b></td><td><span class="disp d-exp">explained</span></td></tr>
+</table>
+<p style="font-size:13px">Same raw verdict (both "Diff"), opposite meaning. <code>Go.Escalate</code>'s column + row-delta detail is what distinguishes "clone is just behind" from "the data genuinely disagrees." That distinction is the cutover decision.</p>
+
+<h2>The procedure</h2>
+
+<div class="step"><h3><span class="num">0</span> Pre-flight</h3>
+<div class="code-block">Go.Status            # scheduler Enabled? latest sweep? verdict counts?</div>
+Confirm cadence is ticking (5-min) and you're reading a fresh sweep. Rehearsal saw <code>Enabled, clean=113 benign=93 signal=2</code>.</div>
+
+<div class="step"><h3><span class="num">1</span> See the timeline</h3>
+<div class="code-block">Go.Replay                       # the cascade movie -- how drift evolved (356 ticks)
+Go.Replay &lt;stream&gt;              # one stream's verdict lane + flips
+Go.Replay at &lt;time&gt;             # freeze-frame at any past tick</div>
+Orient before you act: what's been drifting, since when, and whether it's trending worse or holding.</div>
+
+<div class="step"><h3><span class="num">2</span> Triage the worklist</h3>
+<div class="code-block">Go.Signal            # ONLY genuine signals + the cutover gate line</div>
+Everything Clean/Cosmetic/Benign is suppressed. Each signal is tagged <code>[needs triage]</code> or <code>[BLOCKER]</code>.</div>
+
+<div class="step"><h3><span class="num">3</span> Dig each signal</h3>
+<div class="code-block">Go.Escalate &lt;stream&gt;           # verified /parity/l3: which columns drifted + row delta</div>
+This is the honest deep-diff (Board 20). It tells lag apart from divergence. Read the row delta sign: clone <em>behind</em> (negative) leans lag; clone with <em>extra/changed</em> rows leans divergence.</div>
+
+<div class="step"><h3><span class="num">4</span> Decide, on the record</h3>
+<div class="code-block">Go.Risk &lt;stream&gt; explain "&lt;why it's noise&gt;"        # lag / expected   -> Benign
+Go.Risk &lt;stream&gt; accept  "&lt;why we live with it&gt;"   # real, accepted   -> Benign
+Go.Risk &lt;stream&gt; block   "&lt;why it must be fixed&gt;"   # real, blocker    -> stays RED
+Go.Risk                                              # review the register</div>
+Every disposition needs a comment. Loop steps 3-4 until every signal is dispositioned.</div>
+
+<div class="step ext"><h3><span class="num">5</span> Feed the clone (external + destructive)</h3>
+<div class="code-block">Go.Reclone           # refresh AIRBYTE_CLONE from prod   (DESTRUCTIVE: drop + recreate)
+# -- OR -- point airbyte-philz (new Airbyte) at the clone and let it catch up</div>
+<div class="danger-box"><strong>Gated.</strong> <code>Go.Reclone</code> drops and recreates <code>AIRBYTE_CLONE</code>. The real cutover feeds the clone from <b>new Airbyte (airbyte-philz)</b> — external infra. NOT fired in this rehearsal. When fired, stale-lag signals (like OFFLINE_STORES) collapse to clean; genuine divergences (like SPREE) either resolve or stay as real blockers.</div></div>
+
+<div class="step"><h3><span class="num">6</span> Confirm green</h3>
+<div class="code-block">Go.Signal            # cutover gate: GREEN -- 0 un-dispositioned, 0 blockers
+Go.Replay            # the recovery reel -- signals collapsing back to clean</div>
+Green is honest: every red is fixed, explained, or accepted with a comment. Replay the recovery as proof on film.</div>
+
+<div class="step ext"><h3><span class="num">7</span> Cut over (external)</h3>
+Switch consumers from <code>AIRBYTE_DB</code> to <code>AIRBYTE_CLONE</code> (promote / repoint). Outside cadence. Keep cadence running after &mdash; <code>Go.Signal</code> should stay clean.</div>
+
+<h2>Rehearsal disposition cycle (exercised, then restored)</h2>
+<p style="font-size:13px">To prove step 4 + the gate end to end, both signals were dispositioned live and the gate observed, then cleared:</p>
+<div class="code-block">explain OFFLINE_STORES + block SPREE  -> tick -> gate: RED -- 0 un-dispositioned, 1 blocker(s)
+   register:  BLOCKER(1) SPREE_CMS_SECTIONS   EXPLAINED(1) OFFLINE_STORES
+clear both                            -> tick -> gate: RED -- 2 un-dispositioned, 0 blockers (restored)</div>
+<div class="callout"><strong>Left clean.</strong> The dispositions above were a rehearsal &mdash; both were cleared. SPREE_CMS_SECTIONS and OFFLINE_STORES are un-dispositioned now, so the real calls are yours at real cutover time.</div>
+
+<h2>Where the gate stands now</h2>
+<p style="font-size:13px"><b>RED &mdash; 2 un-dispositioned, 0 blockers.</b> To reach green at real cutover: feed the clone (step 5), which should collapse the stale-lag signals; then disposition or fix whatever genuinely remains. The procedure above is the path.</p>
+
+<h2>Gaps noticed during the rehearsal</h2>
+<ul>
+<li><b>Go.Replay &lt;stream&gt; lanes collide on one temp file</b> &mdash; opening two stream lanes back-to-back, the second overwrites the first before the browser reads it. View lanes one at a time, or a future tweak gives each stream its own temp file.</li>
+<li><b>No single "rehearse" command yet</b> &mdash; this was a hand-run sequence. Could be wrapped as <code>Go.Cutover</code> (read-only walkthrough) if rehearsing becomes routine.</li>
+</ul>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Rehearsal runbook saved + (to be) published</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Full loop run live (Go.Status/Replay/Signal/Escalate/Risk/gate)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Destructive (Go.Reclone) + external (cutover switch) steps gated, not fired</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; State restored -- both signals left un-dispositioned for the operator</div>
+</div>
+
+<div class="footer">
+Be &middot; airbyte-parity &middot; v0 &middot; r136 &middot; 2026-05-29 16:08 &middot; ~demo cutover rehearsal<br>
+"Show me, don't tell me." -jc
+</div>
+
+</div></body></html>
