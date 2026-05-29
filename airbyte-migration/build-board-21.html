@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 21 -- cutover rehearsal gap fixes</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 21</nav>
+
+<h1>~b Board 21 -- cutover rehearsal gap fixes</h1>
+<p class="sub">The two gaps the 2026-05-29 cutover rehearsal surfaced, closed. Both client-side launchers -- no deploy.</p>
+<span class="banner">Shipped &middot; Verified</span>
+
+<h2>Gap 1 -- Go.Replay lanes collided</h2>
+<p style="font-size:13px"><b>Was:</b> <code>Go.Replay &lt;stream&gt;</code> wrote every lane to one shared <code>cadence-replay.html</code>, so opening two back-to-back, the second clobbered the first. <b>Now:</b> per-target temp files &mdash; <code>cadence-replay-&lt;stream&gt;.html</code> (and <code>-frame-&lt;at&gt;.html</code>). Two lanes open side by side.</p>
+<div class="code-block">Go.Replay ECOMM.SPREE_CMS_SECTIONS  -> cadence-replay-ECOMM_SPREE_CMS_SECTIONS.html  (32938 b)
+Go.Replay ETHER.OFFLINE_STORES      -> cadence-replay-ETHER_OFFLINE_STORES.html      (33082 b)
+both files present -- no collision</div>
+
+<h2>Gap 2 -- no one-command rehearsal</h2>
+<p style="font-size:13px"><b>Now:</b> <code>Go.Cutover</code> runs the whole read-only walkthrough in order &mdash; pre-flight (status) &rarr; timeline pointers &rarr; each signal deep-diffed via <code>/parity/l3</code> &rarr; gate &rarr; next steps. Fires <b>nothing destructive</b>; <code>-nodig</code> skips the per-signal L3 for a fast no-Snowflake pass.</p>
+<div class="code-block">CUTOVER WALKTHROUGH (read-only -- fires nothing destructive)
+0. PRE-FLIGHT   scheduler: Enabled  snapshots: 362  clean=113 benign=93 signal=2
+2. SIGNALS (2)
+   ECOMM.SPREE_CMS_SECTIONS   dig: L3 Diff 12/12 cols   rows 392/393 delta=1  -> divergence lean
+   ETHER.OFFLINE_STORES       dig: L3 Diff 9/9 cols     rows 18943/18937 delta=-6 -> stale-lag lean
+3. CUTOVER GATE   RED -- 2 un-dispositioned, 0 blocker(s)
+4. NEXT (manual)  Go.Risk ... | Go.Reclone (gated) | re-walk Go.Cutover</div>
+<div class="callout"><strong>The lean hint.</strong> Go.Cutover reads the row-delta sign to suggest the disposition: clone <em>behind</em> &rarr; stale-lag lean; clone with <em>extra/changed</em> rows &rarr; divergence lean. It guides the call without making it &mdash; the row-delta correctly tagged OFFLINE_STORES as lag and SPREE as divergence.</div>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Go.Replay.ps1</code></td><td>per-target temp filename for stream/frame modes</td></tr>
+<tr><td><code>cadence/Go.Cutover.ps1 + .bat</code></td><td>read-only walkthrough: pre-flight + per-signal deep-diff + gate + next</td></tr>
+<tr><td>cadence commit</td><td><code>1e769cf</code> (no deploy -- client-side launchers)</td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence 1e769cf; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 21 -- 2 items Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Pushed + verified live (Go.Cutover walkthrough + two non-colliding replay files)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (launcher-only; no server change, no deploy)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r138 &middot; 2026-05-29 16:27 &middot; ~b Board 21</div>
+</body></html>
