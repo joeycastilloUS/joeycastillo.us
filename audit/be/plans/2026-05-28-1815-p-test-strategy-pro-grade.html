@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~p Test Strategy — Professional Grade</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 25px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 30px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 22px; }
+  p { color: #ccc; margin: 8px 0; } ul { margin: 8px 0 8px 22px; } li { color: #ccc; margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  .board { background: var(--surface); border:1px solid var(--surface2); border-radius:6px; padding: 12px 16px; margin: 12px 0; }
+  .board h3 { color: var(--accent); font-size: 14px; margin-bottom: 4px; }
+  .pts { color: var(--accent); font-weight:700; }
+  .note { background:#0e1419; border-left:3px solid var(--accent); padding:12px 18px; margin:14px 0; color:#cfe6ee; font-size:13.5px; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~p test strategy &middot; pile of tests → a system</span></nav>
+<div class="container">
+
+  <h1>~p Test Strategy — Professional Grade</h1>
+  <div class="sub">Turns the 70-file pile (from the ~i audit, same datetime) into a test <b>system</b>: one harness, one runner, a CI gate, measured coverage, and the adversarial tests a security product lives or dies on. "Best of the best" is a discipline, not a count.</div>
+
+  <h2>Intent</h2>
+  <p>Make every commit to nous provably-tested: one command runs everything, returns a pass/fail count + exit code, a CI gate blocks regressions, coverage is measured (not guessed), and every trust-bearing parser is fuzzed + attacked. Each MH hardening board ships paired tests (Rule 7).</p>
+
+  <h2>Scope</h2>
+  <p><b>In:</b> a unified CHECK harness + root <code>make test</code>; CI workflow; gcov/llvm-cov coverage; fill the trust-root unit gaps; adversarial/negative + fuzz expansion; per-MH-board tests; on-VM e2e smoke automation. <b>Out:</b> rewriting the ~50 run-and-eyeball intelligence smoke tests wholesale (triage, don't carpet-bomb); GUI/desktop tests.</p>
+
+  <h2>Approach</h2>
+  <p>Don't boil the ocean. Standardize the harness once, wire a runner + CI, then raise coverage where risk is highest (security + mesh trust first, intelligence later). Adopt the existing <code>security/Makefile</code> <code>test</code>/<code>test-deep</code> pattern as the template and lift it to the repo root. Negative-test every parser that eats attacker-controlled bytes. Pair MH-board tests with the MH boards so test and feature ship together.</p>
+
+  <h2>The test boards</h2>
+
+  <div class="board">
+    <h3>TEST-1 — Unified harness + runner + CI · <span class="pts">18 pts</span> · the #1 gap</h3>
+    <p>One shared <code>check.h</code> (CHECK macro + pass/fail tally + exit code). A root <code>make test</code> (or <code>test.sh</code>) that builds + runs every assertion-gated test and prints <code>N passed, M failed</code> with a non-zero exit on failure. A CI workflow (GitHub Actions on kastil-systems/nous) running it on every push — the gate that makes "tested" automatic.</p>
+    <div class="triple">{shared `check.h` harness, add to, nous root — unify CHECK/tally/exit} · 5 · ~a~t</div>
+    <div class="triple">{root `make test` aggregator, build, builds+runs all unit tests, pass/fail count + exit code} · 5 · ~bt</div>
+    <div class="triple">{CI workflow, add to, .github/workflows — run make test on push, block on red} · 5 · ~a~t</div>
+    <div class="triple">{test README, add to, nous — how to run/add a test} · 3 · ~a</div>
+  </div>
+
+  <div class="board">
+    <h3>TEST-2 — Fill the trust-root unit gaps · <span class="pts">16 pts</span></h3>
+    <p>The key-handling tools must be directly tested, not just covered by e2e interop.</p>
+    <div class="triple">{operator-keygen `--out` flag + unit test, add to, tool/operator-keygen (testability fix + key-format asserts)} · 5 · ~a~t</div>
+    <div class="triple">{mesh-roster-build unit test, add to, tool/mesh-roster-build (framing/sign/round-trip)} · 5 · ~a~t</div>
+    <div class="triple">{intelligence zero-assert test triage, update, convert the ~10 highest-risk run-and-eyeball tests to assertion-gated} · 3 · ~u~t</div>
+    <div class="triple">{relay self-verify unit test, add to, comms/skill/relay (cert verify path direct)} · 3 · ~a~t</div>
+  </div>
+
+  <div class="board">
+    <h3>TEST-3 — Coverage + fuzz expansion · <span class="pts">16 pts</span></h3>
+    <div class="triple">{gcov/llvm-cov coverage target, add to, make test-cov + report} · 5 · ~a~t</div>
+    <div class="triple">{coverage floor (security + mesh trust paths >= 85%), add to, CI gate} · 3 · ~a~t</div>
+    <div class="triple">{wire-protocol fuzz harness, build, feed random frames to the wire parser} · 5 · ~bt</div>
+    <div class="triple">{relay/store deserialization fuzz, build, attacker-reachable parsers} · 3 · ~bt</div>
+  </div>
+
+  <div class="board">
+    <h3>TEST-4 — Adversarial + per-MH-board tests · <span class="pts">21 pts</span> · pairs with MH-2..5</h3>
+    <p>The security tests that matter most: prove the trust layer <i>rejects</i> the attacks. Each ships WITH its MH board (Rule 7), not after.</p>
+    <div class="triple">{MH-2 expiry tests, add to, valid_until honored/expired-rejected/clock-skew} · 5 · ~a~t</div>
+    <div class="triple">{MH-3 revocation tests, add to, revoked-node-rejected + revocation-version-rollback-rejected} · 5 · ~a~t</div>
+    <div class="triple">{MH-4 handshake adversarial, build, replay nonce / wrong cert / MITM / downgrade all rejected} · 5 · ~bt</div>
+    <div class="triple">{MH-5 rotation tests, add to, grace-window dual-key + old-key-retired} · 3 · ~a~t</div>
+    <div class="triple">{negative-test sweep, add to, every trust parser: tamper/truncate/wrong-key/malformed} · 3 · ~a~t</div>
+  </div>
+
+  <div class="board">
+    <h3>TEST-5 — On-VM e2e smoke automation · <span class="pts">13 pts</span></h3>
+    <p>The live mesh, verified by a script not by hand. gcloud-driven: deploy to a throwaway VM (or Ashburn /tmp), boot, assert the journal shows self-verify OK + peer-connect, tear down.</p>
+    <div class="triple">{on-VM smoke harness, build, gcloud deploy → boot → assert journal markers → teardown} · 5 · ~bt</div>
+    <div class="triple">{mesh-formed assertion, add to, query peer count + roster-loaded across nodes} · 5 · ~a~t</div>
+    <div class="triple">{nightly smoke schedule, add to, CI cron against a scratch node} · 3 · ~a</div>
+  </div>
+
+  <h2>Totals</h2>
+  <p><b>5 boards · 84 pts.</b> Critical path: TEST-1 first (it makes everything else automatic), then TEST-2/3 in parallel, TEST-4 rides alongside the MH hardening boards, TEST-5 last. If you do one board: <b>TEST-1</b> — a runner + CI converts the existing 480 assertions from "ran once on someone's box" into "green on every commit."</p>
+
+  <h2>Constraints</h2>
+  <ul>
+    <li>Pure C, no test framework dependency — the harness is a header (<code>check.h</code>), not a vendored library. Stays house-style.</li>
+    <li>Sub-5-second default <code>make test</code> (fast feedback); slow/fuzz/on-VM in <code>test-deep</code>/<code>test-cov</code>/nightly.</li>
+    <li>Tests are committed source + run in CI — "ran on my box" doesn't count (Rule 8: verifiable by a third party).</li>
+  </ul>
+
+  <h2>Unknowns (named)</h2>
+  <ul>
+    <li>How many of the ~50 zero-assert intelligence tests are worth converting vs. deleting vs. leaving as smoke — needs a triage pass (TEST-2 item is a guess at ~10).</li>
+    <li>CI runner availability for nous (private repo) — GitHub Actions minutes / self-hosted? affects TEST-1 + TEST-5.</li>
+    <li>Coverage floor number (85% is a starting target) — may need tuning once first measured.</li>
+    <li>On-VM smoke against a scratch node vs a live prime — must not perturb production (TEST-5 design risk).</li>
+  </ul>
+
+  <h2>When to revisit (v2 signal)</h2>
+  <ul>
+    <li>First CI red that a human had to notice manually → the gate isn't wired tight enough; fix TEST-1.</li>
+    <li>First security regression that tests missed → add the adversarial case that would've caught it (grow TEST-4).</li>
+    <li>Coverage floor blocks a legitimate change repeatedly → re-tune the floor or refactor the untestable code.</li>
+    <li>PQC / crypto-agility lands → whole new test axis (algorithm negotiation, downgrade) — re-plan.</li>
+  </ul>
+
+  <div class="note"><b>Connects to the mesh hardening:</b> TEST-4 is intentionally the same work as the per-board tests inside MH-2..MH-5 — this plan just names the test discipline explicitly so "professional grade" means measured + automated + adversarial, not "we wrote some tests."</div>
+
+  <footer>Be &middot; v0 &middot; r69 &middot; 2026-05-28 &middot; metal-2 &middot; ~p test strategy &middot; 5 boards · 84 pts · TEST-1 = the unlock</footer>
+</div>
+</body>
+</html>
