@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 22 -- server-driven reclone + ops log</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:3px 0}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;background:#1A1A1A;border-radius:6px;padding:18px;margin:14px 0}
+.stat .num{font-size:20px;font-weight:700;display:block;color:#6FC3DF}.stat .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 22</nav>
+
+<h1>~b Board 22 -- server-driven reclone + ops log</h1>
+<p class="sub">The destructive reclone now lives in the cadence service and writes a per-step Firestore log. The chain runs and is observed entirely from cadence. No Driver, no console, no Q&A. Verified end-to-end live.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified</span>
+
+<div class="summary">
+<div class="stat"><span class="num" style="color:#5cb85c">208 / 208</span><span class="label">Clean (perfect)</span></div>
+<div class="stat"><span class="num">5 / 5</span><span class="label">Items Done</span></div>
+<div class="stat"><span class="num">15 min</span><span class="label">End-to-end</span></div>
+<div class="stat"><span class="num">17</span><span class="label">Pts</span></div>
+</div>
+
+<div class="callout">
+<strong>The proof, live.</strong> Fired <code>POST /reset/reclone</code> from HTTP &mdash; no console, no Driver. Op <code>reclone-20260530T020009</code> ran server-side, writing each step to <code>cadence-operations/{opId}</code>. Watcher streamed: <b>pause-scheduler &rarr; drop-clone (2m) &rarr; create-clone (13m) &rarr; resume-scheduler &rarr; SUCCEEDED</b>. Confirming tick: <code>clean=208 cosmetic=0 benign=0 signal=0</code>. Gate <b>GREEN -- 0 un-dispositioned, 0 blockers</b>. The bug from the previous rehearsal &mdash; "what does your screen say?" &mdash; is closed.
+</div>
+
+<h2>1. cadence-operations log + read endpoints</h2>
+<p style="font-size:13px"><code>GET /operations?limit=N</code> (recent ops) and <code>GET /operations/{opId}</code> (one op's full trail). Doc shape: <code>{opId, kind, status, startedAt, finishedAt, steps[], cloneCreatedAt?, error?}</code>. Steps carry <code>{name, status, startedAt?, finishedAt?, error?}</code> so a watcher knows the exact step + duration.</p>
+
+<h2>2. POST /reset/reclone -- async harness</h2>
+<p style="font-size:13px">X-Reset-Confirm guarded, ResetLock single-flight. Spawns a background <code>Task.Run</code> that walks the four steps, writing each transition to Firestore. Returns <b>202 Accepted</b> + <code>{opId}</code> immediately; the request doesn't block on the 15-minute reclone. Cloud Run instance survives the work (no recycle observed); if it ever recycles mid-op, the doc records the last good step for manual resume.</p>
+
+<h2>3. Drop AIRBYTE_CLONE step</h2>
+<p style="font-size:13px"><code>DROP DATABASE IF EXISTS AIRBYTE_CLONE</code> via the existing <code>SnowflakeConn.OpenAsync</code> + 3600s CommandTimeout. SQL lifted verbatim from <code>Cadence.Driver/Steps/DropCloneStep.cs</code>. On failure, step.error captured + op halted before Create. <b>Live: 2m 3s.</b></p>
+
+<h2>4. Create AIRBYTE_CLONE CLONE AIRBYTE_DB step</h2>
+<p style="font-size:13px"><code>CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB</code> (no COPY GRANTS, per the Board 11 fix). On success, <code>cloneCreatedAt</code> resolved via Snowflake INFORMATION_SCHEMA and written to the op doc. <b>Live: 12m 40s.</b></p>
+
+<h2>5. Watcher + ship</h2>
+<div class="code-block">Go.Watch              follow the most recent op
+Go.Watch &lt;opId&gt;       follow a specific op
+Go.Reclone server     fire /reset/reclone + chain into Go.Watch (one command)</div>
+<p style="font-size:13px">The operator drives + observes from any console. Local Driver path (<code>Go.Reclone</code> without the <code>server</code> token) stays as the interactive forensic mode.</p>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>GET /operations + GET /operations/{opId} + POST /reset/reclone (async background task with per-step Firestore writes)</td></tr>
+<tr><td><code>cadence/Go.Watch.ps1 + .bat</code></td><td>follow /operations/{opId}, print step transitions, confirming tick + gate on success</td></tr>
+<tr><td><code>cadence/Go.Reclone.Server.ps1</code></td><td>POST /reset/reclone + chain to Go.Watch</td></tr>
+<tr><td><code>cadence/Go.Reclone.bat</code></td><td>"server" token branches to the HTTP path; existing Driver flow unchanged</td></tr>
+<tr><td>cadence commits / build</td><td><code>9597996</code> + <code>5a26606</code> + <code>08cc830</code> / Cloud Build <code>04be2b6c</code></td></tr>
+</table>
+
+<h2>The operator surface now</h2>
+<div class="code-block">Go.Cutover                            read-only walkthrough -- pre-flight + per-signal deep-diff + gate
+Go.Signal / Go.Risk / Go.Escalate     triage + disposition + deep-diff
+Go.Replay [stream|at T]               play the timeline (cascade / lane / freeze-frame)
+Go.Reclone server                     fire server-side reclone -> Go.Watch (one command)
+Go.Reclone                            local interactive Driver (forensic + cutover-day)
+Go.Watch [opId]                       follow any /operations record
+HTTP: /tick /firstdiff /replay /escalate[/run] /reset/reclone /operations[/{opId}] + /reset/{status,pause,resume,wipe,baseline,retention}</div>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 1. Code committed (cadence 9597996+5a26606+08cc830; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 2. Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 3. Board 22 -- 5 items Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 4. HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 5. be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 6. Pushed + deployed (Cloud Build 04be2b6c) + verified live: 4-step op SUCCEEDED, clean=208/208, gate GREEN, NO console-Q&A</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; 7. No prior Done damaged (additive endpoints; Driver path unchanged; /tick unchanged)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r144 &middot; 2026-05-30 02:19 &middot; ~b Board 22</div>
+</body></html>

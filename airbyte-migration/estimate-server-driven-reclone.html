@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~e Server-driven reclone -- Board 22</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.board{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.item{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:6px 0;font-size:13px}
+.item .pts{display:inline-block;background:#6FC3DF;color:#111;padding:2px 8px;border-radius:3px;font-weight:700;margin-right:8px;min-width:28px;text-align:center}
+.item .cmd{display:inline-block;background:#222;color:#5cb85c;padding:2px 6px;border-radius:3px;font-size:11px;margin-left:8px;font-family:'Consolas',monospace}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~e server-driven reclone</nav>
+
+<h1>Sizing: server-driven reclone + ops log</h1>
+<p class="sub">Plan: <code>be/plans/2026-05-30-0143-plan-server-driven-reclone.html</code>. One board. <b>Board 22</b> (17 pts): server-side reclone end-to-end with per-step Firestore log so the chain runs and is observed entirely from cadence.</p>
+<span class="banner">Estimate &mdash; Ready for ~b</span>
+
+<h2>Sizing rationale</h2>
+<table>
+<tr><th>Mass</th><th>Pts</th><th>Why</th></tr>
+<tr><td>cadence-operations schema + GET /operations + GET /operations/{opId}</td><td>3</td><td>One Firestore collection, two read endpoints. Existing client patterns.</td></tr>
+<tr><td>/reset/reclone harness (no-SQL, First Move)</td><td>5</td><td>Async background task + per-step writes + op status transitions + 202 response. The shape everything else hangs on.</td></tr>
+<tr><td>Drop SQL step (lift from Driver)</td><td>3</td><td>Replace NOOP with real DROP; 3600s timeout; failure halts op cleanly.</td></tr>
+<tr><td>Create SQL step (lift from Driver)</td><td>3</td><td>Replace NOOP with CREATE FROM CLONE; cloneCreatedAt; same timeout pattern.</td></tr>
+<tr><td>Server-driven watcher + ship</td><td>3</td><td>Launcher polls /operations + /escalate; rehearse end-to-end with no console-Q&A; build report + close.</td></tr>
+</table>
+
+<h2 id="board22">Board 22 -- Server-driven reclone + ops log (17 pts) -- REVIEW THIS</h2>
+<div class="board">
+<h4 style="color:#5cb85c;margin-top:0">Ready</h4>
+<div class="item"><span class="pts">3</span>{cadence-operations Firestore doc shape (opId, kind, status, startedAt, finishedAt, steps[], cloneCreatedAt?, error?) + GET /operations?limit=N + GET /operations/{opId} read endpoints, add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">5</span>{POST /reset/reclone harness (X-Reset-Confirm) -- async background Task.Run, per-step writes (pause-scheduler real / drop-clone NOOP / create-clone NOOP / resume-scheduler real), returns 202+opId; op status transitions running->succeeded (First Move), add to, cadence/Cadence/Program.cs + Operations/ReconeOp.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{lift Drop SQL -- replace drop-clone NOOP with DROP DATABASE AIRBYTE_CLONE from existing SnowflakeConn (3600s CommandTimeout from Board 13); on failure step.error + op.status=failed, halt before Create, fix in, cadence/Cadence/Operations/ReconeOp.cs}<span class="cmd">~f</span></div>
+<div class="item"><span class="pts">3</span>{lift Create SQL -- replace create-clone NOOP with CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB (no COPY GRANTS per Board 11); set step.cloneCreatedAt on success; 3600s timeout; same failure semantics, fix in, cadence/Cadence/Operations/ReconeOp.cs}<span class="cmd">~f</span></div>
+<div class="item"><span class="pts">3</span>{server-driven watcher -- Go.Watch (or extend Go.Cutover) polls /operations/{opId} + /escalate, prints per-step progress and gate; rehearse end-to-end via POST /reset/reclone with NO console-Q&A; build report + close, add to, cadence/Go.Watch.* + airbyte-parity be/}<span class="cmd">~a</span></div>
+</div>
+<p style="font-size:12px;color:#888">Critical path: 1 &rarr; 2 (First Move gate) &rarr; 3 &rarr; 4 &rarr; 5. One Cloud Build deploy after item 2 (harness verified); one more after items 3+4 (SQL live).</p>
+
+<h2>What Board 22 delivers</h2>
+<p style="font-size:13px">The next reclone fires from <code>curl -X POST /reset/reclone</code> &mdash; no console, no Driver, no operator handheld. The watcher prints "drop-clone: running &rarr; succeeded; create-clone: running &rarr; succeeded; resume-scheduler: succeeded; gate: GREEN." Anyone with HTTP can run + observe. The Driver stays as the local interactive option for cutover-day manual approval.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Board 22 (17 pts) added to be/board.md</div>
+<div class="dod-item">&check; Items 3-5 pts each, Fibonacci</div>
+<div class="dod-item">&check; Board 22 in the 13-21 envelope (17); critical path documented</div>
+<div class="dod-item">&check; Estimate published</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r142 &middot; 2026-05-30 01:50 &middot; ~e server-driven reclone</div>
+</body></html>
