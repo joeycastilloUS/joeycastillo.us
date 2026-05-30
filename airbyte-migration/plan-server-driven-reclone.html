@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~p Build server-driven reclone + ops log</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}.phase .accept strong{color:#5cb85c}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~p server-driven reclone</nav>
+
+<h1>Build server-driven reclone + ops log</h1>
+<p class="sub">Execute <code>be/designs/2026-05-30-0143-design-server-driven-reclone.html</code>. Lift the reclone into the cadence service with a Firestore ops log, so the chain runs and is observed entirely from cadence. Driver stays for local interactive runs.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> the next time a reclone fires, anyone with HTTP can see every step in real time &mdash; no "what does your screen say?", no inferring from <code>schedulerState</code>. <code>POST /reset/reclone</code> &rarr; opId &rarr; <code>/operations/{opId}</code> &rarr; watcher follows the steps.</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td><code>cadence-operations</code> Firestore collection (op + steps). <code>GET /operations</code> + <code>GET /operations/{opId}</code>. <code>POST /reset/reclone</code> (X-Reset-Confirm) spawning an async task: <b>pause &rarr; drop &rarr; create &rarr; resume</b>, per-step writes. cadence-svc uses its own Snowflake key (no user creds). Rewrite the watcher (or new <code>Go.Watch</code>) to follow <code>/operations</code>. Deploy + rehearse against /reset/reclone instead of Go.Reclone.</td><td>Removing the Driver (it stays for interactive forensic + cutover-day approval runs). Generalizing to N op kinds (one for now). Changing /tick. Heartbeats inside long-running steps (escape route if needed).</td></tr>
+</table>
+
+<h2>Phases</h2>
+<div class="phase"><h3><span class="num">1</span> Operations schema + read endpoints</h3>
+<div class="meta">Firestore <code>cadence-operations</code> doc shape (opId, kind, status, startedAt, finishedAt, steps[], cloneCreatedAt?, error?). <code>GET /operations?limit=N</code> + <code>GET /operations/{opId}</code>. Both header-guarded? Read endpoints can be authenticated-invoker only; no Confirm header for reads.</div>
+<div class="accept"><strong>Accept:</strong> Writing a hand-crafted op doc to Firestore and hitting <code>GET /operations/{opId}</code> returns it cleanly. Empty list when no ops.</div></div>
+
+<div class="phase"><h3><span class="num">2</span> Reclone harness -- no-SQL (First Move)</h3>
+<div class="meta"><code>POST /reset/reclone</code> guarded by X-Reset-Confirm. Spawns a background task (Task.Run) that records the four step doc updates: <code>pause-scheduler</code> (real Cloud Scheduler pause), <code>drop-clone</code> (NOOP, marks succeeded), <code>create-clone</code> (NOOP, marks succeeded, sets cloneCreatedAt = now), <code>resume-scheduler</code> (real Cloud Scheduler resume). Returns 202 + <code>{opId}</code>.</div>
+<div class="accept"><strong>Accept:</strong> POST returns opId immediately; polling /operations/{opId} every 5s sees the four steps flip to succeeded over a few seconds; scheduler genuinely pauses + resumes around the NOOP steps. Op status transitions running -&gt; succeeded.</div></div>
+
+<div class="phase"><h3><span class="num">3</span> Drop AIRBYTE_CLONE step (real SQL)</h3>
+<div class="meta">Replace the <code>drop-clone</code> NOOP with the real <code>DROP DATABASE AIRBYTE_CLONE</code> via the existing SnowflakeConn. Lift the exact SQL from <code>Cadence.Driver/Steps/DropCloneStep.cs</code>. Honor the 3600s CommandTimeout (Board 13 fix). On failure, write step.status=failed + step.error; op.status=failed; do NOT proceed to Create (clone would already be dropped + recreating without it would be a different bug).</div>
+<div class="accept"><strong>Accept:</strong> POST /reset/reclone on a sandbox actually drops AIRBYTE_CLONE; op doc shows drop-clone succeeded with timing; an injected failure (e.g. permission) records step.error and halts the op.</div></div>
+
+<div class="phase"><h3><span class="num">4</span> Create AIRBYTE_CLONE FROM AIRBYTE_DB step</h3>
+<div class="meta">Replace the <code>create-clone</code> NOOP with the real <code>CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB</code>. Lift from <code>Cadence.Driver/Steps/CloneFromProdStep.cs</code> (no COPY GRANTS &mdash; Board 11 fix). 3600s timeout. On success, write step.cloneCreatedAt = the time the CREATE returned. Then proceed to resume.</div>
+<div class="accept"><strong>Accept:</strong> POST /reset/reclone end-to-end on the live service: pause -&gt; drop -&gt; create -&gt; resume, all four steps logged with timing, AIRBYTE_CLONE present with cloneCreatedAt matching the create's finishedAt; a follow-up /tick measures the fresh clone (signal=0 or near).</div></div>
+
+<div class="phase"><h3><span class="num">5</span> Server-driven watcher + close</h3>
+<div class="meta">Replace the <code>watch_gate.py</code> hack with a real watcher (<code>Go.Watch</code> or rolled into Go.Cutover) that polls <code>/operations/latest</code> + <code>/escalate</code>. Knows the precise step instead of inferring from schedulerState. Optionally <code>Go.Reclone --server</code> hits <code>/reset/reclone</code> instead of the Driver. Build report + close Board 22.</div>
+<div class="accept"><strong>Accept:</strong> A rehearsal run end-to-end with NO console-Q&A: I hit /reset/reclone, the watcher prints "drop-clone: running", "drop-clone: succeeded", "create-clone: running", ..., "resume: succeeded", then signal collapses to 0, gate GREEN. The next time a destructive op runs, anyone can see every step.</div></div>
+
+<h2>Constraints / risks</h2>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td>Cloud Run instance recycle mid-op</td><td>Op doc records last successful step; operator resumes manually (Driver still works). Future: /reset/reclone/resume?from=step.</td></tr>
+<tr><td>SQL drift between Driver + service</td><td>Phase 3/4 lift verbatim; an integration smoke runs both against a sandbox if drift becomes a concern.</td></tr>
+<tr><td>Long Create step looks "stuck" to a watcher</td><td>Phase 4 records step.startedAt + finishedAt; if needed (escape route) add an in-step lastHeartbeatAt &mdash; cheap upgrade.</td></tr>
+<tr><td>Partial state: Drop succeeded, Create failed</td><td>Op doc flags failure with the last good step; manual recovery via Driver. Real risk worth a runbook entry.</td></tr>
+<tr><td>Auth: who can POST /reset/reclone?</td><td>Same guard as /reset/wipe + /reset/baseline: X-Reset-Confirm header + run.invoker IAM. Consistent with the existing destructive surface.</td></tr>
+</table>
+
+<h2>Board (see ~e)</h2>
+<p style="font-size:13px"><code>~e</code> sizes this as <b>Board 22</b> (~17-19 pts). The First Move (Phase 2 harness) is the gate &mdash; once that's proven, Phases 3-4 are mechanical (lifting SQL).</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved + (to be) published</div>
+<div class="dod-item">&check; 5 phases with accept criteria</div>
+<div class="dod-item">&check; Inherits ~d decisions (async + per-step log, /reset/reclone naming, Driver coexists)</div>
+<div class="dod-item">&check; Risks incl. instance recycle + partial state</div>
+<div class="dod-item">&check; Hands to ~e for Board 22</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r140 &middot; 2026-05-30 01:43 &middot; ~p server-driven reclone</div>
+</body></html>

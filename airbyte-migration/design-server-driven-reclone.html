@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~d Server-driven reclone + operations log -- end the console-Q&A dependency</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}
+.choice .fork{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}.choice .opts{color:#888;font-size:12px;margin-bottom:6px}
+.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}
+.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.candidate .name{color:#6FC3DF;font-weight:700;font-family:'Consolas',monospace}.candidate .gut{color:#888;font-size:11px}
+.candidate.winner{border-color:#5cb85c}.candidate.winner .name{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~d server-driven reclone</nav>
+
+<h1>Server-driven reclone + operations log</h1>
+<p class="sub">Lift the destructive reclone into the cadence service with a Firestore ops log, so the rehearsal + cutover chain runs and is observed entirely from cadence. No console-Q&A. No "what does your screen say?" The next time a reclone fires, anyone with HTTP can watch every step live.</p>
+<span class="banner">Design &mdash; Pure Metal</span>
+
+<div class="callout">
+<strong>What prompted this.</strong> The 2026-05-29 rehearsal worked &mdash; <code>Go.Reclone</code> succeeded, gate went GREEN &mdash; but the gate-watcher saw <code>scheduler=Paused</code> for 37 min and couldn't tell whether the Driver was mid-clone, waiting at an approval gate, or stuck. I asked the operator what his console showed. That is the bug. Cadence already has the Snowflake key and Firestore; lifting the reclone into the service makes the whole chain server-observable.
+</div>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> A server-side reclone &mdash; <code>POST /reset/reclone</code> (header-guarded) spawns an async task that runs <b>Pause &rarr; Drop &rarr; Create &rarr; Resume</b> in the cadence service, writing per-step progress to a <code>cadence-operations</code> Firestore collection. <strong>Intent:</strong> end the console-Q&A dependency. Anyone with HTTP can fire and watch the entire chain &mdash; the watcher reads <code>/operations</code> instead of inferring state from <code>schedulerState</code>. The Driver stays for interactive local runs; autonomous runs go through the endpoint.
+</div>
+
+<h2>Discovery</h2>
+<ul>
+<li>cadence already owns the load-bearing pieces: the Snowflake connection (uses it for <code>/tick</code>), Firestore writes, the Cloud Scheduler pause/resume (<code>/reset/pause</code> + <code>/reset/resume</code>).</li>
+<li>The reclone's destructive SQL (DROP DATABASE / CREATE DATABASE FROM CLONE) lives in <code>Cadence.Driver</code> Steps &mdash; runs on the operator's workstation. That makes progress local-only.</li>
+<li>The observability gap surfaced today: 37 min of <code>scheduler=Paused</code> told the watcher nothing about <em>which step</em> &mdash; was Drop running, Create running, or just waiting for an approval? A server-side op log answers it directly.</li>
+<li>Honest scope: the Driver is still valuable for INTERACTIVE local runs (real cutover, an operator wants per-step approval). The server-side path is for autonomous chains + remote observation. They coexist.</li>
+<li>Auth: cadence-svc already loads the Snowflake key from Secret Manager &mdash; no user creds needed for the autonomous path. The Driver's <code>gcloud auth print-access-token</code> dance becomes optional.</li>
+</ul>
+
+<h2>Naming Pass</h2>
+<div class="candidate"><span class="name">/reset/reclone + cadence-operations</span><span class="gut">winner &middot; fits the /reset/* family &middot; "operations" is the universal log shape</span></div>
+<div class="candidate"><span class="name">/ops/reclone + cadence-ops</span><span class="gut">/ops/ implies many op types; we have one for now &middot; less consistent with the existing surface</span></div>
+<div class="candidate"><span class="name">/admin/reclone + admin-log</span><span class="gut">"admin" is fuzzier &middot; /reset/* is the established destructive verb prefix</span></div>
+<div class="candidate winner"><span class="name">/reset/reclone (POST) + /operations (GET) + cadence-operations (Firestore)</span><span class="gut">picks the existing family + a clean read path</span></div>
+<p style="font-size:13px;color:#ccc;margin-top:8px">Stick with <code>/reset/*</code> for destructive ops (it's the discipline). The READ path lives at <code>/operations</code> so future op kinds (rebaseline, retention prune, etc.) share one observation surface.</p>
+
+<h2>Shape</h2>
+<table>
+<tr><th>Endpoint</th><th>Purpose</th><th>Returns</th></tr>
+<tr><td><code>POST /reset/reclone</code> (X-Reset-Confirm)</td><td>Spawn async reclone op</td><td>202 + <code>{opId}</code></td></tr>
+<tr><td><code>GET /operations</code></td><td>Recent ops (default last 5)</td><td><code>[{opId, kind, status, startedAt, finishedAt, steps}]</code></td></tr>
+<tr><td><code>GET /operations/{opId}</code></td><td>One op's full trail</td><td><code>{opId, kind, status, steps:[{name,status,startedAt,finishedAt,error?}], cloneCreatedAt?, error?}</code></td></tr>
+</table>
+<h3>The op document (cadence-operations/{opId})</h3>
+<div class="code-block">{
+  opId:        "reclone-20260530T014217",
+  kind:        "reclone",
+  status:      "running" | "succeeded" | "failed",
+  startedAt:   2026-05-30T01:42:17Z,
+  finishedAt:  ...,                       // null while running
+  steps: [
+    { name: "pause-scheduler",  status: "succeeded", startedAt, finishedAt },
+    { name: "drop-clone",       status: "succeeded", startedAt, finishedAt },
+    { name: "create-clone",     status: "running",   startedAt },
+    { name: "resume-scheduler", status: "pending" }
+  ],
+  cloneCreatedAt: null,                   // populated on Create success
+  error: null
+}</div>
+<p style="font-size:13px"><b>Out of scope:</b> generalizing to N op kinds at once (one type now: reclone); the Driver's removal (it stays); changing how /tick works.</p>
+
+<h2>Choices + Consequences</h2>
+<div class="choice">
+<div class="fork">1. Async vs sync execution</div>
+<div class="opts">a) Async: return opId immediately, run in background, poll <code>/operations/{opId}</code>. b) Sync: hold the HTTP request open until done.</div>
+<div class="conseq">a) Standard for long-running ops; Cloud Run kills idle requests at the timeout, but background tasks survive within the instance lifetime; risk = instance recycle mid-op. b) Simple but Cloud Run's request timeout (we configured 540s) is shorter than a worst-case clone; would 504 mid-flight even on success.</div>
+<div class="pick">PICK: (a) async + log every step.</div>
+<div class="why">Long-running by nature. The op log <em>is</em> the recovery mechanism: if the instance recycles, the log shows the last successful step and someone can resume manually.</div>
+</div>
+<div class="choice">
+<div class="fork">2. Where the Drop/Create SQL lives</div>
+<div class="opts">a) Copy the SQL strings from <code>Cadence.Driver/Steps/</code> into a new <code>Cadence.Service.Operations.ReconeOp</code>. b) Extract to a shared library both reference.</div>
+<div class="conseq">a) Pragmatic; 2 short SQL strings; duplication risk is small + caught by integration test. b) Cleanest long-term but pulls scope (a new Cadence.Shared project).</div>
+<div class="pick">PICK: (a) for now; refactor to shared if a third caller appears.</div>
+<div class="why">DRY is a guideline, not a religion. Two copies of <code>DROP DATABASE AIRBYTE_CLONE</code> won't drift faster than the migration finishes.</div>
+</div>
+<div class="choice">
+<div class="fork">3. Driver's future</div>
+<div class="opts">a) Driver stays as a local interactive UI for forensic + cutover-day approval runs. b) Driver becomes a thin client of <code>/reset/reclone</code>. c) Retire the Driver entirely.</div>
+<div class="conseq">a) Two paths to the same effect; the Driver's per-step interactive gates remain useful at real cutover. b) One path, but loses the local-only forensic mode (no internet). c) Removes a working tool that just helped this rehearsal.</div>
+<div class="pick">PICK: (a) Driver stays; server path is additive.</div>
+<div class="why">"Roll your own. The best code is no code." &mdash; but only when it's no code <em>worth</em> deleting. The Driver works. Leave it; add a server path beside it.</div>
+</div>
+<div class="choice">
+<div class="fork">4. Progress granularity</div>
+<div class="opts">a) Per-major-step (pause/drop/create/resume). b) Per-SQL-statement + heartbeat. c) Just start/end markers.</div>
+<div class="conseq">a) Four log writes per op, enough to drive any watcher; matches the Driver's existing step model. b) Richer but writes/second on a long Create; over-engineering. c) Tells you nothing while it's running &mdash; back to the watcher's blind spot.</div>
+<div class="pick">PICK: (a) per major step.</div>
+<div class="why">Four data points (paused, dropped, created, resumed) gives the watcher everything it needs to localize where things are or where they failed.</div>
+</div>
+<div class="choice">
+<div class="fork">5. Auth model for /reset/reclone</div>
+<div class="opts">a) X-Reset-Confirm header guard, IAM-authenticated invoker only. b) Add a one-shot token in the body. c) Allow unauthenticated (allUsers).</div>
+<div class="conseq">a) Matches /reset/wipe + /reset/baseline + /reset/retention &mdash; consistent. b) Extra friction without a clear threat model. c) Anyone can drop your clone &mdash; obvious no.</div>
+<div class="pick">PICK: (a) X-Reset-Confirm + run.invoker IAM.</div>
+<div class="why">Same guard as the existing destructive endpoints; same surface area for the operator to learn.</div>
+</div>
+
+<h2>Escape Routes</h2>
+<div class="escape"><strong>From PICK 1 (async + instance recycle):</strong> if Cloud Run recycles mid-op, the operations doc has the last successful step + the running step's startedAt. Operator resumes manually from there (Driver) or via a future <code>/reset/reclone/resume?from=step</code>. Reversible &mdash; no work lost from the log.</div>
+<div class="escape"><strong>From PICK 2 (copied SQL):</strong> if Drop SQL drifts between Driver and service, an integration test runs the same SQL against a fresh sandbox and catches it. Refactor to shared lib if a third caller appears.</div>
+<div class="escape"><strong>From PICK 3 (Driver stays):</strong> if the duplication becomes maintenance pain, Driver gets refactored into a thin client of the endpoint. Reversible.</div>
+<div class="escape"><strong>From PICK 4 (granularity):</strong> if four steps isn't enough during the Create (the slow one), add an in-step <code>lastHeartbeatAt</code> field. Cheap upgrade.</div>
+
+<h2>Pure Metal Test</h2>
+<table>
+<tr><td>Snowflake connection (already in service for /tick)</td><td style="color:#5cb85c">load-bearing &mdash; reused</td></tr>
+<tr><td>Firestore cadence-operations collection</td><td style="color:#5cb85c">load-bearing &mdash; existing client</td></tr>
+<tr><td>Background task (Task.Run within service)</td><td style="color:#5cb85c">no dep &mdash; standard .NET</td></tr>
+<tr><td>Cloud Run / scheduler (already)</td><td style="color:#5cb85c">no new dep</td></tr>
+</table>
+<p style="font-size:13px;margin-top:8px"><strong>No new external dependency.</strong> Everything reuses what cadence already has.</p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>The smallest proof</strong>
+Ship <code>/reset/reclone</code> + <code>/operations</code> as a <b>harness with no SQL</b> &mdash; the background task does only Pause &rarr; Resume, writing the four step records (pause-scheduler / drop-clone-NOOP / create-clone-NOOP / resume-scheduler) to <code>cadence-operations/{opId}</code>. Poll <code>/operations/{opId}</code> from the watcher and see the steps appear in real time. Once the harness is proven (~30 lines), the actual DROP + CREATE SQL drops in as two more await calls. The watcher rewrite is independent and immediate.
+</div>
+
+<h2>What this does NOT do</h2>
+<ul>
+<li>Remove the Driver. It stays as the local interactive path; cutover-day operator approvals will likely still use it.</li>
+<li>Make the reclone faster. The Snowflake clone takes what it takes.</li>
+<li>Change auth for the existing endpoints. Same header guard, same IAM.</li>
+<li>Generalize to N operation kinds. One kind now (reclone); the schema admits more but the code only handles reclone.</li>
+</ul>
+
+<h2>Path to plan + build</h2>
+<p style="font-size:13px"><code>~p</code> phases this (operations schema + read endpoints &rarr; reclone harness no-SQL &rarr; Drop SQL &rarr; Create SQL &rarr; watcher rewrite + close). <code>~e</code> sizes it into Board 22.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved + (to be) published</div>
+<div class="dod-item">&check; 4 naming candidates, winner: /reset/reclone + /operations + cadence-operations</div>
+<div class="dod-item">&check; 5 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Op doc schema defined; per-major-step granularity</div>
+<div class="dod-item">&check; First Move: no-SQL harness proves the async + log shape before any destructive SQL runs server-side</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r140 &middot; 2026-05-30 01:43 &middot; ~d server-driven reclone</div>
+</body></html>
