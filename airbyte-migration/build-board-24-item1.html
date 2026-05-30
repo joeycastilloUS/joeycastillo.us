@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 24 item 1 -- ?dry=true (First Move)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 24 item 1</nav>
+
+<h1>~b Board 24 item 1 -- /reset/reclone?dry=true (First Move)</h1>
+<p class="sub">Dry mode shipped &mdash; you can now fire the full reclone path without touching <code>AIRBYTE_CLONE</code>. Smallest rehearsal-saving deliverable from the dry-run-control plan; gates, abort, heartbeats stay Ready for follow-up.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified</span>
+
+<div class="callout">
+<strong>The proof, end-to-end.</strong> Fired <code>POST /reset/reclone?dry=true</code> from HTTP &mdash; op <code>reclone-20260530T150331</code> ran the four-step path with <code>dryRun:true</code>, scheduler genuinely paused + resumed, Drop + Create slept their modest constants and skipped the SQL. Total <b>56 seconds</b>. <code>cloneCreatedAt: null</code> &mdash; AIRBYTE_CLONE was not touched.</div>
+
+<h2>The change (small)</h2>
+<div class="code-block">// /reset/reclone handler
+bool dry = ctx.Request.Query["dry"] == "true" || ctx.Request.Query["dry"] == "1";
+// op doc: ["dryRun"] = dry
+
+// step 1 (Drop)
+if (dry) await Task.Delay(TimeSpan.FromSeconds(10));
+else     await ExecSql("DROP DATABASE IF EXISTS AIRBYTE_CLONE");
+
+// step 2 (Create) -- skip cloneCreatedAt resolution on dry; no clone exists
+if (dry) await Task.Delay(TimeSpan.FromSeconds(30));
+else { await ExecSql("CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB"); var ct = await ResolveCloneTimeAsync(s); ... }</div>
+
+<h2>Live verification</h2>
+<div class="code-block">opId:           reclone-20260530T150331
+dryRun:         True
+status:         succeeded
+startedAt:      2026-05-30T15:03:31.921Z
+finishedAt:     2026-05-30T15:04:28.175Z      (56 s)
+cloneCreatedAt: null                          (no clone created -- expected for dry)
+
+steps:
+  pause-scheduler   succeeded   2.4s   (real Cloud Scheduler pause)
+  drop-clone        succeeded  10.3s   (SQL skipped, sleep 10s)
+  create-clone      succeeded  32.9s   (SQL skipped, sleep 30s)
+  resume-scheduler  succeeded   4.2s   (real Cloud Scheduler resume)</div>
+
+<h2>What's still Ready on Board 24</h2>
+<p style="font-size:13px">Per the plan, each phase is independently shippable. Phase 1 alone is the rehearsal-saving win; the rest add steering and live progress:</p>
+<table>
+<tr><th>Phase</th><th>Pts</th><th>Status</th></tr>
+<tr><td>1. ?dry=true skip-SQL + sleep (First Move)</td><td>3</td><td style="color:#5cb85c">✓ DONE (this commit)</td></tr>
+<tr><td>2. ?gate=after-drop|after-create + /proceed</td><td>3</td><td>Ready</td></tr>
+<tr><td>3. /abort cooperative</td><td>3</td><td>Ready</td></tr>
+<tr><td>4. lastHeartbeat (Snowflake query state, ~15s)</td><td>5</td><td>Ready</td></tr>
+<tr><td>5. Go.Watch render new fields + close</td><td>3</td><td>Ready</td></tr>
+</table>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>parse ?dry; write dryRun on op doc; branch Drop/Create steps on dry (skip SQL + Task.Delay); live path unchanged</td></tr>
+<tr><td>cadence commit / build</td><td><code>4d3328c</code> / Cloud Build <code>c7d08ec3</code></td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Code committed (cadence 4d3328c; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Board 24 -- item 1 Done; items 2-5 remain Ready</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Pushed + deployed (Cloud Build c7d08ec3) + verified live (op reclone-20260530T150331, 56s, AIRBYTE_CLONE untouched)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; No prior Done damaged (live path unchanged; existing op records read correctly)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r152 &middot; 2026-05-30 15:05 &middot; ~b Board 24 item 1</div>
+</body></html>

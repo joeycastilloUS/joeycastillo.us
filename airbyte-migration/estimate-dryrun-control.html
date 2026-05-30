@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~e Dry-run control -- Board 24</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.board{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.item{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:6px 0;font-size:13px}
+.item .pts{display:inline-block;background:#6FC3DF;color:#111;padding:2px 8px;border-radius:3px;font-weight:700;margin-right:8px;min-width:28px;text-align:center}
+.item .cmd{display:inline-block;background:#222;color:#5cb85c;padding:2px 6px;border-radius:3px;font-size:11px;margin-left:8px;font-family:'Consolas',monospace}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~e dry-run control</nav>
+
+<h1>Sizing: dry-run rehearsal control + visibility</h1>
+<p class="sub">Plan: <code>be/plans/2026-05-30-1441-plan-dryrun-control.html</code>. <b>Board 24</b> (17 pts): five additions to <code>/reset/reclone</code>, each independently shippable. Phase 1 alone is the rehearsal-saving win.</p>
+<span class="banner">Estimate &mdash; Ready for ~b</span>
+
+<h2>Sizing rationale</h2>
+<table>
+<tr><th>Mass</th><th>Pts</th><th>Why</th></tr>
+<tr><td>?dry=true skip-SQL + sleep (First Move)</td><td>3</td><td>Parse query, write dryRun on doc, branch skip-SQL in two step closures, modest sleeps. Smallest rehearsal-saving deliverable.</td></tr>
+<tr><td>?gate + /proceed</td><td>3</td><td>Gate state machine in background task: park on gateState=waiting, poll until cleared, advance. New POST /operations/{opId}/proceed endpoint.</td></tr>
+<tr><td>/abort cooperative</td><td>3</td><td>requestedAbort flag check at gate boundaries + before each step + at heartbeat ticks; always run Resume to leave clean state.</td></tr>
+<tr><td>Heartbeats (Snowflake query state)</td><td>5</td><td>Timer per long step + queryId capture via SYSTEM$LAST_QUERY_ID + side query to INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION + lastHeartbeat doc updates. Most novel piece.</td></tr>
+<tr><td>Go.Watch render + ship</td><td>3</td><td>Render dryRun badge, gateState yellow with proceed/abort one-liners, lastHeartbeat inline, aborted status. Build report + close.</td></tr>
+</table>
+
+<h2 id="board24">Board 24 -- Dry-run rehearsal control + visibility (17 pts) -- REVIEW THIS</h2>
+<div class="board">
+<h4 style="color:#5cb85c;margin-top:0">Ready</h4>
+<div class="item"><span class="pts">3</span>{POST /reset/reclone?dry=true -- write dryRun:true on op doc; Drop+Create steps skip SQL + sleep modest constants (10s/30s); pause+resume still fire real Cloud Scheduler; live path unchanged (First Move; rehearsal-saving alone), add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{?gate=after-drop|after-create + POST /operations/{opId}/proceed -- after named step succeeds set gateState:waiting, op task polls every 5s until cleared; /proceed sets gateState:cleared, add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{POST /operations/{opId}/abort cooperative -- sets requestedAbort:true; op task checks at gate boundaries + before each step + on heartbeat ticks; on abort skip remaining destructive steps + always run Resume + mark op:aborted with reason, add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">5</span>{lastHeartbeat field updated every ~15s during Drop+Create -- capture queryId via SYSTEM$LAST_QUERY_ID after step starts, side-query INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION for executionStatus+bytesScanned; overwrites lastHeartbeat (not append); timer cancels on step completion, add to, cadence/Cadence/Program.cs}<span class="cmd">~a</span></div>
+<div class="item"><span class="pts">3</span>{Go.Watch render new fields -- dryRun badge in header, gateState:waiting highlighted yellow + proceed/abort one-liners, lastHeartbeat printed inline (~15s pulse w/ elapsedSec + Snowflake state when available), aborted status colored; build report + close, add to, cadence/Go.Watch.ps1 + airbyte-parity be/}<span class="cmd">~a</span></div>
+</div>
+<p style="font-size:12px;color:#888">Items can ship independently. Critical path is just deploy-order if batched: Phase 1 alone proves the rehearsal; gates+abort+heartbeats add steering and live progress.</p>
+
+<h2>What Board 24 delivers</h2>
+<p style="font-size:13px">The next rehearsal: <code>POST /reset/reclone?dry=true&gate=after-drop</code> &rarr; <code>Go.Watch</code> shows the trail render without destruction &rarr; op parks at the gate &rarr; operator hits <code>/proceed</code> or <code>/abort</code> &rarr; heartbeats every 15s during the live Create show Snowflake bytesScanned climbing &rarr; gate GREEN with confidence. Hands on the wheel, eyes on the road.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Board 24 (17 pts) added to be/board.md</div>
+<div class="dod-item">&check; Items 3-5 pts each, Fibonacci</div>
+<div class="dod-item">&check; Board 24 in the 13-21 envelope (17); each item independently shippable</div>
+<div class="dod-item">&check; Estimate published</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r152 &middot; 2026-05-30 14:55 &middot; ~e dry-run control</div>
+</body></html>
