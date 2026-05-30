@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>a-d-d vs Code — Security Audit Findings</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 24px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 30px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--text); font-size: 14px; margin: 18px 0 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 22px; }
+  p { color: #ccc; margin: 8px 0; } ul { margin: 6px 0 6px 22px; } li { color: #ccc; margin: 3px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12px; }
+  th { text-align: left; color: var(--accent); padding: 7px 9px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 6px 9px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  td.good { color: var(--green); font-weight:600; } td.bad { color: var(--red); font-weight:600; } td.mid { color: var(--amber); font-weight:600; }
+  .verdict { background:#0a0a0a; border:1px solid var(--accent); border-radius:6px; padding:16px 18px; margin:14px 0; font-size:14px; color:#cfe6ee; }
+  .verdict b { color: var(--accent); }
+  .note { background:#0e1419; border-left:3px solid var(--accent); padding:12px 18px; margin:14px 0; color:#cfe6ee; font-size:13px; }
+  .new { background:#1a1410; border-left:3px solid var(--amber); padding:12px 18px; margin:14px 0; color:#eee0cf; font-size:13px; }
+  .pass { color: var(--green); } .fail { color: var(--red); } .warn { color: var(--amber); }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~i a-d-d SPEC &harr; nous CODE &middot; security audit findings</span></nav>
+<div class="container">
+
+  <h1>a-d-d Spec &harr; Code — Security Audit Findings</h1>
+  <div class="sub">Response to the 2-day rundown handoff (<code>2026-05-29-0930-security-2day-rundown-add-vs-code</code>). Spec = <code>kastil-systems/a-d-d</code> (<code>C:\a-d-d</code>), code = <code>kastil-systems/nous</code> (<code>C:\nous</code>). Three parallel auditors ran the §6 checklist. Every finding cited to <code>file:line</code>. No files modified — read-only audit.</div>
+
+  <div class="verdict">
+    <b>VERDICT — handoff confirmed, no surprises that change the risk picture.</b><br><br>
+    The two flagged deltas are real and honest: <b>wipe</b> = full spec, zero code (no directory); <b>policy</b> = spec'd, <code>NOTE.md</code> placeholder only — and policy's own spec says "not yet implemented." All five §4 gaps are genuinely <b>OPEN</b>, none silently half-built. The mesh cryptographic byte layouts (cert 37B, MESHROSTER1 roster) <b>MATCH exactly</b> across signer, every verifier, and spec. MH-1 replay/rollback guard is <b>real and correct</b> with a 20k-iteration fuzz + full e2e chain. <code>OPERATOR_PUB</code> is the <b>real key</b> (<code>a61bdace…</code>, commit <code>5408b56</code>), not a stub.<br><br>
+    New material the rundown didn't call out: (1) <b>elidable key zeroization</b> — plain <code>memset</code>/loops, no <code>explicit_bzero</code>/<code>SecureZeroMemory</code> anywhere, so <code>-O2</code> may drop the wipe; (2) <b>spec interface drift</b> in <code>crypt</code> + <code>seal</code> — spec promises function names the code renamed/dropped; (3) <b>relay loads its trust root from a file</b>, not compiled-in, so its runtime root is whatever <code>operator.pub</code> is planted (task #40). Details below.
+  </div>
+
+  <h2>&sect;1 — Skill spec &harr; code diff (the core diff)</h2>
+  <p>Spec has 7 skills, code has 6 (<code>wipe</code> absent at the directory level). Per-skill verdict:</p>
+  <table>
+    <tr><th>Skill</th><th>Verdict</th><th>Evidence (file:line)</th></tr>
+    <tr><td>crypt</td><td class="good">MATCH (code ahead)</td><td>All algos real, software-only: SHA-256 <code>crypt.c:50</code>, AES-256-GCM SW S-box <code>:633/:891</code>, X25519 ladder <code>:1301</code>, Ed25519 RFC 8032 <code>:1940</code>. <b>Drift:</b> spec promises <code>x25519_keypair()</code>/<code>x25519_shared()</code> &amp; unsuffixed <code>hkdf_extract/expand()</code> — <b>not in code</b> (code has <code>x25519()</code> + <code>hkdf_*_sha256/384</code>).</td></tr>
+    <tr><td>auth</td><td class="good">MATCH (code ahead)</td><td>Runtime surface 1:1 (<code>auth.h:20</code>); constant-time compare real <code>auth.c:37</code>; HMAC-SHA-256 ts+nonce+body bind <code>:97</code>; no-malloc BSS-only <code>:15</code>. TOTP/CF flow honestly relocated to <code>crypt.c</code>/prime-server (spec CLAUDE.md:108). <b>Nit:</b> spec says "RDRAND entropy"; code uses RtlGenRandom/urandom <code>crypt.c:22</code>.</td></tr>
+    <tr><td>seal</td><td class="good">MATCH (code ahead)</td><td>v2 envelope real: ephemeral X25519 + ECDH <code>seal.c:215</code>, KDF = SHA-256(shared) <code>:225</code> (matches spec step 5), AES-256-GCM wrap <code>:233</code>, Ed25519 sign <code>:288</code>. <b>Drift:</b> code splits into <code>seal_file_v2</code>/<code>unseal_file_v2</code>; spec lists a single stale <code>seal_file</code> interface.</td></tr>
+    <tr><td>vault</td><td class="good">MATCH (clean)</td><td>Interface 1:1 (<code>vault.h:16</code>); PBKDF2-SHA-256 @100K <code>vault.h:8</code>; brute lockout + backoff <code>vault.c:78</code>; keys zeroed <code>:43,:65</code>; no malloc. Nit: <code>hash</code> dep dropped from skill.json.</td></tr>
+    <tr><td>reveal</td><td class="good">MATCH</td><td>Commits <b>confirmed</b> code <code>7aa70d6</code> / spec <code>ca2884e</code>. One-shot self-seal no-TOCTOU <code>reveal.c:122-126</code>; SHA-256 token-at-rest <code>:49,:90</code>, raw token zeroed <code>:97</code>; constant-time lookup <code>:34,:55</code>; static 256-slot, no malloc <code>:27</code>. Test count 25 actual vs 24 claimed (over, not under).</td></tr>
+    <tr><td>policy</td><td class="mid">PLACEHOLDER (spec &amp; code agree)</td><td>Code dir = <code>NOTE.md</code> only, no <code>.c/.h</code>; WAF impl moved to <code>comms/skill/waf/</code>. Spec CLAUDE.md:4 states the primitives "not yet implemented." <b>skill.json over-declares</b> nonexistent <code>policy.c/.h</code>.</td></tr>
+    <tr><td>wipe</td><td class="bad">MISSING — confirmed</td><td>Full spec (3-stage shred, 4 triggers, 5-fn interface, skill.json declaring <code>wipe.c/.h</code>) but <b>no <code>nous\security\skill\wipe\</code> directory exists.</b> Zero code.</td></tr>
+  </table>
+  <p class="note"><b>No dangerous silent half-builds.</b> The two true gaps (wipe MISSING, policy PLACEHOLDER) are both honestly flagged in their own specs. The recurring real issue is <b>stale spec interface blocks</b>: <code>crypt</code> and <code>seal</code> ship a superset of (and renamed from) what the spec promises — callers following the spec's <code>x25519_keypair</code>/<code>x25519_shared</code>/unsuffixed <code>hkdf_*</code> names would not compile. Secondary nits: skill.json dep/source drift (auth+vault drop <code>hash</code>; policy+wipe declare missing files), reveal 24-vs-25, auth "RDRAND" claim.</p>
+
+  <h2>&sect;2 — Cert &amp; roster byte layouts — MATCH</h2>
+  <table>
+    <tr><th>Check</th><th>Result</th><th>Evidence</th></tr>
+    <tr><td>Cert msg <code>node.pub(32)&#8741;role(5)=37B</code></td><td class="good">MATCH</td><td>Signer <code>operator-sign-node/main.c:86-91</code> (no NUL, <code>memcpy strlen</code>) = relay self-verify <code>relay_server.c:283-287</code> (hard 37) = relay peer-verify <code>:594,:653</code> (role="prime") = spec <code>a-d-d relay/CLAUDE.md:42,216</code>. Signer self-verifies before emit <code>:99</code>.</td></tr>
+    <tr><td>Roster MESHROSTER1 framing</td><td class="good">MATCH</td><td>Writer magic16 + uint64-LE len + NUL triples + sig64 <code>mesh-roster-build/main.c:57,172-198</code>; reader exact inverse <code>mesh_roster.c:19-43</code>, same signed span <code>magic&#8741;len&#8741;payload</code>; spec <code>prime-server/CLAUDE.md:46-56</code>. 5 triples/node (type/role/address/signed_at/version) consistent.</td></tr>
+    <tr><td><code>OPERATOR_PUB</code> real vs stub</td><td class="good">REAL</td><td><code>operator_pub.h:28-33</code> = <code>a6 1b da ce…</code>; commit <code>5408b56</code> "plant real operator pubkey (MESH-UP-D)". Not zeros/placeholder.</td></tr>
+    <tr><td>Endianness / length / off-by-one</td><td class="good">NO DEFECTS</td><td>LE symmetric; min-size <code>:28</code>, max-payload <code>:34</code>, <b>exact-size</b> <code>len != HDR+plen+SIG</code> <code>:37</code> (rejects trailing-slack attack); two-pass parse <code>:62-88</code> (no partial inserts).</td></tr>
+  </table>
+  <p class="new"><b>Latent fragility (not a current bug):</b> verifiers hard-code length 37, which is only correct because both legal roles ("prime"/"relay") are exactly 5 bytes. A future 4- or 6-byte role would silently break verification. Prefer <code>32+strlen(role)</code> at the verifier if the role set ever grows.<br><br><b>Config divergence (documented, task #40):</b> the relay does <b>not</b> compile in <code>OPERATOR_PUB</code> — it loads <code>operator.pub</code> from a file at runtime (<code>relay_server.c:78-91</code>), while the prime uses the compiled-in key (<code>mesh_roster.c:12,160</code>). The relay's real trust root is whatever file is planted. Spec acknowledges this (<code>a-d-d relay/CLAUDE.md:11-22</code>).</p>
+
+  <h2>&sect;3 — MH-1 replay/rollback guard — REAL &amp; CORRECT</h2>
+  <ul>
+    <li><b><code>mesh_roster_meta</code></b> (<code>mesh_roster.c:90-110</code>) — extracts <code>signed_at</code>/<code>version</code> via <code>strtoull</code>, first-match-wins.</li>
+    <li><b><code>mesh_roster_freshness_check</code></b> (<code>:129-141</code>) — reads <code>&lt;path&gt;.seen</code> sidecar, <b>rejects</b> <code>signed_at &lt; last</code> (<code>:136</code>), advances on accept (<code>:139</code>). Comparison is <code>&gt;=</code> accept / strict <code>&lt;</code> reject — right call: idempotent reboot of the current roster allowed, anything strictly older blocked. Missing sidecar &rarr; <code>last=0</code> &rarr; first roster accepted.</li>
+    <li><b>Order of operations correct</b> (<code>mesh_roster_load :147-171</code>): signature verify FIRST <code>:160</code>, then freshness <code>:167</code>, then parse <code>:170</code>. A forged old roster never reaches the freshness gate.</li>
+    <li><b>Tests real:</b> 20k-iteration fuzz <code>test_mesh_e2e.c:101</code> (no crash, zero forged accepts <code>:112-113</code>) + full e2e chain with the load-bearing "older REJECTED" assert <code>:87</code>; unit rollback matrix <code>test_mesh_roster.c:138-169</code>.</li>
+  </ul>
+  <p class="new"><b>Three minor hardening gaps in MH-1 (low severity, consistent with threat model):</b> (1) read-then-write of <code>.seen</code> is non-atomic / no lock — harmless single-threaded at boot, real if ever concurrent; (2) the sidecar is unauthenticated plaintext — a local attacker with FS write can zero it to defeat anti-rollback (but local FS write = already game over); (3) <code>seen_write</code> failure is <b>silent</b> (<code>:122-124</code> returns void) — on an unwritable dir the roster is accepted but the high-water mark never advances, degrading rollback protection to a no-op rather than failing closed. <b>Code is ahead of spec here</b> — the v1 relay spec does not yet document the freshness guard; spec should be updated to match (flow-up before down, Rule 11).</p>
+
+  <h2>&sect;4 — §4 open gaps — ALL STILL OPEN</h2>
+  <table>
+    <tr><th>Gap (MH-#)</th><th>Status</th><th>Evidence</th></tr>
+    <tr><td>Cert/roster expiry (MH-2)</td><td class="bad">OPEN</td><td>No <code>valid_until</code>/TTL in cert or roster path. Cert signs only <code>node.pub&#8741;role</code> (<code>operator-sign-node/main.c:88</code>); <code>signed_at</code> used for rollback ordering only, never expiry. TTL grep hits are session/reveal, unrelated.</td></tr>
+    <tr><td>Revocation (MH-3)</td><td class="bad">OPEN</td><td>No CRL consulted at load (<code>mesh_roster_load :147-171</code>). <code>revoke</code> grep &rarr; only <code>reveal.c</code> self-revoke (different subsystem). Compromised node valid until full roster rebuild+redistribute.</td></tr>
+    <tr><td>Per-peer mutual auth (MH-4)</td><td class="bad">OPEN</td><td>relay&harr;prime = IP + shared PSK, not identity. Transport key = <code>HMAC-SHA256(master_psk,"nous-transport:"+region)</code> (<code>relay_server.c:150,2017</code>); same key both sides (<code>prime_server.c:143</code>). <code>node.cert</code> only <b>self</b>-verified at boot (<code>relay_server.c:279</code>), never presented to the peer.</td></tr>
+    <tr><td>Key rotation + sign-then-encrypt (MH-5)</td><td class="bad">OPEN</td><td>Keygen <b>refuses</b> to overwrite ("Rotation is a deliberate ritual", <code>operator-keygen/main.c:92-100</code>) — no rotation tooling. Roster is signed-<b>plaintext</b>, no encryption step (<code>mesh-roster-build/main.c:172-186</code>; format note <code>mesh_roster.h:11-15</code>).</td></tr>
+  </table>
+
+  <h2>&sect;5 — Operator private key handling — WEAK on all three axes</h2>
+  <ul>
+    <li><b>Zeroization — elidable.</b> Key IS wiped after use but via plain <code>memset</code>/loops (<code>operator-keygen/main.c:136</code>, <code>mesh-roster-build/main.c:189</code>, <code>operator-sign-node/main.c:69,77,82,100</code>). <b>No</b> <code>explicit_bzero</code>/<code>memset_s</code>/<code>SecureZeroMemory</code>/<code>volatile</code> anywhere in <code>C:\nous</code>. Under C11 + <code>-O2</code> these are dead stores the optimizer may remove. Stack buffers, no <code>mlock</code> &rarr; pageable. The skill that would provide a real secure-zero (<code>wipe</code>) is the unbuilt one.</li>
+    <li><b>File perms — Unix-only.</b> <code>chmod(path,0600)</code> guarded <code>#ifndef _WIN32</code> (<code>operator-keygen/main.c:64-68</code>); Windows branch is <code>(void)restrict_mode;</code> — no <code>SetNamedSecurityInfo</code>/<code>icacls</code>/DACL. Only Windows "protection" is an advisory <code>printf</code> at <code>:117</code>. Confirms handoff.</li>
+    <li><b>At rest — plaintext, never logged.</b> Raw 64-byte key written cleartext to <code>$HOME/.nous/operator.key</code> (<code>:108</code>); no encryption. Never printed/logged (all output is paths, public hex, counts). Windows path is weakest: plaintext root key + no ACL + elidable wipe.</li>
+  </ul>
+
+  <h2>&sect;6 — Bottom line for the operator</h2>
+  <p>The handoff was accurate. The trust layer is what the deep audit called it — <b>Nebula-grade foundation, honestly v1</b>: authenticity + integrity + replay/rollback guard are real and byte-correct; lifecycle (expiry, revocation, mutual-auth, rotation) is designed-and-estimated but unbuilt. Recommended next moves, in order:</p>
+  <ul>
+    <li><b>Quick wins (hours):</b> (1) add a real secure-zero primitive (<code>explicit_bzero</code>/<code>SecureZeroMemory</code> shim) and route all key wipes through it — this is the <code>wipe</code> skill's reason to exist; (2) make <code>seen_write</code> failure <b>fail closed</b>; (3) reconcile the stale <code>crypt</code>/<code>seal</code> spec interface blocks to the shipped names (flow-up, Rule 11) and document MH-1 in the relay spec.</li>
+    <li><b>Windows parity:</b> add a DACL on <code>operator.key</code> (or encrypt-at-rest with DPAPI/passphrase) so the root secret isn't world-readable on Windows.</li>
+    <li><b>Then the planned hardening:</b> MH-2..MH-5 per the existing 87-pt estimate; the SEALED-IDS v2 spec ("APPROVED, NOT YET WRITTEN") covers TTL + sign-then-encrypt + challenge-response and should be written before that code lands.</li>
+    <li><b>Spec hygiene:</b> remove the nonexistent-file declarations from <code>policy</code>/<code>wipe</code> skill.json, or build the files; either way stop them lying.</li>
+  </ul>
+
+  <h2>DoD</h2>
+  <ul>
+    <li><span class="pass">&#10003;</span> A-D-D verified — this IS the a-d-d&harr;code audit; spec read first for all 7 skills + mesh.</li>
+    <li><span class="pass">&#10003;</span> HTML report saved — this file, datetime-stamped.</li>
+    <li><span class="warn">&#9888;</span> Code committed / pushed / index updated — pending (ship step).</li>
+    <li><span class="pass">&#10003;</span> No prior damage — read-only audit, zero files modified in <code>nous</code> or <code>a-d-d</code>.</li>
+    <li><span class="pass">&#10003;</span> Findings cited — every claim carries a <code>file:line</code> from the live tree.</li>
+  </ul>
+
+  <footer>Be &middot; v0 &middot; r72 &middot; 2026-05-29 09:49 &middot; ~i a-d-d-vs-code security audit &middot; 3-auditor fan-out &middot; read-only</footer>
+</div>
+</body>
+</html>
