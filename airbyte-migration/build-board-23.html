@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 23 -- /operations timestamp serialization fix</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 23</nav>
+
+<h1>~b Board 23 -- /operations timestamp serialization fix</h1>
+<p class="sub">The Board 22 retro flagged <code>cloneCreatedAt = {}</code> in <code>Go.Watch</code>. Root cause was server-side: Firestore <code>Timestamp</code> objects bypass System.Text.Json defaults and serialize as empty objects. Fixed with a tiny recursive normalizer; every client now sees proper ISO 8601 timestamps.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified</span>
+
+<h2>The fix (5 lines)</h2>
+<div class="code-block">private static object? NormalizeFs(object? v) =&gt; v switch
+{
+    Timestamp ts =&gt; ts.ToDateTime(),
+    IDictionary&lt;string, object&gt; d =&gt; d.ToDictionary(kv =&gt; kv.Key, kv =&gt; NormalizeFs(kv.Value)),
+    IList&lt;object&gt; l =&gt; l.Select(NormalizeFs).ToList(),
+    _ =&gt; v
+};</div>
+<p style="font-size:13px">Applied at the two read sites: <code>GET /operations</code> and <code>GET /operations/{opId}</code>. Both now project Firestore docs through the normalizer before returning. Walks the dict/list tree once; <code>Timestamp</code> becomes <code>DateTime</code>, everything else passes through.</p>
+
+<h2>Verified live on the Board 22 rehearsal op</h2>
+<div class="code-block">opId:           reclone-20260530T020009
+status:         succeeded
+startedAt:      2026-05-30T02:00:09.307423Z
+finishedAt:     2026-05-30T02:15:01.862842Z
+cloneCreatedAt: 2026-05-30T02:02:22.171Z
+steps:
+  pause-scheduler   started 02:00:09.546  finished 02:00:15.674   (6.1s)
+  drop-clone        started 02:00:18.563  finished 02:02:19.621   (2m 1s)
+  create-clone      started 02:02:19.661  finished 02:14:59.971   (12m 40s)
+  resume-scheduler  started 02:15:00.003  finished 02:15:01.662   (1.7s)</div>
+<div class="callout"><strong>The rehearsal trail is now fully readable.</strong> Before this fix, every timestamp came back as <code>{}</code> &mdash; the op log was machine-actionable (status flips worked) but the timing was invisible. Now any client (Go.Watch, curl, python, browser) sees clean ISO timestamps and can compute durations.</div>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>NormalizeFs helper + applied at both /operations read sites</td></tr>
+<tr><td>cadence commit / build</td><td><code>2bb4eeb</code> / Cloud Build <code>ce16d125</code></td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Code committed (cadence 2bb4eeb; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Deployed (Cloud Build ce16d125) + verified live on the Board 22 op doc</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Board 23 -- 1 item Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; No prior Done damaged (read-path normalization; writes unchanged; existing docs read correctly)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r148 &middot; 2026-05-30 14:38 &middot; ~b Board 23</div>
+</body></html>
