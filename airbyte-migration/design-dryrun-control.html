@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~d Dry-run rehearsal -- control + visibility</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}
+.choice .fork{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}.choice .opts{color:#888;font-size:12px;margin-bottom:6px}
+.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}
+.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+.candidate .name{color:#6FC3DF;font-weight:700;font-family:'Consolas',monospace}.candidate .gut{color:#888;font-size:11px}
+.candidate.winner{border-color:#5cb85c}.candidate.winner .name{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~d dry-run control</nav>
+
+<h1>Dry-run rehearsal &mdash; control + visibility</h1>
+<p class="sub">Three additions to the server-side reclone, all riding the existing <code>cadence-operations</code> schema: a <b>dry</b> mode that exercises the procedure without destruction, <b>gates</b> + <b>abort</b> for mid-flight steering, and <b>heartbeats</b> so long steps are never silent. Hands on the wheel.</p>
+<span class="banner">Design &mdash; Pure Metal</span>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> Extend <code>POST /reset/reclone</code> with <code>?dry=true</code> + <code>?gate=after-drop|after-create</code> query params, add <code>POST /operations/{opId}/proceed</code> and <code>POST /operations/{opId}/abort</code> control endpoints, and have the long steps (Drop, Create) write a heartbeat row every ~15s with Snowflake query state. <strong>Intent:</strong> turn the committed-and-blind rehearsal into something the operator can <em>steer</em> &mdash; preview without destruction, pause at gate boundaries to think, abort if anything looks wrong, and watch live progress instead of staring at "running" for 12 minutes.</div>
+
+<h2>Discovery</h2>
+<ul>
+<li><b>Board 22 was committed-and-blind.</b> Once <code>POST /reset/reclone</code> fired, the clone was dropping. No abort. No mid-flight gate. Twelve minutes of silent <code>create-clone: running</code>.</li>
+<li><b>Driver has these locally, server doesn't.</b> <code>Go.Reclone</code> interactive prompts at each step + destructive-action gate (type "yes"). The server path inherited none of that for autonomous mode &mdash; it just barrels through.</li>
+<li><b>The cadence-operations doc is the right rail.</b> Adding <code>dryRun</code>, <code>gate</code>, <code>gateState</code>, <code>requestedAbort</code>, <code>lastHeartbeat</code> fields is schema-additive. Same watcher, same launcher patterns, more columns to render.</li>
+<li><b>Snowflake exposes query progress.</b> <code>SELECT * FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION())</code> (or by query_id captured from <code>SYSTEM$LAST_QUERY_ID</code>) returns <code>EXECUTION_STATUS</code>, <code>BYTES_SCANNED</code>, <code>PERCENTAGE_SCANNED_FROM_CACHE</code>, etc. A side-query every 15s during Drop/Create surfaces "is this healthy?"</li>
+<li><b>Driver dry token is "accepted but inert" for reclone</b> (per <code>Go.Reclone.bat</code>). That's a known gap, not a feature.</li>
+</ul>
+
+<h2>Naming Pass</h2>
+<div class="candidate"><span class="name">?dry=true + ?gate=after-drop + /proceed + /abort</span><span class="gut">winner &middot; consistent with existing /reset/* shape &middot; reads like the operator's mental model</span></div>
+<div class="candidate"><span class="name">?mode=dry|gated|live + /control/{proceed,abort}</span><span class="gut">enum is cleaner but combinatorial; gates are independent of dry vs live</span></div>
+<div class="candidate"><span class="name">A separate /reset/reclone-dry endpoint</span><span class="gut">doubles the surface area for one knob; rejects</span></div>
+<div class="candidate"><span class="name">Approval token in body (pre-approve all steps)</span><span class="gut">defeats the point -- the gate is for thinking mid-flight, not pre-batching</span></div>
+<p style="font-size:13px;color:#ccc;margin-top:8px"><code>?dry</code> and <code>?gate</code> as orthogonal query params. The <code>/proceed</code> + <code>/abort</code> verbs live on the op, where they belong (each op has its own state machine).</p>
+
+<h2>Shape</h2>
+<table>
+<tr><th>Endpoint / param</th><th>What it does</th></tr>
+<tr><td><code>POST /reset/reclone?dry=true</code></td><td>Op doc marked <code>dryRun: true</code>. Scheduler pause + resume genuinely fire (realistic rehearsal). Drop + Create steps log <code>"would: DROP DATABASE..."</code> + simulate the historical duration (sleep N seconds) and write a NOOP success. <b>Zero Snowflake destruction.</b></td></tr>
+<tr><td><code>POST /reset/reclone?gate=after-drop</code></td><td>After step 1 (Drop) succeeds, set <code>gateState: waiting</code> and hold. The op runs in the background but won't advance until <code>POST /operations/{opId}/proceed</code>.</td></tr>
+<tr><td><code>POST /operations/{opId}/proceed</code></td><td>Clears the gate &mdash; op picks up from where it parked. No-op if not gated.</td></tr>
+<tr><td><code>POST /operations/{opId}/abort</code></td><td>Sets <code>requestedAbort: true</code>. The op checks this at every gate boundary + every heartbeat tick; if true, it skips remaining destructive steps, runs Resume to leave the scheduler in a clean state, and marks the op <code>aborted</code>.</td></tr>
+<tr><td>Heartbeat (in-step, every ~15s)</td><td>While Drop or Create is running, a side task writes <code>lastHeartbeat: {at, snowflakeQueryId?, executionStatus?, bytesScanned?, elapsedSec, message}</code> to the op doc. Watcher prints one line per heartbeat.</td></tr>
+</table>
+<h3>The op doc, with new fields</h3>
+<div class="code-block">{
+  opId, kind, status, startedAt, finishedAt, steps[],
+  cloneCreatedAt?, error?,
+  dryRun:         true | false,
+  gate:           "after-drop" | "after-create" | null,
+  gateState:      "waiting" | "cleared" | null,
+  requestedAbort: false | true,
+  lastHeartbeat:  { at, queryId?, executionStatus?, bytesScanned?, elapsedSec, message } | null,
+}</div>
+
+<h2>Choices + Consequences</h2>
+<div class="choice">
+<div class="fork">1. Dry mode -- skip SQL entirely vs run against a sandbox vs noop with delay</div>
+<div class="opts">a) Skip Drop + Create SQL; log "would: ..."; simulate timing with a sleep (historical avg). Scheduler pause + resume still REAL. b) Run Drop + Create against a throwaway test DB. c) Skip all four steps -- only write logs.</div>
+<div class="conseq">a) Realistic enough to exercise the harness, log shape, watcher, and the operator's drive-the-keyboard motion. Zero Snowflake risk. b) More realistic but requires a sandbox DB + its own teardown; adds infra. c) Doesn't exercise scheduler / async / lock -- loses rehearsal value.</div>
+<div class="pick">PICK: (a) -- skip SQL, keep scheduler real, simulate timing.</div>
+<div class="why">Cheapest realistic. The operator gets to fire the endpoint, watch the trail, hit /proceed at the gate, see /abort interrupt -- without anything to recover. If we later want sandbox-mode, that's an additive escape.</div>
+</div>
+<div class="choice">
+<div class="fork">2. Gates -- hardcoded enum vs configurable list</div>
+<div class="opts">a) Two values: <code>after-drop</code>, <code>after-create</code> (plus implicit none). b) A list of step names: <code>?gates=drop-clone,create-clone</code>. c) Gate before every step.</div>
+<div class="conseq">a) Reflects the two real human-decision moments in a reclone: "you sure you wanted to drop?" "the clone is fresh -- ready to resume the scheduler?". b) Flexible but no one needs gates anywhere else. c) Annoying; pause-scheduler doesn't need approval.</div>
+<div class="pick">PICK: (a) -- hardcoded enum.</div>
+<div class="why">The two values are exactly the moments a human wants to think. Adding more is a no-op for cost (enum extension) if it ever matters.</div>
+</div>
+<div class="choice">
+<div class="fork">3. Abort semantics -- cooperative vs forceful</div>
+<div class="opts">a) Cooperative: op checks <code>requestedAbort</code> at gate boundaries + heartbeats; if true, skips remaining destructive steps + runs Resume to leave a clean state. b) Forceful: kill the Snowflake query mid-flight via <code>SYSTEM$CANCEL_QUERY</code>.</div>
+<div class="conseq">a) Safe; you can abort BEFORE Drop fires (gate=after-drop is the natural abort point) and DURING Create (between heartbeats). You can't undo a DROP that already started. b) Killing mid-CREATE leaves an unknown partial state in Snowflake -- recovery is harder than the abort is worth.</div>
+<div class="pick">PICK: (a) -- cooperative abort.</div>
+<div class="why">The honest interrupt points are: (i) at the gate, before Drop or Create commits; (ii) during a long step, between heartbeats, before the NEXT step starts. Forceful kill of a multi-minute Snowflake op invites a worse mess than waiting it out.</div>
+</div>
+<div class="choice">
+<div class="fork">4. Heartbeat content</div>
+<div class="opts">a) Pure timer: <code>{at, elapsedSec, message: "still running"}</code>. b) Timer + Snowflake query state via INFORMATION_SCHEMA.QUERY_HISTORY (queryId, executionStatus, bytesScanned). c) Append to a heartbeats[] array.</div>
+<div class="conseq">a) Proves liveness (the cadence service is alive + the step is alive) but not progress. b) Real progress signal -- bytesScanned climbing means Snowflake is doing work; executionStatus going to "BLOCKED" tells you something's wrong. c) Doc grows unbounded over a long Create.</div>
+<div class="pick">PICK: (b) overwriting <code>lastHeartbeat</code>; not appending.</div>
+<div class="why">Real progress, bounded doc size. The historical trail is the per-step <code>started/finished</code> timestamps + the durations they encode; per-tick heartbeat trail isn't worth the doc bloat.</div>
+</div>
+<div class="choice">
+<div class="fork">5. Watcher integration</div>
+<div class="opts">a) Extend <code>Go.Watch</code> to print heartbeats + gate state inline. b) New <code>Go.Watch --live</code> flag for the noisier output. c) New launcher.</div>
+<div class="conseq">a) Operator only learns one verb; quieter modes (skip heartbeats) is a flag. b) Same. c) Two watchers for the same op = confusing.</div>
+<div class="pick">PICK: (a) -- extend Go.Watch; heartbeats are part of the story.</div>
+<div class="why">The watcher already polls the op doc; rendering one more field is trivial. Heartbeats appear inline between step transitions.</div>
+</div>
+
+<h2>Escape Routes</h2>
+<div class="escape"><strong>From PICK 1 (skip SQL dry):</strong> if dry mode needs more realism, add an opt-in <code>?dry=sandbox</code> mode that runs Drop+Create on a throwaway DB. The first mode (NOOP) already proves the harness.</div>
+<div class="escape"><strong>From PICK 2 (hardcoded gates):</strong> if more gates are needed, the enum extends; the parser change is one line.</div>
+<div class="escape"><strong>From PICK 3 (cooperative abort):</strong> if cooperative isn't enough (e.g., the Create is genuinely stuck and never heartbeats), add a force-cancel endpoint that issues <code>SYSTEM$CANCEL_QUERY</code> using the captured queryId. Opt-in, separate verb.</div>
+<div class="escape"><strong>From PICK 4 (overwriting heartbeat):</strong> if a historical heartbeat trail becomes useful (debugging a slow step), capture each heartbeat into a sibling <code>cadence-heartbeats/{opId}/{ts}</code> subcollection. Not now.</div>
+
+<h2>Pure Metal Test</h2>
+<table>
+<tr><td>cadence-operations doc + new fields</td><td style="color:#5cb85c">schema-additive -- no new collection</td></tr>
+<tr><td>Snowflake INFORMATION_SCHEMA.QUERY_HISTORY for heartbeat</td><td style="color:#5cb85c">existing SnowflakeConn; same key, same warehouse</td></tr>
+<tr><td>Background timer for heartbeat ticks</td><td style="color:#5cb85c">System.Threading.Timer -- standard .NET</td></tr>
+<tr><td>The /operations gate/abort endpoints</td><td style="color:#5cb85c">two new POSTs on the existing route family</td></tr>
+</table>
+<p style="font-size:13px;margin-top:8px"><strong>Zero new external dependencies.</strong></p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>The smallest proof</strong>
+Ship <code>?dry=true</code> alone (PICK 1) &mdash; nothing else. The Drop + Create steps log <code>"would: DROP DATABASE..."</code> and sleep the historical avg (Drop ~2min, Create ~13min). Real pause + resume on the scheduler. Op doc has <code>dryRun: true</code>. Fire it once: <code>POST /reset/reclone?dry=true</code> &rarr; <code>Go.Watch</code> &rarr; trail looks identical to a real run but no clone was harmed. Validate the rehearsal motion end-to-end without risk. Gates, abort, heartbeats follow as additive phases.
+</div>
+
+<h2>What this does NOT do</h2>
+<ul>
+<li>Change the <em>real</em> reclone path -- live mode is unchanged.</li>
+<li>Add a sandbox DB for dry mode (escape route if it matters).</li>
+<li>Force-kill Snowflake queries (escape route).</li>
+<li>Replay or retry-from-step (separate concern; the Driver can do this locally).</li>
+<li>Remove the Driver -- it stays for operator-day approval flows.</li>
+</ul>
+
+<h2>Path to plan</h2>
+<p style="font-size:13px"><code>~p</code> phases this: (1) dry mode, (2) gates + /proceed, (3) /abort, (4) heartbeats, (5) Go.Watch render + close. Each is independently shippable; dry mode alone is the rehearsal-saving deliverable.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved + (to be) published</div>
+<div class="dod-item">&check; 4 naming candidates, winner: ?dry + ?gate + /proceed + /abort</div>
+<div class="dod-item">&check; 5 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Schema-additive (no new collection); zero new external deps</div>
+<div class="dod-item">&check; First Move: ?dry=true alone, smallest rehearsal-saving deliverable</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r150 &middot; 2026-05-30 14:41 &middot; ~d dry-run control</div>
+</body></html>

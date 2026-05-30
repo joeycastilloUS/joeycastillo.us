@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~i Dry-run rehearsal -- control + visibility gaps</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:16px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~i dry-run gap</nav>
+
+<h1>Dry-run rehearsal &mdash; control + visibility gaps</h1>
+<p class="sub">Board 22 proved the server-driven reclone works. The next rehearsal needs to be a <b>dry run</b> &mdash; trustable preview, mid-flight steering, live progress. Today's three gaps, named.</p>
+<span class="banner">Inspect &middot; Gap analysis</span>
+
+<div class="lede">
+<strong>Operator's exact words:</strong> "I want to do a dry run rehearsal but I feel I don't have enough control or visibility to the entire process." The Board 22 rehearsal demonstrated the procedure end-to-end, but it was committed-and-blind: once <code>POST /reset/reclone</code> fired, the clone was dropping and there was no way to pause, abort, or see <em>where inside the 12m 40s create-clone</em> the work was. For a real cutover rehearsal &mdash; or a real cutover &mdash; that's not enough hand on the wheel.</div>
+
+<h2>Gap 1: there is no dry mode</h2>
+<p style="font-size:13px">Every <code>POST /reset/reclone</code> is destructive. The Driver has a <code>dry</code> token but it's "accepted but inert" for reclone (per <code>Go.Reclone.bat</code>) &mdash; it does NOT prevent the DROP. There's no way to ask "what would happen if I fired this right now?" without firing it. For rehearsal, that means every dry-run is a real-clone.</p>
+<div class="code-block">Today:  POST /reset/reclone  ->  drops + recreates AIRBYTE_CLONE          (destructive, always)
+Want:   POST /reset/reclone?dry=true  ->  pretend-pause / log "would drop" / no SQL / pretend-resume
+                                          full op doc written, scheduler genuinely paused+resumed for realism,
+                                          ZERO Snowflake destruction</div>
+
+<h2>Gap 2: no mid-flight control</h2>
+<p style="font-size:13px">Once an op starts, there's no HTTP way to stop it. <code>ResetLock</code> blocks new ops but doesn't let you interrupt the running one. Specifically missing:</p>
+<table>
+<tr><th>Missing control</th><th>Why it matters for dry-run</th></tr>
+<tr><td>Abort an in-flight op</td><td>If the dry-run reveals something looks wrong at step 2, you're stuck waiting for steps 3 + 4 before you can act. For a real run, you can't stop a destructive Create mid-flight.</td></tr>
+<tr><td>Approval gates between steps</td><td>The Driver does this locally (per-step prompts). Server-side has nothing -- the op runs straight through. Operator can't say "pause after Drop, let me think, then proceed".</td></tr>
+<tr><td>Replay / re-fire a single failed step</td><td>If Drop succeeds and Create fails, there's no "retry from Create"; the operator has to manually fix in Snowflake or run the full Driver flow.</td></tr>
+</table>
+
+<h2>Gap 3: no heartbeat visibility within long steps</h2>
+<p style="font-size:13px">The Board 22 op log told you which STEP was running but not <em>how far into it</em>:</p>
+<div class="code-block">02:02:48Z  create-clone   running        # ... and then 12 minutes 40 seconds of silence ...
+02:15:28Z  create-clone   succeeded</div>
+<p style="font-size:13px">For 760 seconds the watcher couldn't tell: is the CREATE 10% done? 90%? Has Snowflake hung? Should I worry? Snowflake exposes query progress (rowsProduced, percent for some ops, query state) via INFORMATION_SCHEMA / GET_QUERY_OPERATOR_STATS &mdash; today we don't surface any of it. ETA = unknown. Liveness = unknown.</p>
+
+<div class="warn"><strong>Where these gaps actually hurt.</strong> A real cutover rehearsal is "are we ready to do the real thing?" Without dry mode you can't rehearse without destruction. Without abort you can't stop if something surprises you. Without heartbeats you can't tell if a long step is healthy or hung. All three matter more for the REAL cutover than for any rehearsal.</div>
+
+<h2>What exists that's reusable</h2>
+<ul>
+<li><b>cadence-operations doc</b> -- already records per-step status. Adding <code>dryRun</code>, <code>requestedAbort</code>, <code>heartbeat</code> fields is a schema additive.</li>
+<li><b>ResetLock single-flight</b> -- already prevents concurrent ops; an abort signal can live alongside it.</li>
+<li><b>The watcher pattern</b> -- <code>Go.Watch</code> already polls <code>/operations/{opId}</code>; new fields render with one more line per cell.</li>
+<li><b>Snowflake query stats</b> -- the same SnowflakeConn the reclone uses can issue a side query (<code>SELECT SYSTEM$LAST_QUERY_ID()</code> + <code>INFORMATION_SCHEMA.QUERY_HISTORY</code>) to get live progress on the in-flight Create.</li>
+</ul>
+
+<h2>What "good" looks like</h2>
+<div class="callout">
+A rehearsal session should be: <b>(1)</b> hit <code>POST /reset/reclone?dry=true</code>, watch the op trail render without anything actually getting dropped &mdash; preview-level confidence. <b>(2)</b> When ready for real, hit <code>POST /reset/reclone</code> with optional <code>?gate=after-drop</code> so the op pauses for your explicit <code>POST /operations/{opId}/proceed</code>. <b>(3)</b> The watcher prints heartbeats every ~15s during long steps: <code>"create-clone: running  85% (Snowflake QH_xyz, rowsProduced=...)"</code> so you can tell healthy from hung. <b>(4)</b> If anything looks wrong: <code>POST /operations/{opId}/abort</code> halts where possible and records the partial state.
+</div>
+
+<h2>Path to design + plan</h2>
+<p style="font-size:13px"><code>~d</code> a design that picks the shapes for: (a) dry-run mode, (b) abort + per-step gates, (c) heartbeat surfacing. <code>~p</code> phases them. All four ride the existing <code>cadence-operations</code> schema and <code>/reset/reclone</code> endpoint -- additive, no API churn.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Inspect saved + (to be) published</div>
+<div class="dod-item">&check; 3 gaps named with concrete examples from Board 22</div>
+<div class="dod-item">&check; Reusable primitives identified (ops doc, ResetLock, watcher, Snowflake query stats)</div>
+<div class="dod-item">&check; "What good looks like" written as operator scenarios</div>
+<div class="dod-item">&check; Hands to ~d</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r150 &middot; 2026-05-30 14:41 &middot; ~i dry-run gap</div>
+</body></html>

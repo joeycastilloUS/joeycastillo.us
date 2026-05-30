@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~p Build dry-run control + visibility</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:18px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+.phase{background:#1A1A1A;border-radius:6px;padding:18px 22px;margin:14px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:700;flex-shrink:0}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}.phase .accept strong{color:#5cb85c}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~p dry-run control</nav>
+
+<h1>Build dry-run control + visibility</h1>
+<p class="sub">Execute <code>be/designs/2026-05-30-1441-design-dryrun-control.html</code>. Five independently-shippable phases on top of <code>/reset/reclone</code>. Dry mode (Phase 1) is the rehearsal-saving deliverable; gates, abort, heartbeats are additive value.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> turn the committed-and-blind reclone into a steerable rehearsal. Preview without destruction (<code>?dry=true</code>), pause at gate boundaries to think (<code>?gate=after-drop|after-create</code>), abort if anything looks wrong (<code>POST /operations/{opId}/abort</code>), live progress during long steps (heartbeats with Snowflake query state). Same schema, same watcher, more hand on the wheel.</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td><code>?dry=true</code> mode (SQL skipped + historical-avg sleep). <code>?gate=after-drop|after-create</code> + <code>POST /operations/{opId}/proceed</code>. <code>POST /operations/{opId}/abort</code> with cooperative semantics. <code>lastHeartbeat</code> field updated every ~15s during Drop/Create with Snowflake query state. <code>Go.Watch</code> renders the new fields. Op doc schema-additive; live path unchanged.</td><td>Sandbox-mode dry (escape route). Force-cancel via SYSTEM$CANCEL_QUERY (escape route). Heartbeat trail / subcollection (escape route). Replay / retry-from-step. Removing the Driver. Changes to /tick.</td></tr>
+</table>
+
+<h2>Phases</h2>
+<div class="phase"><h3><span class="num">1</span> Dry mode (First Move)</h3>
+<div class="meta"><code>POST /reset/reclone?dry=true</code> writes <code>dryRun: true</code> on the op doc. Pause + Resume scheduler steps fire for real (rehearsal realism). Drop + Create steps SKIP the SQL, log <code>"would: DROP DATABASE..."</code> + <code>"would: CREATE DATABASE..."</code>, and sleep historical averages (Drop ~125s, Create ~760s) so timing looks like a real run. Step records succeed normally.</div>
+<div class="accept"><strong>Accept:</strong> <code>POST /reset/reclone?dry=true</code> &rarr; op trail looks identical to a real run (per-step started/finished, ~15min total) but AIRBYTE_CLONE is untouched (verified by reading SHOW DATABASES before+after). dryRun: true visible in op doc.</div></div>
+
+<div class="phase"><h3><span class="num">2</span> Gates + /proceed</h3>
+<div class="meta"><code>?gate=after-drop</code> or <code>?gate=after-create</code> persists on the op doc. After the named step succeeds, op sets <code>gateState: "waiting"</code> and parks (no advancement). <code>POST /operations/{opId}/proceed</code> sets <code>gateState: "cleared"</code> and the parked task picks up. Op-doc state machine handled in the background task's main loop.</div>
+<div class="accept"><strong>Accept:</strong> <code>POST /reset/reclone?dry=true&gate=after-drop</code> &rarr; op pauses at "after-drop"; <code>Go.Watch</code> shows <code>gateState: waiting</code>; <code>POST .../proceed</code> &rarr; op continues to Create.</div></div>
+
+<div class="phase"><h3><span class="num">3</span> /abort</h3>
+<div class="meta"><code>POST /operations/{opId}/abort</code> sets <code>requestedAbort: true</code>. The background task checks the flag at: (a) every gate boundary before advancing, (b) every heartbeat tick during a long step, (c) just before each step starts. If set: skip remaining destructive steps, run Resume (clean scheduler state), mark op <code>aborted</code> with a note saying which step the abort took effect at.</div>
+<div class="accept"><strong>Accept:</strong> Fire <code>POST /reset/reclone?dry=true&gate=after-drop</code>, then <code>POST .../abort</code> while parked at the gate &rarr; Resume runs, op status = <code>aborted</code>, Create + Resume steps skipped/marked aborted with reason.</div></div>
+
+<div class="phase"><h3><span class="num">4</span> Heartbeats</h3>
+<div class="meta">Inside Drop + Create step execution, a System.Threading.Timer (or background loop) writes <code>lastHeartbeat: {at, queryId?, executionStatus?, bytesScanned?, elapsedSec, message}</code> every ~15s. queryId resolved via <code>SELECT SYSTEM$LAST_QUERY_ID()</code> at step start; details via <code>INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION</code>. Timer cancels on step completion. Honest if INFORMATION_SCHEMA returns nothing yet -- log a plain timer pulse.</div>
+<div class="accept"><strong>Accept:</strong> Fire a real <code>POST /reset/reclone</code>; <code>Go.Watch</code> prints a heartbeat line every ~15s during Drop + Create with elapsedSec climbing + (when available) Snowflake bytesScanned / executionStatus. Heartbeat clears on step end.</div></div>
+
+<div class="phase"><h3><span class="num">5</span> Go.Watch render + ship</h3>
+<div class="meta"><code>Go.Watch</code> reads + prints the new fields: <code>dryRun</code> badge in the header; <code>gateState: waiting</code> highlighted yellow with the proceed/abort one-liners; <code>lastHeartbeat</code> printed inline (overwrites prior heartbeat lines or appends?); <code>aborted</code> status colored. Build report + close board.</div>
+<div class="accept"><strong>Accept:</strong> A full rehearsal driven via Go.Watch: <code>?dry=true&gate=after-drop</code>, hit /proceed, hit /abort once mid-Create, watcher prints the whole arc with heartbeats and the final aborted state. No console-Q&A.</div></div>
+
+<h2>Constraints / risks</h2>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td>Dry mode's sleep duration drifts from real Drop/Create times</td><td>Pull the durations from the latest succeeded real op (cadence-operations history). Fallback to constants. Updates itself over time.</td></tr>
+<tr><td>Gate state requires the op task to poll the doc</td><td>Background task reads <code>gateState</code> at each gate; lightweight Firestore read every 5s while parked. Bounded -- only when gated.</td></tr>
+<tr><td>Heartbeat write rate</td><td>Every 15s during long steps = ~50 writes for a 12min Create. Within Firestore's per-doc 1 write/sec cap (Cloud Run side; same doc). Safe.</td></tr>
+<tr><td>Abort during a real Drop that has already committed</td><td>Cooperative: we can't un-Drop. The abort takes effect BEFORE the next step. Op record states this clearly in the abort note.</td></tr>
+<tr><td>Cloud Run instance recycle while parked at a gate</td><td>Op doc has all state needed to resume. A future <code>POST /operations/{opId}/resume-from-step?step=N</code> closes this. Out of scope here.</td></tr>
+</table>
+
+<h2>Board (see ~e -- pending)</h2>
+<p style="font-size:13px">~e will size this; rough cut: 3 + 3 + 3 + 5 + 3 = <b>17 pts</b>, one board. Each phase independently deployable; Phase 1 alone is the rehearsal-saving win.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved + (to be) published</div>
+<div class="dod-item">&check; 5 phases with accept criteria; each independently shippable</div>
+<div class="dod-item">&check; Inherits ~d decisions (?dry + ?gate + /proceed + /abort, cooperative abort, overwriting heartbeat)</div>
+<div class="dod-item">&check; Risks incl. dry-mode duration drift, parked-gate doc-read load, recycle while parked</div>
+<div class="dod-item">&check; Awaits ~e</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r150 &middot; 2026-05-30 14:41 &middot; ~p dry-run control</div>
+</body></html>
