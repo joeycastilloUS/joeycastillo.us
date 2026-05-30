@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i Vault Anonymity — Design Violation + Fix</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 25px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 30px 0 10px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 22px; }
+  p { color: #ccc; margin: 8px 0; } ul { margin: 8px 0 8px 22px; } li { color: #ccc; margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  .crit { background: #1F0F0F; border: 2px solid var(--red); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .crit b { color: var(--red); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  .fix { background: #0c2417; border: 2px solid var(--green); padding: 14px 20px; margin: 16px 0; font-size: 13.5px; }
+  .fix b { color: var(--green); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; display: block; margin-bottom: 4px; }
+  pre { background: #0a0a0a; color: #ccc; padding: 14px 18px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Consolas', monospace; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; ~i vault anonymity &middot; design hole + fix</span></nav>
+<div class="container">
+
+  <h1>~i Vault Anonymity — Design Violation + Fix</h1>
+  <div class="sub">Joey flagged: "from inside the vault, no idea what belongs to who." I checked the a-d-d / kernel / master plan — the requirement is there, and my MH-VAULT V1 violates it. This report confirms, locates, and proposes the surgical fix.</div>
+
+  <h2>&sect;1 — The requirement (it IS in your stack, repeatedly)</h2>
+  <table>
+    <tr><th>Where</th><th>Quote</th></tr>
+    <tr><td><code>a-d-d/nous/comms/skill/mesh/DIAGRAM.md:38</code></td><td>"Mesh sees opaque bytes — crypto is security's job"</td></tr>
+    <tr><td><code>a-d-d/nous/comms/skill/relay/CLAUDE.md:32, 270, 324</code></td><td>"opaque byte forwarding"; "blobs are opaque ciphertext (relay can't read)"</td></tr>
+    <tr><td>master plan <code>plan-master-metal.html:262</code></td><td>"peers hold; can not read; resilience layer"</td></tr>
+    <tr><td>kernel <code>CLAUDE.md</code> Quote #32 (2026-05-29)</td><td>"IDS is a pseudonym mostly... It's a pseudonym that hides the substrate. Don't expose triples in prose." — the masking principle, generalized.</td></tr>
+  </table>
+  <p>The principle is consistent across architecture, spec, and kernel: <b>the mesh substrate must mask both the content AND the identity</b> behind the data it stores. Quote #32 names it explicitly for the data shape; it applies equally to the identity shape. My V1 design respects content masking (ciphertext) but breaks identity masking — that's the gap.</p>
+
+  <h2>&sect;2 — The violation (what I shipped)</h2>
+  <div class="crit">
+    <b>MH-VAULT V1 key shape leaks operator identity</b>
+    Current shape: <code>&lt;operator-fqdn&gt;:&lt;sha256-content&gt;</code> (e.g. <code>joeycastillo.us:a61b...</code>).
+    The FQDN is in cleartext, visible to anyone with relay disk access OR anyone watching wire traffic (URL path). A peer or attacker can:
+    <ul>
+      <li><b>Link blobs to an operator</b> — every key starting with <code>joeycastillo.us:</code> belongs to Joey. Operator inventory is enumerable per FQDN.</li>
+      <li><b>Profile activity</b> — count of blobs, write rates, size patterns per operator FQDN.</li>
+      <li><b>Single out individuals</b> — relay logs (request paths) name the operator on every request.</li>
+    </ul>
+    This contradicts the spec's "opaque" property and the kernel's "pseudonym masks substrate" rule.
+  </div>
+
+  <p><b>Committed exposures</b> (all need revision):</p>
+  <ul>
+    <li><code>nous/comms/skill/relay/relay_vault.h</code> — header comment + function docs name the FQDN shape</li>
+    <li><code>nous/comms/skill/relay/test_relay_vault.c</code> — <code>#define FQDN "joey.castillo.us"</code> test constant</li>
+    <li><code>a-d-d/nous/comms/skill/relay/CLAUDE.md</code> — 6 places (key shape spec, storage layout, curl examples, client-side convention)</li>
+    <li><code>audit-of-all/be/coordination/mesh.md</code> — cross-lane briefing example</li>
+  </ul>
+
+  <h2>&sect;3 — The fix (small, surgical, restores the property)</h2>
+  <div class="fix">
+    <b>New key shape — both components opaque 64-hex</b>
+    <pre>&lt;key&gt; = &lt;namespace-hex&gt; ":" &lt;content-hex&gt;
+
+namespace-hex = 64 lowercase hex chars (32-byte HMAC-SHA256 over op privkey)
+content-hex   = 64 lowercase hex chars (32-byte SHA-256 of plaintext)</pre>
+    Both components are indistinguishable random-looking hex. <b>Nothing in the key reveals the operator</b>; mesh, peers, and disk-readers see two opaque 32-byte values per blob.
+  </div>
+
+  <h3>Namespace derivation (client-side, deterministic, secret)</h3>
+  <pre>namespace = HMAC-SHA256(operator_privkey, "vault-namespace-v1")[:32 bytes]
+            → hex-encode → 64 chars</pre>
+  <ul>
+    <li><b>Deterministic</b> — same operator key → same namespace, every time, on every machine. Operator can always find their own blobs.</li>
+    <li><b>Unforgeable</b> — only someone with the operator private key can compute it. Mesh peers (who have only the public key, if even that) cannot reverse-engineer.</li>
+    <li><b>Per-operator scoping preserved</b> — the relay still does per-namespace quota; the namespace is just opaque hex, not a recognizable FQDN.</li>
+    <li><b>Stronger than pubkey-derived</b> (e.g. <code>sha256(op_pub || "vault")</code>) which would still leak to anyone who has the pubkey. HMAC-with-priv ensures only the operator can compute it.</li>
+  </ul>
+
+  <h3>Storage path (server-side, opaque)</h3>
+  <pre>/var/nous/vault/&lt;namespace-hex&gt;/&lt;content-hex&gt;
+                    (64-hex subdir, opaque)</pre>
+
+  <h3>Why this satisfies Joey's brief verbatim</h3>
+  <ul>
+    <li>"<i>from inside the vault, no idea what belongs to who</i>" — relay disk shows directories named by 64 hex chars; no FQDN, no domain, no recognizable identifier.</li>
+    <li>"<i>not knowable from inside the vault</i>" — even with the operator pubkey in hand, you can't compute the namespace (requires the private key).</li>
+    <li>Quote #32 "pseudonym masks substrate" — the namespace IS the pseudonym for the operator; substrate (FQDN) is masked.</li>
+  </ul>
+
+  <h2>&sect;4 — Impact analysis</h2>
+  <table>
+    <tr><th>Scope</th><th>Change</th><th>Risk</th></tr>
+    <tr><td>relay_vault.h</td><td>Validate key as <code>&lt;64-hex&gt;:&lt;64-hex&gt;</code> (drop fqdn charset). Constants renamed (NS_HEX_LEN = 64).</td><td>Low; smaller char set = stricter</td></tr>
+    <tr><td>relay_vault.c</td><td>Drop fqdn-extraction; first component used as opaque subdir name. Same path construction, just different validation regex.</td><td>Low; less code (no charset complexity)</td></tr>
+    <tr><td>test_relay_vault.c</td><td>Replace FQDN constant with NS hex constant; same adversarial cases; add cases for non-hex chars in NS slot.</td><td>Low</td></tr>
+    <tr><td>relay_vault_server.c</td><td>No change (server is structure-blind; just forwards the key string).</td><td>None</td></tr>
+    <tr><td>a-d-d relay/CLAUDE.md</td><td>Update Vault Endpoints section + Client-side vault convention. ~10 line diff.</td><td>Spec-only</td></tr>
+    <tr><td>Deploy</td><td><b>Not deployed yet</b>; no live data to migrate. Free do-over.</td><td>None</td></tr>
+    <tr><td>Client side (vault_sync.c, TLT, AI-LF)</td><td>Need namespace derivation helper. ~10 LOC (HMAC call). Same endpoints, same caps, just compute the ns once and prepend it to every key.</td><td>Low; documented before they build</td></tr>
+  </table>
+
+  <h2>&sect;5 — Recommendation</h2>
+  <ol>
+    <li><b>Ship the fix now</b> — V1 isn't deployed, so this is a free, lossless do-over.</li>
+    <li>Code: revise <code>relay_vault.{c,h}</code> + <code>test_relay_vault.c</code>; re-run tests; commit.</li>
+    <li>Spec: revise <code>a-d-d/nous/comms/skill/relay/CLAUDE.md</code> in lockstep.</li>
+    <li>Cross-lane: update mesh.md briefing so master-plan-keeper, TLT, AI-LF build against the new shape from day one.</li>
+    <li>Add a <code>vault_namespace.h</code> client helper exposing the HMAC derivation, so all client lanes compute the namespace the same way.</li>
+  </ol>
+
+  <h2>&sect;6 — Honest note on what this does and does NOT give you</h2>
+  <ul>
+    <li><b>Does</b> hide which operator owns which blob from any relay-disk reader, wire snooper, or peer relay.</li>
+    <li><b>Does</b> hide blob content (already ciphertext under <code>seal</code> v2).</li>
+    <li><b>Does NOT</b> hide that <i>some</i> operator wrote <i>some</i> blob at time T (timing/traffic analysis); that's a tor-class property requiring mix-networking — out of scope for v1.</li>
+    <li><b>Does NOT</b> hide the number of blobs per namespace (quota visible by directory listing) — but the namespace is unlinkable to the operator, so this is mostly meaningless to an attacker.</li>
+    <li>The operator's <b>identity remains anchored</b> at the Pantheon trust root (operator pub baked into nodes) — anonymity here is for vault contents only, not for mesh participation.</li>
+  </ul>
+
+  <footer>Be &middot; v0 &middot; r78 &middot; 2026-05-30 &middot; metal-2 &middot; ~i vault anonymity &middot; surgical fix proposed</footer>
+</div>
+</body>
+</html>
