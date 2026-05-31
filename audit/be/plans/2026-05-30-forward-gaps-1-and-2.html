@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forward paths — Gap 1 (tests) + Gap 2 (live mesh)</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --surface2:#222; --accent:#6FC3DF; --text:#E0E0E0; --t2:#999; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.55; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 10px 24px; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 3px; font-size: 16px; }
+  .brand-sub { color: var(--t3); font-size: 11px; letter-spacing: 1px; margin-left: 12px; }
+  .container { max-width: 900px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { color: var(--accent); font-size: 25px; margin-bottom: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 32px 0 12px; border-bottom: 1px solid var(--surface2); padding-bottom: 5px; }
+  h3 { color: var(--accent); font-size: 15px; margin: 18px 0 6px; }
+  .sub { color: var(--t2); font-size: 14px; margin-bottom: 22px; }
+  p { color: #ccc; margin: 8px 0; } ul { margin: 8px 0 8px 22px; } li { color: #ccc; margin: 4px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+  pre { background: var(--surface); border-left: 3px solid var(--accent); padding: 12px 16px; margin: 10px 0; overflow-x: auto; font-size: 12px; color: #d6e8ef; font-family: 'Consolas', monospace; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12.5px; }
+  th { text-align: left; color: var(--accent); padding: 8px 10px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1A1A1A; vertical-align: top; color: #ccc; }
+  .green { color: var(--green); font-weight: 700; }
+  .red   { color: var(--red);   font-weight: 700; }
+  .amber { color: var(--amber); font-weight: 700; }
+  .box { background: var(--surface); border-left: 3px solid var(--accent); padding: 12px 16px; margin: 12px 0; }
+  .box h3 { margin-top: 0; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 18px; border-top: 1px solid #222; margin-top: 28px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="brand-sub">audit-of-all &middot; forward paths &middot; Gap 1 + Gap 2 movement plan</span></nav>
+<div class="container">
+
+  <h1>How to move Gap 1 and Gap 2 forward (the non-MS threads)</h1>
+  <div class="sub">
+    While the 4 round-2 MS deep-research agents run, here are the concrete forward paths for the other two threads — TEST infrastructure and Live Mesh enforcement. Both are <b>do-now</b> work with no external dependencies.
+  </div>
+
+  <h2 style="color: var(--green);">Gap 1 → TEST infrastructure forward (TEST-3 / TEST-4 / TEST-5)</h2>
+
+  <p>
+    TEST-1 is the spine (done — green on CI, 24s feedback). TEST-2 is the trust-root tools (done — green on CI, 616 assertions). Remaining: <b>66 pts across 3 boards.</b>
+  </p>
+
+  <table>
+    <tr><th>Board</th><th>Pts</th><th>What it does</th><th>Effort</th></tr>
+    <tr><td><b>TEST-3</b> — Coverage + fuzz expansion</td><td>16</td><td>(a) <code>make test-cov</code> using gcov/llvm-cov + HTML report; (b) CI floor — block PR if security + mesh trust paths drop below 85% coverage; (c) wire-protocol fuzz harness — random frames into the wire parser, must never crash, must always reject malformed; (d) relay + store deserialization fuzz — attacker-reachable parsers get the same treatment.</td><td>~1 session</td></tr>
+    <tr><td><b>TEST-4</b> — Adversarial + per-MH-board</td><td>21</td><td>The security tests that matter most — proves the trust layer REJECTS attacks. Pairs with MH-2..5 hardening boards: (a) MH-2 expiry tests (valid_until honored, expired-rejected, clock-skew); (b) MH-3 revocation tests (revoked-node-rejected + version-rollback); (c) MH-4 handshake adversarial (replay nonce / wrong cert / MITM / downgrade — all rejected); (d) MH-5 rotation tests (grace-window dual-key + old-key-retired); (e) negative-test sweep — every trust parser gets tamper/truncate/wrong-key/malformed coverage.</td><td>~2 sessions, in lockstep with MH boards</td></tr>
+    <tr><td><b>TEST-5</b> — On-VM e2e smoke automation</td><td>13</td><td>gcloud-driven: deploy to a throwaway VM (or Ashburn /tmp), boot, assert journal markers show self-verify OK + peer-connect, tear down. Plus a mesh-formed assertion (curl /topology across nodes, confirm 6 nodes visible). Plus a nightly CI cron against a scratch node. <b>This is the bridge between Gap 1 (tests run) and Gap 2 (live mesh works) — the e2e test is exactly the gate that proves the rebuilt prime works in production.</b></td><td>~1 session</td></tr>
+  </table>
+
+  <h3>Plus 2 unfinished items from TEST-2 to clean up:</h3>
+  <ul>
+    <li><b>seal CLI test</b> (the 1 skipped suite in CI) — needs a stdin-injection harness to drive the interactive passphrase prompt. ~half a session. Already deferred in the TEST-2 commit because the crypto core is covered by <code>security test</code> 106/106.</li>
+    <li><b>Intelligence zero-assert test triage</b> (~50 smoke tests in <code>intelligence/</code>) — convert the ~10 highest-risk to assertion-gated. Per the audit, most are run-and-eyeball tests; the conversion is mechanical but tedious.</li>
+  </ul>
+
+  <div class="box">
+    <h3>My recommended Gap 1 order</h3>
+    <ol>
+      <li><b>TEST-5 first</b> — the on-VM smoke harness is the gate that proves Gap 2 worked. It's also a prerequisite for safely doing the live-mesh redeploy without risk of bricking the production primes.</li>
+      <li><b>TEST-3</b> — coverage + fuzz. The coverage floor catches regressions before they ship; fuzz catches parser bugs an attacker would.</li>
+      <li><b>TEST-4 lands in lockstep with MH-2..5</b> — these tests don't exist as standalone work because they're paired with the mesh-hardening boards (which mesh-security session owns per your handoff).</li>
+      <li><b>seal CLI test</b> + <b>intelligence triage</b> — housekeeping, do when nothing else queued.</li>
+    </ol>
+    <p><b>"What's the next ~go signal for Gap 1?"</b> Just say "~go test-5" or "~go test-3" and I'll start.</p>
+  </div>
+
+  <h2 style="color: var(--amber);">Gap 2 → Live mesh MH-1/2/3 enforcement on the 4 production primes</h2>
+
+  <p>
+    The MH-1 (replay/rollback guard), MH-2 (30-day expiry), and MH-3 (revocation purge) code shipped in nous weeks ago. The bytes are even in the deployed <code>mesh.sealed</code> on the live primes (verified yesterday — the <code>strings.bin</code> on Ashburn now interns the HK relay's IP, proving the roster IS being parsed). <b>But the prime binary that's running was built 2026-05-27 — before MH-1/2/3 landed.</b> So the enforcement code is present in the source but absent on the wire.
+  </p>
+
+  <h3>The execution plan (3-phase, conservative — production-touching)</h3>
+
+  <table>
+    <tr><th>Phase</th><th>Steps</th><th>Verify</th><th>Rollback</th></tr>
+    <tr><td><b>Phase A — Local proof</b></td><td>1. Rebuild prime locally at current nous HEAD (<code>r268+</code>, includes MH-1/2/3 + MH-VAULT V1 + all later landings).<br>2. Run TEST-5 (on-VM smoke harness — once it exists) against a throwaway scratch VM, NOT against any of the 4 production primes.<br>3. Confirm: prime binary contains the new strings (<code>strings ./prime \| grep -iE "valid_until\|expired\|revoked\|freshness"</code> returns hits).<br>4. Confirm: <code>.seen</code> sidecar gets written on first boot.</td><td>scratch-VM journal shows: <br><code>Mesh roster: loaded N triples</code><br><code>Mesh expiry: valid until &lt;ts&gt;</code><br>scratch <code>/var/nous/mesh.sealed.seen</code> exists.</td><td>Trivial — scratch VM is throwaway. Delete + reprovision.</td></tr>
+    <tr><td><b>Phase B — Ashburn-first (canary)</b></td><td>1. Take a backup of <code>/opt/nous/prime</code> on Ashburn as <code>prime.bak.2026-05-27</code>.<br>2. SCP new <code>prime</code> binary to Ashburn <code>/tmp/prime</code>.<br>3. <code>sudo systemctl stop prime</code>.<br>4. <code>sudo install -m 0755 /tmp/prime /opt/nous/prime</code>.<br>5. <code>sudo systemctl start prime</code>.<br>6. <code>journalctl -u prime -n 50</code> — confirm load.<br>7. <code>curl http://10.150.0.3:8080/topology</code> (internal IP, from another GCE host) — confirm 6 nodes still visible.<br>8. <b>Wait 30 minutes.</b> Monitor logs for any error, peer-disconnect, or roster-related warning.</td><td>Journal shows MH-1 freshness ACCEPT (signed_at &gt; last seen). <code>.seen</code> sidecar appears. <code>/topology</code> returns the same 6 nodes. Other 3 primes still talk to Ashburn.</td><td><code>sudo systemctl stop prime</code> + <code>sudo install -m 0755 /opt/nous/prime.bak.2026-05-27 /opt/nous/prime</code> + restart. Old binary, known-good.</td></tr>
+    <tr><td><b>Phase C — Roll out</b></td><td>Repeat Phase B steps 1-7 for Las Vegas → Singapore → Hong Kong, <b>one at a time</b>, with 5-minute soak between. At each: backup, scp, swap, restart, verify, wait.</td><td>All 4 primes report 6-node topology. Each has a <code>.seen</code> sidecar. <code>curl</code> hits from external (relay → prime) still pass.</td><td>Per-VM rollback to <code>.bak</code>. Other primes unaffected.</td></tr>
+  </table>
+
+  <h3>Risk assessment</h3>
+  <ul>
+    <li><b>Low-risk:</b> The new binary is a strict superset of the deployed one — it adds enforcement, doesn't change format. Existing roster (today's 6-node mesh.sealed) will load cleanly because MH-2 valid_until=1782759766 (June 29) is in the future and MH-1 signed_at=1780167766 is greater than any prior seen.</li>
+    <li><b>Mitigated:</b> The <code>.seen</code> sidecar doesn't exist on any prime yet — first boot writes it, no rollback rejection.</li>
+    <li><b>Watch-item:</b> If the prime aborts on boot, the old <code>.bak</code> is right there for instant restore. Each prime is independently rolled, so worst-case is one prime down 60 seconds while we restore.</li>
+  </ul>
+
+  <h3>Prerequisites (must be true before Phase B)</h3>
+  <ul>
+    <li>TEST-5 (on-VM smoke harness) exists and is green against a scratch VM — proves the binary works in a production-like environment without touching production.</li>
+    <li>Prime binary is built from a known-good commit hash (current <code>nous</code> HEAD <code>d64beae</code> is the TEST-2 green commit — could use that or wait for HEAD to absorb any pending fixes).</li>
+    <li>A 30-minute monitoring window scheduled (the soak after Ashburn).</li>
+  </ul>
+
+  <div class="box">
+    <h3>My recommended Gap 2 sequencing</h3>
+    <ol>
+      <li><b>Do TEST-5 first</b> (Gap 1 work) — gives us the smoke harness we need for Phase A. Sequence is <code>TEST-5 → Gap 2 Phase A → Phase B → Phase C</code>. ~half a day end-to-end.</li>
+      <li><b>OR skip TEST-5 and do Phase A by hand</b> — provision a fresh GCE micro VM, install + smoke manually, then proceed. Faster (~2 hours) but doesn't leave a reusable harness behind.</li>
+      <li>Either way: Phase B (Ashburn canary) waits for your explicit <code>~go</code> — production touch.</li>
+    </ol>
+    <p><b>"What's the next ~go signal for Gap 2?"</b> Either: "~go gap2 test5-first" (cautious, takes ~half day) or "~go gap2 manual-canary" (faster, less reusable).</p>
+  </div>
+
+  <h2>Combined movement plan (one-line summary)</h2>
+
+  <table>
+    <tr><th>Thread</th><th>Status</th><th>Next signal</th></tr>
+    <tr><td>Gap 1 (tests)</td><td><span class="green">✓ TEST-1 + TEST-2 green on CI · 616 assertions</span></td><td><code>~go test-5</code> or <code>~go test-3</code></td></tr>
+    <tr><td>Gap 2 (live mesh)</td><td><span class="amber">⏳ Code shipped, binary needs rebuild + 4-VM deploy</span></td><td><code>~go gap2 test5-first</code> (preferred) or <code>~go gap2 manual-canary</code></td></tr>
+    <tr><td>Gap 3 (Michelin Star)</td><td><span class="amber">⏳ Round-1 done · Round-2 deep-IP-matrix in flight (4 background agents, ~5-10 min each)</span></td><td>Wait for MS-DEEP synthesis · separately: <b>NLnet deadline 36hrs</b> — decide whether to draft application tonight</td></tr>
+  </table>
+
+  <footer>Be &middot; v0 &middot; r463 (audit-of-all) &middot; 2026-05-30 19:20 PDT &middot; metal-2 &middot; forward paths for the non-MS threads</footer>
+</div>
+</body>
+</html>
