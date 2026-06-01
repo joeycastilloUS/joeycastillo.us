@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~i Board 25 review -- what's still missing</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#3a1414;color:#f06e6e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:20px}h3{color:#fff;margin:14px 0 6px;font-size:15px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:16px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}
+td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+.miss{background:#1a0e0e;border-left:3px solid #f06e6e;padding:12px 16px;margin:12px 0;color:#e6b0b0;font-size:13px;border-radius:0 4px 4px 0}.miss strong{color:#f06e6e}
+.ok{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.ok strong{color:#5cb85c}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~i Board 25 review</nav>
+
+<h1>Board 25 review &mdash; what's still missing</h1>
+<p class="sub">Honest audit of what I shipped vs what was asked. The op-log fields are right; the operator-facing experience is not.</p>
+<span class="banner">Inspect &middot; incomplete</span>
+
+<div class="lede">
+<strong>Operator's exact words:</strong> "I want to see the exact sql statement being executed to snowflake before it happens. when it happens and after it happens. and I want you to get and show me the actual snowflake log."<br><br>
+What I delivered captured the SQL/queryId/snowflake fields on the op doc and made the watcher render them. <b>But it doesn't show the SQL on screen <em>before</em> the operator confirms Stage 4</b>, and there's <b>no JWT/auth step</b> in the op trail. Two real gaps.
+</div>
+
+<h2>Gap 1: the SQL is invisible before the destructive confirmation</h2>
+<p style="font-size:13px"><code>Go.Rehearse</code> Stage 4 says:</p>
+<div class="code-block">================================================================
+ STAGE 4 of 5  --  REAL RECLONE  --  drops + recreates AIRBYTE_CLONE from prod
+================================================================
+  This is the only destructive step of the rehearsal.
+  Pause scheduler -> DROP AIRBYTE_CLONE -> CREATE FROM AIRBYTE_DB -> Resume.
+  Takes ~12-15 minutes. Confirm by typing yes (anything else cancels).
+
+type "yes" to fire, anything else to skip and finish.</div>
+<div class="miss"><strong>What's wrong:</strong> the operator is asked to type "yes" without ever <em>seeing the actual SQL strings</em>. The SQL appears in <code>step.sql</code> only after the op starts. By then it's too late to refuse. "Before it happens" was the explicit ask; this is "during it happens."</div>
+<p style="font-size:13px"><strong>What it should look like:</strong></p>
+<div class="code-block">  Stage 4 will fire these statements against Snowflake (as cadence-svc):
+
+    1. DROP DATABASE IF EXISTS AIRBYTE_CLONE              (~2 min)
+    2. CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB     (~12 min)
+
+  Both run under JWT auth -- the connection is established with
+  the cadence-svc key pair (a SELECT CURRENT_USER() is fired first
+  to prove the auth works before any destructive statement).
+
+  type "yes" to fire those exact statements, anything else cancels.</div>
+
+<h2>Gap 2: no JWT / Snowflake-auth step in the op trail</h2>
+<p style="font-size:13px">Current op steps:</p>
+<div class="code-block">pause-scheduler  drop-clone  create-clone  resume-scheduler</div>
+<p style="font-size:13px">The Snowflake JWT authentication happens silently inside <code>SnowflakeConn.OpenAsync()</code> -- once per <code>ExecAndCapture</code> call. If the JWT is wrong, the FIRST destructive statement is what surfaces the failure, after pause-scheduler has already fired.</p>
+<div class="miss"><strong>What's wrong:</strong> auth is invisible AND happens late. The operator wants the JWT step to come <b>first</b>: open the connection, fire a benign <code>SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE()</code>, capture <em>that</em> query's id + Snowflake QUERY_HISTORY row, mark it succeeded. Then pause. Then drop. Then create. Then resume. If JWT is broken, the op fails at step 0 -- before pause, before anything destructive.</div>
+<p style="font-size:13px"><strong>What the op should look like:</strong></p>
+<div class="code-block">snowflake-auth    sql: "SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE()"
+                  queryId: 01b8c7c1-...
+                  snowflake: status=SUCCESS  user=CADENCE_SVC  role=...  warehouse=...
+                  jwt: ok
+pause-scheduler   ...
+drop-clone        sql: "DROP DATABASE IF EXISTS AIRBYTE_CLONE"
+                  queryId: 01b8c7d2-...
+                  snowflake: status=SUCCESS  elapsed=124310ms  bytes=...  rows=...
+create-clone      sql: "CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB"
+                  queryId: 01b8c7e9-...
+                  snowflake: status=SUCCESS  elapsed=760234ms  bytes=...  rows=...
+resume-scheduler  ...</div>
+
+<h2>What IS right in the current delivery</h2>
+<div class="ok">
+<ul>
+<li><b>step.sql</b> is captured before SQL runs (visible on <code>running</code> transition in the op doc).</li>
+<li><b>step.queryId</b> is captured via <code>SYSTEM$LAST_QUERY_ID()</code> right after each statement.</li>
+<li><b>step.snowflake</b> pulls the official <code>INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION</code> row -- executionStatus, start/end, totalElapsedMs, bytesScanned, rowsProduced, errorCode/Message.</li>
+<li><b>History fetch is best-effort</b> -- a logging failure can't block the destructive op.</li>
+<li><b>NormalizeFs</b> renders the new Timestamps cleanly through <code>/operations</code>.</li>
+<li><b>Go.Watch + Go.Rehearse</b> print the fields when they appear in the op doc.</li>
+</ul>
+The skeleton is correct. The two gaps are at the human-facing edges, not in the data plane.
+</div>
+
+<h2>What needs to change</h2>
+<table>
+<tr><th>Where</th><th>Fix</th><th>Size</th></tr>
+<tr><td><code>cadence/Go.Rehearse.ps1</code> Stage 4 confirmation</td><td>Print both literal SQL strings + the JWT-auth pre-flight note BEFORE the "type yes" prompt. Pure client-side change.</td><td>small</td></tr>
+<tr><td><code>cadence/Cadence/Program.cs</code> /reset/reclone background task</td><td>Insert a new step <code>snowflake-auth</code> at index 0 (before pause-scheduler). It runs <code>SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE()</code> via <code>ExecAndCapture</code>; on failure halt the op (no destructive step fires). Surface <code>user</code>/<code>role</code>/<code>warehouse</code> on <code>step.snowflake</code>.</td><td>small</td></tr>
+<tr><td><code>cadence/Cadence/Program.cs</code> dry mode</td><td>Dry runs the auth step <b>for real</b> -- it's a SELECT, non-destructive, and proves the JWT works in any rehearsal. The "would:" prefix only applies to drop + create.</td><td>tiny</td></tr>
+</table>
+
+<h2>Pure metal check</h2>
+<p style="font-size:13px">No new dependencies. The auth step uses the same <code>SnowflakeConn</code> + <code>ExecAndCapture</code> already in place. The Go.Rehearse change is just <code>Write-Host</code> lines. Risk: zero (a SELECT is not destructive even in real mode; dry mode running the SELECT actually <em>improves</em> dry fidelity).</p>
+
+<h2>Recommendation</h2>
+<p style="font-size:13px">Close both as a single small board (~6 pts). <code>~d</code> isn't strictly necessary -- the design space is two lines per gap above. Could go straight to <code>~p</code> + <code>~b</code> if you want speed, or <code>~d~p~e~b</code> if you want the discipline.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Both gaps named with concrete examples + before/after screenshots-in-text</div>
+<div class="dod-item">&check; What's RIGHT in the current delivery acknowledged honestly (not the whole thing was wrong)</div>
+<div class="dod-item">&check; Fix sizes called out + zero-risk profile noted</div>
+<div class="dod-item">&check; Inspect saved + (to be) published; hands to operator for direction</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r156 &middot; 2026-06-01 21:41 &middot; ~i Board 25 gaps</div>
+</body></html>
