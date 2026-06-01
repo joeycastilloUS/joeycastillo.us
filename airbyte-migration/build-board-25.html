@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 25 -- SQL visibility on reclone ops</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 25</nav>
+
+<h1>~b Board 25 -- SQL visibility on reclone ops</h1>
+<p class="sub">Every destructive SQL statement now travels with its full receipt: the exact SQL <em>before</em> it runs, Snowflake's <code>QUERY_ID</code> <em>when</em> it runs, and Snowflake's official <code>QUERY_HISTORY</code> record <em>after</em>. Same fields render in dry mode with a "would:" prefix and no execution record. Verified dry; real path is the operator's trigger.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified (dry)</span>
+
+<div class="callout">
+<strong>The fields, on the op doc steps.</strong> For drop-clone + create-clone:
+<ul style="margin-top:8px">
+<li><code>sql</code> &mdash; the exact text. Dry runs prefix with <code>"would: "</code>.</li>
+<li><code>queryId</code> &mdash; Snowflake's id (<code>SELECT SYSTEM$LAST_QUERY_ID()</code>). Null on dry.</li>
+<li><code>snowflake</code> &mdash; the QUERY_HISTORY_BY_SESSION row: <code>executionStatus</code>, <code>startTime</code>, <code>endTime</code>, <code>totalElapsedMs</code>, <code>bytesScanned</code>, <code>rowsProduced</code>, optional <code>errorCode</code>/<code>errorMessage</code>. Empty on dry.</li>
+</ul>
+</div>
+
+<h2>1. ~u Server-side capture</h2>
+<p style="font-size:13px"><code>ExecAndCapture(sql)</code> replaces the old <code>ExecSql</code> -- runs the statement, captures <code>SYSTEM$LAST_QUERY_ID()</code>, then pulls the matching row from <code>INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION(RESULT_LIMIT =&gt; 100)</code> with a defensive 30s timeout. History fetch is best-effort: if it fails (timeout, transient permissions), the op succeeds with <code>step.snowflake.fetchError</code> noted; the destructive op is never blocked by a logging failure.</p>
+<p style="font-size:13px">SQL is written to the step doc <b>before</b> <code>StartStep</code> so it's visible the moment status flips to <code>running</code>.</p>
+
+<h2>2. ~t Dry-only verification (per "never destructive")</h2>
+<p style="font-size:13px">Fired one dry op (<code>reclone-20260601T193125</code>); confirmed both expected SQL strings rendered with "would:" prefix:</p>
+<div class="code-block">{
+  "opId": "reclone-20260601T193125",
+  "dryRun": true,
+  "status": "succeeded",
+  "steps": [
+    { "name": "pause-scheduler",  "status": "succeeded" },
+    { "name": "drop-clone",       "status": "succeeded",
+      "sql": "would: DROP DATABASE IF EXISTS AIRBYTE_CLONE" },
+    { "name": "create-clone",     "status": "succeeded",
+      "sql": "would: CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB" },
+    { "name": "resume-scheduler", "status": "succeeded" }
+  ]
+}</div>
+<p style="font-size:13px"><code>queryId</code> + <code>snowflake</code> stay absent on dry (correct -- nothing ran). Real-path verification is the operator's call to make.</p>
+
+<h2>3. ~s Watcher render + ship</h2>
+<p style="font-size:13px">Both <code>Go.Watch</code> and <code>Go.Rehearse</code>'s <code>Watch-Op</code> print the new fields inline when present:</p>
+<div class="code-block">  19:31:36  drop-clone          succeeded
+            sql:     would: DROP DATABASE IF EXISTS AIRBYTE_CLONE
+            queryId: 01b8c7d2-...                         &lt;-- present on real runs
+            snowflake: status=SUCCESS  elapsed=124310ms  bytes=...  rows=...
+            snowflake-error: 042... no such database     &lt;-- only on Snowflake errors</div>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>ExecAndCapture helper + Drop/Create steps capture step.sql, step.queryId, step.snowflake (with NormalizeFs already converting nested Timestamps)</td></tr>
+<tr><td><code>cadence/Go.Watch.ps1 + Go.Rehearse.ps1</code></td><td>render the new fields inline (sql / queryId / snowflake summary / errorCode + errorMessage if present)</td></tr>
+<tr><td>cadence commit / build</td><td><code>721f507</code> / Cloud Build <code>824c1b4d</code></td></tr>
+</table>
+
+<div class="warn"><strong>Note on the operator rule.</strong> Per the 2026-06-01 directive "never do anything destructive ever": this board verified ONLY via dry. The real-path queryId + Snowflake history will populate when the operator fires a real reclone -- not the assistant.</div>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Code committed (cadence 721f507; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Board 25 -- 3 items Done</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Pushed + deployed (Cloud Build 824c1b4d) + verified live via dry op reclone-20260601T193125</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; No prior Done damaged; no destructive ops fired by assistant</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r154 &middot; 2026-06-01 19:33 &middot; ~b Board 25</div>
+</body></html>
