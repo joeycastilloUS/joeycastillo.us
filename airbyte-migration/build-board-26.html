@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 26 -- snowflake-auth step + Stage 4 SQL preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:15px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:'Consolas',monospace;font-size:11px;color:#9fdfff;overflow-x:auto;white-space:pre;line-height:1.5}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 26</nav>
+
+<h1>~b Board 26 -- close Board 25 gaps (auth step + Stage 4 SQL preview)</h1>
+<p class="sub">Operator-facing gaps from the Board 25 review, closed. The JWT/auth check now runs as the first op step (before pause, before anything destructive); Go.Rehearse Stage 4 prints the literal SQL strings + auth note before asking for "yes". Three sub-bugs surfaced on first dry runs; all fixed.</p>
+<span class="banner">Shipped &middot; Deployed &middot; Verified (dry, end-to-end)</span>
+
+<h2>Final state -- the verified dry op</h2>
+<div class="code-block">snowflake-auth   succeeded
+  sql:       SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE()
+  queryId:   01c4c468-0916-7034-0000-2ca539a149fa
+  snowflake: executionStatus=SUCCESS  totalElapsedMs=52  bytesScanned=0  rowsProduced=0
+             user=JOEY_BE  role=ACCOUNTADMIN  warehouse=DEVELOPER_WH  jwt=ok
+             startTime=2026-06-01 15:32:20.694 -0700
+             endTime  =2026-06-01 15:32:20.746 -0700
+pause-scheduler   succeeded
+drop-clone        succeeded   sql: would: DROP DATABASE IF EXISTS AIRBYTE_CLONE
+create-clone      succeeded   sql: would: CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB
+resume-scheduler  succeeded
+op SUCCEEDED  dryRun=true  cloneCreatedAt=null</div>
+
+<h2>The two gaps closed</h2>
+
+<h3>Gap 1: SQL invisible before the destructive confirmation</h3>
+<p style="font-size:13px"><code>Go.Rehearse</code> Stage 4 now prints the exact statements + JWT-auth note <em>before</em> asking for "yes":</p>
+<div class="code-block">  Stage 4 will fire these SQL statements against Snowflake (as cadence-svc):
+
+    0. SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE()
+         JWT/auth check.  Non-destructive.  Halts the op if it fails --
+         nothing destructive runs until Snowflake confirms who we are.
+
+    1. DROP DATABASE IF EXISTS AIRBYTE_CLONE                                ~2 min
+    2. CREATE DATABASE AIRBYTE_CLONE CLONE AIRBYTE_DB                       ~12 min
+
+  Plus: pause + resume of Cloud Scheduler around the destructive pair.
+  Each statement's Snowflake QUERY_ID + QUERY_HISTORY row lands on the op log.
+
+type "yes" to fire those exact statements, anything else to skip and finish.</div>
+
+<h3>Gap 2: no JWT/auth step in the op trail</h3>
+<p style="font-size:13px">New step at index 0: <code>snowflake-auth</code> runs <code>SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE()</code> via the same capture pipeline. Runs <b>real</b> even on dry (it's a non-destructive SELECT). On failure the op halts at step 0 -- pause, drop, create, resume don't fire. Surfaces user/role/warehouse + the JWT verdict on <code>step.snowflake</code> alongside the standard QUERY_HISTORY record.</p>
+
+<h2>Sub-bugs fixed in iteration (lessons captured)</h2>
+<table>
+<tr><th>Bug</th><th>Surfaced by</th><th>Fix</th></tr>
+<tr><td>Used <code>SYSTEM$LAST_QUERY_ID()</code> -- not a valid Snowflake function</td><td>Auth-step dry op 1 (failed)</td><td>Changed to <code>LAST_QUERY_ID()</code> (the documented function name)</td></tr>
+<tr><td>Logging failure could fail the underlying step (Board 25 latent bug)</td><td>Same dry op</td><td>Wrapped <code>CapturePrevQuery</code> in try/catch inside both <code>ExecAndCapture</code> and <code>AuthCheck</code>; provenance is best-effort, never blocks work</td></tr>
+<tr><td><code>INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION</code> unresolved (session has no default database)</td><td>Auth-step dry op 2</td><td>Qualified with <code>AIRBYTE_DB.INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION</code></td></tr>
+<tr><td>Snowflake .NET driver fails <code>TIMESTAMP_LTZ -&gt; System.DateTime</code> conversion</td><td>Auth-step dry op 3</td><td><code>TO_VARCHAR(START_TIME) / TO_VARCHAR(END_TIME)</code> in SQL; read as <code>string</code> in C#</td></tr>
+</table>
+
+<div class="warn"><strong>Honest note:</strong> three iterations to land. Each surfaced a different Snowflake/driver gotcha that wasn't caught in Board 25 because Board 25 only ran the dry NOOP path. Adding the auth step (which calls Snowflake even on dry) forced the issues out -- exactly the proof Board 25's "dry-only" verification couldn't give. The "never destructive" rule cost us nothing extra -- a real reclone would have surfaced the same bugs even later, at the cost of an actual cluster drop.</div>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Cadence/Program.cs</code></td><td>steps[] now 5 entries (snowflake-auth at index 0); AuthCheck helper; LAST_QUERY_ID; qualified INFORMATION_SCHEMA; TO_VARCHAR timestamps; best-effort capture</td></tr>
+<tr><td><code>cadence/Go.Rehearse.ps1</code></td><td>Stage 4 prints literal SQL + auth note before the "yes" prompt</td></tr>
+<tr><td>cadence commits / build</td><td><code>09a66d4</code> &rarr; <code>09a621c</code> &rarr; <code>50425fa</code> &rarr; <code>de27f10</code> / final Cloud Build <code>cab013fb</code></td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Code committed (cadence de27f10 final; airbyte-parity this commit)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Hash backfilled in telemetry</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Board 26 -- 1 item Done (the closure work was one logical fix with iteration)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; HTML report saved</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; be/index.html updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Pushed + deployed (Cloud Build cab013fb) + verified live via 4 dry ops (last clean: reclone-20260601T223202)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; No destructive ops fired by assistant (per 2026-06-01 rule)</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r158 &middot; 2026-06-01 22:34 &middot; ~b Board 26</div>
+</body></html>
