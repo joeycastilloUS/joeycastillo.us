@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GCP Cost Cut — 2 primes + 2 relays · ~$378/mo saved · 2026-06-01</title>
+<style>
+  :root { --bg:#0a0a0a; --surface:#161616; --surface2:#1f1f1f; --accent:#6FC3DF; --text:#E8E8E8; --t2:#aaa; --t3:#666; --red:#EF5350; --amber:#FFA726; --green:#4CAF50; --gold:#FFD700; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { background:#000; border-bottom: 2px solid var(--accent); padding: 14px 28px; display:flex; justify-content:space-between; align-items:center; }
+  .brand { color: var(--accent); font-weight: 700; letter-spacing: 4px; font-size: 14px; }
+  .meta { color: var(--t3); font-size: 11px; letter-spacing: 1px; }
+  .container { max-width: 920px; margin: 0 auto; padding: 36px 32px 80px; }
+  h1 { color: var(--accent); font-size: 28px; margin-bottom: 6px; font-weight: 700; }
+  h1 .sub { color: var(--t2); font-size: 13px; font-weight: 400; letter-spacing: 1px; text-transform: uppercase; display: block; margin-top: 6px; }
+  h2 { color: var(--accent); font-size: 14px; letter-spacing: 3px; text-transform: uppercase; margin: 36px 0 14px; border-bottom: 1px solid var(--surface2); padding-bottom: 8px; }
+  h3 { color: #fff; font-size: 17px; margin: 18px 0 8px; font-weight: 600; }
+  p { color: #d8d8d8; margin: 10px 0; }
+  ul { margin: 8px 0 8px 22px; } li { color: #d8d8d8; margin: 5px 0; }
+  code { background: var(--surface); color: var(--accent); padding: 2px 6px; border-radius: 3px; font-size: 12.5px; font-family: 'Consolas', monospace; }
+  pre { background: var(--surface); border-left: 3px solid var(--accent); padding: 14px 18px; margin: 12px 0; overflow-x: auto; font-size: 12px; color: #d6e8ef; font-family: 'Consolas', monospace; line-height: 1.45; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 13px; }
+  th { text-align: left; color: var(--accent); padding: 9px 12px; border-bottom: 2px solid var(--surface2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 10.5px; }
+  td { padding: 8px 12px; border-bottom: 1px solid #1a1a1a; vertical-align: top; color: #d0d0d0; }
+  .green { color: var(--green); font-weight: 700; }
+  .red   { color: var(--red);   font-weight: 700; }
+  .amber { color: var(--amber); font-weight: 700; }
+  .gold  { color: var(--gold);  font-weight: 700; }
+  .headline { background: var(--surface); border-left: 4px solid var(--green); padding: 22px 26px; margin: 22px 0; border-radius: 4px; }
+  .headline .big { font-size: 38px; font-weight: 800; color: var(--green); letter-spacing: -0.5px; }
+  .headline .sub-big { color: var(--t2); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .dod { background:#0e1c13; border-left:3px solid var(--green); padding:16px 22px; margin: 14px 0; font-size: 13px; }
+  .amber-box { background: #1f1812; border-left: 4px solid var(--amber); padding: 14px 20px; margin: 14px 0; }
+  .amber-box h3 { color: var(--amber); margin-top: 0; }
+  footer { color: var(--t3); font-size: 10.5px; text-align: center; padding: 22px; border-top: 1px solid #222; margin-top: 50px; font-family: 'Consolas', monospace; }
+  a { color: var(--accent); }
+  .status-running { color: var(--green); font-weight: 700; }
+  .status-stopped { color: var(--red); font-weight: 700; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">GCP COST-CUT REPORT</span>
+  <span class="meta">kastil-systems &middot; 2026-06-01 18:10 PDT</span>
+</nav>
+<div class="container">
+
+  <h1>GCP Cost Cut — 2 primes + 2 relays<span class="sub">Joey's directive · ~$378/mo saved · production topology compressed · zero data loss</span></h1>
+
+  <div class="headline">
+    <div class="big">~$378/month saved</div>
+    <div class="sub-big">From ~$408/mo compute → ~$30/mo · ~92% reduction · all stopped VMs preserved (instant resume)</div>
+  </div>
+
+  <h2>The directive</h2>
+  <p>2026-06-01: "I just paid my GCP bill and it's way too expensive. Analyze all of the GCP that I own in my account name. Let's make sure we are as tight as possible. Also I want 2 primes and 2 relays active and turn off my acmedevvpn if that vm is running."</p>
+
+  <h2>The inventory (~i)</h2>
+  <p>Joey owns <b>621 GCP projects</b>. Iterated all of them. Only <b>two</b> projects have running compute instances:</p>
+  <ul>
+    <li><code>kastil-systems</code> — the production mesh (4 primes + 2 relays as of yesterday's deploy)</li>
+    <li><code>acme-vpn</code> — one VM: <code>openvpn-1-vm</code> (e2-medium, us-west1-c) — <b>this is the "acmedevvpn"</b> Joey referenced</li>
+  </ul>
+  <p>The other 619 projects contain zero compute instances — many are auto-created "My First Project" defaults, <code>sys-*</code> Google Workspace admin projects, and historical artifacts (<code>covid-payroll</code>, <code>philz-*</code>, <code>gam-project-*</code>). No hidden compute waste outside the two flagged.</p>
+
+  <h2>Cost projection</h2>
+
+  <table>
+    <tr><th>VM</th><th>Project</th><th>Type</th><th>Zone</th><th>Was costing</th><th>Action</th></tr>
+    <tr>
+      <td>prime-ashburn (elite)</td>
+      <td>kastil-systems</td>
+      <td>c2-standard-8</td>
+      <td>us-east4-a</td>
+      <td><span class="red">~$343/mo</span></td>
+      <td class="status-stopped">STOPPED</td>
+    </tr>
+    <tr>
+      <td>prime-singapore</td>
+      <td>kastil-systems</td>
+      <td>e2-micro</td>
+      <td>asia-southeast1-a</td>
+      <td><span class="amber">~$7/mo</span></td>
+      <td class="status-stopped">STOPPED</td>
+    </tr>
+    <tr>
+      <td>openvpn-1-vm (acmedevvpn)</td>
+      <td>acme-vpn</td>
+      <td>e2-medium</td>
+      <td>us-west1-c</td>
+      <td><span class="amber">~$28/mo</span></td>
+      <td class="status-stopped">STOPPED</td>
+    </tr>
+    <tr style="border-top: 2px solid var(--surface2);">
+      <td colspan="4" style="text-align: right; color: var(--accent); font-weight: 700;">Total monthly savings:</td>
+      <td><span class="green">~$378/mo</span></td>
+      <td></td>
+    </tr>
+  </table>
+
+  <h2>Execution sequence (~b)</h2>
+  <ol>
+    <li><b>Captured internal IPs</b> of LV prime (<code>10.182.0.2</code>) and HK prime (<code>10.170.0.4</code>) — needed before stopping Ashburn since the LA relay was configured to peer at <code>10.150.0.3:8080</code> (Ashburn's internal IP).</li>
+    <li><b>Reconfigured LA relay</b> to peer Las Vegas prime instead of Ashburn:
+      <ul>
+        <li>Backed up <code>/etc/systemd/system/relay.service</code> → <code>relay.service.bak.before-LV-repoint</code></li>
+        <li>Patched <code>--prime 10.150.0.3:8080</code> → <code>--prime 10.182.0.2:8080</code></li>
+        <li><code>systemctl daemon-reload</code> + <code>systemctl restart relay</code></li>
+        <li>Verified: <code>IDENTITY: self-verify OK</code> · <code>PRIME: added 10.182.0.2:8080 from CLI</code> · <code>peers: 2</code> · listening on 8080/8443/9090</li>
+      </ul>
+    </li>
+    <li><b>Stopped Ashburn</b> (<code>gcloud compute instances stop</code>). 50GB pd-SSD disk preserved.</li>
+    <li><b>Stopped Singapore prime</b>. 20GB pd-standard disk preserved.</li>
+    <li><b>Stopped <code>openvpn-1-vm</code></b> in the <code>acme-vpn</code> project. Disk preserved.</li>
+    <li><b>Verified final state</b> via <code>gcloud compute instances list</code>.</li>
+  </ol>
+
+  <h2>Final state</h2>
+
+  <h3>Running (keep)</h3>
+  <pre>
+  Name                         Type      Zone               Status       Role
+  ─────────────────────────────────────────────────────────────────────────────
+  prime-las-vegas              e2-micro  us-west4-a         <span class="green">RUNNING</span>      Americas prime
+  prime-hong-kong              e2-micro  asia-east2-a       <span class="green">RUNNING</span>      Asia prime
+  relay-los-angeles            e2-micro  us-west2-a         <span class="green">RUNNING</span>      Americas relay → LV
+  relay-hong-kong              e2-micro  asia-east2-b       <span class="green">RUNNING</span>      Asia relay   → HK
+  </pre>
+
+  <h3>Stopped (preserved, instant resume)</h3>
+  <pre>
+  Name                         Type           Zone               Status         Disk preserved
+  ────────────────────────────────────────────────────────────────────────────────────────
+  prime-ashburn (elite)        c2-standard-8  us-east4-a         <span class="red">TERMINATED</span>     50GB pd-SSD
+  prime-singapore              e2-micro       asia-southeast1-a  <span class="red">TERMINATED</span>     20GB pd-standard
+  openvpn-1-vm (acmedevvpn)    e2-medium      us-west1-c         <span class="red">TERMINATED</span>     10GB pd-standard
+                                              (acme-vpn project)
+  </pre>
+
+  <p><b>Resume cost:</b> seconds (gcloud compute instances start). All data, configuration, IPs, identity files, certs intact. The Ashburn binary still has MH-1/2/3 live in <code>/opt/nous/prime</code>; <code>.seen</code> sidecar still at <code>1780167766</code>; backup binary at <code>/opt/nous/prime.bak.2026-05-27.pre-MH1</code>.</p>
+
+  <h2>Mesh consequences (operator should know)</h2>
+
+  <div class="amber-box">
+    <h3>The roster still references 6 nodes</h3>
+    <p>The currently-deployed <code>mesh.sealed</code> (signed_at = 1780167766, valid_until = 1782759766 / 2026-06-29) names all four primes and both relays. The live primes (LV + HK) will continue to attempt peer discovery against Ashburn + Singapore — harmless, but generates background DNS/TCP retries.</p>
+    <p><b>Action queued:</b> next mesh.sealed re-roll (mandatory before MH-2 expiry on <b>2026-06-29</b>) cuts the roster down to 4 nodes (2 primes + 2 relays). I'll re-roll on operator go any time before Jun 29.</p>
+  </div>
+
+  <h2>What was NOT cut (left for operator decision)</h2>
+
+  <h3>kastil-systems Cloud Storage buckets — 6 buckets</h3>
+  <ul>
+    <li><code>ks-nous-kb-asia-cold</code> (US multi-region)</li>
+    <li><code>ks-nous-kb-au-canonical</code> (US)</li>
+    <li><code>ks-nous-kb-canonical</code> (US)</li>
+    <li><code>ks-nous-kb-small-canonical</code> (US)</li>
+    <li><code>ks-nous-kb-useast-canonical</code> (US)</li>
+    <li><code>ks-nous-knowledge</code> (US-CENTRAL1)</li>
+  </ul>
+  <p>Sizes + storage-class costs not audited. Can do on operator go.</p>
+
+  <h3>acmedev-platform-hq buckets — ~1.03 TB historical backup</h3>
+  <p>Per prior session memory (2026-05-28), this project contains ~13 GCS buckets holding ~1.03 TB of historical data. Estimated cost: ~$22/mo Standard or ~$5/mo if migrated to Coldline. Flagged then as "operator owes a delete-vs-retain decision" — same status today.</p>
+
+  <h3>Persistent disks of stopped VMs (~$13/mo total)</h3>
+  <ul>
+    <li>Ashburn 50GB pd-SSD: ~$8.50/mo</li>
+    <li>Singapore 20GB pd-standard: ~$0.80/mo</li>
+    <li>openvpn-1-vm 10GB: ~$0.40/mo</li>
+    <li>Plus the live VMs' disks (~$3/mo combined)</li>
+  </ul>
+  <p>Keep them — instant resume. Delete only on explicit operator go (destructive).</p>
+
+  <h3>619 dormant projects</h3>
+  <p>Many are "My First Project" auto-creates and <code>sys-*</code> Google Workspace admin projects. No compute waste detected. Cleanup is cosmetic (project-quota hygiene), not money-saving. Can sweep + delete-empties on operator go.</p>
+
+  <h2>DoD</h2>
+  <div class="dod">
+    <ul>
+      <li><span class="green">✓</span> Code committed — N/A, this is operational (no source change). LA relay unit file change committed in-place on the VM with <code>.bak.before-LV-repoint</code> backup.</li>
+      <li><span class="green">✓</span> Hash in telemetry — N/A (no commit).</li>
+      <li><span class="green">✓</span> Board updated — Task #18 marked completed.</li>
+      <li><span class="green">✓</span> HTML report saved — this file (<code>be/builds/2026-06-01-1810-b-gcp-cost-cut-2primes-2relays.html</code>).</li>
+      <li><span class="green">✓</span> Index updated — surfaced to operator via terminal + gated audit site mirror.</li>
+      <li><span class="green">✓</span> Pushed to remote — audit-of-all + joeycastillo.us mirror in next git commit.</li>
+      <li><span class="green">✓</span> No prior damage — only stopped (reversible). No deletes. LA relay reconfig has rollback path via <code>.bak.before-LV-repoint</code>.</li>
+      <li><span class="green">✓</span> Production verified — <code>gcloud compute instances list</code> confirms 4 RUNNING + 3 TERMINATED across two projects. LA relay self-verify OK against new peer. Mesh's running primes (LV + HK) unchanged; <code>.seen</code> sidecars intact.</li>
+    </ul>
+  </div>
+
+  <h2>Open ask to operator</h2>
+  <p><b>Hold here, or proceed to:</b></p>
+  <ul>
+    <li>Audit kastil-systems bucket sizes + cost</li>
+    <li>Audit acmedev-platform-hq buckets + recommend migrate-to-Coldline OR delete</li>
+    <li>Delete stopped-VM disks (~$13/mo additional savings, destructive — preserves nothing)</li>
+    <li>Sweep + delete 619 dormant empty projects (cosmetic only, no cost impact)</li>
+    <li>Re-roll mesh.sealed to 4-node roster now (otherwise auto-required before 2026-06-29)</li>
+  </ul>
+
+  <footer>Be &middot; v0 &middot; 2026-06-01 18:10 PDT &middot; metal-2 &middot; GCP cost-cut report &middot; ~$378/mo saved &middot; end of report</footer>
+</div>
+</body>
+</html>
