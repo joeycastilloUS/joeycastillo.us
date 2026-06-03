@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~WTF audit -- 2026-06-03 -- the operator can't see what they asked for</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:28px;margin-bottom:6px}h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:28px 0 10px;font-size:18px}h3{color:#fff;font-size:14px;margin:14px 0 6px}
+.sub{color:#6FC3DF;font-size:14px;margin-bottom:14px}
+.banner{background:#3a1414;color:#f06e6e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:2px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+.grade{display:inline-block;padding:1px 9px;border-radius:9px;font-size:10px;font-weight:700;text-transform:uppercase}
+.grade.verified{background:#0d2818;color:#4caf50}
+.grade.suspect{background:#1f1f0a;color:#ff9800}
+.grade.broken{background:#2a1414;color:#f44336}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:Consolas,monospace;font-size:11px;color:#9fdfff;white-space:pre;overflow-x:auto}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.trigger{background:#1a0e0e;border-left:3px solid #f06e6e;padding:14px 18px;margin:12px 0;color:#e6b0b0;font-size:14px;border-radius:0 4px 4px 0;font-style:italic}.trigger strong{color:#f06e6e;font-style:normal}
+.ap{background:#1f1410;border-left:3px solid #f0ad4e;padding:14px 18px;margin:14px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.ap .name{color:#f0ad4e;font-weight:700;font-size:14px;font-family:Consolas,monospace;margin-bottom:6px}.ap .rule{color:#bbe6c8;background:#0d2818;border-left:3px solid #5cb85c;padding:8px 12px;margin-top:10px;border-radius:0 4px 4px 0;font-size:13px}.ap .rule strong{color:#5cb85c}
+.checkpoint{background:#0d2818;border-left:3px solid #5cb85c;padding:14px 18px;margin:14px 0;color:#bbe6c8;font-size:14px;border-radius:0 4px 4px 0}.checkpoint strong{color:#5cb85c}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~WTF 2026-06-03</nav>
+
+<h1>~WTF audit &mdash; the operator can't see what they asked for</h1>
+<p class="sub">Honest forensic on the gap between what the operator asked for + what I shipped. No revert. The diagnosis is the fix.</p>
+<span class="banner">trust recovery</span>
+
+<h2>1. Trigger</h2>
+<div class="trigger">
+<strong>Operator, verbatim:</strong> "so I can't see shit. This is crap. I expect to re-clone.. then see we are in sync.. then to see the state every 5 minutes.. then I can click things and get explanasion. I can dig in. I asked for all of this already. check the a-d-d. ~WTF"
+</div>
+<p style="font-size:13px">Earlier in the same arc (paraphrased / direct quotes): <em>"I want to use everything we built thus far and start rehearsing the cutover procedure" &middot; "I want cadence at 5 minutes and I want to know exactly what is falling out of whack, when, and why" &middot; "I want to see the cadence as we go so I can drive and steer and course correct" &middot; "I want what I've been asking for this entire time" &middot; "I want my timeline where is the time flow"</em></p>
+<p style="font-size:13px"><b>Pattern in the asks:</b> ONE LIVING PAGE. Auto-refresh. Reclone &rarr; "we're in sync." 5-min state refresh. Clickable signals. Drilldown for explanation. Not 14 launchers.</p>
+
+<h2>2. Blast Radius</h2>
+<p style="font-size:13px">Last truly-working baseline: <code>a9ca498</code> (Board 22 SHIPPED -- server-driven reclone end-to-end + GREEN gate). Everything since has been gap-fix iteration that solved narrow problems without revisiting the unified operator view.</p>
+<table>
+<tr><th>Commit</th><th>What it did</th><th>Operator value delivered</th><th>Grade</th></tr>
+<tr><td><code>a9ca498</code></td><td>Board 22 server-driven reclone</td><td>Real value: gate logic + ops API. Operator's last "wow."</td><td><span class="grade verified">verified</span></td></tr>
+<tr><td><code>d82e269</code></td><td>Board 23 timestamp fix</td><td>Necessary plumbing. No new view.</td><td><span class="grade verified">verified</span></td></tr>
+<tr><td><code>ed87e64</code></td><td>Board 24 ?dry=true</td><td>Useful primitive. No view.</td><td><span class="grade verified">verified</span></td></tr>
+<tr><td><code>e1c6724</code></td><td>Board 25 SQL visibility</td><td>SQL field on op doc. Operator never saw it (no page rendered).</td><td><span class="grade suspect">suspect</span></td></tr>
+<tr><td><code>3d5b1e6</code></td><td>Board 26 auth step + Stage 4 SQL preview</td><td>Real but local-only. Operator saw it in terminal Stage 4.</td><td><span class="grade verified">verified</span></td></tr>
+<tr><td><code>9a1502e</code></td><td>Board 27 Go.Live CORS fix</td><td>One op viewer that works. <b>Still only one op</b>, not the dashboard.</td><td><span class="grade suspect">suspect</span></td></tr>
+</table>
+<p style="font-size:13px"><b>Code is sound</b> -- nothing to revert. The gap is at the operator-view layer: every commit shipped a piece, no commit assembled the whole.</p>
+
+<h2>3. Audit results &mdash; what the operator can actually do today</h2>
+<table>
+<tr><th>The ask</th><th>What's built</th><th>Reality</th></tr>
+<tr><td>"see we're in sync after reclone"</td><td>Gate field on /escalate; gate text in Go.Signal terminal output</td><td>Operator has to run a CLI to read it. No persistent visual proof.</td></tr>
+<tr><td>"see the state every 5 minutes"</td><td>cadence-snapshots collection (live); cadence.html (static); Go.Status (CLI watch mode)</td><td>cadence.html only regenerates when <code>Go.Dash</code> fires. Stale by default. Operator can't just leave a tab open.</td></tr>
+<tr><td>"click things and get explanation"</td><td>Nothing. Every drilldown is a CLI flag (Go.FirstDiff, Go.Escalate, Go.Replay <stream>)</td><td>Zero clickable surface.</td></tr>
+<tr><td>"dig in"</td><td>Per-stream lane via Go.Replay; per-signal Go.Escalate &rarr; /parity/l3</td><td>Both CLI; nothing in the browser.</td></tr>
+<tr><td>"where is the time flow"</td><td>Go.Replay aggregate (static HTML, 549 ticks); not auto-refreshing</td><td>Refreshes only when re-fired; reclone-as-cut detection is silent (heuristic didn't fire on the 2026-06-03 21:23Z real reclone).</td></tr>
+</table>
+
+<h2>4. Actions taken (this session)</h2>
+<ul>
+<li><b>Honest stop.</b> No new feature board until the unified operator dashboard exists. Boards 23-27 stand; Board 28 will be the unified view.</li>
+<li><b>Document the anti-patterns below</b> as the standing rule set for the rest of this work.</li>
+<li><b>No revert.</b> The code under the launchers is the data plane. The fix is forward: a single auto-refreshing dashboard that re-uses what's there.</li>
+</ul>
+
+<h2>5. Board state after housekeeping</h2>
+<p style="font-size:13px">All shipped boards (16-27) stay closed; the work in them is reusable. Adding <b>Board 28 -- Unified live operator dashboard</b> as the next priority. Per the rules below, no Board 29 until the operator confirms Board 28 actually shows what they asked for.</p>
+<div class="code-block">## Board 28 -- Unified live operator dashboard (size TBD)
+&gt; the page the operator has been asking for, end to end.
+### Ready
+- {ONE auto-refreshing HTML page rendered server-side by PowerShell + meta-refresh:
+   header  -- big GREEN/RED gate verdict, scheduler state, last tick timestamp
+   timeline -- last N ticks stacked-area (re-clones marked as cut bands)
+   worklist -- signals listed with click-through to per-stream details
+   per-stream drill -- modal/section showing Snowflake L3 deep-diff + verdict lane
+   reclone events -- linked to /operations/{opId} live view (Go.Live page)
+   refreshes via &lt;meta refresh&gt; every 30s; clickable, no CLI needed,
+   add to, cadence/Go.Dash.ps1 (replace) or new Go.Op.ps1 dashboard runner}
+   pts: TBD pending ~p</div>
+
+<h2>6. Anti-patterns &mdash; the named rules</h2>
+
+<div class="ap">
+<div class="name">AP-1: launcher constellation instead of operator dashboard</div>
+What happened: shipped 14+ separate <code>Go.*</code> launchers (Go.Status, Go.Signal, Go.Risk, Go.Escalate, Go.Replay, Go.Watch, Go.Live, Go.Dash, Go.Cutover, Go.Rehearse, Go.Diff, Go.FirstDiff, Go.Reclone, Go.Rebaseline). Operator must mentally assemble the picture across CLI invocations.<br>
+Example: <code>cadence/Go.Dash.ps1</code> shows signal-first state; <code>cadence/Go.Replay.ps1</code> shows timeline; <code>cadence/Go.Live.ps1</code> shows one op. Same operator, three browsers tabs, none auto-refreshing.
+<div class="rule"><strong>Rule:</strong> Default surface for any "I want to see X" ask = section on the unified dashboard. New launcher only when no existing page is the right home AND the operator explicitly wants a CLI.</div>
+</div>
+
+<div class="ap">
+<div class="name">AP-2: per-board narrow gap fix without auditing whole operator journey</div>
+What happened: each board (23-27) solved a real gap (timestamps, SQL fields, auth step, CORS) but no board stepped back to ask "is the dashboard whole?"<br>
+Example: Board 27 fixed Go.Live's blank page. Go.Live now renders ONE op. The operator's actual ask -- a living dashboard -- was never the unit of work.
+<div class="rule"><strong>Rule:</strong> Every 3 boards, run a <code>~i operator-journey</code>: walk through what the operator actually sees end to end before opening the next feature board. If the journey is broken, the next board is "fix the journey," not the next backlog item.</div>
+</div>
+
+<div class="ap">
+<div class="name">AP-3: verified my work in op doc JSON instead of on the operator's screen</div>
+What happened: declared "shipped" after reading <code>step.sql: "would: DROP..."</code> in Firestore. Operator's screen was blank.<br>
+Example: Board 25 verification was "dry op doc contains the field." Operator saw nothing rendered until Board 27 fixed the CORS rendering -- and even then, only for one op.
+<div class="rule"><strong>Rule:</strong> "Shipped" requires a rendered HTML screenshot OR a live browser page showing the new value. JSON in op doc is necessary but not sufficient. If I can't paste the operator-visible result, it's not done.</div>
+</div>
+
+<div class="ap">
+<div class="name">AP-4: claimed shipped before operator validated end-to-end</div>
+What happened: marked boards "✅ DONE" minutes after deploy, before the operator ran them.<br>
+Example: Board 24 item 1 (?dry=true) -- shipped + closed + retro'd; operator's first run came days later. Board 26 -- shipped after 3 iterative sub-bug fixes from my side, none with operator at the keyboard.
+<div class="rule"><strong>Rule:</strong> Boards stay <code>In Progress</code> until the operator runs the new value end-to-end and types "ok." I can deploy + dry-verify, but the board doesn't close until operator confirms.</div>
+</div>
+
+<div class="ap">
+<div class="name">AP-5: added new tools instead of fusing existing into one view</div>
+What happened: every "I want to see X" produced a new <code>Go.X.ps1</code>. The operator's mental model is one living page; my reflex was a new launcher.<br>
+Example: operator asked for timeline &rarr; I built Go.Replay (separate from Go.Live, separate from Go.Dash). Asked for "see cadence as we go" &rarr; built Go.Watch + Go.Live (still both fragmented).
+<div class="rule"><strong>Rule:</strong> Default action for any new operator-visibility ask = "add a section to <code>Go.Dash</code> (the unified dashboard)" not "<code>Go.X</code> new launcher." Launchers are the back door, not the front door.</div>
+</div>
+
+<h2>7. Checkpoint</h2>
+<div class="checkpoint">
+<strong>Known-good checkpoint:</strong> current HEAD (<code>565a843</code>). All shipped code works at the data layer. No revert. Forward fix = <b>Board 28: unified live operator dashboard</b> that consolidates the existing pieces (Go.Replay's timeline + Go.Live's op view + Go.Dash's signal-first + per-stream drill from Go.Escalate) into ONE auto-refreshing page. <code>~i~d~p</code> Board 28 next, then operator validates before any further work.
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r162 &middot; 2026-06-03 23:01 &middot; ~WTF audit</div>
+</body></html>
