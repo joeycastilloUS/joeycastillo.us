@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~b Board 27 -- Go.Live polls server-side (bypass CORS)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:26px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:14px;margin-bottom:14px}
+.banner{background:#1a3a2a;color:#5cb85c;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:24px 0 10px;font-size:17px}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:Consolas,monospace;font-size:11px;color:#9fdfff;white-space:pre;overflow-x:auto}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:1px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~b Board 27</nav>
+
+<h1>~b Board 27 -- Go.Live polls server-side (bypass CORS)</h1>
+<p class="sub">Operator reported the live op page was blank. Inspect (<a href="https://joeycastillo.us/airbyte-migration/inspect-live-page-blank.html" style="color:#6FC3DF">inspect-live-page-blank.html</a>) traced it to CORS preflight rejected at Cloud Run IAM. Fix: move the polling out of the browser, into the PowerShell launcher, and have the browser auto-refresh via &lt;meta&gt;.</p>
+<span class="banner">Shipped &middot; Verified</span>
+
+<h2>Root cause</h2>
+<p style="font-size:13px">Browser fetch from <code>file://</code> to <code>https://cadence-...run.app</code> with <code>Authorization: Bearer</code> header triggers a CORS <code>OPTIONS</code> preflight. The preflight carries no Authorization header (by W3C spec). Cloud Run's IAM layer rejects the unauthenticated <code>OPTIONS</code> before the app sees it. Preflight fails &rarr; main fetch never sent &rarr; page blank.</p>
+
+<h2>Fix</h2>
+<div class="callout">
+<strong>Architecture flip.</strong> PowerShell loops, fetches <code>/operations/{opId}</code> + <code>/escalate</code> with the gcloud token, renders HTML to <code>$env:TEMP\cadence-live.html</code>, and writes <code>&lt;meta http-equiv="refresh" content="3"&gt;</code> while the op is running (omitted on terminal). The browser just reloads the file from disk every 3 seconds. No browser fetches. No CORS. No token in JS.
+</div>
+<div class="code-block">PowerShell (Go.Live.ps1)                  Browser (cadence-live.html on disk)
+-----------------------------             ------------------------------------
+fetch /operations/{opId}  (token in PS)
+fetch /escalate
+render &amp; write HTML                       &lt;meta refresh content="3"&gt;
+sleep 3s; loop                            reads new HTML from disk
+                                          ...
+op succeeded? write without &lt;meta&gt;        final state stays put</div>
+
+<h2>Verified</h2>
+<p style="font-size:13px">Rendered the existing succeeded op <code>reclone-20260601T223202</code> (Board 26 verification) and confirmed: opId rendered, <code>user=JOEY_BE</code> on the snowflake-auth card, <code>executionStatus=SUCCESS</code> + start/end timestamps + elapsed/bytes/rows, no <code>&lt;meta refresh&gt;</code> tag on terminal op. File size 6.5KB. Browser opened cleanly.</p>
+
+<h2>Files</h2>
+<table>
+<tr><td><code>cadence/Go.Live.ps1</code></td><td>complete rewrite: PowerShell poll loop renders HTML to disk; meta-refresh while alive; final write without meta on terminal</td></tr>
+<tr><td><code>cadence/Go.Rehearse.ps1</code></td><td>Stage 2 + Stage 4 launch Go.Live via Start-Process (non-blocking new window)</td></tr>
+<tr><td>cadence commit</td><td><code>a713cf6</code></td></tr>
+</table>
+
+<h2>DoD</h2>
+<div style="background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0">
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Cadence commit pushed (a713cf6)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Inspect documented and (to be) published</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Build report saved; index updated</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; Verified by rendering an existing succeeded op (terminal path)</div>
+<div style="color:#5cb85c;margin:2px 0;font-size:13px">&check; No destructive ops fired</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r160 &middot; 2026-06-03 21:42 &middot; ~b Board 27</div>
+</body></html>

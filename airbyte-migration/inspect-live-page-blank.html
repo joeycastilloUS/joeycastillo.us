@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~i Live op page shows nothing -- CORS preflight blocked at Cloud Run IAM</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:24px;margin-bottom:6px}h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:24px 0 10px;font-size:17px}
+.sub{color:#6FC3DF;font-size:14px;margin-bottom:14px}
+.banner{background:#3a1414;color:#f06e6e;padding:8px 12px;border-radius:4px;font-weight:700;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block;letter-spacing:1px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:Consolas,monospace;font-size:11px;color:#9fdfff;white-space:pre;overflow-x:auto}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.miss{background:#1a0e0e;border-left:3px solid #f06e6e;padding:12px 16px;margin:12px 0;color:#e6b0b0;font-size:13px;border-radius:0 4px 4px 0}.miss strong{color:#f06e6e}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~i live page blank</nav>
+
+<h1>Live op page shows nothing</h1>
+<p class="sub">Operator: "op succeeded but cadence live op shows nothing."</p>
+<span class="banner">root cause: CORS preflight blocked at IAM</span>
+
+<h2>Diagnosis</h2>
+<p style="font-size:14px">The HTML file is served from <code>file://</code> in the browser. Its JavaScript calls <code>fetch("https://cadence-.../operations?limit=1")</code> with an <code>Authorization: Bearer</code> header.</p>
+<div class="miss"><strong>The break:</strong> the <code>Authorization</code> header is a "non-simple" header. The browser fires a CORS <code>OPTIONS</code> preflight FIRST -- and that preflight has <b>no Authorization header on it</b> (by design). Cloud Run's IAM layer rejects the unauthenticated <code>OPTIONS</code> request before it ever reaches the cadence app. The preflight fails &rarr; the browser refuses to send the real <code>GET</code> &rarr; the page stays blank.</div>
+
+<p style="font-size:13px">Even if I added CORS middleware in the app, Cloud Run's auth layer rejects the OPTIONS request before the app sees it. The only ways to make in-browser fetch work would be (a) make the service unauthenticated (<code>allUsers</code> invoker), or (b) front it with a public proxy. Both worse than the alternative.</p>
+
+<h2>Fix</h2>
+<div class="callout"><strong>Move the polling out of the browser, into the launcher.</strong> PowerShell already has the gcloud token + can fetch <code>/operations</code> cleanly. So: PowerShell loops, fetches the op + gate, renders a static HTML to disk, and the page uses <code>&lt;meta http-equiv="refresh" content="3"&gt;</code> to reload itself. No cross-origin fetches from the browser. No CORS. No token in JS. Works on file://.</div>
+
+<div class="code-block">PowerShell (Go.Live.ps1)        Browser (cadence-live.html)
+---------------------------     -----------------------------
+fetch /operations/{opId}
+fetch /escalate
+render HTML -> file
+write file                      &lt;meta refresh content="3"&gt;
+sleep 3s                        (browser reloads file from disk)
+loop                            renders the new HTML
+                                ...
+op terminal? omit meta tag.     final state stays put.</div>
+
+<p style="font-size:13px">Side benefits: no browser-cached token at risk, polling cadence happens in one place (the launcher) with proper auth + error handling + a visible polling status in the console window.</p>
+
+<h2>Path to ship</h2>
+<ul style="margin:8px 0 0 22px">
+<li><code>~f</code> rewrite <code>Go.Live.ps1</code> as a poll-loop that writes HTML to <code>$env:TEMP\cadence-live.html</code>; browser auto-refreshes via <code>&lt;meta&gt;</code>.</li>
+<li><code>~s</code> commit + push; operator pulls + runs.</li>
+</ul>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r160 &middot; 2026-06-03 21:38 &middot; ~i live page blank</div>
+</body></html>
