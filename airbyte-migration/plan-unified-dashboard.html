@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~p Build unified dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:26px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:14px;margin-bottom:14px}
+.banner{background:#3a3a1a;color:#f0ad4e;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:24px 0 10px;font-size:18px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:16px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+.phase{background:#1A1A1A;border-radius:6px;padding:16px 20px;margin:12px 0;border-left:3px solid #6FC3DF}
+.phase h3{color:#6FC3DF;font-size:15px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.phase h3 .num{display:inline-block;background:#6FC3DF;color:#111;width:28px;height:28px;border-radius:50%;text-align:center;line-height:28px;font-size:12px;font-weight:700}
+.phase .meta{color:#888;font-size:12px;margin-bottom:8px}
+.phase .accept{margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a;font-size:12px}.phase .accept strong{color:#5cb85c}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:1px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.warn{background:#1f1410;border-left:3px solid #f0ad4e;padding:12px 16px;margin:12px 0;color:#e6cba0;font-size:13px;border-radius:0 4px 4px 0}.warn strong{color:#f0ad4e}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~p unified dashboard</nav>
+
+<h1>Build the unified live operator dashboard</h1>
+<p class="sub">Execute <code>be/designs/2026-06-03-2307-design-unified-dashboard.html</code>. Replace Go.Dash with one auto-refreshing page; close the WTF gap from 2026-06-03.</p>
+<span class="banner">Plan &mdash; Awaiting Approval</span>
+
+<div class="lede">
+<strong>Intent:</strong> hand the operator ONE URL that refreshes itself and shows: are we in sync, what's not, when did it break, recent reclones, and clickable explanation -- all without firing a CLI.</div>
+
+<h2>Scope</h2>
+<table>
+<tr><th>In scope</th><th>Out of scope</th></tr>
+<tr><td>Replace <code>Go.Dash.ps1</code> with poll-loop + meta-refresh page. Hero (gate / scheduler / counts / re-clone-recency). Timeline (last 200 ticks stacked-area + actual /operations reclone cut bands). Worklist (signals with inline <code>&lt;details&gt;</code> drill: reason, when, L3 deep-diff cached 5min, Go.Risk command to copy). Recent reclone ops list with links to existing Go.Live page. Auto-launch from Go.Rehearse Stage 1.</td><td>Server-side actions (Go.Risk submit from page). Operator typing into the page. Replacing Go.Live (still owns one-op deep view). Replacing Go.Replay (still owns full timeline deep view). New endpoints on the cadence service.</td></tr>
+</table>
+
+<h2>Phases</h2>
+
+<div class="phase"><h3><span class="num">1</span> Hero + recent ops (First Move)</h3>
+<div class="meta">Smallest replacement of the broken Go.Dash. Poll <code>/reset/status</code> + <code>/escalate</code> + <code>/operations?limit=5</code>; render hero (gate big + scheduler + verdict counts + last sweep age + "RE-CLONED at X" banner if last successful op &lt; 1h old) and recent-ops list (link each opId to <code>Go.Live &lt;opId&gt;</code>-rendered file). Meta-refresh 30s. Auto-launch from <code>Go.Rehearse</code> Stage 1.</div>
+<div class="accept"><strong>Accept:</strong> operator runs <code>Go.Dash</code>, browser opens; page shows current gate GREEN/RED, recent ops list with at least one entry; tab left open auto-refreshes; clicking opId opens Go.Live page for that op.</div></div>
+
+<div class="phase"><h3><span class="num">2</span> Timeline with real reclone cuts</h3>
+<div class="meta">Pull <code>/replay</code> aggregate (existing endpoint, 549+ ticks) + <code>/operations?limit=20</code>. Render inline-SVG stacked-area (last 200 ticks for legibility) with vertical bands at every successful real reclone time. The truth, not the heuristic.</div>
+<div class="accept"><strong>Accept:</strong> the page shows the cascade movie with the 2026-06-03 21:23Z real reclone marked as a vertical band; clean count visibly returns to 208 to the right of it.</div></div>
+
+<div class="phase"><h3><span class="num">3</span> Worklist with click-to-drill</h3>
+<div class="meta">Render each signal from <code>/escalate</code> as a row + <code>&lt;details&gt;</code> expand. Inside: reason, when (from <code>/firstdiff</code>), L3 deep-diff (call <code>/escalate/run</code> per signal; cache result in PS hashtable for 5 min so repeated polls don't refire), Go.Risk + Go.Escalate command strings to copy. Highlight blockers vs un-dispositioned.</div>
+<div class="accept"><strong>Accept:</strong> if signals exist, clicking the chevron expands the row inline showing column-level deep-diff + the exact Go.Risk command. No new CLI invocation needed to understand the signal.</div></div>
+
+<div class="phase"><h3><span class="num">4</span> Polish + ship</h3>
+<div class="meta">Token refresh per poll (Board 27's pattern). Robust error rendering (if any endpoint 5xx, show inline diagnostic; don't blank the page). Footer with last-refreshed timestamp + token-expires hint. Build report. Operator validates END-to-END before close (AP-4 rule).</div>
+<div class="accept"><strong>Accept:</strong> operator opens the page, leaves it open through a fresh /tick, confirms it visibly updates without intervention. Operator types "ok" before board closes.</div></div>
+
+<h2>Constraints / risks</h2>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td>L3 deep-diff is slow (each call = ~5s of live Snowflake)</td><td>Cache per-signal for 5 min in PS hashtable. Refresh only on first time + every 5 min.</td></tr>
+<tr><td>Token expiry mid-session</td><td>Refresh token each poll (Board 27 pattern, already proven).</td></tr>
+<tr><td>Page becomes too large with all signals expanded by default</td><td><code>&lt;details&gt;</code> are collapsed by default; operator expands the one they care about.</td></tr>
+<tr><td>Browser caches stale HTML between meta-refreshes</td><td><code>&lt;meta http-equiv="cache-control" content="no-cache"&gt;</code> already in template; file:// reads are also typically uncached.</td></tr>
+<tr><td>Operator runs the page and we declare shipped too early (AP-4)</td><td>Phase 4 accept requires operator says "ok" before board closes. Honor the rule.</td></tr>
+</table>
+
+<h2>Board (see ~e)</h2>
+<p style="font-size:13px"><code>~e</code> sizes this as Board 28; rough cut 5 + 5 + 5 + 3 = 18 pts. Phase 1 (First Move) alone is the rehearsal-saving replacement of the current broken Go.Dash.</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Plan saved + (to be) published</div>
+<div class="dod-item">&check; 4 phases with explicit operator-visible accept criteria</div>
+<div class="dod-item">&check; Inherits ~d picks (replace Go.Dash, real ops as cut markers, inline details drill, 30s refresh)</div>
+<div class="dod-item">&check; Risks named; AP-4 rule embedded in Phase 4 accept</div>
+<div class="dod-item">&check; Hands to ~e for Board 28</div>
+</div>
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r163 &middot; 2026-06-03 23:07 &middot; ~p unified dashboard</div>
+</body></html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~d Unified live operator dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.65;max-width:920px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:26px;margin-bottom:4px}.sub{color:#6FC3DF;font-size:14px;margin-bottom:14px}
+.banner{background:#1a2438;color:#6FC3DF;padding:9px 14px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block}
+h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:24px 0 10px;font-size:18px}h3{color:#fff;margin:14px 0 6px;font-size:14px}
+.lede{background:#1A1A1A;border-left:3px solid #6FC3DF;padding:14px 18px;margin:16px 0;color:#ddd;font-size:14px;border-radius:0 4px 4px 0}.lede strong{color:#6FC3DF}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:1px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e;vertical-align:top}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:Consolas,monospace;font-size:11px;color:#9fdfff;white-space:pre;overflow-x:auto}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+ul{margin:8px 0 8px 22px}li{font-size:13px;margin:4px 0}
+.dod{background:#1A1A1A;border-radius:6px;padding:12px 18px;margin:14px 0}.dod-item{color:#5cb85c;margin:2px 0;font-size:13px}
+.choice{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:14px 18px;margin:14px 0}.choice .fork{color:#fff;font-weight:700;font-size:14px;margin-bottom:6px}.choice .opts{color:#888;font-size:12px;margin-bottom:6px}.choice .pick{color:#5cb85c;font-weight:700;font-size:13px;margin-top:4px}.choice .why{color:#bbe6c8;font-size:13px;margin-top:4px}.choice .conseq{font-size:12px;color:#ddd;margin-top:6px;padding-left:14px;border-left:2px solid #333}
+.escape{background:#1f1410;border-left:3px solid #f0ad4e;padding:10px 14px;margin:10px 0 14px;font-size:12px;color:#e6cba0;border-radius:0 4px 4px 0}.escape strong{color:#f0ad4e}
+.candidate{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:10px 14px;margin:8px 0;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}.candidate .name{color:#6FC3DF;font-weight:700;font-family:Consolas,monospace}.candidate .gut{color:#888;font-size:11px}.candidate.winner{border-color:#5cb85c}.candidate.winner .name{color:#5cb85c}
+.first-move{background:#0d2818;border:2px solid #5cb85c;border-radius:6px;padding:18px 22px;margin:18px 0;color:#bbe6c8;font-size:14px}.first-move strong{color:#5cb85c;display:block;margin-bottom:6px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+.mockup{background:#0a0a0a;border:1px dashed #444;border-radius:4px;padding:14px 18px;margin:10px 0;font-family:Consolas,monospace;font-size:11px;color:#9fdfff;white-space:pre;line-height:1.5}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~d unified dashboard</nav>
+
+<h1>Unified live operator dashboard</h1>
+<p class="sub">One page. Auto-refreshes. Re-clone &rarr; see we're in sync, see state every 5 min, click signals for explanation, dig in. Closes Board 28's <a href="https://joeycastillo.us/airbyte-migration/wtf-audit.html" style="color:#6FC3DF">WTF audit</a>.</p>
+<span class="banner">Design &middot; Pure Metal</span>
+
+<h2>Subject + Intent</h2>
+<div class="lede">
+<strong>Subject:</strong> Replace <code>Go.Dash</code> with a single self-refreshing HTML page that consolidates the four operator views (current state, timeline with reclone cut markers, signal worklist with click-through, recent reclone ops). PowerShell polls server-side every 30s and writes the page to disk; browser auto-refreshes via <code>&lt;meta&gt;</code>. <strong>Intent:</strong> kill the launcher constellation (AP-1). The operator's mental model is one living page; the data plane already exists; this fuses it.</div>
+
+<h2>Discovery</h2>
+<ul>
+<li><b>Data sources all already exist</b>: <code>GET /reset/status</code> (scheduler + last sweep + verdict counts), <code>GET /escalate</code> (gate + signals), <code>GET /replay</code> (timeline series + baseline cuts), <code>GET /operations?limit=5</code> (recent reclones), <code>GET /firstdiff</code> (per-stream first divergence).</li>
+<li><b>Rendering pattern proven by Board 27</b>: PowerShell polls + writes static HTML + browser meta-refresh. Zero CORS, zero token in JS, works on file://.</li>
+<li><b>"Click things and get explanation"</b> resolves via HTML <code>&lt;details&gt;</code> + anchored sections. No JS fetch needed -- the same poll cycle pre-renders the drill content inline.</li>
+<li><b>Reclone-as-cut markers</b> on the timeline: <code>/replay</code> already has a <code>baselineCuts</code> heuristic; it didn't fire on the 2026-06-03 reclone (clean jumped 56%-&gt;100% but pre-clone fraction had been low for days). Improve by also pulling <code>/operations?kind=reclone</code> and overlaying those <em>actual</em> reclone events directly as cuts. Truth beats heuristic.</li>
+</ul>
+
+<h2>Naming Pass</h2>
+<div class="candidate"><span class="name">Go.Dash (replace existing)</span><span class="gut">winner &middot; existing name, existing verb, signal-first dashboard becomes the dashboard. AP-5 rule applied: fuse don't fork.</span></div>
+<div class="candidate"><span class="name">Go.Live (extend)</span><span class="gut">Go.Live's domain is ONE op trail; extending it to a dashboard widens its scope. Rejected.</span></div>
+<div class="candidate"><span class="name">Go.Op / Go.View / Go.Hub</span><span class="gut">new verbs = AP-1 again. Rejected.</span></div>
+<div class="candidate"><span class="name">cadence-live.html as the only filename</span><span class="gut">reuses the live page slot; <code>Go.Live &lt;opId&gt;</code> still works for one-op view by writing to a different file. Acceptable.</span></div>
+<p style="font-size:13px;color:#ccc;margin-top:8px"><b>Pick:</b> <code>Go.Dash</code> the verb; output to <code>$env:TEMP\cadence-dashboard.html</code> (separate from <code>cadence-live.html</code> so Go.Live still works for per-op drilldown).</p>
+
+<h2>Shape -- one page, four sections, top to bottom</h2>
+<div class="mockup">+-----------------------------------------------------------------+
+| HERO                                                            |
+|   GATE: GREEN -- 0 un-dispositioned, 0 blockers   [big & bold]  |
+|   scheduler: Enabled (next tick +185s)   snapshots: 555         |
+|   last sweep: sweep-20260603T230000Z (4m ago)                   |
+|   verdicts: clean=208  cosmetic=0  benign=0  signal=0           |
+|   [ if re-clone in last 1h: "RE-CLONED at 2026-06-03 21:23Z" ]  |
++-----------------------------------------------------------------+
+| TIMELINE  (last 200 ticks)                                      |
+|   stacked-area SVG: clean / cosmetic / benign / signal          |
+|   vertical bands marking actual /operations reclones            |
+|   x-axis: time | y-axis: stream count                           |
++-----------------------------------------------------------------+
+| WORKLIST  (signals only -- clickable to expand)                 |
+|   no signals.                            [if green]             |
+|   ECOMM.SPREE_CMS_SECTIONS  [needs triage]  v                   |
+|     why:   dead/stuck sync ...                                  |
+|     when:  first diverged 2026-06-03 14:51Z                     |
+|     dig:   L3 deep-diff (cached, refreshed each poll)           |
+|              ID, NAME, TYPE -- rowCount + hash differ           |
+|              prod=392 / clone=393 / delta=+1                    |
+|     mark:  Go.Risk "ECOMM.SPREE_CMS_SECTIONS" accept|block|exp  |
++-----------------------------------------------------------------+
+| RECENT RECLONES                                                 |
+|   reclone-20260603T212314 (real)  succeeded   01:14m  [open]    |
+|   reclone-20260603T212139 (dry)   succeeded   00:48s  [open]    |
+|   reclone-20260601T222342 (dry)   succeeded   00:53s  [open]    |
++-----------------------------------------------------------------+
+| FOOTER -- last refreshed: 2026-06-03 23:08:42Z (auto every 30s) |
++-----------------------------------------------------------------+</div>
+<p style="font-size:13px"><b>Out of scope</b> (Board 28): operator typing into the page (Go.Risk + Go.Escalate stay CLI for now; page shows the commands to copy). A future board can add server-side actions if needed.</p>
+
+<h2>Choices + Consequences</h2>
+
+<div class="choice">
+<div class="fork">1. Rendering -- server-poll + meta-refresh vs SPA fetch in browser vs Cloud Run static file</div>
+<div class="opts">a) PS polls, writes HTML, browser meta-refresh. b) HTML with JS fetch (CORS issue per Board 27). c) Cadence service renders + serves HTML route.</div>
+<div class="conseq">a) Proven (Board 27); no CORS, no token in JS. b) Blocked at IAM (Board 27 inspect). c) Would require deploy churn for every page change + a new route + auth.</div>
+<div class="pick">PICK: (a) -- same pattern as Go.Live, scales to many sections.</div>
+<div class="why">One architectural pattern across Go.Live + Go.Dash. Familiar. No CORS. Works offline-ish (page stays readable if cadence goes down).</div>
+</div>
+
+<div class="choice">
+<div class="fork">2. Reclone-as-cut markers -- heuristic only vs actual /operations vs both</div>
+<div class="opts">a) Keep the <code>/replay</code> clean-fraction heuristic. b) Pull <code>/operations?limit=20</code> and overlay successful real reclones as cuts. c) Both -- heuristic finds unannounced cuts, real ops mark the known ones.</div>
+<div class="conseq">a) Misses 2026-06-03 21:23Z. b) Always right -- the op IS the cut. c) Defensive but the heuristic adds value only when ops collection is empty (won't happen now).</div>
+<div class="pick">PICK: (b) -- real ops as the truth.</div>
+<div class="why">The op doc IS the reclone. Heuristic was a workaround for not having that data; now we have it.</div>
+</div>
+
+<div class="choice">
+<div class="fork">3. Click-to-drill on signals -- expand inline vs new HTML file vs link to Go.Live</div>
+<div class="opts">a) HTML <code>&lt;details&gt;</code> expand inline; drill content pre-rendered each poll. b) Each signal generates <code>$env:TEMP\stream-XYZ.html</code>; anchor link. c) Link to per-stream Go.Replay HTML.</div>
+<div class="conseq">a) All in one page; one refresh; readable offline. b) More files but cleaner per-stream context. c) Reuses Go.Replay but loses inline context.</div>
+<div class="pick">PICK: (a) inline <code>&lt;details&gt;</code>. Drill content fits in ~10 lines per signal.</div>
+<div class="why">Operator click &rarr; instant expand, no navigation. Polled content stays fresh. Browser bookmarkable. AP-5 rule satisfied.</div>
+</div>
+
+<div class="choice">
+<div class="fork">4. L3 deep-diff freshness on the worklist</div>
+<div class="opts">a) Cache L3 per signal for 5 min (live Snowflake scans are expensive). b) Fire L3 every poll (~30s). c) Show only on first click ("fetch deep diff" button).</div>
+<div class="conseq">a) Pragmatic; signal state doesn't change minute-to-minute; one L3 per signal per 5min. b) Snowflake cost + slow page. c) Loses pre-rendered insight.</div>
+<div class="pick">PICK: (a) 5-min cache per signal, stored alongside the page state.</div>
+<div class="why">L3 is the expensive primitive; cache it. Operator sees deep diff inline without firing the call manually.</div>
+</div>
+
+<div class="choice">
+<div class="fork">5. Refresh cadence -- 30s vs 5 min vs match cadence ticks</div>
+<div class="opts">a) 30s meta-refresh. b) 5 min (match cadence ticks). c) 60s.</div>
+<div class="conseq">a) Page feels alive; ops + gate flip is visible quickly; small cost. b) Operator stares at stale page between ticks. c) Compromise.</div>
+<div class="pick">PICK: (a) 30s.</div>
+<div class="why">During a reclone, op state changes every minute or so; 30s catches transitions. Outside reclones, tick interval is 5 min but the operator can still see gate flips quickly. Cost is negligible (Firestore reads are cheap).</div>
+</div>
+
+<h2>Escape Routes</h2>
+<div class="escape"><strong>From PICK 1 (PS poll):</strong> if the PS-poll model strains (operator wants the page on a phone, an auditor's machine without gcloud), expose a read-only HTTP endpoint on cadence that renders the same page server-side. The page contract is identical; only the host shifts.</div>
+<div class="escape"><strong>From PICK 3 (inline details):</strong> if a signal has too much drill content to fit inline, link out to a per-stream file (escape to PICK 3b).</div>
+<div class="escape"><strong>From PICK 4 (L3 cache):</strong> if L3 caching gets stale-feeling, add a manual "refresh deep diff for this signal" button that triggers a separate PS-side fetch.</div>
+
+<h2>Pure Metal Test</h2>
+<table>
+<tr><td>cadence HTTP endpoints (already exist)</td><td style="color:#5cb85c">reused; no schema change</td></tr>
+<tr><td>gcloud identity token + PowerShell Invoke-RestMethod</td><td style="color:#5cb85c">already used by Go.Live</td></tr>
+<tr><td>inline SVG stacked-area chart</td><td style="color:#5cb85c">no framework (Go.Replay precedent)</td></tr>
+<tr><td>HTML &lt;details&gt; element for drill</td><td style="color:#5cb85c">native HTML, no JS</td></tr>
+<tr><td>L3 deep-diff cache (in-memory in PS loop)</td><td style="color:#5cb85c">PS hashtable</td></tr>
+</table>
+<p style="font-size:13px;margin-top:8px"><strong>Zero new dependencies.</strong></p>
+
+<h2>First Move</h2>
+<div class="first-move">
+<strong>Smallest proof:</strong> replace <code>Go.Dash.ps1</code> with the new poll-loop + meta-refresh page that renders ONLY the hero (gate + sweep counts + scheduler) + the recent-ops list. Fire <code>Go.Dash</code>; page opens; auto-refreshes every 30s; operator sees the gate flip as it changes; clicks a recent op link &rarr; opens the existing Go.Live page. That's enough to prove the architecture and replace the broken existing Go.Dash. Timeline + worklist + drill add as phases 2-4.
+</div>
+
+<h2>What this does NOT do</h2>
+<ul>
+<li>Add new launchers (AP-1 rule).</li>
+<li>Let the operator type Go.Risk into the browser (commands shown to copy; future board if needed).</li>
+<li>Replace Go.Live (still the right home for ONE op deep view, linked from the dashboard).</li>
+<li>Replace Go.Replay (still the right home for full timeline + per-stream lane drilldown; linked from the dashboard).</li>
+<li>Remove existing launchers (Go.Signal, Go.Risk, Go.Escalate stay as the action surface; the dashboard is the read surface).</li>
+</ul>
+
+<h2>Path to plan + build</h2>
+<p style="font-size:13px"><code>~p</code> phases the build (hero &rarr; timeline &rarr; worklist &rarr; recent ops &rarr; polish). <code>~e</code> sizes into Board 28 (~17 pts). <code>~b</code> implements; operator validates END-to-END before close (AP-4 rule).</p>
+
+<h2>DoD</h2>
+<div class="dod">
+<div class="dod-item">&check; Design saved + (to be) published</div>
+<div class="dod-item">&check; 4 naming candidates, winner: replace Go.Dash (AP-5 rule)</div>
+<div class="dod-item">&check; 5 forks with picks + consequences + escape routes</div>
+<div class="dod-item">&check; Operator-ask coverage table: re-clone visible / state every 5 min / clickable / dig-in -- all addressed</div>
+<div class="dod-item">&check; First Move: hero + recent ops only. Smallest replacement-of-broken-page deliverable.</div>
+</div>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r163 &middot; 2026-06-03 23:07 &middot; ~d unified dashboard</div>
+</body></html>
