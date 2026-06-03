@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>~i click-everything gap on Board 28 dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#111;color:#ccc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:32px 24px}
+h1{color:#fff;font-size:24px;margin-bottom:6px}h2{color:#6FC3DF;border-bottom:1px solid #333;padding-bottom:6px;margin:24px 0 10px;font-size:17px}
+.sub{color:#6FC3DF;font-size:14px;margin-bottom:14px}
+.banner{background:#3a1414;color:#f06e6e;padding:8px 12px;border-radius:4px;font-weight:700;text-transform:uppercase;font-size:11px;margin-bottom:18px;display:inline-block;letter-spacing:1px}
+code{background:#222;padding:2px 6px;border-radius:3px;color:#6FC3DF;font-size:12px}
+.code-block{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:12px 16px;margin:8px 0;font-family:Consolas,monospace;font-size:11px;color:#9fdfff;white-space:pre;overflow-x:auto}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:12px 24px;color:#6FC3DF;font-weight:700;letter-spacing:2px;margin:-32px -24px 24px}
+.callout{background:#0d2818;border-left:3px solid #5cb85c;padding:12px 16px;margin:12px 0;color:#bbe6c8;font-size:13px;border-radius:0 4px 4px 0}.callout strong{color:#5cb85c}
+.miss{background:#1a0e0e;border-left:3px solid #f06e6e;padding:12px 16px;margin:12px 0;color:#e6b0b0;font-size:13px;border-radius:0 4px 4px 0}.miss strong{color:#f06e6e}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th{text-align:left;color:#6FC3DF;border-bottom:1px solid #333;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #1e1e1e}
+.footer{margin-top:30px;padding-top:14px;border-top:1px solid #333;color:#666;font-size:12px;text-align:center}
+</style></head><body>
+<nav>Be &middot; airbyte-parity ~i click-everything</nav>
+
+<h1>Click-everything gap on Board 28 dashboard</h1>
+<p class="sub">Operator: "it says there are benign changes. I want to be able to click everything. Where are the real answers."</p>
+<span class="banner">Gap -- Board 28 not yet whole</span>
+
+<h2>What's missing</h2>
+<div class="miss"><strong>The worklist only shows Signal streams.</strong> The current snapshot has 32 Benign streams (sync lag accumulated since the 21:23Z reclone) and 0 Signal -- so the worklist says "ALL CLEAR" and the operator has no way to inspect the 32 benigns. Plus the four verdict count tiles on the hero (clean/cosmetic/benign/signal) aren't clickable. There's no path from "I see 32 benign" to "let me look at them."</div>
+
+<h2>The data already exists</h2>
+<p style="font-size:13px"><code>/reset/status</code> &rarr; <code>lastSweep.drifts</code> already contains EVERY non-Clean stream with full per-stream context:</p>
+<div class="code-block">drifts array length: 32
+by verdict: {'Benign': 32}
+sample drift fields:
+  stream, verdict, rawVerdict, lagHours, shapeMatch, windowedMatch, rowDelta, reason</div>
+<p style="font-size:13px">For Cosmetic the same; for Signal the same. Already in the snapshot. I'm just not surfacing them.</p>
+
+<h2>The fix (within Board 28, not a new board)</h2>
+<table>
+<tr><th>Change</th><th>Where</th></tr>
+<tr><td>Hero verdict tiles become anchored links to a new "All streams" section below</td><td><code>Go.Dash.ps1</code> RenderHero</td></tr>
+<tr><td>New section: "All streams classified" with three subsections (Cosmetic / Benign / Signal). Each subsection has a count header + collapsible <code>&lt;details&gt;</code> per stream showing reason, lagHours, rowDelta, shapeMatch, windowedMatch, raw verdict, when (firstdiff), Go.Risk command to copy</td><td><code>Go.Dash.ps1</code> new RenderAllStreams</td></tr>
+<tr><td>For Signal: keep the L3 deep-diff pre-fetched (cached 5min) -- already there</td><td>existing</td></tr>
+<tr><td>For Benign/Cosmetic: show metadata only; <code>Go.Escalate &lt;stream&gt;</code> command-string for deeper drill (don't pre-fetch L3 -- 32 streams x ~5s each is too slow per refresh)</td><td>new</td></tr>
+<tr><td>For Clean: count only -- streams not individually tracked (Clean-by-absence in driftSchemaVersion=2); note that on the tile</td><td>RenderHero footnote</td></tr>
+</table>
+
+<h2>What the operator gets</h2>
+<div class="callout">Click "Benign 32" tile &rarr; jumps to Benign subsection. Click any stream row &rarr; expands inline showing why it's benign, how much lag, raw verdict, row delta, when first diverged, and the exact <code>Go.Escalate</code> + <code>Go.Risk</code> commands. Same for Cosmetic, same for Signal. <b>Click everything.</b></div>
+
+<h2>Scope</h2>
+<ul style="margin:8px 0 0 22px">
+<li>Edit Go.Dash.ps1. Add RenderAllStreams. Wire hero tile anchors.</li>
+<li>Verify renders. Push. Operator validates.</li>
+<li>Board 28 stays In Progress until operator says ok (still per AP-4).</li>
+</ul>
+
+<div class="footer">Be &middot; airbyte-parity &middot; v0 &middot; r165 &middot; 2026-06-03 23:20 &middot; ~i click-everything gap</div>
+</body></html>
