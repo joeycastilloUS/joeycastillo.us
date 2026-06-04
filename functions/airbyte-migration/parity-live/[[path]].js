@@ -14,7 +14,7 @@
 // from a network-exposed surface behind only a password gate).
 
 const CLOUD_RUN = "https://cadence-d5vc4tye3a-uc.a.run.app";
-const REQUIRED_GATE_HASH = "1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa";
+const REQUIRED_GATE_HASH = "822b33ad87c148a0a20a5ba7cd5ebcaa68d36a18e7aad165554903f52ca82757";
 
 // Mutating paths -- block any non-GET to these from the public proxy.
 const DESTRUCTIVE_PATH_RE = /^\/(?:reset|tick|ack(?:\/|$))/;
