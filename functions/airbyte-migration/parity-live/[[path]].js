@@ -142,10 +142,13 @@ export async function onRequest(context) {
 
 let cachedToken = null;
 let cachedTokenExp = 0;
+let cachedTokenAud = null;  // audience the cached token was minted for
 
 async function getIdToken(saKeyJson, audience) {
   const now = Math.floor(Date.now() / 1000);
-  if (cachedToken && cachedTokenExp > now + 60) return cachedToken;
+  // Key the cache by audience so a deploy that changes CLOUD_RUN doesn't
+  // re-use a token whose 'aud' claim matches the previous backend.
+  if (cachedToken && cachedTokenAud === audience && cachedTokenExp > now + 60) return cachedToken;
 
   const sa = JSON.parse(saKeyJson);
   const header = { alg: "RS256", typ: "JWT", kid: sa.private_key_id };
@@ -177,6 +180,7 @@ async function getIdToken(saKeyJson, audience) {
   }
   const data = await resp.json();
   cachedToken = data.id_token;
+  cachedTokenAud = audience;
   cachedTokenExp = now + 3000; // 50 min
   return cachedToken;
 }
