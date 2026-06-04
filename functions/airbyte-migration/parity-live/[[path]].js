@@ -1,5 +1,5 @@
 // Cloudflare Pages Function: proxy joeycastillo.us/airbyte-migration/parity-live/*
-// to the airbyte-parity Cloud Run service. Attaches a Google identity token
+// to the cadence Cloud Run service. Attaches a Google identity token
 // generated from a service-account JSON key (CF env var GCP_SA_KEY).
 //
 // Auth chain:
@@ -8,11 +8,16 @@
 //   2. Function generates a Google ID token via signed JWT exchange.
 //   3. Proxies request to Cloud Run with Authorization: Bearer <id-token>.
 //
-// Read-only by design: only GET/POST forwarding; no mutating Cloud Run calls
-// from this proxy beyond what the dashboard endpoints already support.
+// Read-only by design: GETs pass through; mutating POSTs to /reset/* and /tick
+// are BLOCKED at the proxy (operator's "never destructive ever" rule -- those
+// fire from local Go.Dash + bridge with the YES-confirm safety contract, not
+// from a network-exposed surface behind only a password gate).
 
-const CLOUD_RUN = "https://airbyte-parity-d5vc4tye3a-uc.a.run.app";
+const CLOUD_RUN = "https://cadence-d5vc4tye3a-uc.a.run.app";
 const REQUIRED_GATE_HASH = "1b7deda8eab377461e0a83e1484ce8177f5de16374992d0ce783fa1630eb8faa";
+
+// Mutating paths -- block any non-GET to these from the public proxy.
+const DESTRUCTIVE_PATH_RE = /^\/(?:reset|tick|ack(?:\/|$))/;
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -40,6 +45,18 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const upstream = CLOUD_RUN + path + url.search;
 
+  // 2a. Destructive-path block -- never let mutating POSTs through the public proxy.
+  // GETs are read-only and pass; anything else against /reset/*, /tick, /ack(/)* is denied.
+  if (DESTRUCTIVE_PATH_RE.test(path) && request.method !== "GET" && request.method !== "HEAD") {
+    return new Response(
+      "Blocked at proxy -- mutating " + request.method + " " + path +
+      " not allowed from joeycastillo.us. Use local Go.Dash (YES-confirm gate) for state changes.",
+      {
+        status: 403,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      });
+  }
+
   // 3. Generate Google ID token.
   let idToken;
   try {
@@ -65,26 +82,44 @@ export async function onRequest(context) {
   const respHeaders = new Headers(resp.headers);
   respHeaders.delete("set-cookie");
 
-  // The dashboard HTML's JS does fetch('/dashboard/data'), fetch('/dashboard/stream/...'),
-  // etc. on absolute paths. Hosted under /airbyte-migration/parity-live/, those
-  // hit Cloudflare's root, not our proxy. Rewrite HTML responses so the JS
-  // calls the proxied path instead.
+  // Rewrite absolute-path references in HTML responses so the page's JS calls
+  // land back on our proxy (joeycastillo.us/airbyte-migration/parity-live/...)
+  // instead of Cloudflare's root. Inject a meta-refresh so the page auto-updates
+  // (cadence sweeps every 5 min; reload at 60s to surface fresh state quickly).
   const respCt = (respHeaders.get("content-type") || "").toLowerCase();
   if (respCt.includes("text/html")) {
     let body = await resp.text();
-    // Order matters: rewrite the more-specific paths first to avoid double-prefixing.
-    body = body
-      .replaceAll("'/dashboard/", "'/airbyte-migration/parity-live/dashboard/")
-      .replaceAll('"/dashboard/', '"/airbyte-migration/parity-live/dashboard/')
-      .replaceAll("`/dashboard/", "`/airbyte-migration/parity-live/dashboard/")
-      .replaceAll("'/parity/", "'/airbyte-migration/parity-live/parity/")
-      .replaceAll('"/parity/', '"/airbyte-migration/parity-live/parity/')
-      .replaceAll("`/parity/", "`/airbyte-migration/parity-live/parity/")
-      .replaceAll("'/tick", "'/airbyte-migration/parity-live/tick")
-      .replaceAll('"/tick', '"/airbyte-migration/parity-live/tick')
-      .replaceAll("`/tick", "`/airbyte-migration/parity-live/tick");
+    const PREFIX = "/airbyte-migration/parity-live";
+    // Order matters: rewrite more-specific paths first to avoid double-prefixing.
+    // Wrap each pattern in quote+backtick variants since HTML/JS uses all three.
+    const rewrites = [
+      ["/dashboard/", PREFIX + "/dashboard/"],
+      ["/reset/",     PREFIX + "/reset/"],
+      ["/parity/",    PREFIX + "/parity/"],
+      ["/tick",       PREFIX + "/tick"],
+      ["/escalate",   PREFIX + "/escalate"],
+      ["/operations", PREFIX + "/operations"],
+      ["/replay",     PREFIX + "/replay"],
+      ["/firstdiff",  PREFIX + "/firstdiff"],
+      ["/acks",       PREFIX + "/acks"],
+    ];
+    for (const [from, to] of rewrites) {
+      body = body
+        .replaceAll("'" + from, "'" + to)
+        .replaceAll('"' + from, '"' + to)
+        .replaceAll("`" + from, "`" + to);
+    }
+    // Inject meta-refresh so the page reloads itself once a minute.
+    // If a <meta http-equiv="refresh"> already exists, leave it alone.
+    if (!/<meta[^>]+http-equiv=['"]?refresh/i.test(body)) {
+      body = body.replace(
+        /<head([^>]*)>/i,
+        "<head$1><meta http-equiv=\"refresh\" content=\"60\">"
+      );
+    }
     respHeaders.set("content-length", String(new TextEncoder().encode(body).length));
     respHeaders.delete("content-encoding"); // we returned plain text
+    respHeaders.set("cache-control", "no-store, no-cache, must-revalidate");
     return new Response(body, {
       status: resp.status,
       statusText: resp.statusText,
