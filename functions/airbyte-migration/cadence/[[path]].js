@@ -1,4 +1,4 @@
-// Cloudflare Pages Function: proxy joeycastillo.us/airbyte-migration/parity-live/*
+// Cloudflare Pages Function: proxy joeycastillo.us/airbyte-migration/cadence/*
 // to the cadence Cloud Run service. Attaches a Google identity token
 // generated from a service-account JSON key (CF env var GCP_SA_KEY).
 //
@@ -50,7 +50,7 @@ export async function onRequest(context) {
   if (DESTRUCTIVE_PATH_RE.test(path) && request.method !== "GET" && request.method !== "HEAD") {
     return new Response(
       "Blocked at proxy -- mutating " + request.method + " " + path +
-      " not allowed from joeycastillo.us. Use local Go.Dash (YES-confirm gate) for state changes.",
+      " not allowed from joeycastillo.us/cadence. Use local Go.Dash (YES-confirm gate) for state changes.",
       {
         status: 403,
         headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
@@ -89,7 +89,7 @@ export async function onRequest(context) {
   const respCt = (respHeaders.get("content-type") || "").toLowerCase();
   if (respCt.includes("text/html")) {
     let body = await resp.text();
-    const PREFIX = "/airbyte-migration/parity-live";
+    const PREFIX = "/airbyte-migration/cadence";
     // Order matters: rewrite more-specific paths first to avoid double-prefixing.
     // Wrap each pattern in quote+backtick variants since HTML/JS uses all three.
     const rewrites = [
