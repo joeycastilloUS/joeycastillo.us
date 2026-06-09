@@ -1,7 +1,7 @@
 /* gate.js — Be password gate (client-side SHA-256). Run Sheet has its own password (diverged from mendo-dgx 2026-06-09). */
 (function () {
   /* mendo-konductor password hash -- rotate the whole area by changing this one line. */
-  var TARGET = 'fa50dc498c1c50a95cefde858b4d9cf3e5b54a861f98ecfe7f4cd5bbd392524a';
+  var TARGET = '7a20371831997d9c81b6054a8cead80cca68e91c060c6f15721ebe696eeb95f4';
   var KEY = 'mendo_konductor_gate_v1';
 
   /* Fast path — session already valid */
