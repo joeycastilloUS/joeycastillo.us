@@ -1,4 +1,4 @@
-/* gate.js — Be password gate (client-side SHA-256). Same hash as mendo-dgx: one Mendocino password. */
+/* gate.js — Be password gate (client-side SHA-256). Run Sheet has its own password (diverged from mendo-dgx 2026-06-09). */
 (function () {
   var script = document.currentScript;
   var TARGET = script.getAttribute('data-hash');
