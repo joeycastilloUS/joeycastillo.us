@@ -225,7 +225,9 @@ function render(){
       const conn=(p.status||"").toLowerCase()==="connected";
       const allClients=(p.clients||[]);
       let cs=allClients;
-      if(onlineOnly) cs=cs.filter(c=>(c.status||"").toLowerCase()==="online");
+      // "Connected now only": the live PORT status is authoritative. Meraki's 24h client list
+      // can still report a just-dropped device as Online, so a Disconnected port shows nothing.
+      if(onlineOnly) cs = conn ? cs.filter(c=>(c.status||"").toLowerCase()==="online") : [];
       let desc=cs.map(c=>esc(c.name||"")).join("<br>");
       // Connected port on the POS VLAN (100) with no client -> almost always a Toast POS receipt printer.
       if(conn && String(p.vlan)==="100" && allClients.length===0) desc="<span class='hint'>likely Toast POS Receipt Printer</span>";
