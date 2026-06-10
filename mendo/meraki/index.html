@@ -15,6 +15,12 @@
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
   select,button,input{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:9px 12px;font-size:.9rem;font-family:inherit;}
   select{min-width:280px;} button{background:var(--accent);color:#000;font-weight:700;cursor:pointer;border:none;}
+  .combo{position:relative;min-width:320px;} #netsearch{width:100%;}
+  .netlist{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:8px;max-height:300px;overflow:auto;display:none;box-shadow:0 10px 28px rgba(0,0,0,.55);}
+  .netlist.open{display:block;}
+  .netopt{padding:9px 12px;cursor:pointer;font-size:.9rem;border-bottom:1px solid #1c1c1c;white-space:nowrap;}
+  .netopt:last-child{border-bottom:none;} .netopt.active{background:#1d2a31;color:#fff;}
+  .netopt .hl{color:var(--accent);font-weight:700;}
   button.alt{background:var(--surface);color:var(--text);border:1px solid var(--line);font-weight:600;}
   .muted{color:var(--dim);font-size:.85rem;}
   .nethead{margin:6px 0 4px;font-size:1.05rem;} .nethead b{color:var(--accent);}
@@ -58,7 +64,10 @@
 <div class="wrap">
   <h1>Switch Port View</h1>
   <div class="bar">
-    <select id="net"><option value="">Loading networks&hellip;</option></select>
+    <div class="combo">
+      <input id="netsearch" type="text" placeholder="type a network&hellip;" autocomplete="off">
+      <div id="netlist" class="netlist"></div>
+    </div>
     <button id="go">Pull</button>
     <label class="muted" style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="online" checked style="width:auto;"> Connected now only</label>
     <button id="exh" class="alt" disabled>Export HTML</button>
@@ -88,12 +97,17 @@ function pacific(){
   catch(e){ return new Date().toISOString(); }
 }
 
+let NETS=[], FILTERED=[], ACTIVE=-1, SELECTED_ID="";
 async function loadNetworks(){
-  const r = await api("/meraki/networks");
-  if(r.status===401) throw new Error("unauthorized");
-  const d = await r.json(); const sel=document.getElementById("net"); sel.innerHTML="";
-  d.networks.sort((a,b)=>a.name.localeCompare(b.name)).forEach(n=>{const o=document.createElement("option");o.value=n.id;o.textContent=n.name;sel.appendChild(o);});
+  const r=await api("/meraki/networks"); if(r.status===401) throw new Error("unauthorized");
+  const d=await r.json(); NETS=(d.networks||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
 }
+function scoreN(name,q){ name=name.toLowerCase(); q=q.toLowerCase(); if(!q) return 1; const i=name.indexOf(q); return i<0?-1:(i===0?2:1); }
+function filterNets(q){ FILTERED=NETS.map(n=>({n,s:scoreN(n.name,q)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s||a.n.name.localeCompare(b.n.name)).slice(0,12).map(x=>x.n); ACTIVE=FILTERED.length?0:-1; drawList(q); }
+function hlq(name,q){ if(!q) return esc(name); const i=name.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(name); return esc(name.slice(0,i))+"<span class='hl'>"+esc(name.slice(i,i+q.length))+"</span>"+esc(name.slice(i+q.length)); }
+function drawList(q){ const el=document.getElementById("netlist"); if(!FILTERED.length){ el.classList.remove("open"); el.innerHTML=""; return; } el.innerHTML=FILTERED.map((n,i)=>"<div class='netopt"+(i===ACTIVE?" active":"")+"' data-i='"+i+"'>"+hlq(n.name,q)+"</div>").join(""); el.classList.add("open"); }
+function pickNet(i){ if(i<0||i>=FILTERED.length) return; SELECTED_ID=FILTERED[i].id; document.getElementById("netsearch").value=FILTERED[i].name; document.getElementById("netlist").classList.remove("open"); }
+function resolveNet(){ if(SELECTED_ID) return SELECTED_ID; filterNets(document.getElementById("netsearch").value.trim()); if(FILTERED.length){ pickNet(0); return SELECTED_ID; } return ""; }
 
 // --- pre-configured IP -> expected device name map (gear settings) ---
 const MAP_KEY="meraki_namemap_v1";
@@ -118,8 +132,10 @@ function lastSeenPac(s){ if(!s) return ""; try{ return new Intl.DateTimeFormat('
 function swOrder(n){ n=(n||"").toUpperCase(); if(n.indexOf("POS")>=0) return 0; if(n.indexOf("BOH")>=0) return 1; return 2; }
 
 async function pull(){
-  const net=document.getElementById("net").value, err=document.getElementById("err");
-  document.getElementById("report").innerHTML=""; err.textContent=""; document.getElementById("status").textContent="pulling…";
+  const net=resolveNet(), err=document.getElementById("err");
+  document.getElementById("report").innerHTML=""; err.textContent="";
+  if(!net){ err.textContent="pick a network"; return; }
+  document.getElementById("status").textContent="pulling…";
   const r=await api("/meraki/portmap?network="+encodeURIComponent(net));
   document.getElementById("status").textContent="";
   if(!r.ok){ err.textContent="error "+r.status; return; }
@@ -204,7 +220,7 @@ function exportPdf(){
 
 document.getElementById("gform").addEventListener("submit", async e=>{
   e.preventDefault(); PW=document.getElementById("gpw").value;
-  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); document.getElementById("gate").classList.add("hide"); }
+  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); document.getElementById("gate").classList.add("hide"); document.getElementById("netsearch").focus(); }
   catch(_){ document.getElementById("gerr").textContent="wrong password"; PW=""; }
 });
 document.getElementById("go").addEventListener("click", pull);
@@ -214,6 +230,21 @@ document.getElementById("exp").addEventListener("click", exportPdf);
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); s.style.display = s.style.display==="none"?"block":"none"; });
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
 document.getElementById("namemap").value=mapText();
+
+// --- network combobox (type-to-filter, Enter picks the top match) ---
+const _inp=document.getElementById("netsearch");
+_inp.addEventListener("input", ()=>{ SELECTED_ID=""; filterNets(_inp.value.trim()); });
+_inp.addEventListener("focus", ()=>filterNets(_inp.value.trim()));
+_inp.addEventListener("keydown", e=>{
+  const el=document.getElementById("netlist"), q=_inp.value.trim();
+  if(e.key==="ArrowDown"){ e.preventDefault(); if(ACTIVE<FILTERED.length-1){ACTIVE++; drawList(q);} }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); if(ACTIVE>0){ACTIVE--; drawList(q);} }
+  else if(e.key==="Enter"){ e.preventDefault(); if(ACTIVE>=0){ pickNet(ACTIVE); pull(); } }
+  else if(e.key==="Escape"){ el.classList.remove("open"); }
+});
+document.getElementById("netlist").addEventListener("mousedown", e=>{ const o=e.target.closest(".netopt"); if(o){ pickNet(parseInt(o.dataset.i,10)); _inp.focus(); } });
+document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document.getElementById("netlist").classList.remove("open"); });
+
 (async()=>{ if(PW){ try{ await loadNetworks(); document.getElementById("gate").classList.add("hide"); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
 </script>
 </body>
