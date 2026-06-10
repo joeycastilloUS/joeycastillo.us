@@ -57,6 +57,7 @@
   <div class="bar">
     <select id="net"><option value="">Loading networks&hellip;</option></select>
     <button id="go">Pull</button>
+    <label class="muted" style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="online" checked style="width:auto;"> Connected now only</label>
     <button id="exh" class="alt" disabled>Export HTML</button>
     <button id="exp" class="alt" disabled>Export PDF</button>
     <span class="muted" id="status"></span>
@@ -85,21 +86,30 @@ async function loadNetworks(){
   d.networks.sort((a,b)=>a.name.localeCompare(b.name)).forEach(n=>{const o=document.createElement("option");o.value=n.id;o.textContent=n.name;sel.appendChild(o);});
 }
 
+let LASTDATA=null;
+function lastSeenPac(s){ if(!s) return ""; try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s)); }catch(e){ return s; } }
+function swOrder(n){ n=(n||"").toUpperCase(); if(n.indexOf("POS")>=0) return 0; if(n.indexOf("BOH")>=0) return 1; return 2; }
+
 async function pull(){
-  const net=document.getElementById("net").value, rep=document.getElementById("report"), err=document.getElementById("err");
-  rep.innerHTML=""; err.textContent=""; document.getElementById("status").textContent="pulling…";
+  const net=document.getElementById("net").value, err=document.getElementById("err");
+  document.getElementById("report").innerHTML=""; err.textContent=""; document.getElementById("status").textContent="pulling…";
   const r=await api("/meraki/portmap?network="+encodeURIComponent(net));
   document.getElementById("status").textContent="";
   if(!r.ok){ err.textContent="error "+r.status; return; }
-  const d=await r.json();
-  const stamp=pacific();
+  LASTDATA={ d: await r.json(), stamp: pacific() };
+  render();
+}
+
+function render(){
+  if(!LASTDATA) return;
+  const d=LASTDATA.d, stamp=LASTDATA.stamp;
+  const onlineOnly=document.getElementById("online").checked;
   let h="";
-  h+="<div class='nethead'>Network: <b>"+esc(d.name||net)+"</b></div>";
+  h+="<div class='nethead'>Network: <b>"+esc(d.name||"")+"</b></div>";
   if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span></div>"; }
   else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span></div>"; }
-  h+="<div class='stamp'>Pulled "+esc(stamp)+"</div>";
+  h+="<div class='stamp'>Pulled "+esc(stamp)+(onlineOnly?" &middot; connected-now only":" &middot; seen in last 24h")+"</div>";
 
-  // Meraki devices (name is often the MAC until renamed)
   const dev=d.devices||[];
   if(dev.length){
     h+="<h2>Meraki Devices ("+dev.length+")</h2><table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
@@ -107,24 +117,25 @@ async function pull(){
     h+="</tbody></table>";
   }
 
-  // every switch, every port
-  (d.switches||[]).forEach(sw=>{
+  (d.switches||[]).slice().sort((a,b)=>swOrder(a.name)-swOrder(b.name)||(a.name||"").localeCompare(b.name)).forEach(sw=>{
     h+="<h2>Switch: "+esc(sw.name||sw.serial)+"</h2>";
-    h+="<table><thead><tr><th>Port</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th><th>Description</th><th>IP address</th><th>MAC address</th></tr></thead><tbody>";
+    h+="<table><thead><tr><th>Port</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th><th>Description</th><th>IP address</th><th>MAC address</th><th>Last seen (PT)</th></tr></thead><tbody>";
     const ports=(sw.ports||[]).slice().sort((a,b)=>parseInt(a.port,10)-parseInt(b.port,10));
     ports.forEach(p=>{
       const conn=(p.status||"").toLowerCase()==="connected";
-      const cs=(p.clients||[]);
+      let cs=(p.clients||[]);
+      if(onlineOnly) cs=cs.filter(c=>(c.status||"").toLowerCase()==="online");
       const desc=cs.map(c=>esc(c.name||"")).join("<br>");
       const ips=cs.map(c=>esc(c.ip||"")).join("<br>");
       const macs=cs.map(c=>esc(c.mac||"")).join("<br>");
+      const ls=cs.map(c=>esc(lastSeenPac(c.lastSeen))).join("<br>");
       h+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+
         "</td><td class='"+(conn?"st-conn":"st-disc")+"'>"+esc(p.status||"")+"</td><td>"+esc(p.vlan)+
-        "</td><td class='av'>"+esc(p.allowedVlans||"")+"</td><td>"+desc+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td></tr>";
+        "</td><td class='av'>"+esc(p.allowedVlans||"")+"</td><td>"+desc+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av'>"+ls+"</td></tr>";
     });
     h+="</tbody></table>";
   });
-  rep.innerHTML=h; LAST=h;
+  document.getElementById("report").innerHTML=h; LAST=h;
   document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
 
@@ -141,6 +152,7 @@ document.getElementById("gform").addEventListener("submit", async e=>{
   catch(_){ document.getElementById("gerr").textContent="wrong password"; PW=""; }
 });
 document.getElementById("go").addEventListener("click", pull);
+document.getElementById("online").addEventListener("change", render);
 document.getElementById("exh").addEventListener("click", exportHtml);
 document.getElementById("exp").addEventListener("click", ()=>window.print());
 (async()=>{ if(PW){ try{ await loadNetworks(); document.getElementById("gate").classList.add("hide"); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
