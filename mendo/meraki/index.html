@@ -53,6 +53,19 @@
   .sect-h .chev{color:var(--accent);font-size:.7em;display:inline-block;transition:transform .15s;}
   .sect-h:not(.collapsed) .chev{transform:rotate(90deg);}
   .sect-h.collapsed{opacity:.78;}
+  .feat-sec{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:14px;}
+  .feat-h{color:var(--accent);font-size:.95rem;font-weight:700;margin-bottom:6px;}
+  .featrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0e0e0e;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;}
+  .featrow .fn{font-weight:700;} .featrow .fd{color:var(--dim);font-size:.82rem;flex:1 1 220px;}
+  .badge{font-size:.66rem;font-weight:800;letter-spacing:.5px;border-radius:5px;padding:1px 8px;text-transform:uppercase;}
+  .badge.lab{background:#3a2a00;color:var(--warn);border:1px solid var(--warn);}
+  .badge.prod{background:#06251a;color:var(--ok);border:1px solid var(--ok);}
+  .featrow button{background:var(--accent);color:#001016;border:none;border-radius:6px;padding:6px 11px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;}
+  .nameit{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:0 8px;margin-left:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .nameit:hover{background:var(--accent);color:#001016;} .nameit:disabled{opacity:.6;cursor:default;}
+  .namebar{margin:6px 0 12px;} .namebar #nameall{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}
+  .spin{display:inline-block;width:10px;height:10px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .6s linear infinite;vertical-align:-1px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
   .gate{position:fixed;inset:0;z-index:999;background:#0a0a0a;display:flex;align-items:center;justify-content:center;}
   .gate.hide{display:none;} .gbox{text-align:center;max-width:340px;width:90%;}
   .gbrand{font-size:2rem;font-weight:800;color:var(--accent);letter-spacing:.12em;} .gsub{color:#555;font-size:.8rem;margin:.3rem 0 1.6rem;}
@@ -94,6 +107,16 @@
     <span class="muted" id="status"></span>
   </div>
   <div class="panel" id="settings" style="display:none;">
+    <div class="feat-sec">
+      <div class="feat-h">Lab Features</div>
+      <div class="muted" style="margin-bottom:8px;">New features start in <b>Lab Testing</b> &mdash; live only on lab/test locations. Enable for Production to roll out everywhere; after 7 days it&rsquo;s archived and considered shipped.</div>
+      <div id="featlist"></div>
+      <div style="margin-top:10px;">
+        <div class="muted" style="margin-bottom:4px;">Lab/Test keywords &mdash; a location whose name contains any of these qualifies (comma-separated):</div>
+        <input id="labkw" type="text" spellcheck="false" style="width:100%;">
+        <div style="margin-top:6px;"><button id="savekw">Save keywords</button> <span class="muted" id="kwmsg"></span></div>
+      </div>
+    </div>
     <div class="muted" style="margin-bottom:6px;">Pre-configured device names &mdash; one per line: <code>Name &nbsp; IP</code>. Each pull hints/confirms/warns connected IPs against this.</div>
     <textarea id="namemap" spellcheck="false"></textarea>
     <div style="margin-top:8px;"><button id="savemap">Save</button> <span class="muted" id="savemsg"></span></div>
@@ -140,6 +163,33 @@ const DEFAULT_MAP=["Bread Start\t10.90.100.50","Bread Finish\t10.90.100.58","Sal
 function mapText(){ return localStorage.getItem(MAP_KEY) || DEFAULT_MAP; }
 function parseMap(t){ const m={}; (t||"").split("\n").forEach(l=>{ l=l.trim(); if(!l) return; const mm=l.match(/^(.*?)[\s=,]+(\d{1,3}(?:\.\d{1,3}){3})\s*$/); if(mm) m[mm[2]]=mm[1].trim(); }); return m; }
 let NAMEMAP=parseMap(mapText());
+
+// --- Lab Features lifecycle: Lab Testing -> Production -> archived (shipped after 7 days) ---
+const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
+const FEATURE_DEFS={ "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the switch port in Meraki." } };
+function loadFeatures(){
+  let s={}; try{ s=JSON.parse(localStorage.getItem(FEAT_KEY)||"{}"); }catch(e){}
+  for(const k in FEATURE_DEFS){ if(!s[k]) s[k]={state:"lab",enabledForProdAt:null}; }
+  const now=Date.now();
+  for(const k in s){ if(s[k].state==="prod" && s[k].enabledForProdAt && now-new Date(s[k].enabledForProdAt).getTime()>=7*864e5) s[k].state="shipped"; }
+  localStorage.setItem(FEAT_KEY, JSON.stringify(s)); return s;
+}
+let FEATURES=loadFeatures();
+function saveFeatures(){ localStorage.setItem(FEAT_KEY, JSON.stringify(FEATURES)); }
+function labKeywords(){ const v=localStorage.getItem(LABKW_KEY); return (v!=null?v:"TEST, LAB").split(/[,\s]+/).filter(Boolean).map(x=>x.toUpperCase()); }
+function isLabNet(name){ const n=(name||"").toUpperCase(); return labKeywords().some(k=>k&&n.indexOf(k)>=0); }
+function featureActive(key,netName){ const f=FEATURES[key]; if(!f) return false; if(f.state==="shipped"||f.state==="prod") return true; if(f.state==="lab") return isLabNet(netName); return false; }
+function daysLeft(iso){ if(!iso) return 0; return Math.max(0, 7-Math.floor((Date.now()-new Date(iso).getTime())/864e5)); }
+function renderFeatures(){
+  const el=document.getElementById("featlist"); if(!el) return; let rows="";
+  for(const k in FEATURE_DEFS){ const f=FEATURES[k]; if(!f||f.state==="shipped") continue; const def=FEATURE_DEFS[k];
+    let badge,action;
+    if(f.state==="lab"){ badge="<span class='badge lab'>Lab Testing</span>"; action="<button data-feat-prod='"+esc(k)+"'>Enable for Production</button>"; }
+    else { badge="<span class='badge prod'>Production</span>"; action="<span class='muted'>ships in "+daysLeft(f.enabledForProdAt)+"d &middot; then archived</span>"; }
+    rows+="<div class='featrow'><span class='fn'>"+esc(def.name)+"</span>"+badge+"<span class='fd'>"+esc(def.desc)+"</span>"+action+"</div>";
+  }
+  el.innerHTML = rows || "<div class='muted'>No features in testing &mdash; all shipped.</div>";
+}
 function nameCheck(ip, actual, mac){
   const exp=NAMEMAP[ip]; if(!exp) return "";
   const a=(actual||"").trim();
@@ -176,6 +226,7 @@ function render(){
   if(!LASTDATA) return;
   const d=LASTDATA.d, stamp=LASTDATA.stamp;
   const onlineOnly=true; // main view always shows what's connected now; 24h history is per-port "more info"
+  const FEAT=featureActive("one-click-naming", d.name); // One-Click Naming active for this location?
   let h="";
   h+="<div class='nethead'>Network: <b>"+esc(d.name||"")+"</b></div>";
   if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span></div>"; }
@@ -221,13 +272,13 @@ function render(){
      "</div>";
 
   // --- Switch pane ---
-  h+="<div id='pane-switch' class='"+(TAB==="switch"?"":"hidden")+"'>";
+  let sp="", nameableCount=0;
   const dev=d.devices||[];
   if(dev.length){
     let db="<table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
     dev.forEach(x=>{ db+="<tr><td>"+esc(x.name||"(no name)")+"</td><td>"+esc(x.model)+"</td><td>"+esc(x.serial)+"</td><td class='ip'>"+esc(x.mac)+"</td></tr>"; });
     db+="</tbody></table>";
-    h+=sect("devices","Meraki Devices ("+dev.length+")", db);
+    sp+=sect("devices","Meraki Devices ("+dev.length+")", db);
   }
   (d.switches||[]).slice().sort((a,b)=>swOrder(a.name)-swOrder(b.name)||(a.name||"").localeCompare(b.name)).forEach(sw=>{
     let sb="<table><thead><tr><th>Port</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th><th>Description</th><th>IP address</th><th>MAC address</th><th>Last seen (PT)</th></tr></thead><tbody>";
@@ -241,18 +292,22 @@ function render(){
       let desc=cs.map(c=>esc(c.name||"")).join("<br>");
       // Connected POS-VLAN (100) port with no live client -> almost always a Toast POS receipt printer.
       if(conn && String(p.vlan)==="100" && cs.length===0) desc="<span class='hint'>&rarr; likely Toast POS Receipt Printer</span>";
+      // One-Click Naming suggestion: the likely Konductor name for this port (POS printer, or a mapped device that's unnamed/mismatched).
+      let suggest=null;
+      if(conn && String(p.vlan)==="100" && cs.length===0) suggest="Toast POS Receipt Printer";
+      else { for(const c of cs){ const exp=NAMEMAP[c.ip]; if(exp){ const a=(c.name||"").trim().toLowerCase(); if(!a||a===(c.mac||"").toLowerCase()||a!==exp.toLowerCase()){ suggest=exp; break; } } } }
+      let nameBtn="";
+      if(FEAT && suggest){ nameableCount++; nameBtn=" <button class='nameit' data-serial='"+esc(sw.serial||"")+"' data-port='"+esc(p.port)+"' data-name='"+esc(suggest)+"'>Name it &rarr; "+esc(suggest)+"</button>"; }
       const ips=cs.map(c=>esc(c.ip||"")+nameCheck(c.ip||"", c.name, c.mac)).join("<br>");
       const macs=cs.map(c=>esc(c.mac||"")).join("<br>");
       const ls=cs.map(c=>esc(lastSeenPac(c.lastSeen))).join("<br>");
       const key=(sw.serial||"sw")+"-"+p.port;
       const hist=allClients.slice().sort((a,b)=>String(b.lastSeen||"").localeCompare(String(a.lastSeen||"")));
-      // Only offer 24h history when it ADDS something beyond the live row -- i.e. a device that
-      // was on this port in the window but isn't connected now. If it just echoes the live client, skip it.
       const hasHist = hist.some(c=>(c.status||"").toLowerCase()!=="online");
       const moreLink = hasHist ? " <a class='moreinfo' data-hist='"+esc(key)+"'>24h &#9662;</a>" : "";
       sb+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+
         "</td><td class='"+(conn?"st-conn":"st-disc")+"'>"+esc(p.status||"")+"</td><td>"+esc(p.vlan)+
-        "</td><td class='av'>"+esc(p.allowedVlans||"")+"</td><td>"+desc+moreLink+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av'>"+ls+"</td></tr>";
+        "</td><td class='av'>"+esc(p.allowedVlans||"")+"</td><td>"+desc+nameBtn+moreLink+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av'>"+ls+"</td></tr>";
       if(hasHist){
         let hr="<div class='histwrap'><div class='histcap'>Past 24 hours &middot; port "+esc(p.port)+" ("+hist.length+")</div>"+
           "<table class='histtbl'><thead><tr><th>Last seen (PT)</th><th>Status</th><th>Description</th><th>IP</th><th>MAC</th><th>VLAN</th></tr></thead><tbody>";
@@ -263,9 +318,10 @@ function render(){
       }
     });
     sb+="</tbody></table>";
-    h+=sect("sw-"+(sw.serial||sw.name), "Switch: "+esc(sw.name||sw.serial), sb);
+    sp+=sect("sw-"+(sw.serial||sw.name), "Switch: "+esc(sw.name||sw.serial), sb);
   });
-  h+="</div>";
+  const nameBar=(FEAT && nameableCount)?"<div class='namebar'><button id='nameall'>Name all matched ("+nameableCount+")</button> <span class='muted' id='nameallmsg'></span></div>":"";
+  h+="<div id='pane-switch' class='"+(TAB==="switch"?"":"hidden")+"'>"+nameBar+sp+"</div>";
 
   // --- Wi-Fi pane ---
   h+="<div id='pane-wifi' class='"+(TAB==="wifi"?"":"hidden")+"'>";
@@ -291,7 +347,7 @@ function render(){
   document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}";
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}";
 function exportDoc(){ return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Meraki Switch View</title><style>"+EXPORT_CSS+"</style></head><body>"+LAST+"</body></html>"; }
 function exportHtml(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
@@ -306,12 +362,29 @@ function exportPdf(){
   setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>{ try{document.body.removeChild(f);}catch(e){} }, 3000); }, 450);
 }
 
+// One-Click Naming: optimistic spinner, then the REAL status the bridge returns.
+async function doNameButton(nb){
+  if(!nb || nb.disabled) return;
+  const serial=nb.dataset.serial, port=nb.dataset.port, name=nb.dataset.name;
+  nb.disabled=true; const old=nb.innerHTML; nb.innerHTML="<span class='spin'></span> naming&hellip;";
+  try{
+    const r=await fetch(BRIDGE+"/meraki/name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:SELECTED_ID,serial,port,name})});
+    if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
+    const res=await r.json();
+    nb.outerHTML="<span class='nameok'>&check; named &ldquo;"+esc(res.applied_name||name)+"&rdquo;</span>";
+  }catch(err){ nb.disabled=false; nb.innerHTML=old; nb.insertAdjacentHTML("afterend"," <span class='namewarn'>write failed: "+esc(err.message)+"</span>"); }
+}
+
 document.getElementById("gform").addEventListener("submit", async e=>{
   e.preventDefault(); PW=document.getElementById("gpw").value;
   try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); document.getElementById("gate").classList.add("hide"); document.getElementById("netsearch").focus(); }
   catch(_){ document.getElementById("gerr").textContent="wrong password"; PW=""; }
 });
 document.getElementById("go").addEventListener("click", pull);
+document.getElementById("report").addEventListener("click", async e=>{
+  const nb=e.target.closest(".nameit"); if(nb){ e.stopPropagation(); doNameButton(nb); return; }
+  const na=e.target.closest("#nameall"); if(na){ na.disabled=true; const msg=document.getElementById("nameallmsg"); const all=[...document.querySelectorAll(".nameit:not(:disabled)")]; if(msg) msg.innerHTML="<span class='spin'></span> naming "+all.length+"&hellip;"; await Promise.all(all.map(doNameButton)); if(msg) msg.textContent="done"; na.disabled=false; return; }
+});
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
   const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); render(); return; }
@@ -319,9 +392,14 @@ document.getElementById("report").addEventListener("click", e=>{
 });
 document.getElementById("exh").addEventListener("click", exportHtml);
 document.getElementById("exp").addEventListener("click", exportPdf);
-document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); s.style.display = s.style.display==="none"?"block":"none"; });
+document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show) renderFeatures(); });
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
 document.getElementById("namemap").value=mapText();
+// Lab Features: enable-for-production + configurable keywords
+document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); renderFeatures(); if(LASTDATA) render(); } });
+document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", "); if(LASTDATA) render(); });
+document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
+renderFeatures();
 
 // --- network combobox (type-to-filter, Enter picks the top match) ---
 const _inp=document.getElementById("netsearch");
