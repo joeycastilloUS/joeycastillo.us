@@ -41,12 +41,15 @@
   .tab.on{background:#1d2a31;color:var(--accent);}
   .hidden{display:none;}
   .wifi-ap{color:var(--dim);}
+  .wifi-flag{display:inline-flex;align-items:center;gap:5px;background:#3a2a00;color:#ffce85;border:1px solid #ffce85;border-radius:5px;padding:1px 8px;font-weight:700;font-size:.82rem;white-space:nowrap;}
+  .tab .wic{vertical-align:-2px;margin-right:5px;}
   .gate{position:fixed;inset:0;z-index:999;background:#0a0a0a;display:flex;align-items:center;justify-content:center;}
   .gate.hide{display:none;} .gbox{text-align:center;max-width:340px;width:90%;}
   .gbrand{font-size:2rem;font-weight:800;color:var(--accent);letter-spacing:.12em;} .gsub{color:#555;font-size:.8rem;margin:.3rem 0 1.6rem;}
   .gerr{color:#ff8b8b;font-size:.82rem;min-height:1.2em;margin-top:.6rem;}
   @media print{
     body{background:#fff;color:#000;} .nav,.bar,.gate,.tabs{display:none!important;} .hidden{display:block!important;}
+    .wifi-flag{background:#fff3e0!important;color:#b35900!important;border-color:#d98a2b!important;}
     table{border-color:#ccc;} th{color:#555;} td{border-color:#eee;} td.port{color:#000;}
     .nethead b,h2,.tmpl .bound,.st-conn{color:#000;} *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   }
@@ -96,6 +99,7 @@ const PW_KEY = "meraki_pw_v1";
 let PW = sessionStorage.getItem(PW_KEY) || "";
 let LAST = "";
 let TAB = "switch";
+const WIFI="<svg class='wic' viewBox='0 0 24 24' width='13' height='13' fill='currentColor'><path d='M12 17.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 3C7.6 3 3.6 4.8.8 7.7l2.1 2.1C5.2 7.5 8.4 6 12 6s6.8 1.5 9.1 3.8l2.1-2.1C20.4 4.8 16.4 3 12 3zm0 5c-2.9 0-5.5 1.2-7.4 3.1l2.1 2.1C8 11 9.9 10 12 10s4 1 5.3 2.2l2.1-2.1C17.5 9.2 14.9 8 12 8z'/></svg>";
 
 function api(p){ return fetch(BRIDGE + p, { headers: { "Authorization": "Bearer " + PW } }); }
 function esc(s){return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
@@ -170,11 +174,12 @@ function render(){
   // --- Konductor rollout completeness: every mapped IP present + live (switch OR Wi-Fi) ---
   const wifi=LASTDATA.wifi, ssid=LASTDATA.ssid||"";
   const seen={};
-  function noteSeen(ip,on,via){ if(!ip) return; if(!seen[ip]){ seen[ip]={online:on,via:via}; } else { if(on) seen[ip].online=true; if(seen[ip].via!==via) seen[ip].via="wired+Wi-Fi"; } }
+  function portTag(swName){ const n=(swName||"").toUpperCase(); if(n.indexOf("POS")>=0) return "POS"; if(n.indexOf("BOH")>=0) return "BOH"; return (swName||"SW").trim(); }
+  function noteSeen(ip,on,where,isWifi){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[]}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); }
   (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>(p.clients||[]).forEach(c=>{
-    noteSeen(c.ip,(c.status||"").toLowerCase()==="online","wired");
+    noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false);
   })));
-  ((wifi&&wifi.clients)||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online","Wi-Fi"); });
+  ((wifi&&wifi.clients)||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||ssid,true); });
 
   const mapped=Object.keys(NAMEMAP);
   if(mapped.length){
@@ -184,12 +189,14 @@ function render(){
       if(!s){ st="MISSING"; cls="namewarn"; }
       else if(s.online){ st="LIVE"; cls="nameok"; live++; }
       else { st="found, not live"; cls="hint"; }
-      const via = s ? " <span class='av'>&middot; "+esc(s.via)+"</span>" : "";
-      rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td class='"+cls+"'>"+st+via+"</td></tr>";
+      const where = s && s.wheres.length
+        ? s.wheres.map(w=> w.wifi ? "<span class='wifi-flag'>"+WIFI+esc(w.label)+"</span>" : "<span class='port'>"+esc(w.label)+"</span>").join(" ")
+        : "<span class='av'>&mdash;</span>";
+      rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td>"+where+"</td><td class='"+cls+"'>"+st+"</td></tr>";
     });
     const total=mapped.length, solid=(live===total);
     h+="<h2>Konductor Rollout &mdash; "+live+"/"+total+" live &middot; "+(solid?"<span class='nameok'>SOLID</span>":"<span class='namewarn'>NOT SOLID</span>")+"</h2>";
-    h+="<table><thead><tr><th>Konductor device</th><th>IP</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>";
+    h+="<table><thead><tr><th>Konductor device</th><th>IP</th><th>Port / SSID</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>";
   }
 
   // --- tabs: Switch Ports | Wi-Fi ---
@@ -199,7 +206,7 @@ function render(){
   wc.sort((a,b)=>(((a.status||"").toLowerCase()==="online"?0:1)-((b.status||"").toLowerCase()==="online"?0:1))||(a.ip||"").localeCompare(b.ip||"",undefined,{numeric:true}));
   h+="<div class='tabs'>"+
      "<button class='tab"+(TAB==="switch"?" on":"")+"' data-tab='switch'>Switch Ports</button>"+
-     "<button class='tab"+(TAB==="wifi"?" on":"")+"' data-tab='wifi'>Wi-Fi"+(ssid?" ("+esc(ssid)+")":"")+" &middot; "+wcTotal+"</button>"+
+     "<button class='tab"+(TAB==="wifi"?" on":"")+"' data-tab='wifi'>"+WIFI+(ssid?esc(ssid):"Wi-Fi")+" &middot; "+wcTotal+"</button>"+
      "</div>";
 
   // --- Switch pane ---
@@ -236,11 +243,12 @@ function render(){
   if(!wifi){ h+="<div class='muted'>No Wi-Fi data &mdash; set an SSID and pull.</div>"; }
   else if(!wc.length){ h+="<div class='muted'>No "+(onlineOnly?"online ":"")+"clients on "+esc(ssid)+" in this network.</div>"; }
   else {
-    h+="<table><thead><tr><th>Description</th><th>IP address</th><th>MAC address</th><th>VLAN</th><th>AP</th><th>Device</th><th>Status</th><th>Last seen (PT)</th></tr></thead><tbody>";
+    h+="<table><thead><tr><th>Description</th><th>IP address</th><th>MAC address</th><th>VLAN</th><th>SSID</th><th>AP</th><th>Device</th><th>Status</th><th>Last seen (PT)</th></tr></thead><tbody>";
     wc.forEach(c=>{
       const on=(c.status||"").toLowerCase()==="online";
       h+="<tr class='"+(on?"":"disc")+"'><td>"+esc(c.name||"")+nameCheck(c.ip||"",c.name,c.mac)+"</td>"+
         "<td class='ip'>"+esc(c.ip||"")+"</td><td class='ip'>"+esc(c.mac||"")+"</td><td>"+esc(c.vlan||"")+"</td>"+
+        "<td><span class='wifi-flag'>"+WIFI+esc(c.ssid||ssid)+"</span></td>"+
         "<td class='wifi-ap'>"+esc(c.ap||"")+"</td><td class='av'>"+esc([c.manufacturer,c.os].filter(Boolean).join(" / "))+"</td>"+
         "<td class='"+(on?"st-conn":"st-disc")+"'>"+esc(c.status||"")+"</td><td class='av'>"+esc(lastSeenPac(c.lastSeen))+"</td></tr>";
     });
@@ -252,7 +260,7 @@ function render(){
   document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}";
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}";
 function exportDoc(){ return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Meraki Switch View</title><style>"+EXPORT_CSS+"</style></head><body>"+LAST+"</body></html>"; }
 function exportHtml(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
