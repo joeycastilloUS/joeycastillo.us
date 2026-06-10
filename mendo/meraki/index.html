@@ -187,11 +187,19 @@ function render(){
   document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
 
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}";
+function exportDoc(){ return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Meraki Switch View</title><style>"+EXPORT_CSS+"</style></head><body>"+LAST+"</body></html>"; }
 function exportHtml(){
-  const css="body{font-family:Arial,sans-serif;margin:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}th{text-align:left;background:#f2f2f2;padding:6px 9px;border:1px solid #ddd;font-size:11px;text-transform:uppercase;color:#555}td{padding:6px 9px;border:1px solid #eee}h2{color:#0d6e8c;font-size:15px;margin:18px 0 6px}.nethead{font-size:18px;margin-bottom:4px}.tmpl,.stamp{margin-bottom:6px}.disc td{color:#999}.hint{color:#0d6e8c}.nameok{color:#1f8a55;font-weight:700}.namewarn{color:#c0392b;font-weight:700}";
-  const html="<!DOCTYPE html><html><head><meta charset=utf-8><title>Meraki Switch View</title><style>"+css+"</style></head><body>"+LAST+"</body></html>";
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
   a.download="meraki-switch-view-"+pacific().replace(/[: ]/g,"-")+".html"; a.click();
+}
+function exportPdf(){
+  if(!LAST){ return; }
+  const f=document.createElement("iframe");
+  f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+  document.body.appendChild(f);
+  const doc=f.contentWindow.document; doc.open(); doc.write(exportDoc()); doc.close();
+  setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>{ try{document.body.removeChild(f);}catch(e){} }, 3000); }, 450);
 }
 
 document.getElementById("gform").addEventListener("submit", async e=>{
@@ -202,7 +210,7 @@ document.getElementById("gform").addEventListener("submit", async e=>{
 document.getElementById("go").addEventListener("click", pull);
 document.getElementById("online").addEventListener("change", render);
 document.getElementById("exh").addEventListener("click", exportHtml);
-document.getElementById("exp").addEventListener("click", ()=>window.print());
+document.getElementById("exp").addEventListener("click", exportPdf);
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); s.style.display = s.style.display==="none"?"block":"none"; });
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
 document.getElementById("namemap").value=mapText();
