@@ -223,9 +223,12 @@ function render(){
     const ports=(sw.ports||[]).slice().sort((a,b)=>parseInt(a.port,10)-parseInt(b.port,10));
     ports.forEach(p=>{
       const conn=(p.status||"").toLowerCase()==="connected";
-      let cs=(p.clients||[]);
+      const allClients=(p.clients||[]);
+      let cs=allClients;
       if(onlineOnly) cs=cs.filter(c=>(c.status||"").toLowerCase()==="online");
-      const desc=cs.map(c=>esc(c.name||"")).join("<br>");
+      let desc=cs.map(c=>esc(c.name||"")).join("<br>");
+      // Connected port on the POS VLAN (100) with no client -> almost always a Toast POS receipt printer.
+      if(conn && String(p.vlan)==="100" && allClients.length===0) desc="<span class='hint'>likely Toast POS Receipt Printer</span>";
       const ips=cs.map(c=>esc(c.ip||"")+nameCheck(c.ip||"", c.name, c.mac)).join("<br>");
       const macs=cs.map(c=>esc(c.mac||"")).join("<br>");
       const ls=cs.map(c=>esc(lastSeenPac(c.lastSeen))).join("<br>");
