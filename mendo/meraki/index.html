@@ -4,30 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Meraki Switch View &middot; Mendocino</title>
+<title>Meraki Switch View</title>
 <style>
-  :root{--bg:#0a0a0a;--surface:#141414;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--ok:#7CFFB2;--pos:#ffce85;}
+  :root{--bg:#0a0a0a;--surface:#141414;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--ok:#7CFFB2;--off:#777;}
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--text);line-height:1.5;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;}
   .nav{background:#000;border-bottom:2px solid var(--accent);padding:12px 20px;display:flex;justify-content:space-between;align-items:center;letter-spacing:.5px;}
   .nav .be{color:var(--accent);font-weight:800;} .nav .r{color:var(--dim);font-size:.78rem;}
-  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px 60px;}
-  h1{font-size:1.4rem;font-weight:300;margin:0 0 14px;}
-  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px;}
+  .wrap{max-width:1040px;margin:0 auto;padding:22px 20px 60px;}
+  h1{font-size:1.35rem;font-weight:300;margin:0 0 14px;}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
   select,button,input{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:9px 12px;font-size:.9rem;font-family:inherit;}
   select{min-width:280px;} button{background:var(--accent);color:#000;font-weight:700;cursor:pointer;border:none;}
+  button.alt{background:var(--surface);color:var(--text);border:1px solid var(--line);font-weight:600;}
   .muted{color:var(--dim);font-size:.85rem;}
-  h2{font-size:1rem;color:var(--accent);margin:24px 0 8px;}
-  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.88rem;}
-  th{text-align:left;color:var(--dim);font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border-bottom:1px solid var(--line);}
-  td{padding:9px 12px;border-bottom:1px solid #1f1f1f;} tr:last-child td{border-bottom:none;}
-  td.port{color:var(--accent);font-weight:700;} .vlan{font-weight:600;} .vlan.v90{color:var(--ok);} .vlan.v100{color:var(--pos);}
-  .ip{font-family:ui-monospace,Consolas,monospace;color:#bbb;} .av{color:var(--dim);font-size:.82rem;}
+  .nethead{margin:6px 0 4px;font-size:1.05rem;} .nethead b{color:var(--accent);}
+  .tmpl{font-size:.9rem;margin-bottom:4px;} .tmpl .bound{color:var(--ok);font-weight:700;} .tmpl .nb{color:#ffce85;font-weight:700;}
+  .stamp{color:var(--dim);font-size:.82rem;margin-bottom:14px;}
+  h2{font-size:.95rem;color:var(--accent);margin:22px 0 8px;}
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.86rem;margin-bottom:8px;}
+  th{text-align:left;color:var(--dim);font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;padding:8px 11px;border-bottom:1px solid var(--line);}
+  td{padding:8px 11px;border-bottom:1px solid #1f1f1f;} tr:last-child td{border-bottom:none;}
+  td.port{color:var(--accent);font-weight:700;} .disc td{color:var(--off);} .ip{font-family:ui-monospace,Consolas,monospace;}
+  .st-conn{color:var(--ok);} .st-disc{color:var(--off);} .av{color:var(--dim);}
   .err{color:#ff8b8b;margin-top:10px;}
-  /* gate */
   .gate{position:fixed;inset:0;z-index:999;background:#0a0a0a;display:flex;align-items:center;justify-content:center;}
   .gate.hide{display:none;} .gbox{text-align:center;max-width:340px;width:90%;}
   .gbrand{font-size:2rem;font-weight:800;color:var(--accent);letter-spacing:.12em;} .gsub{color:#555;font-size:.8rem;margin:.3rem 0 1.6rem;}
   .gerr{color:#ff8b8b;font-size:.82rem;min-height:1.2em;margin-top:.6rem;}
+  @media print{
+    body{background:#fff;color:#000;} .nav,.bar,.gate{display:none!important;}
+    table{border-color:#ccc;} th{color:#555;} td{border-color:#eee;} td.port{color:#000;}
+    .nethead b,h2,.tmpl .bound,.st-conn{color:#000;} *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
 </style>
 </head>
 <body>
@@ -43,15 +51,17 @@
   </div>
 </div>
 
-<div class="nav"><span><span class="be">Be</span> &middot; Meraki Switch View</span><span class="r">Mendocino &middot; on demand</span></div>
+<div class="nav"><span><span class="be">Be</span> &middot; Meraki Switch View</span><span class="r">on demand</span></div>
 <div class="wrap">
-  <h1>POS / BOH Switch View</h1>
+  <h1>Switch Port View</h1>
   <div class="bar">
     <select id="net"><option value="">Loading networks&hellip;</option></select>
     <button id="go">Pull</button>
+    <button id="exh" class="alt" disabled>Export HTML</button>
+    <button id="exp" class="alt" disabled>Export PDF</button>
     <span class="muted" id="status"></span>
   </div>
-  <div id="out"></div>
+  <div id="report"></div>
   <div class="err" id="err"></div>
 </div>
 
@@ -59,69 +69,78 @@
 const BRIDGE = "https://meraki-bridge-d5vc4tye3a-uw.a.run.app";
 const PW_KEY = "meraki_pw_v1";
 let PW = sessionStorage.getItem(PW_KEY) || "";
+let LAST = "";
 
-function api(path){
-  return fetch(BRIDGE + path, { headers: { "Authorization": "Bearer " + PW } });
+function api(p){ return fetch(BRIDGE + p, { headers: { "Authorization": "Bearer " + PW } }); }
+function esc(s){return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
+function pacific(){
+  try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZoneName:'short'}).format(new Date()).replace(',',''); }
+  catch(e){ return new Date().toISOString(); }
 }
 
 async function loadNetworks(){
   const r = await api("/meraki/networks");
-  if(r.status === 401){ throw new Error("unauthorized"); }
-  const d = await r.json();
-  const sel = document.getElementById("net");
-  sel.innerHTML = "";
-  d.networks.sort((a,b)=>a.name.localeCompare(b.name)).forEach(n=>{
-    const o=document.createElement("option"); o.value=n.id; o.textContent=n.name; sel.appendChild(o);
-  });
+  if(r.status===401) throw new Error("unauthorized");
+  const d = await r.json(); const sel=document.getElementById("net"); sel.innerHTML="";
+  d.networks.sort((a,b)=>a.name.localeCompare(b.name)).forEach(n=>{const o=document.createElement("option");o.value=n.id;o.textContent=n.name;sel.appendChild(o);});
 }
-
-function vlanClass(v){ return v==90?"vlan v90":(v==100?"vlan v100":"vlan"); }
 
 async function pull(){
-  const net = document.getElementById("net").value;
-  const out = document.getElementById("out"), err = document.getElementById("err");
-  out.innerHTML=""; err.textContent="";
-  document.getElementById("status").textContent = "pulling…";
-  const r = await api("/meraki/portmap?network=" + encodeURIComponent(net));
-  document.getElementById("status").textContent = "";
-  if(!r.ok){ err.textContent = "error " + r.status; return; }
-  const d = await r.json();
-  if(!d.switches.length){ out.innerHTML = "<p class='muted'>No switches found on this network.</p>"; return; }
-  d.switches.forEach(sw=>{
-    const rows = [];
-    sw.ports.forEach(p=>{
-      const cs = (p.clients||[]).filter(c => c.Ip || c.ip);
-      if((p.status||"").toLowerCase()!=="connected" || !cs.length) return; // connected + has a device only
-      cs.forEach(c=>{
-        rows.push({port:parseInt(p.port,10), device:(c.device||"?"), ip:(c.Ip||c.ip||""), vlan:p.vlan, av:p.allowedVlans});
-      });
+  const net=document.getElementById("net").value, rep=document.getElementById("report"), err=document.getElementById("err");
+  rep.innerHTML=""; err.textContent=""; document.getElementById("status").textContent="pulling…";
+  const r=await api("/meraki/portmap?network="+encodeURIComponent(net));
+  document.getElementById("status").textContent="";
+  if(!r.ok){ err.textContent="error "+r.status; return; }
+  const d=await r.json();
+  const stamp=pacific();
+  let h="";
+  h+="<div class='nethead'>Network: <b>"+esc(d.name||net)+"</b></div>";
+  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span></div>"; }
+  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span></div>"; }
+  h+="<div class='stamp'>Pulled "+esc(stamp)+"</div>";
+
+  // Meraki devices (name is often the MAC until renamed)
+  const dev=d.devices||[];
+  if(dev.length){
+    h+="<h2>Meraki Devices ("+dev.length+")</h2><table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
+    dev.forEach(x=>{ h+="<tr><td>"+esc(x.Name||"(no name)")+"</td><td>"+esc(x.Model)+"</td><td>"+esc(x.Serial)+"</td><td class='ip'>"+esc(x.Mac)+"</td></tr>"; });
+    h+="</tbody></table>";
+  }
+
+  // every switch, every port
+  (d.switches||[]).forEach(sw=>{
+    h+="<h2>Switch: "+esc(sw.name||sw.Serial)+"</h2>";
+    h+="<table><thead><tr><th>Port</th><th>Name</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th><th>Connected device (IP)</th></tr></thead><tbody>";
+    const ports=(sw.ports||[]).slice().sort((a,b)=>parseInt(a.port,10)-parseInt(b.port,10));
+    ports.forEach(p=>{
+      const conn=(p.status||"").toLowerCase()==="connected";
+      const cs=(p.clients||[]);
+      const who=cs.map(c=>esc((c.name|| c.Mac ||"?"))+" ("+esc(c.Ip||"")+")").join("<br>");
+      h+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+"</td><td>"+esc(p.name||"")+
+        "</td><td class='"+(conn?"st-conn":"st-disc")+"'>"+esc(p.status||"")+"</td><td>"+esc(p.vlan)+
+        "</td><td class='av'>"+esc(p.allowedVlans||"")+"</td><td>"+who+"</td></tr>";
     });
-    rows.sort((a,b)=>a.port-b.port);
-    let html = "<h2>Switch: "+esc(sw.name||sw.Serial)+"</h2>";
-    if(!rows.length){ html += "<p class='muted'>No connected devices.</p>"; out.insertAdjacentHTML("beforeend", html); return; }
-    html += "<table><thead><tr><th>Port</th><th>Device</th><th>IP</th><th>VLAN</th><th>Allowed VLANs</th></tr></thead><tbody>";
-    rows.forEach(x=>{
-      html += "<tr><td class='port'>"+x.port+"</td><td>"+esc(x.device)+"</td><td class='ip'>"+esc(x.ip)+
-        "</td><td class='"+vlanClass(x.vlan)+"'>"+(x.vlan??"")+"</td><td class='av'>"+(x.av?esc(x.av):"")+"</td></tr>";
-    });
-    html += "</tbody></table>";
-    out.insertAdjacentHTML("beforeend", html);
+    h+="</tbody></table>";
   });
+  rep.innerHTML=h; LAST=h;
+  document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
-function esc(s){return String(s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
+
+function exportHtml(){
+  const css="body{font-family:Arial,sans-serif;margin:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}th{text-align:left;background:#f2f2f2;padding:6px 9px;border:1px solid #ddd;font-size:11px;text-transform:uppercase;color:#555}td{padding:6px 9px;border:1px solid #eee}h2{color:#0d6e8c;font-size:15px;margin:18px 0 6px}.nethead{font-size:18px;margin-bottom:4px}.tmpl,.stamp{margin-bottom:6px}.disc td{color:#999}";
+  const html="<!DOCTYPE html><html><head><meta charset=utf-8><title>Meraki Switch View</title><style>"+css+"</style></head><body>"+LAST+"</body></html>";
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+  a.download="meraki-switch-view-"+pacific().replace(/[: ]/g,"-")+".html"; a.click();
+}
 
 document.getElementById("gform").addEventListener("submit", async e=>{
-  e.preventDefault();
-  PW = document.getElementById("gpw").value;
-  try{
-    await loadNetworks();
-    sessionStorage.setItem(PW_KEY, PW);
-    document.getElementById("gate").classList.add("hide");
-  }catch(_){ document.getElementById("gerr").textContent = "wrong password"; PW=""; }
+  e.preventDefault(); PW=document.getElementById("gpw").value;
+  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); document.getElementById("gate").classList.add("hide"); }
+  catch(_){ document.getElementById("gerr").textContent="wrong password"; PW=""; }
 });
 document.getElementById("go").addEventListener("click", pull);
-
-// already authed this session?
+document.getElementById("exh").addEventListener("click", exportHtml);
+document.getElementById("exp").addEventListener("click", ()=>window.print());
 (async()=>{ if(PW){ try{ await loadNetworks(); document.getElementById("gate").classList.add("hide"); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
 </script>
 </body>
