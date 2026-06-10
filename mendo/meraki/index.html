@@ -26,6 +26,9 @@
   td{padding:8px 11px;border-bottom:1px solid #1f1f1f;} tr:last-child td{border-bottom:none;}
   td.port{color:var(--accent);font-weight:700;} .disc td{color:var(--off);} .ip{font-family:ui-monospace,Consolas,monospace;}
   .st-conn{color:var(--ok);} .st-disc{color:var(--off);} .av{color:var(--dim);}
+  .hint{color:var(--accent);font-size:.78rem;} .nameok{color:var(--ok);font-weight:700;} .namewarn{color:#ff8b8b;font-weight:700;font-size:.78rem;}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
+  .panel textarea{width:100%;height:200px;background:#0d0d0d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;}
   .err{color:#ff8b8b;margin-top:10px;}
   .gate{position:fixed;inset:0;z-index:999;background:#0a0a0a;display:flex;align-items:center;justify-content:center;}
   .gate.hide{display:none;} .gbox{text-align:center;max-width:340px;width:90%;}
@@ -60,7 +63,13 @@
     <label class="muted" style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="online" checked style="width:auto;"> Connected now only</label>
     <button id="exh" class="alt" disabled>Export HTML</button>
     <button id="exp" class="alt" disabled>Export PDF</button>
+    <button id="gear" class="alt" title="Device name map">&#9881;</button>
     <span class="muted" id="status"></span>
+  </div>
+  <div class="panel" id="settings" style="display:none;">
+    <div class="muted" style="margin-bottom:6px;">Pre-configured device names &mdash; one per line: <code>Name &nbsp; IP</code>. Each pull hints/confirms/warns connected IPs against this.</div>
+    <textarea id="namemap" spellcheck="false"></textarea>
+    <div style="margin-top:8px;"><button id="savemap">Save</button> <span class="muted" id="savemsg"></span></div>
   </div>
   <div id="report"></div>
   <div class="err" id="err"></div>
@@ -84,6 +93,24 @@ async function loadNetworks(){
   if(r.status===401) throw new Error("unauthorized");
   const d = await r.json(); const sel=document.getElementById("net"); sel.innerHTML="";
   d.networks.sort((a,b)=>a.name.localeCompare(b.name)).forEach(n=>{const o=document.createElement("option");o.value=n.id;o.textContent=n.name;sel.appendChild(o);});
+}
+
+// --- pre-configured IP -> expected device name map (gear settings) ---
+const MAP_KEY="meraki_namemap_v1";
+const DEFAULT_MAP=["Bread Start\t10.90.100.50","Bread Finish\t10.90.100.58","Salad Start\t10.90.100.51",
+"Salad Finish\t10.90.100.59","Expo\t10.90.100.52","Digital Expo\t10.90.100.53","HerdServe\t10.90.100.55",
+"Injest\t10.90.100.101","Bread Printer\t10.90.100.70","Salad Printer\t10.90.100.71",
+"Expo Printer\t10.90.100.72","Digital Expo Printer\t10.90.100.90"].join("\n");
+function mapText(){ return localStorage.getItem(MAP_KEY) || DEFAULT_MAP; }
+function parseMap(t){ const m={}; (t||"").split("\n").forEach(l=>{ l=l.trim(); if(!l) return; const mm=l.match(/^(.*?)[\s=,]+(\d{1,3}(?:\.\d{1,3}){3})\s*$/); if(mm) m[mm[2]]=mm[1].trim(); }); return m; }
+let NAMEMAP=parseMap(mapText());
+function nameCheck(ip, actual, mac){
+  const exp=NAMEMAP[ip]; if(!exp) return "";
+  const a=(actual||"").trim();
+  const unnamed = !a || a.toLowerCase()===(mac||"").toLowerCase();
+  if(unnamed) return " <span class='hint'>&rarr; likely \""+esc(exp)+"\"</span>";
+  if(a.toLowerCase()===exp.toLowerCase()) return " <span class='nameok'>&check;</span>";
+  return " <span class='namewarn'>&#9888; should be \""+esc(exp)+"\"</span>";
 }
 
 let LASTDATA=null;
@@ -110,6 +137,27 @@ function render(){
   else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span></div>"; }
   h+="<div class='stamp'>Pulled "+esc(stamp)+(onlineOnly?" &middot; connected-now only":" &middot; seen in last 24h")+"</div>";
 
+  // --- Konductor rollout completeness: every mapped IP must be present + live ---
+  const seen={};
+  (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>(p.clients||[]).forEach(c=>{
+    if(!c.ip) return; const on=(c.status||"").toLowerCase()==="online";
+    if(!seen[c.ip]) seen[c.ip]={online:on}; else if(on) seen[c.ip].online=true;
+  })));
+  const mapped=Object.keys(NAMEMAP);
+  if(mapped.length){
+    let live=0, rows="";
+    mapped.forEach(ip=>{
+      const nm=NAMEMAP[ip], s=seen[ip]; let st,cls;
+      if(!s){ st="MISSING"; cls="namewarn"; }
+      else if(s.online){ st="LIVE"; cls="nameok"; live++; }
+      else { st="found, not live"; cls="hint"; }
+      rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td class='"+cls+"'>"+st+"</td></tr>";
+    });
+    const total=mapped.length, solid=(live===total);
+    h+="<h2>Konductor Rollout &mdash; "+live+"/"+total+" live &middot; "+(solid?"<span class='nameok'>SOLID</span>":"<span class='namewarn'>NOT SOLID</span>")+"</h2>";
+    h+="<table><thead><tr><th>Konductor device</th><th>IP</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>";
+  }
+
   const dev=d.devices||[];
   if(dev.length){
     h+="<h2>Meraki Devices ("+dev.length+")</h2><table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
@@ -126,7 +174,7 @@ function render(){
       let cs=(p.clients||[]);
       if(onlineOnly) cs=cs.filter(c=>(c.status||"").toLowerCase()==="online");
       const desc=cs.map(c=>esc(c.name||"")).join("<br>");
-      const ips=cs.map(c=>esc(c.ip||"")).join("<br>");
+      const ips=cs.map(c=>esc(c.ip||"")+nameCheck(c.ip||"", c.name, c.mac)).join("<br>");
       const macs=cs.map(c=>esc(c.mac||"")).join("<br>");
       const ls=cs.map(c=>esc(lastSeenPac(c.lastSeen))).join("<br>");
       h+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+
@@ -140,7 +188,7 @@ function render(){
 }
 
 function exportHtml(){
-  const css="body{font-family:Arial,sans-serif;margin:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}th{text-align:left;background:#f2f2f2;padding:6px 9px;border:1px solid #ddd;font-size:11px;text-transform:uppercase;color:#555}td{padding:6px 9px;border:1px solid #eee}h2{color:#0d6e8c;font-size:15px;margin:18px 0 6px}.nethead{font-size:18px;margin-bottom:4px}.tmpl,.stamp{margin-bottom:6px}.disc td{color:#999}";
+  const css="body{font-family:Arial,sans-serif;margin:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}th{text-align:left;background:#f2f2f2;padding:6px 9px;border:1px solid #ddd;font-size:11px;text-transform:uppercase;color:#555}td{padding:6px 9px;border:1px solid #eee}h2{color:#0d6e8c;font-size:15px;margin:18px 0 6px}.nethead{font-size:18px;margin-bottom:4px}.tmpl,.stamp{margin-bottom:6px}.disc td{color:#999}.hint{color:#0d6e8c}.nameok{color:#1f8a55;font-weight:700}.namewarn{color:#c0392b;font-weight:700}";
   const html="<!DOCTYPE html><html><head><meta charset=utf-8><title>Meraki Switch View</title><style>"+css+"</style></head><body>"+LAST+"</body></html>";
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([html],{type:"text/html"}));
   a.download="meraki-switch-view-"+pacific().replace(/[: ]/g,"-")+".html"; a.click();
@@ -155,6 +203,9 @@ document.getElementById("go").addEventListener("click", pull);
 document.getElementById("online").addEventListener("change", render);
 document.getElementById("exh").addEventListener("click", exportHtml);
 document.getElementById("exp").addEventListener("click", ()=>window.print());
+document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); s.style.display = s.style.display==="none"?"block":"none"; });
+document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
+document.getElementById("namemap").value=mapText();
 (async()=>{ if(PW){ try{ await loadNetworks(); document.getElementById("gate").classList.add("hide"); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
 </script>
 </body>
