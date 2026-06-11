@@ -45,6 +45,17 @@
   .sevtag{display:inline-block;border-radius:5px;padding:1px 7px;font-size:.66rem;font-weight:800;letter-spacing:.5px;}
   .sevtag.sev-critical{background:#3a1111;border:1px solid var(--bad);} .sevtag.sev-high{background:#3a2400;border:1px solid #ffae6b;}
   .sevtag.sev-medium{background:#3a2a00;border:1px solid var(--warn);} .sevtag.sev-low{background:#16323d;border:1px solid var(--accent);}
+  .catcards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;}
+  .catcard{flex:1 1 130px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 10px;text-align:center;}
+  .catcard.na{opacity:.5;} .catgrade{font-size:1.7rem;font-weight:800;line-height:1;}
+  .catname{font-size:.82rem;color:var(--text);margin-top:3px;font-weight:600;} .catsub{font-size:.72rem;color:var(--dim);margin-top:1px;}
+  .findings{display:flex;flex-direction:column;gap:10px;margin:12px 0;}
+  .fcard{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:11px 14px;}
+  .fcard.sev-l-critical{border-left-color:var(--bad);} .fcard.sev-l-high{border-left-color:#ffae6b;} .fcard.sev-l-medium{border-left-color:var(--warn);} .fcard.sev-l-low{border-left-color:var(--accent);}
+  .fchead{display:flex;align-items:center;gap:9px;margin-bottom:2px;} .fcid{color:var(--dim);font-family:ui-monospace,Consolas,monospace;font-size:.78rem;} .fccat{color:var(--dim);font-size:.78rem;}
+  .fctitle{font-weight:700;font-size:.98rem;margin:2px 0;}
+  .fcev{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;color:var(--text);background:#0d0d0d;border:1px solid var(--line);border-radius:6px;padding:6px 9px;margin:5px 0;word-break:break-word;}
+  .fcrem{color:#b8c4c9;font-size:.9rem;line-height:1.5;} .fcrem b{color:var(--accent);}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
   .panel textarea{width:100%;height:200px;background:#0d0d0d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;}
   .err{color:#ff8b8b;margin-top:10px;}
@@ -480,22 +491,39 @@ function render(){
   else if(!LASTDATA.audit){ h+="<div class='muted'>Open this tab to run a read-only firewall security audit of <b>"+esc(d.name||"this network")+"</b>.</div>"; }
   else {
     const A=LASTDATA.audit, S=A.summary||{};
+    // overall grade
     h+="<div class='auditbar'><span class='gradebig grade-"+esc(A.grade)+"'>"+esc(A.grade)+"</span><span class='scorebig'>"+esc(""+A.score)+"<small>/100</small></span>"+
        "<span class='sevsum'>"+(S.critical||0)+" <span class='sev-critical'>critical</span> &middot; "+(S.high||0)+" <span class='sev-high'>high</span> &middot; "+(S.medium||0)+" <span class='sev-medium'>medium</span> &middot; "+(S.low||0)+" <span class='sev-low'>low</span></span></div>";
+    // per-category report card
+    if(A.categories&&A.categories.length){
+      h+="<div class='catcards'>";
+      A.categories.forEach(c=>{
+        const na=!c.applicable;
+        h+="<div class='catcard"+(na?" na":"")+"'><div class='catgrade grade-"+esc(c.grade)+"'>"+(na?"&ndash;":esc(c.grade))+"</div>"+
+           "<div class='catname'>"+esc(c.category)+"</div>"+
+           "<div class='catsub'>"+(na?"not applicable":(c.findings+" finding"+(c.findings===1?"":"s")))+"</div></div>";
+      });
+      h+="</div>";
+    }
     const M=A.meta||{};
     h+="<div class='stamp'>Scope: <b>"+(M.l3Rules||0)+"</b> L3 rules &middot; <b>"+(M.portForwards||0)+"</b> port-forwards &middot; <b>"+(M.oneToOneNat||0)+"</b> 1:1 NAT &middot; <b>"+(M.enabledSsids||0)+"</b> SSIDs &middot; <b>"+(M.clients||0)+"</b> clients &middot; <b>"+(M.devices||0)+"</b> devices &middot; <a class='moreinfo' id='showchecks'>"+(SHOWCHECKS?"&#9662; hide":"&#9656;")+" checks &amp; scoring</a></div>";
     if(SHOWCHECKS) h+=renderChecks();
     if(A.skipped&&A.skipped.length) h+="<div class='stamp'>Skipped (not applicable / unlicensed): "+esc(A.skipped.join(", "))+"</div>";
     const rank={critical:0,high:1,medium:2,low:3};
     const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
-    if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No findings &mdash; clean against the v1 checks.</div>"; }
+    if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No findings &mdash; clean against every check.</div>"; }
     else {
-      let fb="<table class='nosort'><thead><tr><th>Severity</th><th>ID</th><th>Category</th><th>Finding</th><th>Evidence</th><th>Remediation</th></tr></thead><tbody>";
-      fs.forEach(f=>{ fb+="<tr><td><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span></td>"+
-        "<td class='av'>"+esc(f.id)+"</td><td>"+esc(f.category)+"</td><td><b>"+esc(f.title)+"</b></td>"+
-        "<td class='ip'>"+esc(f.evidence)+"</td><td class='muted'>"+esc(f.remediation)+"</td></tr>"; });
-      fb+="</tbody></table>";
-      h+=fb;
+      // findings as readable cards (no cramped table)
+      h+="<div class='findings'>";
+      fs.forEach(f=>{
+        h+="<div class='fcard sev-l-"+esc(f.severity)+"'>"+
+           "<div class='fchead'><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span>"+
+           "<span class='fcid'>"+esc(f.id)+"</span><span class='fccat'>"+esc(f.category)+"</span></div>"+
+           "<div class='fctitle'>"+esc(f.title)+"</div>"+
+           "<div class='fcev'>"+esc(f.evidence)+"</div>"+
+           "<div class='fcrem'><b>Fix &middot;</b> "+esc(f.remediation)+"</div></div>";
+      });
+      h+="</div>";
     }
     h+="<div class='stamp' style='margin-top:8px;'>Read-only audit &middot; "+esc(A.findingCount+" finding"+(A.findingCount===1?"":"s"))+" &middot; no settings changed.</div>";
   }
