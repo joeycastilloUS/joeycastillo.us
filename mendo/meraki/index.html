@@ -36,6 +36,15 @@
   .st-conn{color:var(--ok);} .st-disc{color:var(--off);} .av{color:var(--dim);}
   .hint{color:var(--accent);font-size:.78rem;} .nameok{color:var(--ok);font-weight:700;} .namewarn{color:#ff8b8b;font-weight:700;font-size:.78rem;}
   .kbadge{display:inline-block;background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:3px;font-size:.6rem;font-weight:800;line-height:1;padding:1px 3px;vertical-align:middle;}
+  .auditbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:12px 0 6px;}
+  .gradebig{font-size:2.4rem;font-weight:800;line-height:1;border:2px solid currentColor;border-radius:10px;padding:6px 14px;}
+  .scorebig{font-size:1.6rem;font-weight:700;color:var(--text);} .scorebig small{color:var(--dim);font-size:.9rem;font-weight:400;}
+  .sevsum{color:var(--dim);font-size:.9rem;}
+  .grade-A{color:var(--ok);} .grade-B{color:#9fe6c0;} .grade-C{color:var(--warn);} .grade-D{color:#ffae6b;} .grade-F{color:var(--bad);}
+  .sev-critical{color:var(--bad);font-weight:700;} .sev-high{color:#ffae6b;font-weight:700;} .sev-medium{color:var(--warn);font-weight:700;} .sev-low{color:var(--accent);font-weight:700;}
+  .sevtag{display:inline-block;border-radius:5px;padding:1px 7px;font-size:.66rem;font-weight:800;letter-spacing:.5px;}
+  .sevtag.sev-critical{background:#3a1111;border:1px solid var(--bad);} .sevtag.sev-high{background:#3a2400;border:1px solid #ffae6b;}
+  .sevtag.sev-medium{background:#3a2a00;border:1px solid var(--warn);} .sevtag.sev-low{background:#16323d;border:1px solid var(--accent);}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
   .panel textarea{width:100%;height:200px;background:#0d0d0d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;}
   .err{color:#ff8b8b;margin-top:10px;}
@@ -161,7 +170,7 @@ function sortTable(table,col,dir){
 }
 function initSortables(){
   document.getElementById("report").querySelectorAll("table").forEach(table=>{
-    if(table.classList.contains("histtbl")) return; // nested 24h detail -- leave as-is
+    if(table.classList.contains("histtbl")||table.classList.contains("nosort")) return; // nested detail / pre-ordered tables
     if(!table.tHead||!table.tBodies[0]) return;
     [...table.tHead.rows[0].cells].forEach(th=>{ th.classList.add("sortable"); if(!th.querySelector(".sortind")){ const s=document.createElement("span"); s.className="sortind"; th.appendChild(s); } });
     const st=SORTSTATE[sortKeyOf(table)]||{col:0,dir:1};
@@ -282,6 +291,18 @@ async function refreshSection(kind, btn){
   render(); // rebuilds the report -- the button is recreated fresh + enabled
 }
 
+// Read-only Firewall Security Audit for the current network (lazy: runs when the tab opens).
+async function pullAudit(){
+  if(!LASTDATA||!LASTDATA.net||LASTDATA.auditing) return;
+  LASTDATA.auditing=true; LASTDATA.auditError=""; render();
+  try{
+    const r=await api("/meraki/audit?network="+encodeURIComponent(LASTDATA.net));
+    if(!r.ok) throw new Error("error "+r.status);
+    LASTDATA.audit=await r.json();
+  }catch(e){ LASTDATA.auditError=e.message||"audit error"; }
+  LASTDATA.auditing=false; render();
+}
+
 function render(){
   if(!LASTDATA) return;
   const d=LASTDATA.d, stamp=LASTDATA.stamp;
@@ -333,9 +354,11 @@ function render(){
   // --- tabs: Switch Ports | Wi-Fi (all SSIDs) ---
   const ssidGroups=(wifi&&wifi.ssids)||[];
   const ssidCount=wifi?(wifi.ssidCount!=null?wifi.ssidCount:ssidGroups.length):0;
+  const auditBadge = LASTDATA.audit ? " &middot; <b class='grade-"+esc(LASTDATA.audit.grade)+"'>"+esc(LASTDATA.audit.grade)+"</b>" : "";
   h+="<div class='tabs'>"+
      "<button class='tab"+(TAB==="switch"?" on":"")+"' data-tab='switch'>Switch Ports</button>"+
      "<button class='tab"+(TAB==="wifi"?" on":"")+"' data-tab='wifi'>"+WIFI+"Wi-Fi &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s")+"</button>"+
+     "<button class='tab"+(TAB==="audit"?" on":"")+"' data-tab='audit'>&#128737; Security Audit"+auditBadge+"</button>"+
      "</div>";
 
   // --- Switch pane: switches first, Meraki Devices inventory last ---
@@ -432,6 +455,31 @@ function render(){
   }
   h+="</div>";
 
+  // --- Security Audit pane: read-only firewall/security audit of this network ---
+  h+="<div id='pane-audit' class='"+(TAB==="audit"?"":"hidden")+"'>";
+  if(LASTDATA.auditing){ h+="<div class='muted'><span class='spin'></span> running security audit&hellip;</div>"; }
+  else if(LASTDATA.auditError){ h+="<div class='err'>audit failed: "+esc(LASTDATA.auditError)+"</div>"; }
+  else if(!LASTDATA.audit){ h+="<div class='muted'>Open this tab to run a read-only firewall security audit of <b>"+esc(d.name||"this network")+"</b>.</div>"; }
+  else {
+    const A=LASTDATA.audit, S=A.summary||{};
+    h+="<div class='auditbar'><span class='gradebig grade-"+esc(A.grade)+"'>"+esc(A.grade)+"</span><span class='scorebig'>"+esc(""+A.score)+"<small>/100</small></span>"+
+       "<span class='sevsum'>"+(S.critical||0)+" <span class='sev-critical'>critical</span> &middot; "+(S.high||0)+" <span class='sev-high'>high</span> &middot; "+(S.medium||0)+" <span class='sev-medium'>medium</span> &middot; "+(S.low||0)+" <span class='sev-low'>low</span></span></div>";
+    if(A.skipped&&A.skipped.length) h+="<div class='stamp'>Skipped (not applicable / unlicensed): "+esc(A.skipped.join(", "))+"</div>";
+    const rank={critical:0,high:1,medium:2,low:3};
+    const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
+    if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No findings &mdash; clean against the v1 checks.</div>"; }
+    else {
+      let fb="<table class='nosort'><thead><tr><th>Severity</th><th>ID</th><th>Category</th><th>Finding</th><th>Evidence</th><th>Remediation</th></tr></thead><tbody>";
+      fs.forEach(f=>{ fb+="<tr><td><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span></td>"+
+        "<td class='av'>"+esc(f.id)+"</td><td>"+esc(f.category)+"</td><td><b>"+esc(f.title)+"</b></td>"+
+        "<td class='ip'>"+esc(f.evidence)+"</td><td class='muted'>"+esc(f.remediation)+"</td></tr>"; });
+      fb+="</tbody></table>";
+      h+=fb;
+    }
+    h+="<div class='stamp' style='margin-top:8px;'>Read-only audit &middot; "+esc(A.findingCount+" finding"+(A.findingCount===1?"":"s"))+" &middot; no settings changed.</div>";
+  }
+  h+="</div>";
+
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
   document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
@@ -505,7 +553,7 @@ document.getElementById("report").addEventListener("keydown", e=>{
 });
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
-  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); render(); return; }
+  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); render(); if(TAB==="audit"&&!LASTDATA.audit&&!LASTDATA.auditing) pullAudit(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("exh").addEventListener("click", exportHtml);
