@@ -53,6 +53,8 @@
   .sect-h .chev{color:var(--accent);font-size:.7em;display:inline-block;transition:transform .15s;}
   .sect-h:not(.collapsed) .chev{transform:rotate(90deg);}
   .sect-h.collapsed{opacity:.78;}
+  .secref{margin-left:auto;background:var(--surface);color:var(--accent);border:1px solid var(--line);border-radius:6px;padding:1px 10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.5;}
+  .secref:hover{border-color:var(--accent);} .secref:disabled{opacity:.55;cursor:default;} .secref .spin{vertical-align:0;}
   .feat-sec{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:14px;}
   .feat-h{color:var(--accent);font-size:.95rem;font-weight:700;margin-bottom:6px;}
   .featrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0e0e0e;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;}
@@ -71,7 +73,7 @@
   .gbrand{font-size:2rem;font-weight:800;color:var(--accent);letter-spacing:.12em;} .gsub{color:#555;font-size:.8rem;margin:.3rem 0 1.6rem;}
   .gerr{color:#ff8b8b;font-size:.82rem;min-height:1.2em;margin-top:.6rem;}
   @media print{
-    body{background:#fff;color:#000;} .nav,.bar,.gate,.tabs{display:none!important;} .hidden{display:block!important;}
+    body{background:#fff;color:#000;} .nav,.bar,.gate,.tabs,.secref{display:none!important;} .hidden{display:block!important;}
     .wifi-flag{background:#fff3e0!important;color:#b35900!important;border-color:#d98a2b!important;}
     table{border-color:#ccc;} th{color:#555;} td{border-color:#eee;} td.port{color:#000;}
     .nethead b,h2,.tmpl .bound,.st-conn{color:#000;} *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -132,7 +134,7 @@ let PW = sessionStorage.getItem(PW_KEY) || "";
 let LAST = "";
 let TAB = "switch";
 let SECTSTATE={}; // section key -> false when collapsed; persists across re-renders
-function sect(key,title,body){ const open=SECTSTATE[key]!==false; return "<h2 class='sect-h"+(open?"":" collapsed")+"' data-sect='"+esc(key)+"'><span class='chev'>&#9656;</span> "+title+"</h2><div class='sect-body' id='secbody-"+esc(key)+"'"+(open?"":" style='display:none'")+">"+body+"</div>"; }
+function sect(key,title,body,kind){ const open=SECTSTATE[key]!==false; const ref=kind?"<button class='secref' data-refresh='"+esc(kind)+"' title='Refresh this section'>&#x21bb; Refresh</button>":""; return "<h2 class='sect-h"+(open?"":" collapsed")+"' data-sect='"+esc(key)+"'><span class='chev'>&#9656;</span> "+title+ref+"</h2><div class='sect-body' id='secbody-"+esc(key)+"'"+(open?"":" style='display:none'")+">"+body+"</div>"; }
 const WIFI="<svg class='wic' viewBox='0 0 24 24' width='13' height='13' fill='currentColor'><path d='M12 17.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 3C7.6 3 3.6 4.8.8 7.7l2.1 2.1C5.2 7.5 8.4 6 12 6s6.8 1.5 9.1 3.8l2.1-2.1C20.4 4.8 16.4 3 12 3zm0 5c-2.9 0-5.5 1.2-7.4 3.1l2.1 2.1C8 11 9.9 10 12 10s4 1 5.3 2.2l2.1-2.1C17.5 9.2 14.9 8 12 8z'/></svg>";
 
 function api(p){ return fetch(BRIDGE + p, { headers: { "Authorization": "Bearer " + PW } }); }
@@ -203,23 +205,46 @@ let LASTDATA=null;
 function lastSeenPac(s){ if(!s) return ""; try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s)); }catch(e){ return s; } }
 function swOrder(n){ n=(n||"").toUpperCase(); if(n.indexOf("POS")>=0) return 0; if(n.indexOf("BOH")>=0) return 1; return 2; }
 
+// Independent source fetchers -- each updates only its slice of LASTDATA + its own stamp,
+// so a single section can be refreshed without re-pulling the others.
+async function pullPorts(net){
+  const r=await api("/meraki/portmap?network="+encodeURIComponent(net));
+  if(!r.ok) throw new Error("switch error "+r.status);
+  LASTDATA.d=await r.json(); LASTDATA.portStamp=pacific();
+}
+async function pullWifi(net,ssid){
+  if(!ssid){ LASTDATA.wifi=null; LASTDATA.ssid=""; LASTDATA.wifiStamp=pacific(); return; }
+  const rw=await api("/meraki/ssid?ssid="+encodeURIComponent(ssid)+"&network="+encodeURIComponent(net));
+  if(!rw.ok) throw new Error("Wi-Fi error "+rw.status);
+  LASTDATA.wifi=await rw.json(); LASTDATA.ssid=ssid; LASTDATA.wifiStamp=pacific();
+}
+
 async function pull(){
   const net=resolveNet(), err=document.getElementById("err");
   document.getElementById("report").innerHTML=""; err.textContent="";
   if(!net){ err.textContent="pick a network"; return; }
   const ssid=(document.getElementById("ssid").value||"").trim();
-  document.getElementById("status").textContent="pulling switch…";
-  const r=await api("/meraki/portmap?network="+encodeURIComponent(net));
-  if(!r.ok){ document.getElementById("status").textContent=""; err.textContent="error "+r.status; return; }
-  const port=await r.json();
-  let wifi=null;
-  if(ssid){
-    document.getElementById("status").textContent="pulling Wi-Fi…";
-    try{ const rw=await api("/meraki/ssid?ssid="+encodeURIComponent(ssid)+"&network="+encodeURIComponent(net)); if(rw.ok) wifi=await rw.json(); }catch(e){}
-  }
+  LASTDATA={ d:null, wifi:null, ssid, net, stamp:pacific(), portStamp:"", wifiStamp:"" };
+  try{
+    document.getElementById("status").textContent="pulling switch…";
+    await pullPorts(net);
+    if(ssid){ document.getElementById("status").textContent="pulling Wi-Fi…"; try{ await pullWifi(net,ssid); }catch(e){} }
+  }catch(e){ document.getElementById("status").textContent=""; err.textContent=e.message||"error"; return; }
   document.getElementById("status").textContent="";
-  LASTDATA={ d: port, wifi, ssid, stamp: pacific() };
   render();
+}
+
+// Per-section refresh: re-pull only the source(s) behind the clicked section, then re-render.
+async function refreshSection(kind, btn){
+  if(!LASTDATA||!LASTDATA.net) return;
+  const net=LASTDATA.net, ssid=(document.getElementById("ssid").value||"").trim();
+  if(btn){ btn.disabled=true; btn.innerHTML="<span class='spin'></span> refreshing&hellip;"; }
+  document.getElementById("err").textContent="";
+  try{
+    if(kind==="ports"||kind==="both") await pullPorts(net);
+    if(kind==="wifi"||kind==="both") await pullWifi(net,ssid);
+  }catch(e){ document.getElementById("err").textContent=e.message||"refresh error"; }
+  render(); // rebuilds the report -- the button is recreated fresh + enabled
 }
 
 function render(){
@@ -231,7 +256,8 @@ function render(){
   h+="<div class='nethead'>Network: <b>"+esc(d.name||"")+"</b></div>";
   if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span></div>"; }
   else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span></div>"; }
-  h+="<div class='stamp'>Pulled "+esc(stamp)+(onlineOnly?" &middot; connected-now only":" &middot; seen in last 24h")+"</div>";
+  const pStamp=LASTDATA.portStamp||stamp, wStamp=LASTDATA.wifiStamp;
+  h+="<div class='stamp'>Switch pulled "+esc(pStamp)+(wStamp?" &middot; Wi-Fi pulled "+esc(wStamp):"")+(onlineOnly?" &middot; connected-now only":" &middot; seen in last 24h")+"</div>";
 
   // --- Konductor rollout completeness: every mapped IP present + live (switch OR Wi-Fi) ---
   const wifi=LASTDATA.wifi, ssid=LASTDATA.ssid||"";
@@ -258,7 +284,7 @@ function render(){
     });
     const total=mapped.length, solid=(live===total);
     h+=sect("rollout","Konductor Rollout &mdash; "+live+"/"+total+" live &middot; "+(solid?"<span class='nameok'>SOLID</span>":"<span class='namewarn'>NOT SOLID</span>"),
-      "<table><thead><tr><th>Konductor device</th><th>IP</th><th>Port / SSID</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>");
+      "<table><thead><tr><th>Konductor device</th><th>IP</th><th>Port / SSID</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>","both");
   }
 
   // --- tabs: Switch Ports | Wi-Fi ---
@@ -278,7 +304,7 @@ function render(){
     let db="<table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
     dev.forEach(x=>{ db+="<tr><td>"+esc(x.name||"(no name)")+"</td><td>"+esc(x.model)+"</td><td>"+esc(x.serial)+"</td><td class='ip'>"+esc(x.mac)+"</td></tr>"; });
     db+="</tbody></table>";
-    sp+=sect("devices","Meraki Devices ("+dev.length+")", db);
+    sp+=sect("devices","Meraki Devices ("+dev.length+")", db, "ports");
   }
   (d.switches||[]).slice().sort((a,b)=>swOrder(a.name)-swOrder(b.name)||(a.name||"").localeCompare(b.name)).forEach(sw=>{
     let sb="<table><thead><tr><th>Port</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th><th>Description</th><th>IP address</th><th>MAC address</th><th>Last seen (PT)</th></tr></thead><tbody>";
@@ -318,7 +344,7 @@ function render(){
       }
     });
     sb+="</tbody></table>";
-    sp+=sect("sw-"+(sw.serial||sw.name), "Switch: "+esc(sw.name||sw.serial), sb);
+    sp+=sect("sw-"+(sw.serial||sw.name), "Switch: "+esc(sw.name||sw.serial), sb, "ports");
   });
   const nameBar=(FEAT && nameableCount)?"<div class='namebar'><button id='nameall'>Name all matched ("+nameableCount+")</button> <span class='muted' id='nameallmsg'></span></div>":"";
   h+="<div id='pane-switch' class='"+(TAB==="switch"?"":"hidden")+"'>"+nameBar+sp+"</div>";
@@ -340,14 +366,14 @@ function render(){
     });
     wb+="</tbody></table>";
   }
-  h+=sect("wifi","Wi-Fi clients"+(ssid?" on "+esc(ssid):"")+" ("+wc.length+" online)", wb);
+  h+=sect("wifi","Wi-Fi clients"+(ssid?" on "+esc(ssid):"")+" ("+wc.length+" online)", wb, "wifi");
   h+="</div>";
 
   document.getElementById("report").innerHTML=h; LAST=h;
   document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}";
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}";
 function exportDoc(){ return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Meraki Switch View</title><style>"+EXPORT_CSS+"</style></head><body>"+LAST+"</body></html>"; }
 function exportHtml(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
@@ -382,6 +408,7 @@ document.getElementById("gform").addEventListener("submit", async e=>{
 });
 document.getElementById("go").addEventListener("click", pull);
 document.getElementById("report").addEventListener("click", async e=>{
+  const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); refreshSection(sr.getAttribute("data-refresh"), sr); return; }
   const nb=e.target.closest(".nameit"); if(nb){ e.stopPropagation(); doNameButton(nb); return; }
   const na=e.target.closest("#nameall"); if(na){ na.disabled=true; const msg=document.getElementById("nameallmsg"); const all=[...document.querySelectorAll(".nameit:not(:disabled)")]; if(msg) msg.innerHTML="<span class='spin'></span> naming "+all.length+"&hellip;"; await Promise.all(all.map(doNameButton)); if(msg) msg.textContent="done"; na.disabled=false; return; }
 });
