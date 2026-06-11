@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Argus</title>
 <style>
-  :root{--bg:#0a0a0a;--surface:#141414;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--ok:#7CFFB2;--off:#777;}
+  :root{--bg:#0a0a0a;--surface:#141414;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--ok:#7CFFB2;--off:#777;--warn:#ffce85;--bad:#ff6b6b;}
   *{box-sizing:border-box;} body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);line-height:1.5;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;}
   .nav{background:#000;border-bottom:2px solid var(--accent);padding:12px 24px;display:flex;justify-content:space-between;align-items:center;letter-spacing:.5px;}
   .nav .be{color:var(--accent);font-weight:800;font-size:1.15rem;letter-spacing:3px;} .nav .r{color:var(--dim);font-size:.78rem;}
@@ -46,6 +46,7 @@
   td.port{color:var(--accent);font-weight:700;} .disc td{color:var(--off);} .ip{font-family:ui-monospace,Consolas,monospace;white-space:nowrap;} .nw{white-space:nowrap;}
   .st-conn{color:var(--ok);} .st-disc{color:var(--off);} .av{color:var(--dim);}
   .hint{color:var(--accent);font-size:.78rem;} .nameok{color:var(--ok);font-weight:700;} .namewarn{color:#ff8b8b;font-weight:700;font-size:.78rem;}
+  .planned{color:var(--warn);font-weight:700;}
   .kbadge{display:inline-block;background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:3px;font-size:.6rem;font-weight:800;line-height:1;padding:1px 3px;vertical-align:middle;}
   .auditbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:12px 0 6px;}
   .gradebig{font-size:2.4rem;font-weight:800;line-height:1;border:2px solid currentColor;border-radius:10px;padding:6px 14px;}
@@ -188,6 +189,9 @@
     <div style="margin-top:8px;"><button id="savemap">Save</button> <span class="muted" id="savemsg"></span></div>
     <div class="muted" style="margin:12px 0 4px;"><b>Toast POS VLAN</b> &mdash; connected devices on this VLAN appear in the Toast section (Operations tab).</div>
     <input id="toastvlan" type="text" spellcheck="false" style="width:130px;"> <button id="savetoast">Save</button> <span class="muted" id="toastmsg"></span>
+    <div class="muted" style="margin:12px 0 4px;"><b>Planned-missing (accepted) Konductor devices</b> &mdash; these are allowed to be absent without breaking <b>SOLID</b>; they show as <span class='planned'>PLANNED</span> instead of <span class='namewarn'>MISSING</span>. Names or IPs, one per line or comma-separated.</div>
+    <textarea id="acceptmiss" spellcheck="false" style="height:70px;"></textarea>
+    <div style="margin-top:6px;"><button id="saveaccept">Save</button> <span class="muted" id="acceptmsg"></span></div>
   </div>
   <div id="report"></div>
 </div>
@@ -305,6 +309,9 @@ function comboResolve(id){ const c=COMBOS[id]; if(!c) return {id:"",name:""}; if
 const MAP_KEY="meraki_namemap_v1";
 const TOAST_KEY="argus_toastvlan_v1";
 function toastVlan(){ const v=localStorage.getItem(TOAST_KEY); return (v!=null&&v!=="")?v.trim():"100"; } // Toast POS VLAN (default 100)
+// Konductor devices accepted as planned-missing -- absent without breaking SOLID. Names or IPs, comma/newline-separated.
+const ACCEPT_KEY="argus_acceptmissing_v1";
+function acceptMissing(){ const set=new Set(); (localStorage.getItem(ACCEPT_KEY)||"").split(/[\n,]/).forEach(t=>{ t=t.trim().toLowerCase(); if(t) set.add(t); }); return set; }
 const DEFAULT_MAP=["Bread Start\t10.90.100.50","Bread Finish\t10.90.100.58","Salad Start\t10.90.100.51",
 "Salad Finish\t10.90.100.59","Expo\t10.90.100.52","Digital Expo\t10.90.100.53","HerdServe\t10.90.100.55",
 "Injest\t10.90.100.101","Bread Printer\t10.90.100.70","Salad Printer\t10.90.100.71",
@@ -458,21 +465,25 @@ function opsContent(slot){
   const d=slot.d, wifi=slot.wifi;
   // --- Konductor rollout completeness: every mapped IP present + live (switch OR Wi-Fi) ---
   const seen={};
-  function noteSeen(ip,on,where,isWifi,vlan){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[],vlans:[]}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); const v=(vlan==null?"":String(vlan)).trim(); if(v && s.vlans.indexOf(v)<0) s.vlans.push(v); }
+  function noteSeen(ip,on,where,isWifi,vlan,ls){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[],vlans:[],ls:""}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); const v=(vlan==null?"":String(vlan)).trim(); if(v && s.vlans.indexOf(v)<0) s.vlans.push(v); const t=(ls==null?"":String(ls)); if(t && t>s.ls) s.ls=t; }
   (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>(p.clients||[]).forEach(c=>{
-    noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false,p.vlan);
+    noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false,p.vlan,c.lastSeen);
   })));
-  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||g.ssid,true,c.vlan); }));
+  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||g.ssid,true,c.vlan,c.lastSeen); }));
 
   let rollHtml="";
   const mapped=Object.keys(NAMEMAP);
   if(mapped.length){
-    let live=0, rows="";
+    const accept=acceptMissing(); // names/IPs allowed to be absent without breaking SOLID
+    let live=0, planned=0, unaccounted=0, rows="";
     mapped.forEach(ip=>{
-      const nm=NAMEMAP[ip], s=seen[ip]; let st,cls;
-      if(!s){ st="MISSING"; cls="namewarn"; }
-      else if(s.online){ st="LIVE"; cls="nameok"; live++; }
-      else { st="found, not live"; cls="hint"; }
+      const nm=NAMEMAP[ip], s=seen[ip];
+      const isAccepted = accept.has(ip) || accept.has((nm||"").toLowerCase());
+      let st,cls;
+      if(s && s.online){ st="LIVE"; cls="nameok"; live++; }
+      else if(isAccepted){ st="PLANNED"; cls="planned"; planned++; }   // known-missing, accepted -- not a threat
+      else if(s){ st="found, not live"; cls="hint"; unaccounted++; }
+      else { st="MISSING"; cls="namewarn"; unaccounted++; }
       // Prefer the WIRED location: if a device is on a switch port, show the POS-# -- never a stale Wi-Fi SSID.
       // Only show Wi-Fi when there is no wired location for the device.
       const wlist = s ? (s.wheres.some(w=>!w.wifi) ? s.wheres.filter(w=>!w.wifi) : s.wheres) : [];
@@ -483,11 +494,13 @@ function opsContent(slot){
       const vlan = s && s.vlans.length
         ? s.vlans.map(v=> esc(v) + (v==="90" ? " <span class='nameok'>&check;</span>" : " <span class='namewarn'>&#10007;</span>")).join(", ")
         : "<span class='av'>&mdash;</span>";
-      rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td>"+vlan+"</td><td>"+where+"</td><td class='"+cls+"'>"+st+"</td></tr>";
+      const lastSeen = (s && s.ls) ? esc(lastSeenPac(s.ls)) : "<span class='av'>&mdash;</span>";
+      rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td>"+vlan+"</td><td>"+where+"</td><td class='av nw'>"+lastSeen+"</td><td class='"+cls+"'>"+st+"</td></tr>";
     });
-    const total=mapped.length, solid=(live===total);
-    rollHtml=sect("rollout","Konductor &mdash; "+live+"/"+total+" live &middot; "+(solid?"<span class='nameok'>SOLID</span>":"<span class='namewarn'>NOT SOLID</span>"),
-      "<table><thead><tr><th>Konductor device</th><th>IP</th><th>VLAN</th><th>Port / SSID</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>","both");
+    const total=mapped.length, solid=(unaccounted===0); // SOLID when nothing is unexpectedly missing (planned-missing is fine)
+    const head="Konductor &mdash; "+live+"/"+total+" live"+(planned?" &middot; <span class='planned'>"+planned+" planned</span>":"")+" &middot; "+(solid?"<span class='nameok'>SOLID</span>":"<span class='namewarn'>NOT SOLID</span>");
+    rollHtml=sect("rollout",head,
+      "<table><thead><tr><th>Konductor device</th><th>IP</th><th>VLAN</th><th>Port / SSID</th><th>Last seen (PT)</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>","both");
   }
 
   // --- Toast POS: every connected device on the Toast VLAN ---
@@ -498,10 +511,11 @@ function opsContent(slot){
   {
     let tr="";
     toast.sort((a,b)=>(a.ip||"").localeCompare(b.ip||"",undefined,{numeric:true})).forEach(t=>{
-      tr+="<tr><td>"+esc(t.name||"(unnamed)")+"</td><td class='ip'>"+esc(t.ip||"")+"</td><td>"+esc(t.where||"")+"</td><td class='ip'>"+esc(t.mac||"")+"</td><td class='av nw'>"+esc(lastSeenPac(t.lastSeen))+"</td></tr>";
+      const on=(t.status||"").toLowerCase()==="online";
+      tr+="<tr><td>"+esc(t.name||"(unnamed)")+"</td><td class='ip'>"+esc(t.ip||"")+"</td><td>"+esc(t.where||"")+"</td><td class='ip'>"+esc(t.mac||"")+"</td><td class='av nw'>"+esc(lastSeenPac(t.lastSeen))+"</td><td class='"+(on?"nameok":"av")+"'>"+(on?"LIVE":esc(t.status||""))+"</td></tr>";
     });
     const body = toast.length
-      ? "<table><thead><tr><th>Device</th><th>IP</th><th>Port / SSID</th><th>MAC</th><th>Last seen (PT)</th></tr></thead><tbody>"+tr+"</tbody></table>"
+      ? "<table><thead><tr><th>Device</th><th>IP</th><th>Port / SSID</th><th>MAC</th><th>Last seen (PT)</th><th>Status</th></tr></thead><tbody>"+tr+"</tbody></table>"
       : "<div class='muted'>No connected devices on VLAN "+esc(tvlan)+". Set the Toast VLAN in &#9881; settings.</div>";
     toastHtml=sect("toast","Toast POS &mdash; "+toast.length+" on VLAN "+esc(tvlan), body, "ports");
   }
@@ -702,7 +716,7 @@ function render(){
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
 function viewName(){ return TAB==="operations"?"Operations":TAB==="network"?"Network":TAB==="audit"?"Security Audit":"View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
@@ -821,6 +835,8 @@ document.getElementById("gear").addEventListener("click", ()=>{ const s=document
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
 document.getElementById("toastvlan").value=toastVlan();
 document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlan(); render(); });
+document.getElementById("acceptmiss").value=localStorage.getItem(ACCEPT_KEY)||"";
+document.getElementById("saveaccept").addEventListener("click", ()=>{ localStorage.setItem(ACCEPT_KEY, document.getElementById("acceptmiss").value); document.getElementById("acceptmsg").textContent="saved · "+acceptMissing().size+" accepted"; render(); });
 document.getElementById("namemap").value=mapText();
 // Lab Features: enable-for-production + configurable keywords
 document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); renderFeatures(); render(); } });
