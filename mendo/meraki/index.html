@@ -159,6 +159,8 @@
     <div class="muted" style="margin-bottom:6px;">Pre-configured <b>Konductor</b> device names (the <span class='kbadge'>K</span> devices) &mdash; one per line: <code>Name &nbsp; IP</code>. These are the Konductor devices for this store; each pull hints/confirms/warns connected IPs against this.</div>
     <textarea id="namemap" spellcheck="false"></textarea>
     <div style="margin-top:8px;"><button id="savemap">Save</button> <span class="muted" id="savemsg"></span></div>
+    <div class="muted" style="margin:12px 0 4px;"><b>Toast POS VLAN</b> &mdash; connected devices on this VLAN appear in the Toast section (Operations tab).</div>
+    <input id="toastvlan" type="text" spellcheck="false" style="width:130px;"> <button id="savetoast">Save</button> <span class="muted" id="toastmsg"></span>
   </div>
   <div id="report"></div>
   <div class="err" id="err"></div>
@@ -221,6 +223,8 @@ function resolveNet(){ if(SELECTED_ID) return SELECTED_ID; filterNets(document.g
 
 // --- pre-configured IP -> expected device name map (gear settings) ---
 const MAP_KEY="meraki_namemap_v1";
+const TOAST_KEY="argus_toastvlan_v1";
+function toastVlan(){ const v=localStorage.getItem(TOAST_KEY); return (v!=null&&v!=="")?v.trim():"100"; } // Toast POS VLAN (default 100)
 const DEFAULT_MAP=["Bread Start\t10.90.100.50","Bread Finish\t10.90.100.58","Salad Start\t10.90.100.51",
 "Salad Finish\t10.90.100.59","Expo\t10.90.100.52","Digital Expo\t10.90.100.53","HerdServe\t10.90.100.55",
 "Injest\t10.90.100.101","Bread Printer\t10.90.100.70","Salad Printer\t10.90.100.71",
@@ -388,6 +392,22 @@ function render(){
       "<table><thead><tr><th>Konductor device</th><th>IP</th><th>VLAN</th><th>Port / SSID</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>","both");
   }
 
+  // --- Toast POS: every connected device on the Toast VLAN ---
+  let toastHtml="";
+  const tvlan=toastVlan(), toast=[];
+  (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>{ if(String(p.vlan)===tvlan) (p.clients||[]).filter(c=>(c.status||"").toLowerCase()==="online").forEach(c=>toast.push({name:c.name,ip:c.ip,mac:c.mac,where:portTag(sw.name)+"-"+p.port,status:c.status,lastSeen:c.lastSeen})); }));
+  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ if(String(c.vlan)===tvlan && (c.status||"").toLowerCase()==="online") toast.push({name:c.name,ip:c.ip,mac:c.mac,where:c.ssid||g.ssid,status:c.status,lastSeen:c.lastSeen}); }));
+  {
+    let tr="";
+    toast.sort((a,b)=>(a.ip||"").localeCompare(b.ip||"",undefined,{numeric:true})).forEach(t=>{
+      tr+="<tr><td>"+esc(t.name||"(unnamed)")+"</td><td class='ip'>"+esc(t.ip||"")+"</td><td>"+esc(t.where||"")+"</td><td class='ip'>"+esc(t.mac||"")+"</td><td class='av nw'>"+esc(lastSeenPac(t.lastSeen))+"</td></tr>";
+    });
+    const body = toast.length
+      ? "<table><thead><tr><th>Device</th><th>IP</th><th>Port / SSID</th><th>MAC</th><th>Last seen (PT)</th></tr></thead><tbody>"+tr+"</tbody></table>"
+      : "<div class='muted'>No connected devices on VLAN "+esc(tvlan)+". Set the Toast VLAN in &#9881; settings.</div>";
+    toastHtml=sect("toast","Toast POS &mdash; "+toast.length+" on VLAN "+esc(tvlan), body, "ports");
+  }
+
   // --- tabs: Switch Ports | Wi-Fi (all SSIDs) ---
   const ssidGroups=(wifi&&wifi.ssids)||[];
   const ssidCount=wifi?(wifi.ssidCount!=null?wifi.ssidCount:ssidGroups.length):0;
@@ -490,8 +510,9 @@ function render(){
     });
   }
 
-  // --- Operations pane: Konductor rollout ---
+  // --- Operations pane: Toast POS (top) then Konductor ---
   h+="<div id='pane-operations' class='"+(TAB==="operations"?"":"hidden")+"'>"+
+     toastHtml+
      (rollHtml || "<div class='muted'>No Konductor devices mapped for this network &mdash; add them in the &#9881; settings (the K devices).</div>")+"</div>";
   // --- Network pane: switches + Meraki devices + Wi-Fi (all SSIDs) ---
   h+="<div id='pane-network' class='"+(TAB==="network"?"":"hidden")+"'>"+nameBar+sp+wifiHtml+"</div>";
@@ -636,6 +657,8 @@ document.getElementById("exh").addEventListener("click", exportHtml);
 document.getElementById("exp").addEventListener("click", exportPdf);
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show) renderFeatures(); });
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
+document.getElementById("toastvlan").value=toastVlan();
+document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlan(); render(); });
 document.getElementById("namemap").value=mapText();
 // Lab Features: enable-for-production + configurable keywords
 document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); renderFeatures(); if(LASTDATA) render(); } });
