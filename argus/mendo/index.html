@@ -767,7 +767,6 @@ const NEVER_AUTO={ "WIFI-01":1, "WIFI-07":1, "EXP-04":1, "EXP-05":1, "ORG-01":1,
 let EXEC={}; // checkId -> { loading, error, network, checkId, steps:[{stepId,label,field,current,moderated,status,value,before,msg}] }
 function actionPlans(f, canApply){
   const why=CAT_WHY[f.category]||"This weakens the network&rsquo;s security posture.";
-  const dash=CAT_DASH[f.category]||"the Meraki dashboard";
   const canExec=!!EXECUTABLE[f.id];
   const cc = CHECK_CONTENT && CHECK_CONTENT[f.id];
   let x="<div class='plans'>";
@@ -776,7 +775,7 @@ function actionPlans(f, canApply){
   if(cc){ const ro=!!READMORE[f.id]; t1+=" <a class='readmore' data-readmore='"+esc(f.id)+"'>"+(ro?"&#9662; show less":"&#9656; read more")+"</a>"; if(ro) t1+=readMoreBlock(cc); }
   x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>1 &middot; Understand</span> Why this matters</div>"+t1+"</div>";
   // Tier 2 -- Fix it yourself + exact Meraki deep-link, help doc, how-to
-  let t2="<div class='ptier-b'><div>"+esc(f.remediation)+"</div><div class='pdash'>Dashboard: "+dash+"</div>";
+  let t2="<div class='ptier-b'><div>"+esc(f.remediation)+"</div>";
   if(cc){
     const sNet = (AUD.view==="network"||AUD.view==="template") && AUD.tgt[AUD.view] ? AUD.tgt[AUD.view].id : null;
     const deep = sNet ? merakiDeepLink(sNet, cc.merakiPath) : "";
@@ -787,18 +786,23 @@ function actionPlans(f, canApply){
     t2+=lk+"</div>";
   }
   x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>2 &middot; Fix it yourself</span> <span class='ro-pill'>read-only</span> you make the change</div>"+t2+"</div>";
-  x+="<div class='ptier t3box'><div class='ptier-h'><span class='ptier-tag t3'>3 &middot; Let Argus fix it</span> <span class='lab'>WRITE</span> Argus applies it for you</div><div class='ptier-b'>";
+  x+="<div class='ptier t3box'><div class='ptier-h'><span class='ptier-tag t3'>3 &middot; Let Argus fix it</span> <span class='lab'>WRITE</span> Argus does it &mdash; you decide every step</div><div class='ptier-b'>";
   if(canExec && canApply){ x+=execUI(f.id); }
-  else if(canExec){ x+="<div class='muted'>Argus <b>can</b> apply this automatically &mdash; add this network to your <b>Remediable</b> allow-list (&#9881; Settings) to unlock per-step <b>Apply</b>, <b>Apply all</b>, and one-tap <b>Roll back</b>.</div>"; }
-  else if(NEVER_AUTO[f.id]){ x+="<div class='muted'>This fix can disconnect clients or change access &mdash; it stays <b>manual by design</b>. Argus won&rsquo;t auto-apply it.</div>"; }
-  else { x+="<div class='muted'>&#9889; <b>Guided fix &mdash; rolling out.</b> Argus will apply this on your allow-listed networks soon; for now the manual steps above are the move.</div>"; }
+  else if(canExec){
+    const t = (AUD.view==="network" && AUD.tgt.network) ? AUD.tgt.network : null;
+    x+="<div class='muted'>Argus walks this in one step you approve at a time &mdash; nothing changes without your tap, and you can roll back any step instantly. <b>You&rsquo;re the decision-maker.</b></div>";
+    if(t) x+="<div class='pexec'><button class='pbtn' data-addremed='"+esc(t.id)+"|"+esc(t.name)+"'>&#10003; Let Argus fix this on &ldquo;"+esc(t.name)+"&rdquo;</button> <span class='ptag'>adds it to your Remediable list, then you build &amp; approve the plan</span></div>";
+    else x+="<div class='muted'>Run this as a <b>network</b> audit (and add that network to your Remediable list in &#9881; Settings) to let Argus do it step by step.</div>";
+  }
+  else if(NEVER_AUTO[f.id]){ x+="<div class='muted'>This one stays in <b>your</b> hands &mdash; it can disconnect clients or change access, so Argus won&rsquo;t touch it automatically. Use the steps above; Argus shows you exactly where.</div>"; }
+  else { x+="<div class='muted'>&#9889; Argus will walk you through this <b>step by step</b> (you approving each change) on your allow-listed networks soon. For now, the steps above &mdash; Argus links you straight to the spot.</div>"; }
   x+="</div></div></div>";
   return x;
 }
 // Tier-3 executor UI for an allowlisted, executable finding.
 function execUI(cid){
   const ex=EXEC[cid];
-  if(!ex) return "<div class='muted'>Argus can apply this on this allow-listed network &mdash; one step you approve, or all at once, with one-tap rollback.</div>"+
+  if(!ex) return "<div class='muted'>Argus does this <b>step by step</b> on this allow-listed network &mdash; you approve each change (or all at once), nothing happens without your tap, and you can roll back any step. <b>You decide.</b></div>"+
     "<div class='pexec'><button class='pbtn' data-execplan='"+esc(cid)+"'>&#9654; Build apply plan</button></div>";
   if(ex.loading) return "<div class='muted'><span class='spin'></span> reading live config&hellip;</div>";
   if(ex.error) return "<div class='err'>"+esc(ex.error)+"</div><div class='pexec'><button class='pbtn' data-execplan='"+esc(cid)+"'>Retry</button></div>";
@@ -1149,6 +1153,7 @@ document.getElementById("report").addEventListener("click", e=>{
   const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
   const pl=e.target.closest(".planlink"); if(pl){ e.stopImmediatePropagation(); const id=pl.getAttribute("data-plan"); PLAN_OPEN[id]=!PLAN_OPEN[id]; render(); return; }
   const rm=e.target.closest("[data-readmore]"); if(rm){ e.stopImmediatePropagation(); const id=rm.getAttribute("data-readmore"); READMORE[id]=!READMORE[id]; render(); return; }
+  const ad=e.target.closest("[data-addremed]"); if(ad){ e.stopImmediatePropagation(); const a=ad.getAttribute("data-addremed").split("|"); addRemediable(a[0],a[1]); toast("“"+a[1]+"” added to Remediable — Argus can now apply fixes here, step by step"); render(); return; }
   const ep=e.target.closest("[data-execplan]"); if(ep){ e.stopImmediatePropagation(); remediatePlan(ep.getAttribute("data-execplan")); return; }
   const ea=e.target.closest("[data-execapply]"); if(ea){ e.stopImmediatePropagation(); const a=ea.getAttribute("data-execapply").split(":"), cid=a[0], idx=+a[1]; const st=EXEC[cid]&&EXEC[cid].steps&&EXEC[cid].steps[idx]; if(st&&st.moderated){ const inp=document.getElementById("execval-"+cid+"-"+idx); if(inp) st.value=inp.value.trim(); } remediateApply(cid,idx); return; }
   const eal=e.target.closest("[data-execall]"); if(eal){ e.stopImmediatePropagation(); const cid=eal.getAttribute("data-execall"); const ex=EXEC[cid]; if(ex&&ex.steps){ ex.steps.forEach((s,i)=>{ if(s.moderated&&s.status!=="applied"){ const inp=document.getElementById("execval-"+cid+"-"+i); if(inp) s.value=inp.value.trim(); } }); } remediateApplyAll(cid); return; }
