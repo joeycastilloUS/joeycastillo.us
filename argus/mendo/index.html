@@ -47,6 +47,7 @@
   .st-conn{color:var(--ok);} .st-disc{color:var(--off);} .av{color:var(--dim);}
   .hint{color:var(--accent);font-size:.78rem;} .nameok{color:var(--ok);font-weight:700;} .namewarn{color:#ff8b8b;font-weight:700;font-size:.78rem;}
   .planned{color:var(--warn);font-weight:700;}
+  .sdot{font-size:1rem;line-height:1;display:inline-block;vertical-align:middle;} .sdot-live{color:var(--ok);} .sdot-missing{color:var(--bad);} .sdot-planned{color:var(--warn);} .sdot-notlive{color:var(--dim);}
   .acceptbtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 7px;margin-left:8px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .acceptbtn:hover{color:var(--warn);border-color:var(--warn);} .acceptbtn.on{color:var(--warn);border-color:var(--warn);background:#2a1f08;}
   .kbadge{display:inline-block;background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:3px;font-size:.6rem;font-weight:800;line-height:1;padding:1px 3px;vertical-align:middle;}
@@ -62,6 +63,8 @@
   .catcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px;margin:12px 0;}
   .catcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 10px;text-align:center;}
   .catcard.na{opacity:.5;} .catgrade{font-size:1.7rem;font-weight:800;line-height:1;}
+  .catcard.jump{cursor:pointer;transition:border-color .12s,transform .12s;} .catcard.jump:hover{border-color:var(--accent);transform:translateY(-2px);}
+  .fcard.flash{animation:fcflash 1.2s ease-out;} @keyframes fcflash{0%,40%{box-shadow:0 0 0 2px var(--accent);}100%{box-shadow:none;}}
   .catname{font-size:.82rem;color:var(--text);margin-top:3px;font-weight:600;} .catsub{font-size:.72rem;color:var(--dim);margin-top:1px;}
   .catwt{font-size:.62rem;color:var(--accent);margin-top:5px;letter-spacing:.5px;text-transform:uppercase;opacity:.8;}
   .findings{display:flex;flex-direction:column;gap:10px;margin:12px 0;}
@@ -190,8 +193,8 @@
     <div class="muted" style="margin-bottom:6px;">Pre-configured <b>Konductor</b> device names (the <span class='kbadge'>K</span> devices) &mdash; one per line: <code>Name &nbsp; IP</code>. These are the Konductor devices for this store; each pull hints/confirms/warns connected IPs against this.</div>
     <textarea id="namemap" spellcheck="false"></textarea>
     <div style="margin-top:8px;"><button id="savemap">Save</button> <span class="muted" id="savemsg"></span></div>
-    <div class="muted" style="margin:12px 0 4px;"><b>Toast POS VLAN</b> &mdash; connected devices on this VLAN appear in the Toast section (Operations tab).</div>
-    <input id="toastvlan" type="text" spellcheck="false" style="width:130px;"> <button id="savetoast">Save</button> <span class="muted" id="toastmsg"></span>
+    <div class="muted" style="margin:12px 0 4px;"><b>Toast POS VLAN(s)</b> &mdash; connected devices on these VLANs appear in the Toast section (Operations tab). One or more, comma-separated &mdash; e.g. <code>90,100</code>.</div>
+    <input id="toastvlan" type="text" spellcheck="false" style="width:180px;" placeholder="e.g. 90,100"> <button id="savetoast">Save</button> <span class="muted" id="toastmsg"></span>
     <div class="muted" style="margin:12px 0 4px;"><b>Planned-missing (accepted) devices</b> are now set <b>inline &amp; per-network</b> &mdash; in the Konductor table, click <span class='planned'>mark planned</span> on any missing device. Accepted devices show <span class='planned'>PLANNED</span> instead of <span class='namewarn'>MISSING</span> and don&rsquo;t break <b>SOLID</b> (for that store only).</div>
   </div>
   <div id="report"></div>
@@ -314,7 +317,8 @@ function comboResolve(id){ const c=COMBOS[id]; if(!c) return {id:"",name:""}; if
 // --- pre-configured IP -> expected device name map (gear settings) ---
 const MAP_KEY="meraki_namemap_v1";
 const TOAST_KEY="argus_toastvlan_v1";
-function toastVlan(){ const v=localStorage.getItem(TOAST_KEY); return (v!=null&&v!=="")?v.trim():"100"; } // Toast POS VLAN (default 100)
+function toastVlan(){ const v=localStorage.getItem(TOAST_KEY); return (v!=null&&v!=="")?v.trim():"100"; } // Toast POS VLAN(s), raw string (default 100). Supports comma-separated, e.g. "90,100".
+function toastVlans(){ return toastVlan().split(/[,\s]+/).map(x=>x.trim()).filter(Boolean); } // parsed list
 // Konductor devices accepted as planned-missing -- PER NETWORK (a device planned-missing at one store
 // isn't at another). Stored as { netId: [ip, ...] }. Set inline from the Konductor table.
 const ACCEPT_KEY="argus_acceptmissing_v2";
@@ -465,8 +469,9 @@ function emptyState(id, slot, icon, title, desc){
 function slotHead(slot){
   const d=slot.d; let h="";
   h+="<div class='nethead'>Network: <b>"+esc(d.name||"")+"</b></div>";
-  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span></div>"; }
-  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span></div>"; }
+  const tmplRef=" <button class='secref' data-refresh='ports' title='Refresh config template'>&#x21bb;</button>";
+  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span>"+tmplRef+"</div>"; }
+  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span>"+tmplRef+"</div>"; }
   h+="<div class='stamp'>Switch pulled "+esc(slot.portStamp||slot.stamp)+(slot.wifiStamp?" &middot; Wi-Fi pulled "+esc(slot.wifiStamp):"")+" &middot; connected-now only</div>";
   return h;
 }
@@ -477,11 +482,15 @@ function opsContent(slot){
   const d=slot.d, wifi=slot.wifi;
   // --- Konductor rollout completeness: every mapped IP present + live (switch OR Wi-Fi) ---
   const seen={};
-  function noteSeen(ip,on,where,isWifi,vlan,ls){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[],vlans:[],ls:""}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); const v=(vlan==null?"":String(vlan)).trim(); if(v && s.vlans.indexOf(v)<0) s.vlans.push(v); const t=(ls==null?"":String(ls)); if(t && t>s.ls) s.ls=t; }
+  function noteSeen(ip,on,where,isWifi,vlan,ls,mac){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[],vlans:[],ls:"",mac:""}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); const v=(vlan==null?"":String(vlan)).trim(); if(v && s.vlans.indexOf(v)<0) s.vlans.push(v); const t=(ls==null?"":String(ls)); if(t && t>s.ls) s.ls=t; if(mac && !s.mac) s.mac=String(mac); }
   (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>(p.clients||[]).forEach(c=>{
-    noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false,p.vlan,c.lastSeen);
+    noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false,p.vlan,c.lastSeen,c.mac);
   })));
-  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||g.ssid,true,c.vlan,c.lastSeen); }));
+  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||g.ssid,true,c.vlan,c.lastSeen,c.mac); }));
+
+  // Shared column header for Konductor + Toast so the two tables line up exactly.
+  const opsHead="<thead><tr><th>Status</th><th>Device</th><th>IP</th><th>MAC</th><th>Port / SSID</th><th>VLAN</th><th>Last seen (PT)</th></tr></thead>";
+  function whereCell(wheres){ const wlist = wheres.some(w=>!w.wifi) ? wheres.filter(w=>!w.wifi) : wheres; return wlist.length ? wlist.map(w=> w.wifi ? "<span class='wifi-flag'>"+WIFI+esc(w.label)+"</span>" : "<span class='port'>"+esc(w.label)+"</span>").join(" ") : "<span class='av'>&mdash;</span>"; }
 
   let rollHtml="";
   const mapped=Object.keys(NAMEMAP);
@@ -491,51 +500,49 @@ function opsContent(slot){
     mapped.forEach(ip=>{
       const nm=NAMEMAP[ip], s=seen[ip];
       const isAccepted = accept.has(String(ip).toLowerCase());
-      let st,cls;
-      if(s && s.online){ st="LIVE"; cls="nameok"; live++; }
-      else if(isAccepted){ st="PLANNED"; cls="planned"; planned++; }   // known-missing, accepted -- not a threat
-      else if(s){ st="found, not live"; cls="hint"; unaccounted++; }
-      else { st="MISSING"; cls="namewarn"; unaccounted++; }
-      // Prefer the WIRED location: if a device is on a switch port, show the POS-# -- never a stale Wi-Fi SSID.
-      // Only show Wi-Fi when there is no wired location for the device.
-      const wlist = s ? (s.wheres.some(w=>!w.wifi) ? s.wheres.filter(w=>!w.wifi) : s.wheres) : [];
-      const where = wlist.length
-        ? wlist.map(w=> w.wifi ? "<span class='wifi-flag'>"+WIFI+esc(w.label)+"</span>" : "<span class='port'>"+esc(w.label)+"</span>").join(" ")
-        : "<span class='av'>&mdash;</span>";
+      let kind,word; // status icon kind + tooltip word
+      if(s && s.online){ kind="live"; word="LIVE"; live++; }
+      else if(isAccepted){ kind="planned"; word="PLANNED (accepted)"; planned++; }
+      else if(s){ kind="notlive"; word="found, not live"; unaccounted++; }
+      else { kind="missing"; word="MISSING"; unaccounted++; }
+      const where = s ? whereCell(s.wheres) : "<span class='av'>&mdash;</span>";
       // VLAN must be 90 for Konductor. 90 -> green check; anything else -> red X (wrong VLAN).
       const vlan = s && s.vlans.length
         ? s.vlans.map(v=> esc(v) + (v==="90" ? " <span class='nameok'>&check;</span>" : " <span class='namewarn'>&#10007;</span>")).join(", ")
         : "<span class='av'>&mdash;</span>";
       const lastSeen = (s && s.ls) ? esc(lastSeenPac(s.ls)) : "<span class='av'>&mdash;</span>";
+      const macCell = (s && s.mac) ? esc(s.mac) : "<span class='av'>&mdash;</span>";
       // Inline planned-missing toggle -- only meaningful when the device is NOT live.
       const isLive = !!(s && s.online);
-      const toggle = isLive ? "" : " <button class='acceptbtn"+(isAccepted?" on":"")+"' data-acceptmiss='"+esc(ip)+"' title='"+(isAccepted?"Unmark -- this device must be present":"Mark as planned-missing (accepted) for this network")+"'>"+(isAccepted?"unmark":"mark planned")+"</button>";
-      rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td>"+vlan+"</td><td>"+where+"</td><td class='av nw'>"+lastSeen+"</td><td><span class='"+cls+"'>"+st+"</span>"+toggle+"</td></tr>";
+      const toggle = isLive ? "" : " <button class='acceptbtn"+(isAccepted?" on":"")+"' data-acceptmiss='"+esc(ip)+"' title='"+(isAccepted?"Unmark -- this device must be present":"Mark as planned-missing (accepted) for this network")+"'>"+(isAccepted?"unmark":"plan")+"</button>";
+      rows+="<tr><td class='nw'>"+statusIcon(kind,word)+toggle+"</td><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td class='ip'>"+macCell+"</td><td>"+where+"</td><td>"+vlan+"</td><td class='av nw'>"+lastSeen+"</td></tr>";
     });
     const total=mapped.length, solid=(unaccounted===0); // SOLID when nothing is unexpectedly missing (planned-missing is fine)
     const head="Konductor &mdash; "+live+"/"+total+" live"+(planned?" &middot; <span class='planned'>"+planned+" planned</span>":"")+" &middot; "+(solid?"<span class='nameok'>SOLID</span>":"<span class='namewarn'>NOT SOLID</span>");
-    rollHtml=sect("rollout",head,
-      "<table><thead><tr><th>Konductor device</th><th>IP</th><th>VLAN</th><th>Port / SSID</th><th>Last seen (PT)</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>","both");
+    rollHtml=sect("rollout",head,"<table>"+opsHead+"<tbody>"+rows+"</tbody></table>","both");
   }
 
-  // --- Toast POS: every connected device on the Toast VLAN ---
+  // --- Toast POS: every connected device on the Toast VLAN(s) ---
   let toastHtml="";
-  const tvlan=toastVlan(), toast=[];
-  (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>{ if(String(p.vlan)===tvlan) (p.clients||[]).filter(c=>(c.status||"").toLowerCase()==="online").forEach(c=>toast.push({name:c.name,ip:c.ip,mac:c.mac,where:portTag(sw.name)+"-"+p.port,status:c.status,lastSeen:c.lastSeen})); }));
-  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ if(String(c.vlan)===tvlan && (c.status||"").toLowerCase()==="online") toast.push({name:c.name,ip:c.ip,mac:c.mac,where:c.ssid||g.ssid,status:c.status,lastSeen:c.lastSeen}); }));
+  const tvlans=toastVlans(), inToast=(v)=>tvlans.indexOf(String(v))>=0, toast=[];
+  (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>{ if(inToast(p.vlan)) (p.clients||[]).filter(c=>(c.status||"").toLowerCase()==="online").forEach(c=>toast.push({name:c.name,ip:c.ip,mac:c.mac,where:portTag(sw.name)+"-"+p.port,vlan:p.vlan,status:c.status,lastSeen:c.lastSeen})); }));
+  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ if(inToast(c.vlan) && (c.status||"").toLowerCase()==="online") toast.push({name:c.name,ip:c.ip,mac:c.mac,where:"<span class='wifi-flag'>"+WIFI+esc(c.ssid||g.ssid)+"</span>",vlan:c.vlan,status:c.status,lastSeen:c.lastSeen,wifi:true}); }));
   {
     let tr="";
     toast.sort((a,b)=>(a.ip||"").localeCompare(b.ip||"",undefined,{numeric:true})).forEach(t=>{
-      const on=(t.status||"").toLowerCase()==="online";
-      tr+="<tr><td>"+esc(t.name||"(unnamed)")+"</td><td class='ip'>"+esc(t.ip||"")+"</td><td>"+esc(t.where||"")+"</td><td class='ip'>"+esc(t.mac||"")+"</td><td class='av nw'>"+esc(lastSeenPac(t.lastSeen))+"</td><td class='"+(on?"nameok":"av")+"'>"+(on?"LIVE":esc(t.status||""))+"</td></tr>";
+      const whereC = t.wifi ? t.where : "<span class='port'>"+esc(t.where||"")+"</span>";
+      tr+="<tr><td class='nw'>"+statusIcon("live","LIVE")+"</td><td>"+esc(t.name||"(unnamed)")+"</td><td class='ip'>"+esc(t.ip||"")+"</td><td class='ip'>"+esc(t.mac||"")+"</td><td>"+whereC+"</td><td>"+esc(t.vlan==null?"":t.vlan)+"</td><td class='av nw'>"+esc(lastSeenPac(t.lastSeen))+"</td></tr>";
     });
+    const vlanLabel=tvlans.join(", ");
     const body = toast.length
-      ? "<table><thead><tr><th>Device</th><th>IP</th><th>Port / SSID</th><th>MAC</th><th>Last seen (PT)</th><th>Status</th></tr></thead><tbody>"+tr+"</tbody></table>"
-      : "<div class='muted'>No connected devices on VLAN "+esc(tvlan)+". Set the Toast VLAN in &#9881; settings.</div>";
-    toastHtml=sect("toast","Toast POS &mdash; "+toast.length+" on VLAN "+esc(tvlan), body, "ports");
+      ? "<table>"+opsHead+"<tbody>"+tr+"</tbody></table>"
+      : "<div class='muted'>No connected devices on VLAN "+esc(vlanLabel)+". Set the Toast VLAN(s) in &#9881; settings.</div>";
+    toastHtml=sect("toast","Toast POS &mdash; "+toast.length+" on VLAN "+esc(vlanLabel), body, "ports");
   }
   return toastHtml + (rollHtml || "<div class='muted'>No Konductor devices mapped for this network &mdash; add them in the &#9881; settings (the K devices).</div>");
 }
+// Small status dot used as the first column of the Konductor + Toast tables (word in the tooltip).
+function statusIcon(kind,word){ const ch=kind==="live"?"&#9679;":kind==="planned"?"&#9670;":kind==="notlive"?"&#9675;":"&#10007;"; return "<span class='sdot sdot-"+kind+"' title='"+esc(word||kind)+"'>"+ch+"</span>"; }
 
 // Network content: switches + Meraki devices + Wi-Fi (all SSIDs), from this slot's own data.
 function netContent(slot){
@@ -599,10 +606,11 @@ function netContent(slot){
     sb+="</tbody></table>";
     sp+=sect("sw-"+(sw.serial||sw.name), "Switch: "+esc(sw.name||sw.serial), sb, "ports");
   });
-  // Meraki Devices inventory -- last, below the switches.
+  // Meraki Devices inventory -- last, below the switches. Rename a device (appliance/switch/AP) inline when naming is active.
   if(dev.length){
     let db="<table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
-    dev.forEach(x=>{ db+="<tr><td>"+esc(x.name||"(no name)")+"</td><td>"+esc(x.model)+"</td><td>"+esc(x.serial)+"</td><td class='ip'>"+esc(x.mac)+"</td></tr>"; });
+    dev.forEach(x=>{ const pen = (FEAT && x.serial) ? " <button class='renameit' data-serial='"+esc(x.serial)+"' data-cur='"+esc(x.name||"").replace(/'/g,"&#39;")+"' title='Rename this Meraki device'>&#9998;</button>" : "";
+      db+="<tr><td><span class='cn'>"+esc(x.name||"(no name)")+"</span>"+pen+"</td><td>"+esc(x.model)+"</td><td>"+esc(x.serial)+"</td><td class='ip'>"+esc(x.mac)+"</td></tr>"; });
     db+="</tbody></table>";
     sp+=sect("devices","Meraki Devices ("+dev.length+")", db, "ports");
   }
@@ -622,7 +630,14 @@ function netContent(slot){
       else {
         wb="<table><thead><tr><th>Description</th><th>IP address</th><th>MAC address</th><th>VLAN</th><th>AP</th><th>Device</th><th>Status</th><th>Last seen (PT)</th></tr></thead><tbody>";
         gc.forEach(c=>{ const on=(c.status||"").toLowerCase()==="online";
-          wb+="<tr class='"+(on?"":"disc")+"'><td>"+esc(c.name||"")+nameCheck(c.ip||"",c.name,c.mac)+"</td>"+
+          const cname=c.name||""; let acts="";
+          if(FEAT && c.mac){
+            acts+="<button class='renameit' data-mac='"+esc(c.mac)+"' data-cur='"+esc(cname).replace(/'/g,"&#39;")+"' title='Rename / describe this Wi-Fi client'>&#9998;</button>";
+            const exp=NAMEMAP[c.ip], a=cname.trim().toLowerCase();
+            const mism = exp && (!a || a===(c.mac||"").toLowerCase() || a!==exp.toLowerCase());
+            if(mism){ nameableCount++; acts+="<button class='nameit' data-mac='"+esc(c.mac)+"' data-name='"+esc(exp)+"'>Name it &rarr; "+esc(exp)+"</button>"; }
+          }
+          wb+="<tr class='"+(on?"":"disc")+"'><td><div class='cline'><span class='cn'>"+esc(cname)+"</span>"+nameCheck(c.ip||"",c.name,c.mac)+acts+"</div></td>"+
             "<td class='ip'>"+esc(c.ip||"")+"</td><td class='ip'>"+esc(c.mac||"")+"</td><td>"+esc(c.vlan||"")+"</td>"+
             "<td class='wifi-ap'>"+esc(c.ap||"")+"</td><td class='av'>"+esc([c.manufacturer,c.os].filter(Boolean).join(" / "))+"</td>"+
             "<td class='"+(on?"st-conn":"st-disc")+"'>"+esc(c.status||"")+"</td><td class='av nw'>"+esc(lastSeenPac(c.lastSeen))+"</td></tr>"; });
@@ -666,7 +681,8 @@ function auditPane(){
     A.categories.forEach(c=>{
       const na=!c.applicable;
       const wt = (c.weight!=null) ? "<div class='catwt' title='category weight in the overall grade'>weight &times;"+esc(""+c.weight)+"</div>" : "";
-      h+="<div class='catcard"+(na?" na":"")+"'><div class='catgrade grade-"+esc(c.grade)+"'>"+(na?"&ndash;":esc(c.grade))+"</div>"+
+      const clickable = c.findings>0; // jump to the first finding in this category
+      h+="<div class='catcard"+(na?" na":"")+(clickable?" jump":"")+"'"+(clickable?" data-cat='"+esc(c.category)+"' title='Jump to "+esc(c.category)+" findings'":"")+"><div class='catgrade grade-"+esc(c.grade)+"'>"+(na?"&ndash;":esc(c.grade))+"</div>"+
          "<div class='catname'>"+esc(c.category)+"</div>"+
          "<div class='catsub'>"+(na?"not applicable":(c.findings+" finding"+(c.findings===1?"":"s")))+"</div>"+wt+"</div>";
     });
@@ -689,7 +705,7 @@ function auditPane(){
   else {
     h+="<div class='feat-h' style='margin-top:14px;'>Action items &mdash; "+fs.length+"</div><div class='findings'>";
     fs.forEach(f=>{
-      h+="<div class='fcard sev-l-"+esc(f.severity)+"'>"+
+      h+="<div class='fcard sev-l-"+esc(f.severity)+"' data-fcat='"+esc(f.category)+"'>"+
          "<div class='fchead'><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span>"+
          "<span class='fcid'>"+esc(f.id)+"</span><span class='fccat'>"+esc(f.category)+"</span>"+lvlBadge(f.level)+"</div>"+
          "<div class='fctitle'>"+esc(f.title)+"</div>"+
@@ -775,6 +791,12 @@ async function writeName(mac, name){
   if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
   const res=await r.json(); return res.applied_name||name;
 }
+// The second naming write: set a Meraki DEVICE's name (appliance/switch/AP) by serial.
+async function writeDeviceName(serial, name){
+  const r=await fetch(BRIDGE+"/meraki/device-name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({serial,name})});
+  if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
+  const res=await r.json(); return res.applied_name||name;
+}
 
 // One-Click Naming: optimistic spinner, then the REAL status the bridge returns.
 async function doNameButton(nb){
@@ -785,18 +807,21 @@ async function doNameButton(nb){
   catch(err){ nb.disabled=false; nb.innerHTML=old; nb.insertAdjacentHTML("afterend"," <span class='namewarn'>write failed: "+esc(err.message)+"</span>"); }
 }
 
-// Inline rename of ANY connected client: pencil -> input+Save -> write -> real status.
+// Inline rename of a client (by MAC) OR a Meraki device (by serial): pencil -> input+Save -> write -> status.
+// The pencil carries data-mac (client) or data-serial (device); the save button inherits whichever.
 function openRename(ri){
-  const mac=ri.dataset.mac, cur=(ri.dataset.cur||"").replace(/"/g,"&quot;");
-  ri.outerHTML="<span class='renbox'><input class='renval' value=\""+cur+"\" spellcheck='false' placeholder='client name'><button class='rensave' data-mac='"+esc(mac)+"'>Save</button><button class='rencancel'>&#10005;</button></span>";
+  const cur=(ri.dataset.cur||"").replace(/"/g,"&quot;");
+  const attr = ri.dataset.serial ? "data-serial='"+esc(ri.dataset.serial)+"'" : "data-mac='"+esc(ri.dataset.mac)+"'";
+  const ph = ri.dataset.serial ? "device name" : "client name";
+  ri.outerHTML="<span class='renbox'><input class='renval' value=\""+cur+"\" spellcheck='false' placeholder='"+ph+"'><button class='rensave' "+attr+">Save</button><button class='rencancel'>&#10005;</button></span>";
   const inp=document.querySelector(".renbox .renval"); if(inp){ inp.focus(); inp.select(); }
 }
 async function doRenameSave(btn){
   const box=btn.closest(".renbox"); if(!box) return;
-  const inp=box.querySelector(".renval"), mac=btn.dataset.mac, name=(inp.value||"").trim();
+  const inp=box.querySelector(".renval"), name=(inp.value||"").trim();
   if(!name){ inp.focus(); return; }
   btn.disabled=true; const old=btn.innerHTML; btn.innerHTML="<span class='spin'></span>";
-  try{ const applied=await writeName(mac,name); box.outerHTML="<span class='nameok'>&check; named &ldquo;"+esc(applied)+"&rdquo;</span>"; }
+  try{ const applied = btn.dataset.serial ? await writeDeviceName(btn.dataset.serial,name) : await writeName(btn.dataset.mac,name); box.outerHTML="<span class='nameok'>&check; named &ldquo;"+esc(applied)+"&rdquo;</span>"; }
   catch(err){ btn.disabled=false; btn.innerHTML=old; box.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
 }
 
@@ -858,13 +883,14 @@ document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
   const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
+  const cj=e.target.closest(".catcard.jump"); if(cj){ const cat=cj.getAttribute("data-cat"); const tgt=document.querySelector(".fcard[data-fcat=\""+(cat||"").replace(/"/g,"")+"\"]"); if(tgt){ tgt.scrollIntoView({behavior:"smooth",block:"center"}); tgt.classList.add("flash"); setTimeout(()=>tgt.classList.remove("flash"),1200); } return; }
   const sc=e.target.closest("[data-scope]"); if(sc){ const s=sc.getAttribute("data-scope"); AUD.view=s; AUDITMODE=s; AUDITTARGET = s==="org" ? {type:"org",id:"org",name:"Organization"} : {type:s,id:(AUD.tgt[s]&&AUD.tgt[s].id)||"",name:(AUD.tgt[s]&&AUD.tgt[s].name)||""}; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show) renderFeatures(); });
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
 document.getElementById("toastvlan").value=toastVlan();
-document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlan(); render(); });
+document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlans().join(", "); render(); });
 document.getElementById("namemap").value=mapText();
 // Lab Features: enable-for-production + configurable keywords
 document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); renderFeatures(); render(); } });
