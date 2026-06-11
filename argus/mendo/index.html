@@ -99,7 +99,7 @@
   .savewrap{position:relative;display:inline-block;}
   .savebtn{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.4;white-space:nowrap;}
   .savebtn:hover{border-color:var(--accent);color:var(--accent);}
-  .sect-h .savewrap{margin-left:auto;} .sect-h .savebtn{padding:1px 9px;font-size:.78rem;}
+  .sect-tools{margin-left:auto;display:inline-flex;align-items:center;gap:8px;} .sect-tools .secref{margin-left:0;} .sect-h .savebtn{padding:1px 9px;font-size:.78rem;}
   .savemenu{position:absolute;top:calc(100% + 4px);right:0;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:5px;min-width:152px;display:none;box-shadow:0 12px 30px rgba(0,0,0,.6);}
   .savewrap.open .savemenu{display:block;}
   .savemenu a{display:block;padding:8px 12px;font-size:.85rem;font-weight:600;color:var(--text);border-radius:6px;cursor:pointer;text-decoration:none;}
@@ -324,7 +324,7 @@ function initSortables(){
     sortTable(table, st.col, st.dir);
   });
 }
-function sect(key,title,body,kind){ const open=SECTSTATE[key]!==false; const ref=kind?"<button class='secref' data-refresh='"+esc(kind)+"' title='Refresh this section'>&#x21bb; Refresh</button>":""; return "<h2 class='sect-h"+(open?"":" collapsed")+"' data-sect='"+esc(key)+"'><span class='chev'>&#9656;</span> "+title+ref+saveMenu("sect:"+key)+"</h2><div class='sect-body' id='secbody-"+esc(key)+"'"+(open?"":" style='display:none'")+">"+body+"</div>"; }
+function sect(key,title,body,kind){ const open=SECTSTATE[key]!==false; const ref=kind?"<button class='secref' data-refresh='"+esc(kind)+"' title='Refresh this section'>&#x21bb; Refresh</button>":""; return "<h2 class='sect-h"+(open?"":" collapsed")+"' data-sect='"+esc(key)+"'><span class='chev'>&#9656;</span> "+title+"<span class='sect-tools'>"+ref+saveMenu("sect:"+key)+"</span></h2><div class='sect-body' id='secbody-"+esc(key)+"'"+(open?"":" style='display:none'")+">"+body+"</div>"; }
 const WIFI="<svg class='wic' viewBox='0 0 24 24' width='13' height='13' fill='currentColor'><path d='M12 17.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 3C7.6 3 3.6 4.8.8 7.7l2.1 2.1C5.2 7.5 8.4 6 12 6s6.8 1.5 9.1 3.8l2.1-2.1C20.4 4.8 16.4 3 12 3zm0 5c-2.9 0-5.5 1.2-7.4 3.1l2.1 2.1C8 11 9.9 10 12 10s4 1 5.3 2.2l2.1-2.1C17.5 9.2 14.9 8 12 8z'/></svg>";
 
 // Always fetch fresh: no-store + a cache-bust param so a Refresh re-hits Meraki, never a cached GET.
@@ -996,6 +996,39 @@ function _slug(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-")
 function _fname(scope,ext){ return "argus-"+(_slug(exportStore())||"data")+"-"+_slug(scope)+"-"+pacific().replace(/[: ]/g,"-")+"."+ext; }
 function _dl(name,text,mime){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:mime})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{document.body.removeChild(a);URL.revokeObjectURL(a.href);}catch(e){} },1500); }
 async function _clip(t){ try{ await navigator.clipboard.writeText(t); return true; }catch(e){ return false; } }
+// Synchronous clipboard copy (works inside a user-gesture without breaking it -- needed before window.open).
+function _clipSync(text){ try{ const ta=document.createElement("textarea"); ta.value=text; ta.style.cssText="position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(ta); ta.focus(); ta.select(); let ok=false; try{ ok=document.execCommand("copy"); }catch(e){} document.body.removeChild(ta); return ok; }catch(e){ return false; } }
+// --- minimal real .xlsx writer (store-only ZIP + CRC32; one sheet per data block) ---
+function _enc(s){ return new TextEncoder().encode(s); }
+function _crc32(b){ let c,crc=0xFFFFFFFF; if(!_crc32.t){ _crc32.t=[]; for(let n=0;n<256;n++){ c=n; for(let k=0;k<8;k++) c=c&1?(0xEDB88320^(c>>>1)):(c>>>1); _crc32.t[n]=c>>>0; } } for(let i=0;i<b.length;i++) crc=(crc>>>8)^_crc32.t[(crc^b[i])&0xFF]; return (crc^0xFFFFFFFF)>>>0; }
+function _zip(files){ const u16=n=>[n&255,(n>>8)&255], u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255]; let parts=[],central=[],off=0;
+  files.forEach(f=>{ const nm=_enc(f.name), dt=f.data, crc=_crc32(dt);
+    parts.push(new Uint8Array([0x50,0x4b,3,4,...u16(20),...u16(0),...u16(0),...u16(0),...u16(0),...u32(crc),...u32(dt.length),...u32(dt.length),...u16(nm.length),...u16(0)])); parts.push(nm); parts.push(dt);
+    central.push(new Uint8Array([0x50,0x4b,1,2,...u16(20),...u16(20),...u16(0),...u16(0),...u16(0),...u16(0),...u32(crc),...u32(dt.length),...u32(dt.length),...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)])); central.push(nm);
+    off += 30+nm.length+dt.length; });
+  let cdLen=0; central.forEach(p=>cdLen+=p.length);
+  const eocd=new Uint8Array([0x50,0x4b,5,6,...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cdLen),...u32(off),...u16(0)]);
+  const all=[...parts,...central,eocd]; let tot=0; all.forEach(p=>tot+=p.length); const out=new Uint8Array(tot); let o=0; all.forEach(p=>{ out.set(p,o); o+=p.length; }); return out;
+}
+function _xmlEsc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function _cellRef(c,r){ let s=""; c++; while(c){ s=String.fromCharCode(65+((c-1)%26))+s; c=Math.floor((c-1)/26); } return s+r; }
+function _xlsxSheet(block){
+  const rowXml=(arr,r)=>"<row r=\""+r+"\">"+arr.map((v,i)=>{ const s=String(v==null?"":v); const num=s!==""&&/^-?\d+(\.\d+)?$/.test(s); return num?"<c r=\""+_cellRef(i,r)+"\"><v>"+s+"</v></c>":"<c r=\""+_cellRef(i,r)+"\" t=\"inlineStr\"><is><t xml:space=\"preserve\">"+_xmlEsc(s)+"</t></is></c>"; }).join("")+"</row>";
+  let rows=rowXml(block.headers,1); block.rows.forEach((rr,i)=>rows+=rowXml(rr,i+2));
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>"+rows+"</sheetData></worksheet>";
+}
+function _xlsx(blocks){
+  if(!blocks.length) blocks=[{name:"Sheet1",headers:[],rows:[]}];
+  blocks.forEach((b,i)=>{ b.name=(b.name||("Sheet"+(i+1))).replace(/[\\\/?*\[\]:]/g," ").trim().slice(0,31)||("Sheet"+(i+1)); });
+  const sheetsXml=blocks.map((b,i)=>"<sheet name=\""+_xmlEsc(b.name)+"\" sheetId=\""+(i+1)+"\" r:id=\"rId"+(i+1)+"\"/>").join("");
+  const wb="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets>"+sheetsXml+"</sheets></workbook>";
+  const wbRels="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"+blocks.map((b,i)=>"<Relationship Id=\"rId"+(i+1)+"\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet"+(i+1)+".xml\"/>").join("")+"</Relationships>";
+  const rels="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>";
+  const ct="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>"+blocks.map((b,i)=>"<Override PartName=\"/xl/worksheets/sheet"+(i+1)+".xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>").join("")+"</Types>";
+  const files=[{name:"[Content_Types].xml",data:_enc(ct)},{name:"_rels/.rels",data:_enc(rels)},{name:"xl/workbook.xml",data:_enc(wb)},{name:"xl/_rels/workbook.xml.rels",data:_enc(wbRels)}];
+  blocks.forEach((b,i)=>files.push({name:"xl/worksheets/sheet"+(i+1)+".xml",data:_enc(_xlsxSheet(b))}));
+  return _zip(files);
+}
 function _csvEsc(v){ v=String(v==null?"":v); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
 function tableData(tbl){
   const heads=tbl.tHead?[...tbl.tHead.rows[0].cells].map(c=>c.textContent.replace(/[▲▼]/g,"").replace(/\s+/g," ").trim()):[];
@@ -1031,13 +1064,15 @@ async function exportRun(fmt, scope){
   if(!tables.length){ toast("nothing to export here yet"); return; }
   if(fmt==="csv"){ _dl(_fname(scope,"csv"), tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\r\n":"")+dataCSV(tableData(t)); }).join("\r\n\r\n"), "text/csv"); return; }
   if(fmt==="excel"){
-    const body=tables.map(t=>{ const ttl=tableTitle(t), d=tableData(t); return (ttl&&tables.length>1?"<h3>"+esc(ttl)+"</h3>":"")+"<table border='1'><thead><tr>"+d.headers.map(h=>"<th>"+esc(h)+"</th>").join("")+"</tr></thead><tbody>"+d.rows.map(r=>"<tr>"+r.map(c=>"<td>"+esc(c)+"</td>").join("")+"</tr>").join("")+"</tbody></table><br>"; }).join("");
-    _dl(_fname(scope,"xls"), "<html xmlns:x='urn:schemas-microsoft-com:office:excel'><head><meta charset='utf-8'></head><body>"+body+"</body></html>", "application/vnd.ms-excel"); return;
+    const blocks=tables.map((t,i)=>{ const d=tableData(t); return {name:(tableTitle(t)||("Sheet"+(i+1))), headers:d.headers, rows:d.rows}; });
+    _dl(_fname(scope,"xlsx"), _xlsx(blocks), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); return;
   }
   if(fmt==="gsheets"){
+    if(!tables.length){ toast("nothing to export here yet"); return; }
     const tsv=tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\n":"")+dataTSV(tableData(t)); }).join("\n\n");
-    const ok=await _clip(tsv); window.open("https://sheets.new","_blank");
-    toast(ok?"Data copied — click cell A1 in the new Google Sheet and paste (Ctrl/Cmd+V)":"Open a new sheet, then paste the data manually");
+    const ok=_clipSync(tsv);            // copy synchronously (keeps the user gesture intact)...
+    window.open("https://sheets.new","_blank"); // ...then open the new sheet (not popup-blocked)
+    toast(ok?"Data copied — click cell A1 in the new Google Sheet and paste (Ctrl/Cmd+V)":"Sheet opened — copy the data again if paste is empty");
     return;
   }
 }
