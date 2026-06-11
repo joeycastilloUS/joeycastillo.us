@@ -150,16 +150,12 @@
 <div class="wrap">
   <h1>Network View</h1>
   <div class="bar">
-    <div class="combo">
-      <input id="netsearch" type="text" placeholder="type a network&hellip;" autocomplete="off">
-      <div id="netlist" class="netlist"></div>
-    </div>
-    <button id="go">Pull</button>
     <button id="exh" class="alt" disabled>Export HTML</button>
     <button id="exp" class="alt" disabled>Export PDF</button>
     <button id="gear" class="alt" title="Device name map">&#9881;</button>
     <span class="muted" id="status"></span>
   </div>
+  <div class="muted" style="margin:-4px 0 14px;">Three tabs &mdash; each loads its own location. Operations and Network can show different stores at the same time.</div>
   <div class="panel" id="settings" style="display:none;">
     <div class="feat-sec">
       <div class="feat-h">Lab Features</div>
@@ -252,17 +248,11 @@ function pacific(){
   catch(e){ return new Date().toISOString(); }
 }
 
-let NETS=[], FILTERED=[], ACTIVE=-1, SELECTED_ID="";
+let NETS=[];
 async function loadNetworks(){
   const r=await api("/meraki/networks"); if(r.status===401) throw new Error("unauthorized");
   const d=await r.json(); NETS=(d.networks||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
 }
-function scoreN(name,q){ name=name.toLowerCase(); q=q.toLowerCase(); if(!q) return 1; const i=name.indexOf(q); return i<0?-1:(i===0?2:1); }
-function filterNets(q){ if(!q){ FILTERED=[]; ACTIVE=-1; drawList(q); return; } FILTERED=NETS.map(n=>({n,s:scoreN(n.name,q)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s||a.n.name.localeCompare(b.n.name)).slice(0,12).map(x=>x.n); ACTIVE=FILTERED.length?0:-1; drawList(q); }
-function hlq(name,q){ if(!q) return esc(name); const i=name.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(name); return esc(name.slice(0,i))+"<span class='hl'>"+esc(name.slice(i,i+q.length))+"</span>"+esc(name.slice(i+q.length)); }
-function drawList(q){ const el=document.getElementById("netlist"); if(!FILTERED.length){ el.classList.remove("open"); el.innerHTML=""; return; } el.innerHTML=FILTERED.map((n,i)=>"<div class='netopt"+(i===ACTIVE?" active":"")+"' data-i='"+i+"'>"+hlq(n.name,q)+"</div>").join(""); el.classList.add("open"); }
-function pickNet(i){ if(i<0||i>=FILTERED.length) return; SELECTED_ID=FILTERED[i].id; document.getElementById("netsearch").value=FILTERED[i].name; document.getElementById("netlist").classList.remove("open"); }
-function resolveNet(){ if(SELECTED_ID) return SELECTED_ID; filterNets(document.getElementById("netsearch").value.trim()); if(FILTERED.length){ pickNet(0); return SELECTED_ID; } return ""; }
 
 // --- pre-configured IP -> expected device name map (gear settings) ---
 const MAP_KEY="meraki_namemap_v1";
@@ -312,48 +302,43 @@ function nameCheck(ip, actual, mac){
   return K+" <span class='namewarn'>&#9888; should be \""+esc(exp)+"\"</span>";
 }
 
-let LASTDATA=null;
 function lastSeenPac(s){ if(!s) return ""; try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s)); }catch(e){ return s; } }
 function swOrder(n){ n=(n||"").toUpperCase(); if(n.indexOf("POS")>=0) return 0; if(n.indexOf("BOH")>=0) return 1; return 2; }
 
-// Independent source fetchers -- each updates only its slice of LASTDATA + its own stamp,
-// so a single section can be refreshed without re-pulling the others.
-async function pullPorts(net){
-  const r=await api("/meraki/portmap?network="+encodeURIComponent(net));
-  if(!r.ok) throw new Error("switch error "+r.status);
-  LASTDATA.d=await r.json(); LASTDATA.portStamp=pacific();
-}
+// Per-tab independent data. Operations and Network each hold their OWN location + pull, so the
+// two tabs can show different stores at the same time. The audit tab picks its own target.
+function newSlot(){ return {net:"",name:"",d:null,wifi:null,stamp:"",portStamp:"",wifiStamp:"",loading:false,error:""}; }
+let OPS=newSlot();   // Operations tab
+let NETV=newSlot();  // Network tab
+let AUD={audit:null,auditing:false,auditError:""}; // Security Audit tab state (target = AUDITTARGET)
+function slotById(id){ return id==="operations"?OPS:id==="network"?NETV:null; }
+
+// Source fetchers -- each writes only its slice of a slot + its own stamp, so a single section
+// refreshes without re-pulling the others.
+async function fetchPorts(slot,net){ const r=await api("/meraki/portmap?network="+encodeURIComponent(net)); if(!r.ok) throw new Error("switch error "+r.status); slot.d=await r.json(); slot.portStamp=pacific(); }
 // All SSIDs in the network, grouped. No SSID arg -- the network selection reveals every SSID.
-async function pullWifi(net){
-  const rw=await api("/meraki/wireless?network="+encodeURIComponent(net));
-  if(!rw.ok) throw new Error("Wi-Fi error "+rw.status);
-  LASTDATA.wifi=await rw.json(); LASTDATA.wifiStamp=pacific();
+async function fetchWifi(slot,net){ const rw=await api("/meraki/wireless?network="+encodeURIComponent(net)); if(!rw.ok) throw new Error("Wi-Fi error "+rw.status); slot.wifi=await rw.json(); slot.wifiStamp=pacific(); }
+
+// Load a tab's slot from its own picker (the <select id='pick-operations'|'pick-network'>).
+async function loadSlot(id){
+  const slot=slotById(id); if(!slot) return;
+  const sel=document.getElementById("pick-"+id); if(!sel||!sel.value){ slot.error="pick a location"; render(); return; }
+  slot.net=sel.value; slot.name=sel.options[sel.selectedIndex].text; slot.loading=true; slot.error=""; slot.stamp=pacific();
+  slot.d=null; slot.wifi=null; slot.portStamp=""; slot.wifiStamp=""; render();
+  try{ await fetchPorts(slot,slot.net); try{ await fetchWifi(slot,slot.net); }catch(e){} }
+  catch(e){ slot.error=e.message||"error"; }
+  slot.loading=false; render();
 }
 
-async function pull(){
-  const net=resolveNet(), err=document.getElementById("err");
-  document.getElementById("report").innerHTML=""; err.textContent="";
-  if(!net){ err.textContent="pick a network"; return; }
-  LASTDATA={ d:null, wifi:null, net, stamp:pacific(), portStamp:"", wifiStamp:"" };
-  try{
-    document.getElementById("status").textContent="pulling switch…";
-    await pullPorts(net);
-    document.getElementById("status").textContent="pulling Wi-Fi…"; try{ await pullWifi(net); }catch(e){}
-  }catch(e){ document.getElementById("status").textContent=""; err.textContent=e.message||"error"; return; }
-  document.getElementById("status").textContent="";
-  render();
-}
-
-// Per-section refresh: re-pull only the source(s) behind the clicked section, then re-render.
-async function refreshSection(kind, btn){
-  if(!LASTDATA||!LASTDATA.net) return;
-  const net=LASTDATA.net;
+// Per-section refresh: re-pull only the source(s) behind the clicked section, in that tab's slot.
+async function refreshSection(id, kind, btn){
+  const slot=slotById(id); if(!slot||!slot.net) return;
   if(btn){ btn.disabled=true; btn.innerHTML="<span class='spin'></span> refreshing&hellip;"; }
-  document.getElementById("err").textContent="";
+  slot.error="";
   try{
-    if(kind==="ports"||kind==="both") await pullPorts(net);
-    if(kind==="wifi"||kind==="both") await pullWifi(net);
-  }catch(e){ document.getElementById("err").textContent=e.message||"refresh error"; }
+    if(kind==="ports"||kind==="both") await fetchPorts(slot,slot.net);
+    if(kind==="wifi"||kind==="both") await fetchWifi(slot,slot.net);
+  }catch(e){ slot.error=e.message||"refresh error"; }
   render(); // rebuilds the report -- the button is recreated fresh + enabled
 }
 
@@ -376,35 +361,48 @@ function renderChecks(){
 
 // Read-only Firewall Security Audit for the current network (lazy: runs when the tab opens).
 async function pullAudit(){
-  if(!LASTDATA||LASTDATA.auditing) return;
+  if(AUD.auditing) return;
   const t=AUDITTARGET; if(!t.id) return;
-  LASTDATA.auditing=true; LASTDATA.auditError=""; LASTDATA.audit=null; render();
+  AUD.auditing=true; AUD.auditError=""; AUD.audit=null; render();
   try{
     const q = t.type==="org" ? "org=1" : t.type==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
     const r=await api("/meraki/audit?"+q);
     if(!r.ok) throw new Error("error "+r.status);
-    LASTDATA.audit=await r.json();
-  }catch(e){ LASTDATA.auditError=e.message||"audit error"; }
-  LASTDATA.auditing=false; render();
+    AUD.audit=await r.json();
+  }catch(e){ AUD.auditError=e.message||"audit error"; }
+  AUD.auditing=false; render();
 }
 
-function render(){
-  if(!LASTDATA) return;
-  const d=LASTDATA.d, stamp=LASTDATA.stamp;
-  const onlineOnly=true; // main view always shows what's connected now; 24h history is per-port "more info"
-  const FEAT=featureActive("one-click-naming", d.name); // One-Click Naming active for this location?
-  let h="";
+// Options for a per-tab location picker -- all networks, current one preselected.
+function netOptions(selId){
+  const nets=(NETS||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  return nets.map(n=>"<option value='"+esc(n.id)+"'"+(n.id===selId?" selected":"")+">"+esc(n.name)+(n.configTemplateId?"":"  (no template)")+"</option>").join("");
+}
+// The picker row that sits at the top of Operations and Network -- pick a location, then Load.
+function pickerRow(id, slot){
+  const btn = slot.loading
+    ? "<button disabled><span class='spin'></span> loading&hellip;</button>"
+    : "<button data-load='"+id+"'>"+(slot.net?"Reload":"Load")+"</button>";
+  const label = slot.net ? "<span class='muted'>showing <b>"+esc(slot.name)+"</b></span>" : "<span class='muted'>pick a location, then Load</span>";
+  return "<div class='bar'><select id='pick-"+id+"' style='min-width:320px;'>"+netOptions(slot.net)+"</select>"+btn+label+"</div>"+
+         (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"");
+}
+// Loaded-slot header: name, config template, pull stamps.
+function slotHead(slot){
+  const d=slot.d; let h="";
   h+="<div class='nethead'>Network: <b>"+esc(d.name||"")+"</b></div>";
-  const tmplRef=" <button class='secref' data-refresh='ports' title='Refresh config template'>&#x21bb;</button>";
-  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span>"+tmplRef+"</div>"; }
-  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span>"+tmplRef+"</div>"; }
-  const pStamp=LASTDATA.portStamp||stamp, wStamp=LASTDATA.wifiStamp;
-  h+="<div class='stamp'>Switch pulled "+esc(pStamp)+(wStamp?" &middot; Wi-Fi pulled "+esc(wStamp):"")+(onlineOnly?" &middot; connected-now only":" &middot; seen in last 24h")+"</div>";
+  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span></div>"; }
+  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span></div>"; }
+  h+="<div class='stamp'>Switch pulled "+esc(slot.portStamp||slot.stamp)+(slot.wifiStamp?" &middot; Wi-Fi pulled "+esc(slot.wifiStamp):"")+" &middot; connected-now only</div>";
+  return h;
+}
+function portTag(swName){ const n=(swName||"").toUpperCase(); if(n.indexOf("POS")>=0) return "POS"; if(n.indexOf("BOH")>=0) return "BOH"; return (swName||"SW").trim(); }
 
+// Operations content: Toast POS (top) then Konductor rollout, from this slot's own data.
+function opsContent(slot){
+  const d=slot.d, wifi=slot.wifi;
   // --- Konductor rollout completeness: every mapped IP present + live (switch OR Wi-Fi) ---
-  const wifi=LASTDATA.wifi;
   const seen={};
-  function portTag(swName){ const n=(swName||"").toUpperCase(); if(n.indexOf("POS")>=0) return "POS"; if(n.indexOf("BOH")>=0) return "BOH"; return (swName||"SW").trim(); }
   function noteSeen(ip,on,where,isWifi,vlan){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[],vlans:[]}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); const v=(vlan==null?"":String(vlan)).trim(); if(v && s.vlans.indexOf(v)<0) s.vlans.push(v); }
   (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>(p.clients||[]).forEach(c=>{
     noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false,p.vlan);
@@ -452,18 +450,14 @@ function render(){
       : "<div class='muted'>No connected devices on VLAN "+esc(tvlan)+". Set the Toast VLAN in &#9881; settings.</div>";
     toastHtml=sect("toast","Toast POS &mdash; "+toast.length+" on VLAN "+esc(tvlan), body, "ports");
   }
+  return toastHtml + (rollHtml || "<div class='muted'>No Konductor devices mapped for this network &mdash; add them in the &#9881; settings (the K devices).</div>");
+}
 
-  // --- tabs: Switch Ports | Wi-Fi (all SSIDs) ---
+// Network content: switches + Meraki devices + Wi-Fi (all SSIDs), from this slot's own data.
+function netContent(slot){
+  const d=slot.d, wifi=slot.wifi, onlineOnly=true;
+  const FEAT=featureActive("one-click-naming", d.name); // One-Click Naming active for this location?
   const ssidGroups=(wifi&&wifi.ssids)||[];
-  const ssidCount=wifi?(wifi.ssidCount!=null?wifi.ssidCount:ssidGroups.length):0;
-  const auditBadge = LASTDATA.audit ? " &middot; <b class='grade-"+esc(LASTDATA.audit.grade)+"'>"+esc(LASTDATA.audit.grade)+"</b>" : "";
-  h+="<div class='tabs'>"+
-     "<button class='tab"+(TAB==="operations"?" on":"")+"' data-tab='operations'>&#9776; Operations</button>"+
-     "<button class='tab"+(TAB==="network"?" on":"")+"' data-tab='network'>"+WIFI+"Network &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s")+"</button>"+
-     "<button class='tab"+(TAB==="audit"?" on":"")+"' data-tab='audit'>&#128737; Security Audit"+auditBadge+"</button>"+
-     "</div>";
-
-  // --- Switch pane: switches first, Meraki Devices inventory last ---
   let sp="", nameableCount=0;
   const dev=d.devices||[];
   (d.switches||[]).slice().sort((a,b)=>swOrder(a.name)-swOrder(b.name)||(a.name||"").localeCompare(b.name)).forEach(sw=>{
@@ -555,83 +549,110 @@ function render(){
     });
   }
 
-  // --- Operations pane: Toast POS (top) then Konductor ---
-  h+="<div id='pane-operations' class='"+(TAB==="operations"?"":"hidden")+"'>"+
-     toastHtml+
-     (rollHtml || "<div class='muted'>No Konductor devices mapped for this network &mdash; add them in the &#9881; settings (the K devices).</div>")+"</div>";
-  // --- Network pane: switches + Meraki devices + Wi-Fi (all SSIDs) ---
-  h+="<div id='pane-network' class='"+(TAB==="network"?"":"hidden")+"'>"+nameBar+sp+wifiHtml+"</div>";
-
-  // --- Security Audit pane: read-only firewall/security audit of this network ---
-  h+="<div id='pane-audit' class='"+(TAB==="audit"?"":"hidden")+"'>";
-  if(LASTDATA.auditing){ h+="<div class='box'><div class='muted'><span class='spin'></span> running read-only audit &amp; collecting config&hellip;</div></div>"; }
-  else if(LASTDATA.auditError){ h+="<div class='err'>audit failed: "+esc(LASTDATA.auditError)+"</div>"+auditControls(); }
-  else if(!LASTDATA.audit){ h+=auditControls(); }
-  else {
-    const A=LASTDATA.audit, S=A.summary||{};
-    h+="<div class='stamp'>Audited "+(A.isTemplate?"template":"network")+" <b>"+esc(A.store||"")+"</b> &middot; <a class='moreinfo' id='auditreset'>&#8635; change target / re-run</a></div>";
-    // overall grade
-    h+="<div class='auditbar'><span class='gradebig grade-"+esc(A.grade)+"'>"+esc(A.grade)+"</span><span class='scorebig'>"+esc(""+A.score)+"<small>/100</small></span>"+
-       "<span class='sevsum'>"+(S.critical||0)+" <span class='sev-critical'>critical</span> &middot; "+(S.high||0)+" <span class='sev-high'>high</span> &middot; "+(S.medium||0)+" <span class='sev-medium'>medium</span> &middot; "+(S.low||0)+" <span class='sev-low'>low</span></span></div>";
-    // per-category report card
-    if(A.categories&&A.categories.length){
-      h+="<div class='catcards'>";
-      A.categories.forEach(c=>{
-        const na=!c.applicable;
-        h+="<div class='catcard"+(na?" na":"")+"'><div class='catgrade grade-"+esc(c.grade)+"'>"+(na?"&ndash;":esc(c.grade))+"</div>"+
-           "<div class='catname'>"+esc(c.category)+"</div>"+
-           "<div class='catsub'>"+(na?"not applicable":(c.findings+" finding"+(c.findings===1?"":"s")))+"</div></div>";
-      });
-      h+="</div>";
-    }
-    const M=A.meta||{};
-    h+="<div class='stamp'>Scope: <b>"+(M.l3Rules||0)+"</b> L3 rules &middot; <b>"+(M.portForwards||0)+"</b> port-forwards &middot; <b>"+(M.oneToOneNat||0)+"</b> 1:1 NAT &middot; <b>"+(M.enabledSsids||0)+"</b> SSIDs &middot; <b>"+(M.clients||0)+"</b> clients &middot; <b>"+(M.devices||0)+"</b> devices &middot; <a class='moreinfo' id='showchecks'>"+(SHOWCHECKS?"&#9662; hide":"&#9656;")+" checks &amp; scoring</a></div>";
-    if(SHOWCHECKS) h+=renderChecks();
-    const C=A.coverage||{}, T=A.template||{};
-    h+="<div class='stamp'>Coverage: <b>"+(C.total||0)+"</b> checks &middot; <span class='sev-low'>"+(C.passed||0)+" passed</span> &middot; <span class='sev-high'>"+(C.failed||0)+" failed</span> &middot; <span class='av'>"+(C.skipped||0)+" skipped</span></div>";
-    if(T.bound) h+="<div class='tplnote'><span class='kbadge'>TPL</span> Bound to config template <b>"+esc(T.name||"")+"</b> &mdash; firewall / content / threat settings are read from the template, not per-network.</div>";
-    else if(T.note) h+="<div class='stamp'>"+esc(T.note)+"</div>";
-    if(A.skipped&&A.skipped.length) h+="<div class='stamp'>Endpoints not readable: "+esc(A.skipped.join(", "))+"</div>";
-    const rank={critical:0,high:1,medium:2,low:3};
-    const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
-    if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No failures &mdash; passed every check.</div>"; }
-    else {
-      h+="<div class='feat-h' style='margin-top:14px;'>Action items &mdash; "+fs.length+"</div><div class='findings'>";
-      fs.forEach(f=>{
-        h+="<div class='fcard sev-l-"+esc(f.severity)+"'>"+
-           "<div class='fchead'><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span>"+
-           "<span class='fcid'>"+esc(f.id)+"</span><span class='fccat'>"+esc(f.category)+"</span>"+lvlBadge(f.level)+"</div>"+
-           "<div class='fctitle'>"+esc(f.title)+"</div>"+
-           "<div class='fcev'>"+esc(f.evidence)+"</div>"+
-           "<div class='fcrem'><b>Fix &middot;</b> "+esc(f.remediation)+"</div></div>";
-      });
-      h+="</div>";
-    }
-    // Everything evaluated -- the backing: every check, pass / fail / skip, with evidence.
-    if(A.results&&A.results.length){
-      const ord={fail:0,pass:1,skip:2};
-      const rs=A.results.slice().sort((a,b)=>(ord[a.status]-ord[b.status])||String(a.id).localeCompare(String(b.id)));
-      h+="<div class='feat-h' style='margin-top:16px;'>Everything evaluated &mdash; "+A.results.length+" checks</div><div class='evlist'>";
-      rs.forEach(r=>{
-        const ic=r.status==='pass'?"<span class='ev-pass'>&check;</span>":r.status==='fail'?"<span class='ev-fail'>&#10007;</span>":"<span class='ev-skip'>&minus;</span>";
-        h+="<div class='evrow ev-"+esc(r.status)+"'><div class='evtop'>"+ic+" <span class='evid'>"+esc(r.id)+"</span> <span class='evcat'>"+esc(r.category)+"</span>"+lvlBadge(r.level)+" <span class='evtitle'>"+esc(r.title)+"</span></div><div class='evev'>"+esc(r.evidence)+"</div></div>";
-      });
-      h+="</div>";
-    }
-    h+="<div class='stamp' style='margin-top:8px;'>Read-only audit &middot; "+esc((A.coverage&&A.coverage.total)||0)+" checks evaluated &middot; no settings changed.</div>";
-  }
-  h+="</div>";
-
-  document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
-  document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
+  return nameBar+sp+wifiHtml;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
+// Security Audit pane: read-only firewall/security audit. Picks its own target (network / template / org).
+function auditPane(){
+  let h="";
+  if(AUD.auditing){ h+="<div class='box'><div class='muted'><span class='spin'></span> running read-only audit &amp; collecting config&hellip;</div></div>"; return h; }
+  if(AUD.auditError){ return "<div class='err'>audit failed: "+esc(AUD.auditError)+"</div>"+auditControls(); }
+  if(!AUD.audit){ return auditControls(); }
+  const A=AUD.audit, S=A.summary||{}, isOrg=AUDITTARGET.type==="org";
+  const scopeLabel = isOrg ? "Audited <b>organization</b>" : "Audited "+(A.isTemplate?"template":"network")+" <b>"+esc(A.store||"")+"</b>";
+  h+="<div class='stamp'>"+scopeLabel+" &middot; <a class='moreinfo' id='auditreset'>&#8635; change target / re-run</a></div>";
+  // overall grade
+  h+="<div class='auditbar'><span class='gradebig grade-"+esc(A.grade)+"'>"+esc(A.grade)+"</span><span class='scorebig'>"+esc(""+A.score)+"<small>/100</small></span>"+
+     "<span class='sevsum'>"+(S.critical||0)+" <span class='sev-critical'>critical</span> &middot; "+(S.high||0)+" <span class='sev-high'>high</span> &middot; "+(S.medium||0)+" <span class='sev-medium'>medium</span> &middot; "+(S.low||0)+" <span class='sev-low'>low</span></span></div>";
+  // per-category report card
+  if(A.categories&&A.categories.length){
+    h+="<div class='catcards'>";
+    A.categories.forEach(c=>{
+      const na=!c.applicable;
+      h+="<div class='catcard"+(na?" na":"")+"'><div class='catgrade grade-"+esc(c.grade)+"'>"+(na?"&ndash;":esc(c.grade))+"</div>"+
+         "<div class='catname'>"+esc(c.category)+"</div>"+
+         "<div class='catsub'>"+(na?"not applicable":(c.findings+" finding"+(c.findings===1?"":"s")))+"</div></div>";
+    });
+    h+="</div>";
+  }
+  // Scope line: org audits have no firewall/SSID/client meta -- show the org posture line instead of a row of 0s.
+  const M=A.meta||{};
+  const checksLink=" <a class='moreinfo' id='showchecks'>"+(SHOWCHECKS?"&#9662; hide":"&#9656;")+" checks &amp; scoring</a>";
+  if(isOrg){ h+="<div class='stamp'>Organization-wide posture &mdash; admins, MFA, login policy &middot; evaluated once for the whole org."+checksLink+"</div>"; }
+  else { h+="<div class='stamp'>Scope: <b>"+(M.l3Rules||0)+"</b> L3 rules &middot; <b>"+(M.portForwards||0)+"</b> port-forwards &middot; <b>"+(M.oneToOneNat||0)+"</b> 1:1 NAT &middot; <b>"+(M.enabledSsids||0)+"</b> SSIDs &middot; <b>"+(M.clients||0)+"</b> clients &middot; <b>"+(M.devices||0)+"</b> devices &middot;"+checksLink+"</div>"; }
+  if(SHOWCHECKS) h+=renderChecks();
+  const C=A.coverage||{}, T=A.template||{};
+  h+="<div class='stamp'>Coverage: <b>"+(C.total||0)+"</b> checks &middot; <span class='sev-low'>"+(C.passed||0)+" passed</span> &middot; <span class='sev-high'>"+(C.failed||0)+" failed</span> &middot; <span class='av'>"+(C.skipped||0)+" skipped</span></div>";
+  if(T.bound) h+="<div class='tplnote'><span class='kbadge'>TPL</span> Bound to config template <b>"+esc(T.name||"")+"</b> &mdash; firewall / content / threat settings are read from the template, not per-network.</div>";
+  else if(T.note) h+="<div class='stamp'>"+esc(T.note)+"</div>";
+  if(A.skipped&&A.skipped.length) h+="<div class='stamp'>Endpoints not readable: "+esc(A.skipped.join(", "))+"</div>";
+  const rank={critical:0,high:1,medium:2,low:3};
+  const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
+  if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No failures &mdash; passed every check.</div>"; }
+  else {
+    h+="<div class='feat-h' style='margin-top:14px;'>Action items &mdash; "+fs.length+"</div><div class='findings'>";
+    fs.forEach(f=>{
+      h+="<div class='fcard sev-l-"+esc(f.severity)+"'>"+
+         "<div class='fchead'><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span>"+
+         "<span class='fcid'>"+esc(f.id)+"</span><span class='fccat'>"+esc(f.category)+"</span>"+lvlBadge(f.level)+"</div>"+
+         "<div class='fctitle'>"+esc(f.title)+"</div>"+
+         "<div class='fcev'>"+esc(f.evidence)+"</div>"+
+         "<div class='fcrem'><b>Fix &middot;</b> "+esc(f.remediation)+"</div></div>";
+    });
+    h+="</div>";
+  }
+  // Everything evaluated -- the backing: every check, pass / fail / skip, with evidence.
+  if(A.results&&A.results.length){
+    const ord={fail:0,pass:1,skip:2};
+    const rs=A.results.slice().sort((a,b)=>(ord[a.status]-ord[b.status])||String(a.id).localeCompare(String(b.id)));
+    h+="<div class='feat-h' style='margin-top:16px;'>Everything evaluated &mdash; "+A.results.length+" checks</div><div class='evlist'>";
+    rs.forEach(r=>{
+      const ic=r.status==='pass'?"<span class='ev-pass'>&check;</span>":r.status==='fail'?"<span class='ev-fail'>&#10007;</span>":"<span class='ev-skip'>&minus;</span>";
+      h+="<div class='evrow ev-"+esc(r.status)+"'><div class='evtop'>"+ic+" <span class='evid'>"+esc(r.id)+"</span> <span class='evcat'>"+esc(r.category)+"</span>"+lvlBadge(r.level)+" <span class='evtitle'>"+esc(r.title)+"</span></div><div class='evev'>"+esc(r.evidence)+"</div></div>";
+    });
+    h+="</div>";
+  }
+  h+="<div class='stamp' style='margin-top:8px;'>Read-only audit &middot; "+esc((A.coverage&&A.coverage.total)||0)+" checks evaluated &middot; no settings changed.</div>";
+  return h;
+}
+
+// Always render all three tabs + their own pickers, with or without data. Each tab loads independently.
+function render(){
+  let h="";
+  const wifiN=NETV.wifi, ssidGroups=(wifiN&&wifiN.ssids)||[];
+  const ssidCount=wifiN?(wifiN.ssidCount!=null?wifiN.ssidCount:ssidGroups.length):0;
+  const auditBadge = AUD.audit ? " &middot; <b class='grade-"+esc(AUD.audit.grade)+"'>"+esc(AUD.audit.grade)+"</b>" : "";
+  h+="<div class='tabs'>"+
+     "<button class='tab"+(TAB==="operations"?" on":"")+"' data-tab='operations'>&#9776; Operations</button>"+
+     "<button class='tab"+(TAB==="network"?" on":"")+"' data-tab='network'>"+WIFI+"Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</button>"+
+     "<button class='tab"+(TAB==="audit"?" on":"")+"' data-tab='audit'>&#128737; Security Audit"+auditBadge+"</button>"+
+     "</div>";
+
+  // Operations -- own picker, own data
+  h+="<div id='pane-operations' class='panebox "+(TAB==="operations"?"":"hidden")+"'>"+pickerRow("operations",OPS)+
+     (OPS.d ? slotHead(OPS)+opsContent(OPS) : "")+"</div>";
+  // Network -- own picker, own data
+  h+="<div id='pane-network' class='panebox "+(TAB==="network"?"":"hidden")+"'>"+pickerRow("network",NETV)+
+     (NETV.d ? slotHead(NETV)+netContent(NETV) : "")+"</div>";
+  // Security Audit -- own target picker
+  h+="<div id='pane-audit' class='panebox "+(TAB==="audit"?"":"hidden")+"'>"+auditPane()+"</div>";
+
+  document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
+  const hasAny=!!(OPS.d||NETV.d||AUD.audit);
+  document.getElementById("exh").disabled=!hasAny; document.getElementById("exp").disabled=!hasAny;
+}
+
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
 function viewName(){ return TAB==="operations"?"Operations":TAB==="network"?"Network":TAB==="audit"?"Security Audit":"View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS &mdash; part of the Pantheon Family of Platform, Tools &amp; Services.</div>";
+function exportStore(){
+  if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
+  if(TAB==="network") return (NETV.d&&NETV.d.name)||NETV.name||"";
+  return AUDITTARGET.type==="org" ? "Organization" : (AUD.audit&&AUD.audit.store)||AUDITTARGET.name||"";
+}
 function exportDoc(){
-  const store=(LASTDATA&&LASTDATA.d&&LASTDATA.d.name)||"", title="Argus &mdash; "+viewName();
+  const store=exportStore(), title="Argus &mdash; "+viewName();
   return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Argus "+viewName()+"</title><style>"+EXPORT_CSS+"</style></head><body><div style='font-size:18px;font-weight:bold;color:#0d6e8c'>"+esc(store)+" &mdash; "+title+"</div><div style='font-size:10px;color:#666;margin-bottom:8px'>"+esc(pacific())+"</div>"+activePaneHtml()+BRAND_FOOT+"</body></html>";
 }
 function exportHtml(){
@@ -649,7 +670,7 @@ function exportPdf(){
 // The one audited write: name a CLIENT by MAC. Shared by the map-suggested "Name it" button
 // and the inline rename of any connected client.
 async function writeName(mac, name){
-  const r=await fetch(BRIDGE+"/meraki/name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:SELECTED_ID,mac,name})});
+  const r=await fetch(BRIDGE+"/meraki/name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:NETV.net,mac,name})});
   if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
   const res=await r.json(); return res.applied_name||name;
 }
@@ -680,19 +701,19 @@ async function doRenameSave(btn){
 
 document.getElementById("gform").addEventListener("submit", async e=>{
   e.preventDefault(); PW=document.getElementById("gpw").value;
-  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); document.getElementById("gate").classList.add("hide"); document.getElementById("netsearch").focus(); }
+  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); document.getElementById("gate").classList.add("hide"); render(); }
   catch(_){ document.getElementById("gerr").textContent="wrong password"; PW=""; }
 });
-document.getElementById("go").addEventListener("click", pull);
 document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
-  const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); refreshSection(sr.getAttribute("data-refresh"), sr); return; }
+  const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
+  const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); const id=sr.closest("#pane-network")?"network":"operations"; refreshSection(id, sr.getAttribute("data-refresh"), sr); return; }
   const ck=e.target.closest("#showchecks"); if(ck){ e.stopImmediatePropagation(); SHOWCHECKS=!SHOWCHECKS; render(); if(SHOWCHECKS&&!CHECKS) pullChecks().then(render); return; }
   const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); AUDITTARGET=AUDITMODE==="org"?{type:"org",id:"org",name:"Organization"}:{type:AUDITMODE,id:"",name:""}; render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
   const ra=e.target.closest("#runaudit"); if(ra){ e.stopImmediatePropagation(); if(AUDITMODE==="org"){ AUDITTARGET={type:"org",id:"org",name:"Organization"}; pullAudit(); return; } const sel=document.getElementById("auditsel"); if(sel&&sel.value){ AUDITTARGET={type:AUDITMODE,id:sel.value,name:sel.options[sel.selectedIndex].text}; pullAudit(); } return; }
   const tn=e.target.closest("#togglenotpl"); if(tn){ e.stopImmediatePropagation(); SHOWNOTPL=!SHOWNOTPL; render(); return; }
   const al=e.target.closest(".auditlink"); if(al){ e.stopImmediatePropagation(); AUDITMODE="network"; AUDITTARGET={type:"network",id:al.getAttribute("data-netid"),name:al.getAttribute("data-netname")}; pullAudit(); return; }
-  const arst=e.target.closest("#auditreset"); if(arst){ e.stopImmediatePropagation(); LASTDATA.audit=null; LASTDATA.auditError=""; render(); return; }
+  const arst=e.target.closest("#auditreset"); if(arst){ e.stopImmediatePropagation(); AUD.audit=null; AUD.auditError=""; render(); return; }
   const ri=e.target.closest(".renameit"); if(ri){ e.stopImmediatePropagation(); openRename(ri); return; }
   const rs=e.target.closest(".rensave"); if(rs){ e.stopImmediatePropagation(); doRenameSave(rs); return; }
   const rc=e.target.closest(".rencancel"); if(rc){ e.stopImmediatePropagation(); render(); return; }
@@ -706,7 +727,7 @@ document.getElementById("report").addEventListener("keydown", e=>{
 });
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
-  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ if(!AUDITTARGET.id&&LASTDATA.net) AUDITTARGET={type:"network",id:LASTDATA.net,name:(LASTDATA.d&&LASTDATA.d.name)||""}; if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
+  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("exh").addEventListener("click", exportHtml);
@@ -717,26 +738,12 @@ document.getElementById("toastvlan").value=toastVlan();
 document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlan(); render(); });
 document.getElementById("namemap").value=mapText();
 // Lab Features: enable-for-production + configurable keywords
-document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); renderFeatures(); if(LASTDATA) render(); } });
-document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", "); if(LASTDATA) render(); });
+document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); renderFeatures(); render(); } });
+document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", "); render(); });
 document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
 renderFeatures();
 
-// --- network combobox (type-to-filter, Enter picks the top match) ---
-const _inp=document.getElementById("netsearch");
-_inp.addEventListener("input", ()=>{ SELECTED_ID=""; filterNets(_inp.value.trim()); });
-_inp.addEventListener("focus", ()=>filterNets(_inp.value.trim()));
-_inp.addEventListener("keydown", e=>{
-  const el=document.getElementById("netlist"), q=_inp.value.trim();
-  if(e.key==="ArrowDown"){ e.preventDefault(); if(ACTIVE<FILTERED.length-1){ACTIVE++; drawList(q);} }
-  else if(e.key==="ArrowUp"){ e.preventDefault(); if(ACTIVE>0){ACTIVE--; drawList(q);} }
-  else if(e.key==="Enter"){ e.preventDefault(); if(ACTIVE>=0){ pickNet(ACTIVE); pull(); } }
-  else if(e.key==="Escape"){ el.classList.remove("open"); }
-});
-document.getElementById("netlist").addEventListener("mousedown", e=>{ const o=e.target.closest(".netopt"); if(o){ pickNet(parseInt(o.dataset.i,10)); _inp.focus(); } });
-document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document.getElementById("netlist").classList.remove("open"); });
-
-(async()=>{ if(PW){ try{ await loadNetworks(); document.getElementById("gate").classList.add("hide"); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
+(async()=>{ if(PW){ try{ await loadNetworks(); document.getElementById("gate").classList.add("hide"); render(); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
