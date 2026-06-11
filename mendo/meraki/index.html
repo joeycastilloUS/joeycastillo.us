@@ -1,10 +1,11 @@
 <!DOCTYPE html>
+<!-- CONFIDENTIAL · TRADE SECRET · PROPRIETARY · Property of Joseph M. Castillo · All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Network View</title>
+<title>Argus</title>
 <style>
   :root{--bg:#0a0a0a;--surface:#141414;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--ok:#7CFFB2;--off:#777;}
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--text);line-height:1.5;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;}
@@ -69,6 +70,14 @@
   .lvl{display:inline-block;font-size:.58rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px;border:1px solid var(--line);color:var(--dim);}
   .lvl-template{background:#1a1407;color:var(--warn);border-color:var(--warn);} .lvl-network{background:#0e1a1f;color:var(--accent);border-color:#2a3f48;}
   .lvl-org{background:#1a0f1a;color:#d6a3ff;border-color:#7a4f9a;} .lvl-override{background:#1a0f0f;color:var(--bad);border-color:var(--bad);}
+  #brand-strip{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:7px 16px;background:#000;border-top:1px solid rgba(111,195,223,0.18);font-family:ui-monospace,Consolas,monospace;font-size:10px;letter-spacing:1.5px;margin-top:30px;}
+  #brand-mark{color:var(--accent);font-weight:800;font-size:12px;letter-spacing:4px;}
+  #brand-tagline{color:var(--dim);font-weight:500;letter-spacing:1.5px;text-transform:uppercase;font-size:9.5px;}
+  #brand-ip{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;margin-left:auto;}
+  .ip-pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;font-family:ui-monospace,Consolas,monospace;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;border-radius:2px;white-space:nowrap;}
+  .ip-pill .ip-icon{font-size:11px;line-height:1;}
+  .ip-pill.ip-secret{color:var(--warn);background:rgba(255,206,133,0.10);border:1px solid rgba(255,206,133,0.55);}
+  .ip-pill.ip-owner{color:var(--accent);background:rgba(111,195,223,0.08);border:1px solid rgba(111,195,223,0.50);}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
   .panel textarea{width:100%;height:200px;background:#0d0d0d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;}
   .err{color:#ff8b8b;margin-top:10px;}
@@ -127,8 +136,8 @@
 <body>
 <div class="gate" id="gate">
   <div class="gbox">
-    <div class="gbrand">MERAKI</div>
-    <div class="gsub">network switch view &middot; private</div>
+    <div class="gbrand">ARGUS</div>
+    <div class="gsub">network &amp; security audit &middot; confidential</div>
     <form id="gform" autocomplete="off">
       <input id="gpw" type="password" placeholder="password" autofocus style="width:100%;">
       <button type="submit" style="width:100%;margin-top:.7rem;">Enter</button>
@@ -137,7 +146,7 @@
   </div>
 </div>
 
-<div class="nav"><span><span class="be">Be</span> &middot; Network View</span><span class="r">on demand</span></div>
+<div class="nav"><span><span class="be">ARGUS</span> <span class="r">&middot; part of the Pantheon Family</span></span><span class="r">read-only</span></div>
 <div class="wrap">
   <h1>Network View</h1>
   <div class="bar">
@@ -188,15 +197,19 @@ function auditControls(){
   const mode=AUDITMODE, tgt=AUDITTARGET;
   let x="<div class='box'><div class='feat-h'>Run a read-only security audit</div>";
   x+="<div class='auditmode'><button class='amode"+(mode==="network"?" on":"")+"' data-amode='network'>Audit a Network</button>"+
-     "<button class='amode"+(mode==="template"?" on":"")+"' data-amode='template'>Audit a Template</button></div>";
+     "<button class='amode"+(mode==="template"?" on":"")+"' data-amode='template'>Audit a Template</button>"+
+     "<button class='amode"+(mode==="org"?" on":"")+"' data-amode='org'>Audit the Organization</button></div>";
   if(mode==="network"){
     const nets=(NETS||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
     x+="<select id='auditsel'>"+nets.map(n=>"<option value='"+esc(n.id)+"'"+(n.id===tgt.id?" selected":"")+">"+esc(n.name)+(n.configTemplateId?"":"  (no template)")+"</option>").join("")+"</select>";
-  } else {
+  } else if(mode==="template"){
     x+= (TEMPLATES&&TEMPLATES.length) ? "<select id='auditsel'>"+TEMPLATES.map(t=>"<option value='"+esc(t.id)+"'"+(t.id===tgt.id?" selected":"")+">"+esc(t.name)+"</option>").join("")+"</select>" : "<span class='muted'><span class='spin'></span> loading templates&hellip;</span>";
+  } else {
+    x+="<span class='muted'>org-wide &mdash; admins, MFA, login policy</span>";
   }
   x+=" <button id='runaudit'>&#9654; Run Audit</button>";
-  x+="<div class='muted' style='margin-top:8px;'>What happens: read-only Meraki calls collect this "+(mode==="template"?"<b>template</b>'s":"<b>network</b>'s")+" firewall, exposure, threat-protection, wireless"+(mode==="network"?", switching, anomaly and org":"")+" config, then grade it against best practice. Nothing is changed. Tap Run to start collecting.</div></div>";
+  const whatScope = mode==="template" ? "<b>template</b>'s appliance (firewall, exposure, threat, wireless)" : mode==="org" ? "<b>organization</b>'s admin / MFA / login posture (once for the whole org &mdash; not per network)" : "<b>network</b>'s own items (switching, anomalies) plus its appliance config or template overrides";
+  x+="<div class='muted' style='margin-top:8px;'>What happens: read-only Meraki calls collect this "+whatScope+", then grade it against best practice. Nothing is changed. Tap Run to start collecting.</div></div>";
   if(mode==="network"){
     const noTpl=(NETS||[]).filter(n=>!n.configTemplateId);
     x+="<div class='box'><div class='feat-h'>Networks NOT using a config template <span class='muted'>("+noTpl.length+")</span> <a class='moreinfo' id='togglenotpl'>"+(SHOWNOTPL?"&#9662; hide":"&#9656; show")+"</a></div>";
@@ -367,7 +380,7 @@ async function pullAudit(){
   const t=AUDITTARGET; if(!t.id) return;
   LASTDATA.auditing=true; LASTDATA.auditError=""; LASTDATA.audit=null; render();
   try{
-    const q = t.type==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
+    const q = t.type==="org" ? "org=1" : t.type==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
     const r=await api("/meraki/audit?"+q);
     if(!r.ok) throw new Error("error "+r.status);
     LASTDATA.audit=await r.json();
@@ -614,13 +627,18 @@ function render(){
 }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
-function exportDoc(){ return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Network View</title><style>"+EXPORT_CSS+"</style></head><body>"+LAST+"</body></html>"; }
+function viewName(){ return TAB==="operations"?"Operations":TAB==="network"?"Network":TAB==="audit"?"Security Audit":"View"; }
+function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
+const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS &mdash; part of the Pantheon Family of Platform, Tools &amp; Services.</div>";
+function exportDoc(){
+  const store=(LASTDATA&&LASTDATA.d&&LASTDATA.d.name)||"", title="Argus &mdash; "+viewName();
+  return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Argus "+viewName()+"</title><style>"+EXPORT_CSS+"</style></head><body><div style='font-size:18px;font-weight:bold;color:#0d6e8c'>"+esc(store)+" &mdash; "+title+"</div><div style='font-size:10px;color:#666;margin-bottom:8px'>"+esc(pacific())+"</div>"+activePaneHtml()+BRAND_FOOT+"</body></html>";
+}
 function exportHtml(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
-  a.download="network-view-"+pacific().replace(/[: ]/g,"-")+".html"; a.click();
+  a.download="argus-"+viewName().toLowerCase().replace(/ /g,"-")+"-"+pacific().replace(/[: ]/g,"-")+".html"; a.click();
 }
 function exportPdf(){
-  if(!LAST){ return; }
   const f=document.createElement("iframe");
   f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
   document.body.appendChild(f);
@@ -670,8 +688,8 @@ document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); refreshSection(sr.getAttribute("data-refresh"), sr); return; }
   const ck=e.target.closest("#showchecks"); if(ck){ e.stopImmediatePropagation(); SHOWCHECKS=!SHOWCHECKS; render(); if(SHOWCHECKS&&!CHECKS) pullChecks().then(render); return; }
-  const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); AUDITTARGET={type:AUDITMODE,id:"",name:""}; render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
-  const ra=e.target.closest("#runaudit"); if(ra){ e.stopImmediatePropagation(); const sel=document.getElementById("auditsel"); if(sel&&sel.value){ AUDITTARGET={type:AUDITMODE,id:sel.value,name:sel.options[sel.selectedIndex].text}; pullAudit(); } return; }
+  const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); AUDITTARGET=AUDITMODE==="org"?{type:"org",id:"org",name:"Organization"}:{type:AUDITMODE,id:"",name:""}; render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
+  const ra=e.target.closest("#runaudit"); if(ra){ e.stopImmediatePropagation(); if(AUDITMODE==="org"){ AUDITTARGET={type:"org",id:"org",name:"Organization"}; pullAudit(); return; } const sel=document.getElementById("auditsel"); if(sel&&sel.value){ AUDITTARGET={type:AUDITMODE,id:sel.value,name:sel.options[sel.selectedIndex].text}; pullAudit(); } return; }
   const tn=e.target.closest("#togglenotpl"); if(tn){ e.stopImmediatePropagation(); SHOWNOTPL=!SHOWNOTPL; render(); return; }
   const al=e.target.closest(".auditlink"); if(al){ e.stopImmediatePropagation(); AUDITMODE="network"; AUDITTARGET={type:"network",id:al.getAttribute("data-netid"),name:al.getAttribute("data-netname")}; pullAudit(); return; }
   const arst=e.target.closest("#auditreset"); if(arst){ e.stopImmediatePropagation(); LASTDATA.audit=null; LASTDATA.auditError=""; render(); return; }
@@ -720,5 +738,14 @@ document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document
 
 (async()=>{ if(PW){ try{ await loadNetworks(); document.getElementById("gate").classList.add("hide"); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
 </script>
+<div id="brand-strip">
+  <span id="brand-mark">ARGUS</span>
+  <span id="brand-tagline">part of the Pantheon Family of Platform, Tools &amp; Services</span>
+  <span style="flex:1"></span>
+  <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
+    <span class="ip-pill ip-secret"><span class="ip-icon">&#x1F512;</span> CONFIDENTIAL &middot; TRADE SECRET</span>
+    <span class="ip-pill ip-owner">&copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED</span>
+  </div>
+</div>
 </body>
 </html>
