@@ -56,6 +56,13 @@
   .fctitle{font-weight:700;font-size:.98rem;margin:2px 0;}
   .fcev{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;color:var(--text);background:#0d0d0d;border:1px solid var(--line);border-radius:6px;padding:6px 9px;margin:5px 0;word-break:break-word;}
   .fcrem{color:#b8c4c9;font-size:.9rem;line-height:1.5;} .fcrem b{color:var(--accent);}
+  .tplnote{background:#16242b;border:1px solid #2a3f48;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:.86rem;color:var(--warn);}
+  .evlist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:6px 0;}
+  .evrow{padding:7px 11px;border-bottom:1px solid #1c1c1c;font-size:.86rem;} .evrow:last-child{border-bottom:none;}
+  .evrow.ev-fail{background:#1a0f0f;} .evtop{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .evid{font-family:ui-monospace,Consolas,monospace;color:var(--dim);font-size:.76rem;} .evcat{color:var(--dim);font-size:.76rem;}
+  .evtitle{color:var(--text);font-weight:600;} .evev{color:var(--dim);font-size:.8rem;margin-top:2px;padding-left:21px;}
+  .ev-pass{color:var(--ok);font-weight:800;} .ev-fail{color:var(--bad);font-weight:800;} .ev-skip{color:var(--dim);font-weight:800;}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
   .panel textarea{width:100%;height:200px;background:#0d0d0d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;}
   .err{color:#ff8b8b;margin-top:10px;}
@@ -513,13 +520,16 @@ function render(){
     const M=A.meta||{};
     h+="<div class='stamp'>Scope: <b>"+(M.l3Rules||0)+"</b> L3 rules &middot; <b>"+(M.portForwards||0)+"</b> port-forwards &middot; <b>"+(M.oneToOneNat||0)+"</b> 1:1 NAT &middot; <b>"+(M.enabledSsids||0)+"</b> SSIDs &middot; <b>"+(M.clients||0)+"</b> clients &middot; <b>"+(M.devices||0)+"</b> devices &middot; <a class='moreinfo' id='showchecks'>"+(SHOWCHECKS?"&#9662; hide":"&#9656;")+" checks &amp; scoring</a></div>";
     if(SHOWCHECKS) h+=renderChecks();
-    if(A.skipped&&A.skipped.length) h+="<div class='stamp'>Skipped (not applicable / unlicensed): "+esc(A.skipped.join(", "))+"</div>";
+    const C=A.coverage||{}, T=A.template||{};
+    h+="<div class='stamp'>Coverage: <b>"+(C.total||0)+"</b> checks &middot; <span class='sev-low'>"+(C.passed||0)+" passed</span> &middot; <span class='sev-high'>"+(C.failed||0)+" failed</span> &middot; <span class='av'>"+(C.skipped||0)+" skipped</span></div>";
+    if(T.bound) h+="<div class='tplnote'><span class='kbadge'>TPL</span> Bound to config template <b>"+esc(T.name||"")+"</b> &mdash; firewall / content / threat settings are read from the template, not per-network.</div>";
+    else if(T.note) h+="<div class='stamp'>"+esc(T.note)+"</div>";
+    if(A.skipped&&A.skipped.length) h+="<div class='stamp'>Endpoints not readable: "+esc(A.skipped.join(", "))+"</div>";
     const rank={critical:0,high:1,medium:2,low:3};
     const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
-    if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No findings &mdash; clean against every check.</div>"; }
+    if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No failures &mdash; passed every check.</div>"; }
     else {
-      // findings as readable cards (no cramped table)
-      h+="<div class='findings'>";
+      h+="<div class='feat-h' style='margin-top:14px;'>Action items &mdash; "+fs.length+"</div><div class='findings'>";
       fs.forEach(f=>{
         h+="<div class='fcard sev-l-"+esc(f.severity)+"'>"+
            "<div class='fchead'><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span>"+
@@ -530,7 +540,18 @@ function render(){
       });
       h+="</div>";
     }
-    h+="<div class='stamp' style='margin-top:8px;'>Read-only audit &middot; "+esc(A.findingCount+" finding"+(A.findingCount===1?"":"s"))+" &middot; no settings changed.</div>";
+    // Everything evaluated -- the backing: every check, pass / fail / skip, with evidence.
+    if(A.results&&A.results.length){
+      const ord={fail:0,pass:1,skip:2};
+      const rs=A.results.slice().sort((a,b)=>(ord[a.status]-ord[b.status])||String(a.id).localeCompare(String(b.id)));
+      h+="<div class='feat-h' style='margin-top:16px;'>Everything evaluated &mdash; "+A.results.length+" checks</div><div class='evlist'>";
+      rs.forEach(r=>{
+        const ic=r.status==='pass'?"<span class='ev-pass'>&check;</span>":r.status==='fail'?"<span class='ev-fail'>&#10007;</span>":"<span class='ev-skip'>&minus;</span>";
+        h+="<div class='evrow ev-"+esc(r.status)+"'><div class='evtop'>"+ic+" <span class='evid'>"+esc(r.id)+"</span> <span class='evcat'>"+esc(r.category)+"</span> <span class='evtitle'>"+esc(r.title)+"</span></div><div class='evev'>"+esc(r.evidence)+"</div></div>";
+      });
+      h+="</div>";
+    }
+    h+="<div class='stamp' style='margin-top:8px;'>Read-only audit &middot; "+esc((A.coverage&&A.coverage.total)||0)+" checks evaluated &middot; no settings changed.</div>";
   }
   h+="</div>";
 
