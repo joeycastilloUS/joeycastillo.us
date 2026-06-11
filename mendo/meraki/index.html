@@ -102,7 +102,6 @@
       <div id="netlist" class="netlist"></div>
     </div>
     <button id="go">Pull</button>
-    <input id="ssid" type="text" value="mendo09" title="Wi-Fi SSID for the Wi-Fi tab" style="width:130px;">
     <button id="exh" class="alt" disabled>Export HTML</button>
     <button id="exp" class="alt" disabled>Export PDF</button>
     <button id="gear" class="alt" title="Device name map">&#9881;</button>
@@ -212,23 +211,22 @@ async function pullPorts(net){
   if(!r.ok) throw new Error("switch error "+r.status);
   LASTDATA.d=await r.json(); LASTDATA.portStamp=pacific();
 }
-async function pullWifi(net,ssid){
-  if(!ssid){ LASTDATA.wifi=null; LASTDATA.ssid=""; LASTDATA.wifiStamp=pacific(); return; }
-  const rw=await api("/meraki/ssid?ssid="+encodeURIComponent(ssid)+"&network="+encodeURIComponent(net));
+// All SSIDs in the network, grouped. No SSID arg -- the network selection reveals every SSID.
+async function pullWifi(net){
+  const rw=await api("/meraki/wireless?network="+encodeURIComponent(net));
   if(!rw.ok) throw new Error("Wi-Fi error "+rw.status);
-  LASTDATA.wifi=await rw.json(); LASTDATA.ssid=ssid; LASTDATA.wifiStamp=pacific();
+  LASTDATA.wifi=await rw.json(); LASTDATA.wifiStamp=pacific();
 }
 
 async function pull(){
   const net=resolveNet(), err=document.getElementById("err");
   document.getElementById("report").innerHTML=""; err.textContent="";
   if(!net){ err.textContent="pick a network"; return; }
-  const ssid=(document.getElementById("ssid").value||"").trim();
-  LASTDATA={ d:null, wifi:null, ssid, net, stamp:pacific(), portStamp:"", wifiStamp:"" };
+  LASTDATA={ d:null, wifi:null, net, stamp:pacific(), portStamp:"", wifiStamp:"" };
   try{
     document.getElementById("status").textContent="pulling switch…";
     await pullPorts(net);
-    if(ssid){ document.getElementById("status").textContent="pulling Wi-Fi…"; try{ await pullWifi(net,ssid); }catch(e){} }
+    document.getElementById("status").textContent="pulling Wi-Fi…"; try{ await pullWifi(net); }catch(e){}
   }catch(e){ document.getElementById("status").textContent=""; err.textContent=e.message||"error"; return; }
   document.getElementById("status").textContent="";
   render();
@@ -237,12 +235,12 @@ async function pull(){
 // Per-section refresh: re-pull only the source(s) behind the clicked section, then re-render.
 async function refreshSection(kind, btn){
   if(!LASTDATA||!LASTDATA.net) return;
-  const net=LASTDATA.net, ssid=(document.getElementById("ssid").value||"").trim();
+  const net=LASTDATA.net;
   if(btn){ btn.disabled=true; btn.innerHTML="<span class='spin'></span> refreshing&hellip;"; }
   document.getElementById("err").textContent="";
   try{
     if(kind==="ports"||kind==="both") await pullPorts(net);
-    if(kind==="wifi"||kind==="both") await pullWifi(net,ssid);
+    if(kind==="wifi"||kind==="both") await pullWifi(net);
   }catch(e){ document.getElementById("err").textContent=e.message||"refresh error"; }
   render(); // rebuilds the report -- the button is recreated fresh + enabled
 }
@@ -260,14 +258,14 @@ function render(){
   h+="<div class='stamp'>Switch pulled "+esc(pStamp)+(wStamp?" &middot; Wi-Fi pulled "+esc(wStamp):"")+(onlineOnly?" &middot; connected-now only":" &middot; seen in last 24h")+"</div>";
 
   // --- Konductor rollout completeness: every mapped IP present + live (switch OR Wi-Fi) ---
-  const wifi=LASTDATA.wifi, ssid=LASTDATA.ssid||"";
+  const wifi=LASTDATA.wifi;
   const seen={};
   function portTag(swName){ const n=(swName||"").toUpperCase(); if(n.indexOf("POS")>=0) return "POS"; if(n.indexOf("BOH")>=0) return "BOH"; return (swName||"SW").trim(); }
   function noteSeen(ip,on,where,isWifi){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[]}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); }
   (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>(p.clients||[]).forEach(c=>{
     noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false);
   })));
-  ((wifi&&wifi.clients)||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||ssid,true); });
+  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||g.ssid,true); }));
 
   const mapped=Object.keys(NAMEMAP);
   if(mapped.length){
@@ -287,14 +285,12 @@ function render(){
       "<table><thead><tr><th>Konductor device</th><th>IP</th><th>Port / SSID</th><th>Status</th></tr></thead><tbody>"+rows+"</tbody></table>","both");
   }
 
-  // --- tabs: Switch Ports | Wi-Fi ---
-  let wc=((wifi&&wifi.clients)||[]).slice();
-  const wcTotal=wc.length;
-  if(onlineOnly) wc=wc.filter(c=>(c.status||"").toLowerCase()==="online");
-  wc.sort((a,b)=>(((a.status||"").toLowerCase()==="online"?0:1)-((b.status||"").toLowerCase()==="online"?0:1))||(a.ip||"").localeCompare(b.ip||"",undefined,{numeric:true}));
+  // --- tabs: Switch Ports | Wi-Fi (all SSIDs) ---
+  const ssidGroups=(wifi&&wifi.ssids)||[];
+  const ssidCount=wifi?(wifi.ssidCount!=null?wifi.ssidCount:ssidGroups.length):0;
   h+="<div class='tabs'>"+
      "<button class='tab"+(TAB==="switch"?" on":"")+"' data-tab='switch'>Switch Ports</button>"+
-     "<button class='tab"+(TAB==="wifi"?" on":"")+"' data-tab='wifi'>"+WIFI+(ssid?esc(ssid):"Wi-Fi")+" &middot; "+wcTotal+"</button>"+
+     "<button class='tab"+(TAB==="wifi"?" on":"")+"' data-tab='wifi'>"+WIFI+"Wi-Fi &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s")+"</button>"+
      "</div>";
 
   // --- Switch pane ---
@@ -349,24 +345,30 @@ function render(){
   const nameBar=(FEAT && nameableCount)?"<div class='namebar'><button id='nameall'>Name all matched ("+nameableCount+")</button> <span class='muted' id='nameallmsg'></span></div>":"";
   h+="<div id='pane-switch' class='"+(TAB==="switch"?"":"hidden")+"'>"+nameBar+sp+"</div>";
 
-  // --- Wi-Fi pane ---
+  // --- Wi-Fi pane: one collapsible section per SSID in the network ---
   h+="<div id='pane-wifi' class='"+(TAB==="wifi"?"":"hidden")+"'>";
-  let wb="";
-  if(!wifi){ wb="<div class='muted'>No Wi-Fi data &mdash; set an SSID and pull.</div>"; }
-  else if(!wc.length){ wb="<div class='muted'>No online clients on "+esc(ssid)+" in this network.</div>"; }
+  if(!wifi){ h+="<div class='muted'>No Wi-Fi data &mdash; pull a network.</div>"; }
+  else if(!ssidGroups.length){ h+="<div class='muted'>No SSIDs broadcasting in this network.</div>"; }
   else {
-    wb="<table><thead><tr><th>Description</th><th>IP address</th><th>MAC address</th><th>VLAN</th><th>SSID</th><th>AP</th><th>Device</th><th>Status</th><th>Last seen (PT)</th></tr></thead><tbody>";
-    wc.forEach(c=>{
-      const on=(c.status||"").toLowerCase()==="online";
-      wb+="<tr class='"+(on?"":"disc")+"'><td>"+esc(c.name||"")+nameCheck(c.ip||"",c.name,c.mac)+"</td>"+
-        "<td class='ip'>"+esc(c.ip||"")+"</td><td class='ip'>"+esc(c.mac||"")+"</td><td>"+esc(c.vlan||"")+"</td>"+
-        "<td><span class='wifi-flag'>"+WIFI+esc(c.ssid||ssid)+"</span></td>"+
-        "<td class='wifi-ap'>"+esc(c.ap||"")+"</td><td class='av'>"+esc([c.manufacturer,c.os].filter(Boolean).join(" / "))+"</td>"+
-        "<td class='"+(on?"st-conn":"st-disc")+"'>"+esc(c.status||"")+"</td><td class='av'>"+esc(lastSeenPac(c.lastSeen))+"</td></tr>";
+    ssidGroups.forEach(g=>{
+      let gc=(g.clients||[]).slice();
+      if(onlineOnly) gc=gc.filter(c=>(c.status||"").toLowerCase()==="online");
+      gc.sort((a,b)=>(((a.status||"").toLowerCase()==="online"?0:1)-((b.status||"").toLowerCase()==="online"?0:1))||(a.ip||"").localeCompare(b.ip||"",undefined,{numeric:true}));
+      let wb;
+      if(!gc.length){ wb="<div class='muted'>No online clients on this SSID"+(g.clientCount?" &middot; "+g.clientCount+" seen in last 24h":"")+".</div>"; }
+      else {
+        wb="<table><thead><tr><th>Description</th><th>IP address</th><th>MAC address</th><th>VLAN</th><th>AP</th><th>Device</th><th>Status</th><th>Last seen (PT)</th></tr></thead><tbody>";
+        gc.forEach(c=>{ const on=(c.status||"").toLowerCase()==="online";
+          wb+="<tr class='"+(on?"":"disc")+"'><td>"+esc(c.name||"")+nameCheck(c.ip||"",c.name,c.mac)+"</td>"+
+            "<td class='ip'>"+esc(c.ip||"")+"</td><td class='ip'>"+esc(c.mac||"")+"</td><td>"+esc(c.vlan||"")+"</td>"+
+            "<td class='wifi-ap'>"+esc(c.ap||"")+"</td><td class='av'>"+esc([c.manufacturer,c.os].filter(Boolean).join(" / "))+"</td>"+
+            "<td class='"+(on?"st-conn":"st-disc")+"'>"+esc(c.status||"")+"</td><td class='av'>"+esc(lastSeenPac(c.lastSeen))+"</td></tr>"; });
+        wb+="</tbody></table>";
+      }
+      const title="<span class='wifi-flag'>"+WIFI+esc(g.ssid)+"</span> &middot; "+(g.online||0)+" online"+(g.enabled===false?" <span class='namewarn'>&#9888; disabled</span>":"");
+      h+=sect("wifi-"+esc(g.ssid), title, wb, "wifi");
     });
-    wb+="</tbody></table>";
   }
-  h+=sect("wifi","Wi-Fi clients"+(ssid?" on "+esc(ssid):"")+" ("+wc.length+" online)", wb, "wifi");
   h+="</div>";
 
   document.getElementById("report").innerHTML=h; LAST=h;
