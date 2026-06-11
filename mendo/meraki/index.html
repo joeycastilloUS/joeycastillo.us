@@ -112,7 +112,7 @@
       <div class="muted" style="margin-bottom:8px;">New features start in <b>Lab Testing</b> &mdash; live only on lab/test locations. Enable for Production to roll out everywhere; after 7 days it&rsquo;s archived and considered shipped.</div>
       <div id="featlist"></div>
       <div style="margin-top:10px;">
-        <div class="muted" style="margin-bottom:4px;">Lab/Test keywords &mdash; a location whose name contains any of these qualifies (comma-separated):</div>
+        <div class="muted" style="margin-bottom:4px;">Lab/Test keywords &mdash; a location qualifies only if its name contains one of these as a <b>whole word</b> (a space on both sides). Comma-separated:</div>
         <input id="labkw" type="text" spellcheck="false" style="width:100%;">
         <div style="margin-top:6px;"><button id="savekw">Save keywords</button> <span class="muted" id="kwmsg"></span></div>
       </div>
@@ -177,7 +177,7 @@ function loadFeatures(){
 let FEATURES=loadFeatures();
 function saveFeatures(){ localStorage.setItem(FEAT_KEY, JSON.stringify(FEATURES)); }
 function labKeywords(){ const v=localStorage.getItem(LABKW_KEY); return (v!=null?v:"TEST, LAB").split(/[,\s]+/).filter(Boolean).map(x=>x.toUpperCase()); }
-function isLabNet(name){ const n=(name||"").toUpperCase(); return labKeywords().some(k=>k&&n.indexOf(k)>=0); }
+function isLabNet(name){ const n=(name||"").toUpperCase(); return labKeywords().some(k=>k&&n.indexOf(" "+k+" ")>=0); } // keyword must be a whole word -- a space on BOTH sides (so "Global FW Lab" does NOT qualify)
 function featureActive(key,netName){ const f=FEATURES[key]; if(!f) return false; if(f.state==="shipped"||f.state==="prod") return true; if(f.state==="lab") return isLabNet(netName); return false; }
 function daysLeft(iso){ if(!iso) return 0; return Math.max(0, 7-Math.floor((Date.now()-new Date(iso).getTime())/864e5)); }
 function renderFeatures(){
@@ -292,12 +292,12 @@ function render(){
       let desc=cs.map(c=>esc(c.name||"")).join("<br>");
       // Connected POS-VLAN (100) port with no live client -> almost always a Toast POS receipt printer.
       if(conn && String(p.vlan)==="100" && cs.length===0) desc="<span class='hint'>&rarr; likely Toast POS Receipt Printer</span>";
-      // One-Click Naming suggestion: the likely Konductor name for this port (POS printer, or a mapped device that's unnamed/mismatched).
-      let suggest=null;
-      if(conn && String(p.vlan)==="100" && cs.length===0) suggest="Toast POS Receipt Printer";
-      else { for(const c of cs){ const exp=NAMEMAP[c.ip]; if(exp){ const a=(c.name||"").trim().toLowerCase(); if(!a||a===(c.mac||"").toLowerCase()||a!==exp.toLowerCase()){ suggest=exp; break; } } } }
+      // One-Click Naming: suggest the likely Konductor name for an actual client (with a MAC) that's unnamed/mismatched.
+      // We name the CLIENT, so we need its MAC -- the clientless POS-printer case can't be named here.
+      let suggest=null, suggestMac=null;
+      for(const c of cs){ const exp=NAMEMAP[c.ip]; if(exp && c.mac){ const a=(c.name||"").trim().toLowerCase(); if(!a||a===(c.mac||"").toLowerCase()||a!==exp.toLowerCase()){ suggest=exp; suggestMac=c.mac; break; } } }
       let nameBtn="";
-      if(FEAT && suggest){ nameableCount++; nameBtn=" <button class='nameit' data-serial='"+esc(sw.serial||"")+"' data-port='"+esc(p.port)+"' data-name='"+esc(suggest)+"'>Name it &rarr; "+esc(suggest)+"</button>"; }
+      if(FEAT && suggest && suggestMac){ nameableCount++; nameBtn=" <button class='nameit' data-mac='"+esc(suggestMac)+"' data-name='"+esc(suggest)+"'>Name it &rarr; "+esc(suggest)+"</button>"; }
       const ips=cs.map(c=>esc(c.ip||"")+nameCheck(c.ip||"", c.name, c.mac)).join("<br>");
       const macs=cs.map(c=>esc(c.mac||"")).join("<br>");
       const ls=cs.map(c=>esc(lastSeenPac(c.lastSeen))).join("<br>");
@@ -365,10 +365,10 @@ function exportPdf(){
 // One-Click Naming: optimistic spinner, then the REAL status the bridge returns.
 async function doNameButton(nb){
   if(!nb || nb.disabled) return;
-  const serial=nb.dataset.serial, port=nb.dataset.port, name=nb.dataset.name;
+  const mac=nb.dataset.mac, name=nb.dataset.name;
   nb.disabled=true; const old=nb.innerHTML; nb.innerHTML="<span class='spin'></span> naming&hellip;";
   try{
-    const r=await fetch(BRIDGE+"/meraki/name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:SELECTED_ID,serial,port,name})});
+    const r=await fetch(BRIDGE+"/meraki/name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:SELECTED_ID,mac,name})});
     if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
     const res=await r.json();
     nb.outerHTML="<span class='nameok'>&check; named &ldquo;"+esc(res.applied_name||name)+"&rdquo;</span>";
