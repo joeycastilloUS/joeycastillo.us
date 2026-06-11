@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Meraki Switch View</title>
+<title>Network View</title>
 <style>
   :root{--bg:#0a0a0a;--surface:#141414;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--ok:#7CFFB2;--off:#777;}
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--text);line-height:1.5;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;}
@@ -65,6 +65,12 @@
   .featrow button{background:var(--accent);color:#001016;border:none;border-radius:6px;padding:6px 11px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;}
   .nameit{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:0 8px;margin-left:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .nameit:hover{background:var(--accent);color:#001016;} .nameit:disabled{opacity:.6;cursor:default;}
+  .renameit{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.74rem;cursor:pointer;font-family:inherit;}
+  .renameit:hover{color:var(--accent);border-color:var(--accent);}
+  .renbox{display:inline-flex;gap:4px;align-items:center;margin-left:6px;vertical-align:middle;}
+  .renbox input{background:#0d0d0d;color:var(--text);border:1px solid var(--accent);border-radius:5px;padding:1px 7px;font-size:.78rem;font-family:inherit;width:140px;}
+  .renbox button{border:none;border-radius:5px;padding:1px 9px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;}
+  .rensave{background:var(--accent);color:#001016;} .rencancel{background:#2a2a2a;color:var(--dim);}
   .namebar{margin:6px 0 12px;} .namebar #nameall{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}
   .spin{display:inline-block;width:10px;height:10px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .6s linear infinite;vertical-align:-1px;}
   @keyframes sp{to{transform:rotate(360deg);}}
@@ -73,7 +79,7 @@
   .gbrand{font-size:2rem;font-weight:800;color:var(--accent);letter-spacing:.12em;} .gsub{color:#555;font-size:.8rem;margin:.3rem 0 1.6rem;}
   .gerr{color:#ff8b8b;font-size:.82rem;min-height:1.2em;margin-top:.6rem;}
   @media print{
-    body{background:#fff;color:#000;} .nav,.bar,.gate,.tabs,.secref{display:none!important;} .hidden{display:block!important;}
+    body{background:#fff;color:#000;} .nav,.bar,.gate,.tabs,.secref,.renameit,.renbox{display:none!important;} .hidden{display:block!important;}
     .wifi-flag{background:#fff3e0!important;color:#b35900!important;border-color:#d98a2b!important;}
     table{border-color:#ccc;} th{color:#555;} td{border-color:#eee;} td.port{color:#000;}
     .nethead b,h2,.tmpl .bound,.st-conn{color:#000;} *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -93,9 +99,9 @@
   </div>
 </div>
 
-<div class="nav"><span><span class="be">Be</span> &middot; Meraki Switch View</span><span class="r">on demand</span></div>
+<div class="nav"><span><span class="be">Be</span> &middot; Network View</span><span class="r">on demand</span></div>
 <div class="wrap">
-  <h1>Switch Port View</h1>
+  <h1>Network View</h1>
   <div class="bar">
     <div class="combo">
       <input id="netsearch" type="text" placeholder="type a network&hellip;" autocomplete="off">
@@ -167,7 +173,7 @@ let NAMEMAP=parseMap(mapText());
 
 // --- Lab Features lifecycle: Lab Testing -> Production -> archived (shipped after 7 days) ---
 const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
-const FEATURE_DEFS={ "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the switch port in Meraki." } };
+const FEATURE_DEFS={ "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." } };
 function loadFeatures(){
   let s={}; try{ s=JSON.parse(localStorage.getItem(FEAT_KEY)||"{}"); }catch(e){}
   for(const k in FEATURE_DEFS){ if(!s[k]) s[k]={state:"lab",enabledForProdAt:null}; }
@@ -252,8 +258,9 @@ function render(){
   const FEAT=featureActive("one-click-naming", d.name); // One-Click Naming active for this location?
   let h="";
   h+="<div class='nethead'>Network: <b>"+esc(d.name||"")+"</b></div>";
-  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span></div>"; }
-  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span></div>"; }
+  const tmplRef=" <button class='secref' data-refresh='ports' title='Refresh config template'>&#x21bb;</button>";
+  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span>"+tmplRef+"</div>"; }
+  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span>"+tmplRef+"</div>"; }
   const pStamp=LASTDATA.portStamp||stamp, wStamp=LASTDATA.wifiStamp;
   h+="<div class='stamp'>Switch pulled "+esc(pStamp)+(wStamp?" &middot; Wi-Fi pulled "+esc(wStamp):"")+(onlineOnly?" &middot; connected-now only":" &middot; seen in last 24h")+"</div>";
 
@@ -293,15 +300,9 @@ function render(){
      "<button class='tab"+(TAB==="wifi"?" on":"")+"' data-tab='wifi'>"+WIFI+"Wi-Fi &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s")+"</button>"+
      "</div>";
 
-  // --- Switch pane ---
+  // --- Switch pane: switches first, Meraki Devices inventory last ---
   let sp="", nameableCount=0;
   const dev=d.devices||[];
-  if(dev.length){
-    let db="<table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
-    dev.forEach(x=>{ db+="<tr><td>"+esc(x.name||"(no name)")+"</td><td>"+esc(x.model)+"</td><td>"+esc(x.serial)+"</td><td class='ip'>"+esc(x.mac)+"</td></tr>"; });
-    db+="</tbody></table>";
-    sp+=sect("devices","Meraki Devices ("+dev.length+")", db, "ports");
-  }
   (d.switches||[]).slice().sort((a,b)=>swOrder(a.name)-swOrder(b.name)||(a.name||"").localeCompare(b.name)).forEach(sw=>{
     let sb="<table><thead><tr><th>Port</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th><th>Description</th><th>IP address</th><th>MAC address</th><th>Last seen (PT)</th></tr></thead><tbody>";
     const ports=(sw.ports||[]).slice().sort((a,b)=>parseInt(a.port,10)-parseInt(b.port,10));
@@ -311,15 +312,28 @@ function render(){
       // Live now only. Port status is authoritative -- a Disconnected port has nothing on it
       // even if Meraki's 24h client list still reports a dropped device as Online.
       const cs = conn ? allClients.filter(c=>(c.status||"").toLowerCase()==="online") : [];
-      let desc=cs.map(c=>esc(c.name||"")).join("<br>");
-      // Connected POS-VLAN (100) port with no live client -> almost always a Toast POS receipt printer.
-      if(conn && String(p.vlan)==="100" && cs.length===0) desc="<span class='hint'>&rarr; likely Toast POS Receipt Printer</span>";
-      // One-Click Naming: suggest the likely Konductor name for an actual client (with a MAC) that's unnamed/mismatched.
-      // We name the CLIENT, so we need its MAC -- the clientless POS-printer case can't be named here.
-      let suggest=null, suggestMac=null;
-      for(const c of cs){ const exp=NAMEMAP[c.ip]; if(exp && c.mac){ const a=(c.name||"").trim().toLowerCase(); if(!a||a===(c.mac||"").toLowerCase()||a!==exp.toLowerCase()){ suggest=exp; suggestMac=c.mac; break; } } }
-      let nameBtn="";
-      if(FEAT && suggest && suggestMac){ nameableCount++; nameBtn=" <button class='nameit' data-mac='"+esc(suggestMac)+"' data-name='"+esc(suggest)+"'>Name it &rarr; "+esc(suggest)+"</button>"; }
+      // One line per connected client. When the feature is active, each client with a MAC gets:
+      // a green "Name it -> X" for a confident IP-map suggestion, AND a pencil to rename ANY connected client.
+      let desc;
+      if(conn && cs.length){
+        desc = cs.map(c=>{
+          const cname=c.name||"";
+          let line="<span class='cn'>"+esc(cname||"(unnamed)")+"</span>";
+          if(FEAT && c.mac){
+            const exp=NAMEMAP[c.ip], a=cname.trim().toLowerCase();
+            const mism = exp && (!a || a===(c.mac||"").toLowerCase() || a!==exp.toLowerCase());
+            if(mism){ nameableCount++; line+=" <button class='nameit' data-mac='"+esc(c.mac)+"' data-name='"+esc(exp)+"'>Name it &rarr; "+esc(exp)+"</button>"; }
+            line+=" <button class='renameit' data-mac='"+esc(c.mac)+"' data-cur='"+esc(cname).replace(/'/g,"&#39;")+"' title='Rename this client'>&#9998;</button>";
+          }
+          return line;
+        }).join("<br>");
+      } else if(conn && String(p.vlan)==="100" && cs.length===0){
+        // Connected POS-VLAN (100) port with no live client -> almost always a Toast POS receipt printer.
+        desc="<span class='hint'>&rarr; likely Toast POS Receipt Printer</span>";
+      } else {
+        desc=cs.map(c=>esc(c.name||"")).join("<br>");
+      }
+      const nameBtn="";
       const ips=cs.map(c=>esc(c.ip||"")+nameCheck(c.ip||"", c.name, c.mac)).join("<br>");
       const macs=cs.map(c=>esc(c.mac||"")).join("<br>");
       const ls=cs.map(c=>esc(lastSeenPac(c.lastSeen))).join("<br>");
@@ -342,6 +356,13 @@ function render(){
     sb+="</tbody></table>";
     sp+=sect("sw-"+(sw.serial||sw.name), "Switch: "+esc(sw.name||sw.serial), sb, "ports");
   });
+  // Meraki Devices inventory -- last, below the switches.
+  if(dev.length){
+    let db="<table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
+    dev.forEach(x=>{ db+="<tr><td>"+esc(x.name||"(no name)")+"</td><td>"+esc(x.model)+"</td><td>"+esc(x.serial)+"</td><td class='ip'>"+esc(x.mac)+"</td></tr>"; });
+    db+="</tbody></table>";
+    sp+=sect("devices","Meraki Devices ("+dev.length+")", db, "ports");
+  }
   const nameBar=(FEAT && nameableCount)?"<div class='namebar'><button id='nameall'>Name all matched ("+nameableCount+")</button> <span class='muted' id='nameallmsg'></span></div>":"";
   h+="<div id='pane-switch' class='"+(TAB==="switch"?"":"hidden")+"'>"+nameBar+sp+"</div>";
 
@@ -375,11 +396,11 @@ function render(){
   document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}";
-function exportDoc(){ return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Meraki Switch View</title><style>"+EXPORT_CSS+"</style></head><body>"+LAST+"</body></html>"; }
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}";
+function exportDoc(){ return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Network View</title><style>"+EXPORT_CSS+"</style></head><body>"+LAST+"</body></html>"; }
 function exportHtml(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
-  a.download="meraki-switch-view-"+pacific().replace(/[: ]/g,"-")+".html"; a.click();
+  a.download="network-view-"+pacific().replace(/[: ]/g,"-")+".html"; a.click();
 }
 function exportPdf(){
   if(!LAST){ return; }
@@ -390,17 +411,36 @@ function exportPdf(){
   setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>{ try{document.body.removeChild(f);}catch(e){} }, 3000); }, 450);
 }
 
+// The one audited write: name a CLIENT by MAC. Shared by the map-suggested "Name it" button
+// and the inline rename of any connected client.
+async function writeName(mac, name){
+  const r=await fetch(BRIDGE+"/meraki/name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:SELECTED_ID,mac,name})});
+  if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
+  const res=await r.json(); return res.applied_name||name;
+}
+
 // One-Click Naming: optimistic spinner, then the REAL status the bridge returns.
 async function doNameButton(nb){
   if(!nb || nb.disabled) return;
   const mac=nb.dataset.mac, name=nb.dataset.name;
   nb.disabled=true; const old=nb.innerHTML; nb.innerHTML="<span class='spin'></span> naming&hellip;";
-  try{
-    const r=await fetch(BRIDGE+"/meraki/name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:SELECTED_ID,mac,name})});
-    if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
-    const res=await r.json();
-    nb.outerHTML="<span class='nameok'>&check; named &ldquo;"+esc(res.applied_name||name)+"&rdquo;</span>";
-  }catch(err){ nb.disabled=false; nb.innerHTML=old; nb.insertAdjacentHTML("afterend"," <span class='namewarn'>write failed: "+esc(err.message)+"</span>"); }
+  try{ const applied=await writeName(mac,name); nb.outerHTML="<span class='nameok'>&check; named &ldquo;"+esc(applied)+"&rdquo;</span>"; }
+  catch(err){ nb.disabled=false; nb.innerHTML=old; nb.insertAdjacentHTML("afterend"," <span class='namewarn'>write failed: "+esc(err.message)+"</span>"); }
+}
+
+// Inline rename of ANY connected client: pencil -> input+Save -> write -> real status.
+function openRename(ri){
+  const mac=ri.dataset.mac, cur=(ri.dataset.cur||"").replace(/"/g,"&quot;");
+  ri.outerHTML="<span class='renbox'><input class='renval' value=\""+cur+"\" spellcheck='false' placeholder='client name'><button class='rensave' data-mac='"+esc(mac)+"'>Save</button><button class='rencancel'>&#10005;</button></span>";
+  const inp=document.querySelector(".renbox .renval"); if(inp){ inp.focus(); inp.select(); }
+}
+async function doRenameSave(btn){
+  const box=btn.closest(".renbox"); if(!box) return;
+  const inp=box.querySelector(".renval"), mac=btn.dataset.mac, name=(inp.value||"").trim();
+  if(!name){ inp.focus(); return; }
+  btn.disabled=true; const old=btn.innerHTML; btn.innerHTML="<span class='spin'></span>";
+  try{ const applied=await writeName(mac,name); box.outerHTML="<span class='nameok'>&check; named &ldquo;"+esc(applied)+"&rdquo;</span>"; }
+  catch(err){ btn.disabled=false; btn.innerHTML=old; box.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
 }
 
 document.getElementById("gform").addEventListener("submit", async e=>{
@@ -411,8 +451,16 @@ document.getElementById("gform").addEventListener("submit", async e=>{
 document.getElementById("go").addEventListener("click", pull);
 document.getElementById("report").addEventListener("click", async e=>{
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); refreshSection(sr.getAttribute("data-refresh"), sr); return; }
+  const ri=e.target.closest(".renameit"); if(ri){ e.stopImmediatePropagation(); openRename(ri); return; }
+  const rs=e.target.closest(".rensave"); if(rs){ e.stopImmediatePropagation(); doRenameSave(rs); return; }
+  const rc=e.target.closest(".rencancel"); if(rc){ e.stopImmediatePropagation(); render(); return; }
   const nb=e.target.closest(".nameit"); if(nb){ e.stopPropagation(); doNameButton(nb); return; }
   const na=e.target.closest("#nameall"); if(na){ na.disabled=true; const msg=document.getElementById("nameallmsg"); const all=[...document.querySelectorAll(".nameit:not(:disabled)")]; if(msg) msg.innerHTML="<span class='spin'></span> naming "+all.length+"&hellip;"; await Promise.all(all.map(doNameButton)); if(msg) msg.textContent="done"; na.disabled=false; return; }
+});
+document.getElementById("report").addEventListener("keydown", e=>{
+  const inp=e.target.closest(".renval"); if(!inp) return;
+  if(e.key==="Enter"){ e.preventDefault(); const sv=inp.parentNode.querySelector(".rensave"); if(sv) doRenameSave(sv); }
+  else if(e.key==="Escape"){ e.preventDefault(); render(); }
 });
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
