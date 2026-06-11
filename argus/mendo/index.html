@@ -88,6 +88,14 @@
   .pexec{margin-top:9px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
   .pbtn{background:var(--ok);color:#001a0e;border:none;border-radius:7px;padding:7px 13px;font-size:.82rem;font-weight:800;cursor:pointer;font-family:inherit;} .pbtn:disabled{background:#1d3a2c;color:#6f9c86;cursor:default;}
   .ptag{color:var(--warn);font-size:.74rem;font-weight:700;}
+  .pbtn.ghost{background:none;border:1px solid var(--bad);color:var(--bad);} .pbtn.ghost:hover{background:#2a1010;}
+  .execsteps{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
+  .execrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:#0d0d0d;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:.84rem;}
+  .execlabel{font-weight:700;color:var(--text);} .execfield{font-family:ui-monospace,Consolas,monospace;font-size:.78rem;}
+  .execval{background:#0d0d0d;color:var(--text);border:1px solid var(--accent);border-radius:6px;padding:3px 8px;font-size:.82rem;font-family:inherit;width:170px;}
+  .remed-sec{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .remchip{display:inline-flex;align-items:center;gap:7px;background:#15110a;color:var(--warn);border:1px solid var(--warn);border-radius:16px;padding:4px 7px 4px 12px;margin:0 8px 8px 0;font-size:.84rem;font-weight:700;}
+  .remx{background:none;border:none;color:var(--warn);cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;font-family:inherit;} .remx:hover{color:#fff;}
   .tplnote{background:#16242b;border:1px solid #2a3f48;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:.86rem;color:var(--warn);}
   .evlist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:6px 0;}
   .evrow{padding:7px 11px;border-bottom:1px solid #1c1c1c;font-size:.86rem;} .evrow:last-child{border-bottom:none;}
@@ -210,6 +218,16 @@
     <div class="muted" style="margin:12px 0 4px;"><b>Toast POS VLAN(s)</b> &mdash; connected devices on these VLANs appear in the Toast section (Operations tab). One or more, comma-separated &mdash; e.g. <code>90,100</code>.</div>
     <input id="toastvlan" type="text" spellcheck="false" style="width:180px;" placeholder="e.g. 90,100"> <button id="savetoast">Save</button> <span class="muted" id="toastmsg"></span>
     <div class="muted" style="margin:12px 0 4px;"><b>Planned-missing (accepted) devices</b> are now set <b>inline &amp; per-network</b> &mdash; in the Konductor table, click <span class='planned'>mark planned</span> on any missing device. Accepted devices show <span class='planned'>PLANNED</span> instead of <span class='namewarn'>MISSING</span> and don&rsquo;t break <b>SOLID</b> (for that store only).</div>
+    <div class="remed-sec">
+      <div class="feat-h">&#9211; Remediable networks <span class="lab">WRITE</span></div>
+      <div class="muted" style="margin-bottom:8px;">The <b>only</b> networks Argus may <b>apply</b> security fixes to (Action Plans &rarr; tier 3). Add your lab/test boxes here &mdash; everything else is apply-blocked, enforced both here and server-side in the bridge. Production stays untouchable.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select id="remedsel" style="min-width:280px;"></select>
+        <button id="remedadd">Add</button>
+        <span class="muted" id="remedmsg"></span>
+      </div>
+      <div id="remedlist" style="margin-top:10px;"></div>
+    </div>
   </div>
   <div id="report"></div>
 </div>
@@ -331,7 +349,7 @@ function comboResolve(id){ const c=COMBOS[id]; if(!c) return {id:"",name:""}; if
 
 // --- operator settings sync: localStorage <-> Firestore (named DB 'argus') via the bridge ---
 // localStorage stays the instant cache; this makes settings follow the operator across machines.
-function settingsKeys(){ return [MAP_KEY, TOAST_KEY, LABKW_KEY, FEAT_KEY, ACCEPT_KEY]; }
+function settingsKeys(){ return [MAP_KEY, TOAST_KEY, LABKW_KEY, FEAT_KEY, ACCEPT_KEY, REMEDIABLE_KEY]; }
 function settingsBlob(){ const o={}; settingsKeys().forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) o[k]=v; }); return o; }
 function applySettings(o){ if(!o||typeof o!=="object") return; settingsKeys().forEach(k=>{ if(o[k]!=null) localStorage.setItem(k,o[k]); }); NAMEMAP=parseMap(mapText()); FEATURES=loadFeatures(); }
 async function loadSettings(){ try{ const r=await api("/settings"); if(r.ok){ const d=await r.json(); if(d&&d.json){ applySettings(JSON.parse(d.json)); } } }catch(e){} }
@@ -348,6 +366,13 @@ function toastVlans(){ return toastVlan().split(/[,\s]+/).map(x=>x.trim()).filte
 // Konductor devices accepted as planned-missing -- PER NETWORK (a device planned-missing at one store
 // isn't at another). Stored as { netId: [ip, ...] }. Set inline from the Konductor table.
 const ACCEPT_KEY="argus_acceptmissing_v2";
+// Explicit allow-list of networks Argus is permitted to APPLY remediations to (lab/test boxes only).
+// Stored as [{id,name}]; enforced in the UI AND server-side by the bridge. Synced via Firestore.
+const REMEDIABLE_KEY="argus_remediable_v1";
+function remediableList(){ try{ const a=JSON.parse(localStorage.getItem(REMEDIABLE_KEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function isRemediable(netId){ return !!netId && remediableList().some(n=>n.id===netId); }
+function addRemediable(id,name){ if(!id) return; const a=remediableList(); if(!a.some(n=>n.id===id)){ a.push({id,name}); localStorage.setItem(REMEDIABLE_KEY,JSON.stringify(a)); saveSettings(); } }
+function removeRemediable(id){ const a=remediableList().filter(n=>n.id!==id); localStorage.setItem(REMEDIABLE_KEY,JSON.stringify(a)); saveSettings(); }
 function acceptMap(){ try{ return JSON.parse(localStorage.getItem(ACCEPT_KEY)||"{}"); }catch(e){ return {}; } }
 function acceptSet(netId){ const a=acceptMap()[netId]||[]; return new Set(a.map(x=>String(x).toLowerCase())); }
 function toggleAccept(netId, ip){ const m=acceptMap(); const arr=(m[netId]||[]).slice(); const i=arr.indexOf(ip); if(i>=0) arr.splice(i,1); else arr.push(ip); m[netId]=arr; localStorage.setItem(ACCEPT_KEY, JSON.stringify(m)); }
@@ -699,9 +724,12 @@ const CAT_DASH={
   "Switching":"Switching &rsaquo; Switch ports / Switch settings","Ops":"Organization &rsaquo; Firmware upgrades &middot; Network-wide &rsaquo; Alerts",
   "Anomalies":"the relevant network page","Overrides":"the bound config template","Organization":"Organization &rsaquo; Administrators / MFA / Login attempts"
 };
-// Checks safe + reversible enough for Argus to auto-apply (lab only). The rest stay manual by design.
-const EXECUTABLE={ "SW-NV1":1, "THR-03":1 };
-function actionPlans(f, labNet){
+// Checks Argus can apply itself (reversible, allowlisted recipe in the bridge).
+const EXECUTABLE={ "SW-NV1":1, "SW-UNUSED":1, "SW-TRUNK":1 };
+// Checks that stay manual FOREVER -- applying them can disconnect clients or impact people.
+const NEVER_AUTO={ "WIFI-01":1, "WIFI-07":1, "EXP-04":1, "EXP-05":1, "ORG-01":1, "ORG-02":1, "ORG-04":1, "FW-01":1, "FW-02":1, "FW-03":1 };
+let EXEC={}; // checkId -> { loading, error, network, checkId, steps:[{stepId,label,field,current,moderated,status,value,before,msg}] }
+function actionPlans(f, canApply){
   const why=CAT_WHY[f.category]||"This weakens the network&rsquo;s security posture.";
   const dash=CAT_DASH[f.category]||"the Meraki dashboard";
   const canExec=!!EXECUTABLE[f.id];
@@ -709,17 +737,57 @@ function actionPlans(f, labNet){
   x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>1 &middot; Understand</span> Why this matters</div><div class='ptier-b'>"+why+"</div></div>";
   x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>2 &middot; Fix it yourself</span> <span class='ro-pill'>read-only</span> you make the change</div>"+
      "<div class='ptier-b'><div>"+esc(f.remediation)+"</div><div class='pdash'>Dashboard: "+dash+"</div></div></div>";
-  x+="<div class='ptier t3box'><div class='ptier-h'><span class='ptier-tag t3'>3 &middot; Let Argus fix it</span> <span class='lab'>LAB</span> Argus applies it for you</div><div class='ptier-b'>";
-  if(canExec && labNet){
-    x+="<div class='muted'>Argus can apply this automatically &mdash; one step you approve at a time, or all at once &mdash; and roll back anything instantly.</div>"+
-       "<div class='pexec'><button class='pbtn' disabled>&#9654; Apply (step-by-step)</button> <button class='pbtn' disabled>&#9889; Apply all</button> <span class='ptag'>executor &mdash; lab write path, landing next</span></div>";
-  } else if(canExec){
-    x+="<div class='muted'>Argus-applied remediation runs on <b>lab networks only</b> (this network isn&rsquo;t lab). On a lab network you&rsquo;d get per-step <b>Apply</b>, <b>Apply all</b>, and one-tap <b>Roll back</b>.</div>";
-  } else {
-    x+="<div class='muted'>This fix can disconnect clients or change access &mdash; it stays <b>manual by design</b>. Argus won&rsquo;t auto-apply it.</div>";
-  }
+  x+="<div class='ptier t3box'><div class='ptier-h'><span class='ptier-tag t3'>3 &middot; Let Argus fix it</span> <span class='lab'>WRITE</span> Argus applies it for you</div><div class='ptier-b'>";
+  if(canExec && canApply){ x+=execUI(f.id); }
+  else if(canExec){ x+="<div class='muted'>Argus <b>can</b> apply this automatically &mdash; add this network to your <b>Remediable</b> allow-list (&#9881; Settings) to unlock per-step <b>Apply</b>, <b>Apply all</b>, and one-tap <b>Roll back</b>.</div>"; }
+  else if(NEVER_AUTO[f.id]){ x+="<div class='muted'>This fix can disconnect clients or change access &mdash; it stays <b>manual by design</b>. Argus won&rsquo;t auto-apply it.</div>"; }
+  else { x+="<div class='muted'>&#9889; <b>Guided fix &mdash; rolling out.</b> Argus will apply this on your allow-listed networks soon; for now the manual steps above are the move.</div>"; }
   x+="</div></div></div>";
   return x;
+}
+// Tier-3 executor UI for an allowlisted, executable finding.
+function execUI(cid){
+  const ex=EXEC[cid];
+  if(!ex) return "<div class='muted'>Argus can apply this on this allow-listed network &mdash; one step you approve, or all at once, with one-tap rollback.</div>"+
+    "<div class='pexec'><button class='pbtn' data-execplan='"+esc(cid)+"'>&#9654; Build apply plan</button></div>";
+  if(ex.loading) return "<div class='muted'><span class='spin'></span> reading live config&hellip;</div>";
+  if(ex.error) return "<div class='err'>"+esc(ex.error)+"</div><div class='pexec'><button class='pbtn' data-execplan='"+esc(cid)+"'>Retry</button></div>";
+  if(!ex.steps||!ex.steps.length) return "<div class='nameok'>&check; Nothing to apply &mdash; live config no longer matches this finding.</div>";
+  let x="<div class='pexec'><button class='pbtn' data-execall='"+esc(cid)+"'>&#9889; Apply all ("+ex.steps.length+")</button> <span class='ptag'>each step writes one port &middot; roll back any time</span></div><div class='execsteps'>";
+  ex.steps.forEach((s,i)=>{
+    let ctl="";
+    if(s.status==="applying"){ ctl="<span class='spin'></span> applying&hellip;"; }
+    else if(s.status==="rollingback"){ ctl="<span class='spin'></span> rolling back&hellip;"; }
+    else if(s.status==="applied"){ ctl="<span class='nameok'>&check; "+esc(s.msg||"applied")+"</span> <button class='pbtn ghost' data-execrb='"+esc(cid)+":"+i+"'>Roll back</button>"; }
+    else if(s.status==="rolledback"){ ctl="<span class='muted'>"+esc(s.msg||"rolled back")+"</span> <button class='pbtn' data-execapply='"+esc(cid)+":"+i+"'>Apply</button>"; }
+    else if(s.status==="failed"){ ctl="<span class='namewarn'>"+esc(s.msg||"failed")+"</span> <button class='pbtn' data-execapply='"+esc(cid)+":"+i+"'>Retry</button>"; }
+    else { const inp=s.moderated?"<input class='execval' id='execval-"+esc(cid)+"-"+i+"' value=\""+esc(s.value||"")+"\" placeholder='"+(s.field==="vlan"?"native VLAN e.g. 90":"allowed VLANs e.g. 1,10,20")+"'>":""; ctl=inp+" <button class='pbtn' data-execapply='"+esc(cid)+":"+i+"'>&#9654; Apply</button>"; }
+    x+="<div class='execrow'><span class='execlabel'>"+esc(s.label)+"</span> <span class='execfield muted'>"+esc(s.field)+(s.current?" "+esc(s.current)+"&rarr;":"")+"</span> "+ctl+"</div>";
+  });
+  return x+"</div>";
+}
+async function remPost(path, body){ const r=await fetch(BRIDGE+"/meraki/remediate/"+path,{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify(body)}); let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(d.detail||d.error||("HTTP "+r.status)); return d; }
+async function remediatePlan(cid){
+  const net=AUD.tgt.network&&AUD.tgt.network.id; if(!net) return;
+  EXEC[cid]={loading:true,steps:null,error:"",network:net,checkId:cid}; render();
+  try{ const d=await remPost("plan",{network:net,checkId:cid}); EXEC[cid]={loading:false,error:"",network:net,checkId:cid,steps:(d.steps||[]).map(s=>({stepId:s.stepId,label:s.label,field:s.field,current:s.current,moderated:!!s.moderated,status:"pending",value:"",before:null,msg:""}))}; }
+  catch(e){ EXEC[cid]={loading:false,error:e.message||"plan failed",network:net,checkId:cid,steps:null}; }
+  render();
+}
+async function remediateApply(cid, i){
+  const ex=EXEC[cid], st=ex&&ex.steps&&ex.steps[i]; if(!st||st.status==="applied"||st.status==="applying") return;
+  st.status="applying"; render();
+  try{ const d=await remPost("apply",{network:ex.network,checkId:ex.checkId,stepId:st.stepId,value:st.value}); st.status="applied"; st.field=d.field||st.field; st.before=d.before; st.msg="applied"+(d.after!=null&&d.after!==""?" &rarr; "+d.after:""); }
+  catch(e){ st.status="failed"; st.msg=e.message||"failed"; }
+  render();
+}
+async function remediateApplyAll(cid){ const ex=EXEC[cid]; if(!ex||!ex.steps) return; for(let i=0;i<ex.steps.length;i++){ if(ex.steps[i].status!=="applied") await remediateApply(cid,i); } }
+async function remediateRollback(cid, i){
+  const ex=EXEC[cid], st=ex&&ex.steps&&ex.steps[i]; if(!st||st.status!=="applied") return;
+  st.status="rollingback"; render();
+  try{ await remPost("rollback",{network:ex.network,checkId:ex.checkId,stepId:st.stepId,field:st.field,before:st.before}); st.status="rolledback"; st.msg="rolled back to "+(st.before||"prior"); }
+  catch(e){ st.status="failed"; st.msg=e.message||"rollback failed"; }
+  render();
 }
 
 // Security Audit pane: read-only firewall/security audit. Picks its own target (network / template / org).
@@ -774,7 +842,7 @@ function auditPane(){
   const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
   if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No failures &mdash; passed every check.</div>"; }
   else {
-    const labNet = (AUD.view==="network" && AUD.tgt.network) ? isLabNet(AUD.tgt.network.name) : false;
+    const canApply = (AUD.view==="network" && AUD.tgt.network) ? isRemediable(AUD.tgt.network.id) : false;
     h+="<div class='feat-h' style='margin-top:14px;'>Action items &mdash; "+fs.length+"</div><div class='findings'>";
     fs.forEach(f=>{
       const open=!!PLAN_OPEN[f.id];
@@ -959,11 +1027,21 @@ document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
   const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
   const pl=e.target.closest(".planlink"); if(pl){ e.stopImmediatePropagation(); const id=pl.getAttribute("data-plan"); PLAN_OPEN[id]=!PLAN_OPEN[id]; render(); return; }
+  const ep=e.target.closest("[data-execplan]"); if(ep){ e.stopImmediatePropagation(); remediatePlan(ep.getAttribute("data-execplan")); return; }
+  const ea=e.target.closest("[data-execapply]"); if(ea){ e.stopImmediatePropagation(); const a=ea.getAttribute("data-execapply").split(":"), cid=a[0], idx=+a[1]; const st=EXEC[cid]&&EXEC[cid].steps&&EXEC[cid].steps[idx]; if(st&&st.moderated){ const inp=document.getElementById("execval-"+cid+"-"+idx); if(inp) st.value=inp.value.trim(); } remediateApply(cid,idx); return; }
+  const eal=e.target.closest("[data-execall]"); if(eal){ e.stopImmediatePropagation(); const cid=eal.getAttribute("data-execall"); const ex=EXEC[cid]; if(ex&&ex.steps){ ex.steps.forEach((s,i)=>{ if(s.moderated&&s.status!=="applied"){ const inp=document.getElementById("execval-"+cid+"-"+i); if(inp) s.value=inp.value.trim(); } }); } remediateApplyAll(cid); return; }
+  const erb=e.target.closest("[data-execrb]"); if(erb){ e.stopImmediatePropagation(); const a=erb.getAttribute("data-execrb").split(":"); remediateRollback(a[0],+a[1]); return; }
   const cj=e.target.closest(".catcard.jump"); if(cj){ const cat=cj.getAttribute("data-cat"); const tgt=document.querySelector(".fcard[data-fcat=\""+(cat||"").replace(/"/g,"")+"\"]"); if(tgt){ tgt.scrollIntoView({behavior:"smooth",block:"center"}); tgt.classList.add("flash"); setTimeout(()=>tgt.classList.remove("flash"),1200); } return; }
   const sc=e.target.closest("[data-scope]"); if(sc){ const s=sc.getAttribute("data-scope"); AUD.view=s; AUDITMODE=s; AUDITTARGET = s==="org" ? {type:"org",id:"org",name:"Organization"} : {type:s,id:(AUD.tgt[s]&&AUD.tgt[s].id)||"",name:(AUD.tgt[s]&&AUD.tgt[s].name)||""}; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
-document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show) renderFeatures(); });
+document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show){ renderFeatures(); fillRemedSelect(); renderRemediable(); } });
+// Remediable-networks allow-list (Settings)
+function netNameById(id){ const n=(NETS||[]).find(x=>x.id===id); return n?n.name:id; }
+function fillRemedSelect(){ const sel=document.getElementById("remedsel"); if(!sel) return; sel.innerHTML=(NETS||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(n=>"<option value='"+esc(n.id)+"'>"+esc(n.name)+(n.configTemplateId?"":"  (no template)")+"</option>").join(""); }
+function renderRemediable(){ const el=document.getElementById("remedlist"); if(!el) return; const a=remediableList(); el.innerHTML = a.length ? a.map(n=>"<span class='remchip'>"+esc(n.name||netNameById(n.id))+"<button class='remx' data-remid='"+esc(n.id)+"' title='Remove'>&times;</button></span>").join("") : "<span class='muted'>None yet &mdash; Argus can&rsquo;t apply a fix anywhere until you add a network.</span>"; }
+document.getElementById("remedadd").addEventListener("click", ()=>{ const sel=document.getElementById("remedsel"); if(sel&&sel.value){ addRemediable(sel.value, netNameById(sel.value)); renderRemediable(); document.getElementById("remedmsg").textContent="added · synced"; render(); } });
+document.getElementById("remedlist").addEventListener("click", e=>{ const x=e.target.closest(".remx"); if(x){ removeRemediable(x.getAttribute("data-remid")); renderRemediable(); document.getElementById("remedmsg").textContent="removed · synced"; render(); } });
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); saveSettings(); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings · synced"; render(); });
 document.getElementById("toastvlan").value=toastVlan();
 document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); saveSettings(); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlans().join(", ")+" · synced"; render(); });
