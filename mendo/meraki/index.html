@@ -67,6 +67,8 @@
   .featrow button{background:var(--accent);color:#001016;border:none;border-radius:6px;padding:6px 11px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;}
   .nameit{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:0 8px;margin-left:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .nameit:hover{background:var(--accent);color:#001016;} .nameit:disabled{opacity:.6;cursor:default;}
+  .cline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;} .cline+.cline{margin-top:5px;border-top:1px dashed #222;padding-top:5px;}
+  .cline .nameit,.cline .renameit{margin-left:0;}
   .renameit{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.74rem;cursor:pointer;font-family:inherit;}
   .renameit:hover{color:var(--accent);border-color:var(--accent);}
   .renbox{display:inline-flex;gap:4px;align-items:center;margin-left:6px;vertical-align:middle;}
@@ -349,17 +351,19 @@ function render(){
       // a green "Name it -> X" for a confident IP-map suggestion, AND a pencil to rename ANY connected client.
       let desc;
       if(conn && cs.length){
+        // Each client is a flex line: name + pencil stay together; a wide "Name it" wraps as one unit
+        // (no more orphaned pencil on its own line).
         desc = cs.map(c=>{
           const cname=c.name||"";
-          let line="<span class='cn'>"+esc(cname||"(unnamed)")+"</span>";
+          let acts="";
           if(FEAT && c.mac){
+            acts+="<button class='renameit' data-mac='"+esc(c.mac)+"' data-cur='"+esc(cname).replace(/'/g,"&#39;")+"' title='Rename this client'>&#9998;</button>";
             const exp=NAMEMAP[c.ip], a=cname.trim().toLowerCase();
             const mism = exp && (!a || a===(c.mac||"").toLowerCase() || a!==exp.toLowerCase());
-            if(mism){ nameableCount++; line+=" <button class='nameit' data-mac='"+esc(c.mac)+"' data-name='"+esc(exp)+"'>Name it &rarr; "+esc(exp)+"</button>"; }
-            line+=" <button class='renameit' data-mac='"+esc(c.mac)+"' data-cur='"+esc(cname).replace(/'/g,"&#39;")+"' title='Rename this client'>&#9998;</button>";
+            if(mism){ nameableCount++; acts+="<button class='nameit' data-mac='"+esc(c.mac)+"' data-name='"+esc(exp)+"'>Name it &rarr; "+esc(exp)+"</button>"; }
           }
-          return line;
-        }).join("<br>");
+          return "<div class='cline'><span class='cn'>"+esc(cname||"(unnamed)")+"</span>"+acts+"</div>";
+        }).join("");
       } else if(conn && String(p.vlan)==="100" && cs.length===0){
         // Connected POS-VLAN (100) port with no live client -> almost always a Toast POS receipt printer.
         desc="<span class='hint'>&rarr; likely Toast POS Receipt Printer</span>";
