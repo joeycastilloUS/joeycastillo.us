@@ -282,8 +282,11 @@ function render(){
       if(!s){ st="MISSING"; cls="namewarn"; }
       else if(s.online){ st="LIVE"; cls="nameok"; live++; }
       else { st="found, not live"; cls="hint"; }
-      const where = s && s.wheres.length
-        ? s.wheres.map(w=> w.wifi ? "<span class='wifi-flag'>"+WIFI+esc(w.label)+"</span>" : "<span class='port'>"+esc(w.label)+"</span>").join(" ")
+      // Prefer the WIRED location: if a device is on a switch port, show the POS-# -- never a stale Wi-Fi SSID.
+      // Only show Wi-Fi when there is no wired location for the device.
+      const wlist = s ? (s.wheres.some(w=>!w.wifi) ? s.wheres.filter(w=>!w.wifi) : s.wheres) : [];
+      const where = wlist.length
+        ? wlist.map(w=> w.wifi ? "<span class='wifi-flag'>"+WIFI+esc(w.label)+"</span>" : "<span class='port'>"+esc(w.label)+"</span>").join(" ")
         : "<span class='av'>&mdash;</span>";
       rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td>"+where+"</td><td class='"+cls+"'>"+st+"</td></tr>";
     });
