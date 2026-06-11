@@ -92,7 +92,10 @@
   .plinks{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;}
   .plink{display:inline-flex;align-items:center;gap:5px;background:#0d0d0d;border:1px solid var(--line);color:var(--text);border-radius:7px;padding:5px 11px;font-size:.8rem;font-weight:600;text-decoration:none;}
   .plink:hover{border-color:var(--accent);color:var(--accent);} .plink.go{background:#16242b;border-color:#2a3f48;color:var(--accent);}
-  .audithero{text-align:center;max-width:560px;margin:2px auto 16px;padding-bottom:16px;border-bottom:1px solid var(--line);} .audithero .empty-ico{margin-bottom:8px;} .audithero .empty-desc{margin:0 auto;}
+  .audithero{text-align:center;max-width:560px;margin:2px auto 18px;padding-bottom:18px;border-bottom:1px solid var(--line);} .audithero .empty-ico{margin-bottom:8px;} .audithero .empty-desc{margin:0 auto;}
+  .auditcard.emptycard{max-width:660px;margin:0 auto;}
+  .auditmode.centered{justify-content:center;} .auditpick.centered{justify-content:center;}
+  .notpl{max-width:660px;margin:14px auto 0;text-align:center;font-size:.85rem;} .notpl .evlist{text-align:left;margin-top:8px;}
   .savewrap{position:relative;display:inline-block;}
   .savebtn{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.4;white-space:nowrap;}
   .savebtn:hover{border-color:var(--accent);color:var(--accent);}
@@ -268,13 +271,13 @@ function lvlBadge(l){ if(!l) return ""; return " <span class='lvl lvl-"+esc(l)+"
 function auditPicker(){
   const mode=AUDITMODE, tgt=AUDITTARGET;
   const noRes = !["network","template","org"].some(s=>AUD.results[s]);
-  let x="<div class='box'>";
+  let x="<div class='box auditcard"+(noRes?" emptycard":"")+"'>";
   if(noRes) x+="<div class='audithero'><div class='empty-ico'>&#128737;</div><div class='empty-title'>Security Audit</div><div class='empty-desc'>Read-only audit of a network, a config template, or the whole organization &mdash; graded against best practice, with an action plan for every finding. Nothing is changed.</div></div>";
-  x+="<div class='feat-h'>Run a read-only security audit</div>";
-  x+="<div class='auditmode'><button class='amode"+(mode==="network"?" on":"")+"' data-amode='network'>Audit a Network</button>"+
-     "<button class='amode"+(mode==="template"?" on":"")+"' data-amode='template'>Audit a Template</button>"+
-     "<button class='amode"+(mode==="org"?" on":"")+"' data-amode='org'>Audit the Organization</button></div>";
-  x+="<div class='bar'>";
+  else x+="<div class='feat-h'>Run another audit</div>";
+  x+="<div class='auditmode"+(noRes?" centered":"")+"'><button class='amode"+(mode==="network"?" on":"")+"' data-amode='network'>Network</button>"+
+     "<button class='amode"+(mode==="template"?" on":"")+"' data-amode='template'>Template</button>"+
+     "<button class='amode"+(mode==="org"?" on":"")+"' data-amode='org'>Organization</button></div>";
+  x+="<div class='bar auditpick"+(noRes?" centered":"")+"'>";
   if(mode==="network"){ x+=combo("audit-net", netItems(), tgt.type==="network"?tgt:{id:"",name:""}, "type a network…"); }
   else if(mode==="template"){ x+= (TEMPLATES&&TEMPLATES.length) ? combo("audit-tpl", TEMPLATES.map(t=>({id:t.id,name:t.name})), tgt.type==="template"?tgt:{id:"",name:""}, "type a template…") : "<span class='muted'><span class='spin'></span> loading templates&hellip;</span>"; }
   else { x+="<span class='muted'>org-wide &mdash; admins, MFA, login policy</span>"; }
@@ -284,18 +287,14 @@ function auditPicker(){
   x+=" <button id='runaudit'>&#9654; "+(sameTarget?"Re-run":"Run Audit")+"</button></div></div>";
   return x;
 }
-// Verbose pre-run helpers -- the "what happens" note + the no-template network list. Pre-run only.
+// One subtle line under the card: networks that run without a config template (network mode only).
 function auditExtras(){
-  const mode=AUDITMODE;
-  const whatScope = mode==="template" ? "<b>template</b>'s appliance (firewall, exposure, threat, wireless)" : mode==="org" ? "<b>organization</b>'s admin / MFA / login posture (once for the whole org &mdash; not per network)" : "<b>network</b>'s own items (switching, anomalies) plus its appliance config or template overrides";
-  let x="<div class='box'><div class='muted'>What happens: read-only Meraki calls collect this "+whatScope+", then grade it against best practice. Nothing is changed. Tap Run to start collecting.</div></div>";
-  if(mode==="network"){
-    const noTpl=(NETS||[]).filter(n=>!n.configTemplateId);
-    x+="<div class='box'><div class='feat-h'>Networks NOT using a config template <span class='muted'>("+noTpl.length+")</span> <a class='moreinfo' id='togglenotpl'>"+(SHOWNOTPL?"&#9662; hide":"&#9656; show")+"</a></div>";
-    if(SHOWNOTPL){ x+="<div class='muted' style='margin-bottom:6px;'>These run their own config &mdash; the template's hardening doesn't cover them. Click one to audit it.</div><div class='evlist'>"+noTpl.map(n=>"<div class='evrow'><a class='auditlink' data-netid='"+esc(n.id)+"' data-netname='"+esc(n.name)+"'>"+esc(n.name)+"</a></div>").join("")+"</div>"; }
-    x+="</div>";
-  }
-  return x;
+  if(AUDITMODE!=="network") return "";
+  const noTpl=(NETS||[]).filter(n=>!n.configTemplateId);
+  if(!noTpl.length) return "";
+  let x="<div class='notpl'><a class='moreinfo' id='togglenotpl'>"+noTpl.length+" network"+(noTpl.length===1?"":"s")+" run without a config template &mdash; "+(SHOWNOTPL?"&#9662; hide":"&#9656; show")+"</a>";
+  if(SHOWNOTPL){ x+="<div class='muted' style='margin:8px 0 4px;'>These run their own config &mdash; the template&rsquo;s hardening doesn&rsquo;t cover them. Click one to audit it.</div><div class='evlist'>"+noTpl.map(n=>"<div class='evrow'><a class='auditlink' data-netid='"+esc(n.id)+"' data-netname='"+esc(n.name)+"'>"+esc(n.name)+"</a></div>").join("")+"</div>"; }
+  return x+"</div>";
 }
 // --- generic sortable tables: click a header to sort; default = first column, alphanumeric ascending ---
 function sortKeyOf(table){ const b=table.closest(".sect-body"); return b?b.id:""; }
