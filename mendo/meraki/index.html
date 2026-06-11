@@ -77,6 +77,7 @@
   .evtitle{color:var(--text);font-weight:600;} .evev{color:var(--dim);font-size:.8rem;margin-top:2px;padding-left:21px;}
   .ev-pass{color:var(--ok);font-weight:800;} .ev-fail{color:var(--bad);font-weight:800;} .ev-skip{color:var(--dim);font-weight:800;}
   .auditmode{display:flex;gap:8px;margin:8px 0;} .amode{background:var(--surface);color:var(--dim);border:1px solid var(--line);border-radius:7px;padding:7px 14px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit;} .amode.on{background:#1d2a31;color:var(--accent);border-color:var(--accent);}
+  .scopeflip{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 6px;} .scopebtn{background:var(--surface);color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px;} .scopebtn:hover:not(.on){color:var(--text);} .scopebtn.on{background:#1d2a31;color:var(--accent);border-color:var(--accent);}
   #auditsel{min-width:280px;} #runaudit{background:var(--ok);color:#001a0e;border:none;border-radius:7px;padding:8px 16px;font-weight:800;cursor:pointer;font-family:inherit;}
   .auditlink{color:var(--accent);cursor:pointer;} .auditlink:hover{text-decoration:underline;}
   .lvl{display:inline-block;font-size:.58rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px;border:1px solid var(--line);color:var(--dim);}
@@ -220,7 +221,10 @@ function auditPicker(){
   if(mode==="network"){ x+=combo("audit-net", netItems(), tgt.type==="network"?tgt:{id:"",name:""}, "type a network…"); }
   else if(mode==="template"){ x+= (TEMPLATES&&TEMPLATES.length) ? combo("audit-tpl", TEMPLATES.map(t=>({id:t.id,name:t.name})), tgt.type==="template"?tgt:{id:"",name:""}, "type a template…") : "<span class='muted'><span class='spin'></span> loading templates&hellip;</span>"; }
   else { x+="<span class='muted'>org-wide &mdash; admins, MFA, login policy</span>"; }
-  x+=" <button id='runaudit'>&#9654; "+(AUD.audit?"Re-run":"Run Audit")+"</button></div></div>";
+  // "Re-run" only when the CURRENT selection matches an already-run target for this mode -- otherwise it's a fresh Run.
+  const ran=AUD.results[mode], rt=AUD.tgt[mode];
+  const sameTarget = !!ran && !!rt && (mode==="org" || rt.id===tgt.id);
+  x+=" <button id='runaudit'>&#9654; "+(sameTarget?"Re-run":"Run Audit")+"</button></div></div>";
   return x;
 }
 // Verbose pre-run helpers -- the "what happens" note + the no-template network list. Pre-run only.
@@ -301,7 +305,9 @@ function comboDraw(id,q){ const c=COMBOS[id], el=document.getElementById("cl-"+i
 }
 function comboPick(id,i){ const c=COMBOS[id]; if(!c||i<0||i>=c.filtered.length) return; const n=c.filtered[i]; c.sel={id:n.id,name:n.name}; const inp=document.getElementById("ci-"+id); if(inp) inp.value=n.name; const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="flex"; const el=document.getElementById("cl-"+id); if(el) el.classList.remove("open"); }
 // Clear a combo's input + selection and reopen the full list, so you can search again.
-function comboClear(id){ const c=COMBOS[id]; if(c) c.sel={id:"",name:""}; const inp=document.getElementById("ci-"+id); if(inp){ inp.value=""; inp.focus(); } const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="none"; comboFilter(id,""); }
+function comboClear(id){ const c=COMBOS[id]; if(c) c.sel={id:"",name:""}; const inp=document.getElementById("ci-"+id); if(inp){ inp.value=""; inp.focus(); } const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="none"; comboFilter(id,""); if(id.indexOf("audit-")===0) resetRunLabel(); }
+// After the audit target selection changes, the button is a fresh Run -- never a "Re-run".
+function resetRunLabel(){ const b=document.getElementById("runaudit"); if(b) b.innerHTML="&#9654; Run Audit"; }
 // Resolve a combo's selection at action time: if nothing committed, take the top match for what was typed.
 function comboResolve(id){ const c=COMBOS[id]; if(!c) return {id:"",name:""}; if(!c.sel.id){ comboFilter(id,(c.sel.name||"").trim()); if(c.filtered.length) comboPick(id,0); } return c.sel; }
 
@@ -364,7 +370,9 @@ function swOrder(n){ n=(n||"").toUpperCase(); if(n.indexOf("POS")>=0) return 0; 
 function newSlot(){ return {net:"",name:"",d:null,wifi:null,stamp:"",portStamp:"",wifiStamp:"",loading:false,error:""}; }
 let OPS=newSlot();   // Operations tab
 let NETV=newSlot();  // Network tab
-let AUD={audit:null,auditing:false,auditError:""}; // Security Audit tab state (target = AUDITTARGET)
+// Security Audit holds up to three independent results -- network / template / org -- so you can run
+// each and flip between them. `view` is which one is on screen; export scopes to the viewed result.
+let AUD={ results:{network:null,template:null,org:null}, tgt:{network:null,template:null,org:null}, view:null, auditing:false, auditError:"" };
 function slotById(id){ return id==="operations"?OPS:id==="network"?NETV:null; }
 
 // Source fetchers -- each writes only its slice of a slot + its own stamp, so a single section
@@ -417,12 +425,13 @@ function renderChecks(){
 async function pullAudit(){
   if(AUD.auditing) return;
   const t=AUDITTARGET; if(!t.id) return;
-  AUD.auditing=true; AUD.auditError=""; AUD.audit=null; render();
+  const mode=t.type; // network | template | org
+  AUD.auditing=true; AUD.auditError=""; AUD.view=mode; render();
   try{
-    const q = t.type==="org" ? "org=1" : t.type==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
+    const q = mode==="org" ? "org=1" : mode==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
     const r=await api("/meraki/audit?"+q);
     if(!r.ok) throw new Error("error "+r.status);
-    AUD.audit=await r.json();
+    AUD.results[mode]=await r.json(); AUD.tgt[mode]={id:t.id,name:t.name}; AUD.view=mode;
   }catch(e){ AUD.auditError=e.message||"audit error"; }
   AUD.auditing=false; render();
 }
@@ -626,8 +635,18 @@ function auditPane(){
   let h=auditPicker(); // always present -- run, re-run, or switch target at any time
   if(AUD.auditing){ return h+"<div class='box'><div class='muted'><span class='spin'></span> running read-only audit &amp; collecting config&hellip;</div></div>"; }
   if(AUD.auditError){ return h+"<div class='err'>audit failed: "+esc(AUD.auditError)+"</div>"+auditExtras(); }
-  if(!AUD.audit){ return h+auditExtras(); }
-  const A=AUD.audit, S=A.summary||{}, isOrg=AUDITTARGET.type==="org";
+  const scopesRun=["network","template","org"].filter(s=>AUD.results[s]);
+  if(!scopesRun.length){ return h+auditExtras(); }
+  if(!AUD.view||!AUD.results[AUD.view]) AUD.view=scopesRun[0];
+  // Flip between the scopes that have results (network / template / org).
+  if(scopesRun.length>1){
+    const lab={network:"Network",template:"Template",org:"Organization"};
+    h+="<div class='scopeflip'>";
+    scopesRun.forEach(s=>{ const R=AUD.results[s], t=AUD.tgt[s], nm=(s!=="org"&&t&&t.name)?" &middot; "+esc(t.name):"";
+      h+="<button class='scopebtn"+(AUD.view===s?" on":"")+"' data-scope='"+s+"'>"+lab[s]+nm+" <b class='grade-"+esc(R.grade)+"'>"+esc(R.grade)+"</b></button>"; });
+    h+="</div>";
+  }
+  const A=AUD.results[AUD.view], S=A.summary||{}, isOrg=AUD.view==="org";
   const scopeLabel = isOrg ? "Audited <b>organization</b>" : "Audited "+(A.isTemplate?"template":"network")+" <b>"+esc(A.store||"")+"</b>";
   h+=exportRow();
   h+="<div class='stamp'>"+scopeLabel+"</div>";
@@ -693,7 +712,8 @@ function render(){
   let h="";
   const wifiN=NETV.wifi, ssidGroups=(wifiN&&wifiN.ssids)||[];
   const ssidCount=wifiN?(wifiN.ssidCount!=null?wifiN.ssidCount:ssidGroups.length):0;
-  const auditBadge = AUD.audit ? " &middot; <b class='grade-"+esc(AUD.audit.grade)+"'>"+esc(AUD.audit.grade)+"</b>" : "";
+  const auditView = (AUD.view&&AUD.results[AUD.view]) ? AUD.results[AUD.view] : null;
+  const auditBadge = auditView ? " &middot; <b class='grade-"+esc(auditView.grade)+"'>"+esc(auditView.grade)+"</b>" : "";
   h+="<div class='tabwrap'><div class='tabs'>"+
      "<button class='tab"+(TAB==="operations"?" on":"")+"' data-tab='operations'>&#9776; Operations</button>"+
      "<button class='tab"+(TAB==="network"?" on":"")+"' data-tab='network'>"+WIFI+"Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</button>"+
@@ -716,14 +736,15 @@ function render(){
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
-function viewName(){ return TAB==="operations"?"Operations":TAB==="network"?"Network":TAB==="audit"?"Security Audit":"View"; }
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const m={network:"Network",template:"Template",org:"Organization"}; return "Security Audit"+(AUD.view&&m[AUD.view]?" — "+m[AUD.view]:""); } return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
   if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
   if(TAB==="network") return (NETV.d&&NETV.d.name)||NETV.name||"";
-  return AUDITTARGET.type==="org" ? "Organization" : (AUD.audit&&AUD.audit.store)||AUDITTARGET.name||"";
+  if(AUD.view==="org") return "Organization";
+  const t=AUD.tgt[AUD.view]; return (t&&t.name)||"";
 }
 function exportDoc(){
   const store=exportStore(), title="Argus &mdash; "+viewName();
@@ -785,7 +806,7 @@ document.getElementById("report").addEventListener("click", async e=>{
   const ex=e.target.closest("[data-export]"); if(ex){ e.stopImmediatePropagation(); ex.getAttribute("data-export")==="pdf"?exportPdf():exportHtml(); return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); const id=sr.closest("#pane-network")?"network":"operations"; refreshSection(id, sr.getAttribute("data-refresh"), sr); return; }
   const ck=e.target.closest("#showchecks"); if(ck){ e.stopImmediatePropagation(); SHOWCHECKS=!SHOWCHECKS; render(); if(SHOWCHECKS&&!CHECKS) pullChecks().then(render); return; }
-  const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); AUDITTARGET=AUDITMODE==="org"?{type:"org",id:"org",name:"Organization"}:{type:AUDITMODE,id:"",name:""}; render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
+  const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); const prior=AUD.tgt[AUDITMODE]; AUDITTARGET=AUDITMODE==="org"?{type:"org",id:"org",name:"Organization"}:(prior?{type:AUDITMODE,id:prior.id,name:prior.name}:{type:AUDITMODE,id:"",name:""}); if(AUD.results[AUDITMODE]) AUD.view=AUDITMODE; render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
   const ra=e.target.closest("#runaudit"); if(ra){ e.stopImmediatePropagation(); if(AUDITMODE==="org"){ AUDITTARGET={type:"org",id:"org",name:"Organization"}; pullAudit(); return; } const cid=AUDITMODE==="template"?"audit-tpl":"audit-net"; const sel=comboResolve(cid); if(sel.id){ AUDITTARGET={type:AUDITMODE,id:sel.id,name:sel.name}; pullAudit(); } return; }
   const tn=e.target.closest("#togglenotpl"); if(tn){ e.stopImmediatePropagation(); SHOWNOTPL=!SHOWNOTPL; render(); return; }
   const al=e.target.closest(".auditlink"); if(al){ e.stopImmediatePropagation(); AUDITMODE="network"; AUDITTARGET={type:"network",id:al.getAttribute("data-netid"),name:al.getAttribute("data-netname")}; pullAudit(); return; }
@@ -805,6 +826,7 @@ document.getElementById("report").addEventListener("input", e=>{
   const ci=e.target.closest(".comboinput"); if(!ci) return;
   const id=ci.id.slice(3), c=COMBOS[id]; if(c) c.sel={id:"",name:ci.value};
   const cx=document.getElementById("cx-"+id); if(cx) cx.style.display=ci.value?"flex":"none";
+  if(id.indexOf("audit-")===0) resetRunLabel();
   comboFilter(id, ci.value.trim());
 });
 document.getElementById("report").addEventListener("focusin", e=>{
@@ -829,6 +851,7 @@ document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
   const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
+  const sc=e.target.closest("[data-scope]"); if(sc){ const s=sc.getAttribute("data-scope"); AUD.view=s; AUDITMODE=s; AUDITTARGET = s==="org" ? {type:"org",id:"org",name:"Organization"} : {type:s,id:(AUD.tgt[s]&&AUD.tgt[s].id)||"",name:(AUD.tgt[s]&&AUD.tgt[s].name)||""}; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show) renderFeatures(); });
