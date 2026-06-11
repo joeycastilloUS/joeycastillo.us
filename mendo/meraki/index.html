@@ -30,7 +30,9 @@
   table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.86rem;margin-bottom:8px;}
   th{text-align:left;color:var(--dim);font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;padding:5px 11px;border-bottom:1px solid var(--line);}
   td{padding:4px 11px;line-height:1.35;border-bottom:1px solid #1f1f1f;} tr:last-child td{border-bottom:none;}
-  td.port{color:var(--accent);font-weight:700;} .disc td{color:var(--off);} .ip{font-family:ui-monospace,Consolas,monospace;}
+  th.sortable{cursor:pointer;user-select:none;white-space:nowrap;} th.sortable:hover{color:var(--accent);}
+  th .sortind{font-size:.82em;color:var(--accent);margin-left:3px;}
+  td.port{color:var(--accent);font-weight:700;} .disc td{color:var(--off);} .ip{font-family:ui-monospace,Consolas,monospace;white-space:nowrap;} .nw{white-space:nowrap;}
   .st-conn{color:var(--ok);} .st-disc{color:var(--off);} .av{color:var(--dim);}
   .hint{color:var(--accent);font-size:.78rem;} .nameok{color:var(--ok);font-weight:700;} .namewarn{color:#ff8b8b;font-weight:700;font-size:.78rem;}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
@@ -79,7 +81,7 @@
   .gbrand{font-size:2rem;font-weight:800;color:var(--accent);letter-spacing:.12em;} .gsub{color:#555;font-size:.8rem;margin:.3rem 0 1.6rem;}
   .gerr{color:#ff8b8b;font-size:.82rem;min-height:1.2em;margin-top:.6rem;}
   @media print{
-    body{background:#fff;color:#000;} .nav,.bar,.gate,.tabs,.secref,.renameit,.renbox{display:none!important;} .hidden{display:block!important;}
+    body{background:#fff;color:#000;} .nav,.bar,.gate,.tabs,.secref,.renameit,.renbox,.sortind{display:none!important;} .hidden{display:block!important;}
     .wifi-flag{background:#fff3e0!important;color:#b35900!important;border-color:#d98a2b!important;}
     table{border-color:#ccc;} th{color:#555;} td{border-color:#eee;} td.port{color:#000;}
     .nethead b,h2,.tmpl .bound,.st-conn{color:#000;} *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -139,6 +141,30 @@ let PW = sessionStorage.getItem(PW_KEY) || "";
 let LAST = "";
 let TAB = "switch";
 let SECTSTATE={}; // section key -> false when collapsed; persists across re-renders
+let SORTSTATE={}; // table key (sect-body id) -> {col,dir}; persists across re-renders. Default: first column ascending.
+// --- generic sortable tables: click a header to sort; default = first column, alphanumeric ascending ---
+function sortKeyOf(table){ const b=table.closest(".sect-body"); return b?b.id:""; }
+function cmpVals(a,b){ return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"}); }
+function sortTable(table,col,dir){
+  const tb=table.tBodies[0], head=table.tHead; if(!tb||!head) return;
+  // Group each primary row with its trailing 24h-history row(s) so pairs move together.
+  const groups=[]; let cur=null;
+  [...tb.rows].forEach(r=>{ if(r.classList.contains("histrow")){ if(cur) cur.extra.push(r); else groups.push({main:r,extra:[]}); } else { cur={main:r,extra:[]}; groups.push(cur); } });
+  const cell=(g)=> g.main.cells[col]?g.main.cells[col].textContent.trim():"";
+  groups.sort((x,y)=>cmpVals(cell(x),cell(y))*dir);
+  groups.forEach(g=>{ tb.appendChild(g.main); g.extra.forEach(e=>tb.appendChild(e)); });
+  const k=sortKeyOf(table); if(k) SORTSTATE[k]={col,dir};
+  [...head.rows[0].cells].forEach((th,i)=>{ let s=th.querySelector(".sortind"); if(s) s.textContent = i===col?(dir>0?"▲":"▼"):""; });
+}
+function initSortables(){
+  document.getElementById("report").querySelectorAll("table").forEach(table=>{
+    if(table.classList.contains("histtbl")) return; // nested 24h detail -- leave as-is
+    if(!table.tHead||!table.tBodies[0]) return;
+    [...table.tHead.rows[0].cells].forEach(th=>{ th.classList.add("sortable"); if(!th.querySelector(".sortind")){ const s=document.createElement("span"); s.className="sortind"; th.appendChild(s); } });
+    const st=SORTSTATE[sortKeyOf(table)]||{col:0,dir:1};
+    sortTable(table, st.col, st.dir);
+  });
+}
 function sect(key,title,body,kind){ const open=SECTSTATE[key]!==false; const ref=kind?"<button class='secref' data-refresh='"+esc(kind)+"' title='Refresh this section'>&#x21bb; Refresh</button>":""; return "<h2 class='sect-h"+(open?"":" collapsed")+"' data-sect='"+esc(key)+"'><span class='chev'>&#9656;</span> "+title+ref+"</h2><div class='sect-body' id='secbody-"+esc(key)+"'"+(open?"":" style='display:none'")+">"+body+"</div>"; }
 const WIFI="<svg class='wic' viewBox='0 0 24 24' width='13' height='13' fill='currentColor'><path d='M12 17.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 3C7.6 3 3.6 4.8.8 7.7l2.1 2.1C5.2 7.5 8.4 6 12 6s6.8 1.5 9.1 3.8l2.1-2.1C20.4 4.8 16.4 3 12 3zm0 5c-2.9 0-5.5 1.2-7.4 3.1l2.1 2.1C8 11 9.9 10 12 10s4 1 5.3 2.2l2.1-2.1C17.5 9.2 14.9 8 12 8z'/></svg>";
 
@@ -347,7 +373,7 @@ function render(){
       const moreLink = hasHist ? " <a class='moreinfo' data-hist='"+esc(key)+"'>24h &#9662;</a>" : "";
       sb+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+
         "</td><td class='"+(conn?"st-conn":"st-disc")+"'>"+esc(p.status||"")+"</td><td>"+esc(p.vlan)+
-        "</td><td class='av'>"+esc(p.allowedVlans||"")+"</td><td>"+desc+nameBtn+moreLink+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av'>"+ls+"</td></tr>";
+        "</td><td class='av'>"+esc(p.allowedVlans||"")+"</td><td>"+desc+nameBtn+moreLink+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av nw'>"+ls+"</td></tr>";
       if(hasHist){
         let hr="<div class='histwrap'><div class='histcap'>Past 24 hours &middot; port "+esc(p.port)+" ("+hist.length+")</div>"+
           "<table class='histtbl'><thead><tr><th>Last seen (PT)</th><th>Status</th><th>Description</th><th>IP</th><th>MAC</th><th>VLAN</th></tr></thead><tbody>";
@@ -387,7 +413,7 @@ function render(){
           wb+="<tr class='"+(on?"":"disc")+"'><td>"+esc(c.name||"")+nameCheck(c.ip||"",c.name,c.mac)+"</td>"+
             "<td class='ip'>"+esc(c.ip||"")+"</td><td class='ip'>"+esc(c.mac||"")+"</td><td>"+esc(c.vlan||"")+"</td>"+
             "<td class='wifi-ap'>"+esc(c.ap||"")+"</td><td class='av'>"+esc([c.manufacturer,c.os].filter(Boolean).join(" / "))+"</td>"+
-            "<td class='"+(on?"st-conn":"st-disc")+"'>"+esc(c.status||"")+"</td><td class='av'>"+esc(lastSeenPac(c.lastSeen))+"</td></tr>"; });
+            "<td class='"+(on?"st-conn":"st-disc")+"'>"+esc(c.status||"")+"</td><td class='av nw'>"+esc(lastSeenPac(c.lastSeen))+"</td></tr>"; });
         wb+="</tbody></table>";
       }
       const title="<span class='wifi-flag'>"+WIFI+esc(g.ssid)+"</span> &middot; "+(g.online||0)+" online"+(g.enabled===false?" <span class='namewarn'>&#9888; disabled</span>":"");
@@ -396,11 +422,11 @@ function render(){
   }
   h+="</div>";
 
-  document.getElementById("report").innerHTML=h; LAST=h;
+  document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
   document.getElementById("exh").disabled=false; document.getElementById("exp").disabled=false;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}";
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
 function exportDoc(){ return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Network View</title><style>"+EXPORT_CSS+"</style></head><body>"+LAST+"</body></html>"; }
 function exportHtml(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
@@ -454,6 +480,7 @@ document.getElementById("gform").addEventListener("submit", async e=>{
 });
 document.getElementById("go").addEventListener("click", pull);
 document.getElementById("report").addEventListener("click", async e=>{
+  const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); refreshSection(sr.getAttribute("data-refresh"), sr); return; }
   const ri=e.target.closest(".renameit"); if(ri){ e.stopImmediatePropagation(); openRename(ri); return; }
   const rs=e.target.closest(".rensave"); if(rs){ e.stopImmediatePropagation(); doRenameSave(rs); return; }
