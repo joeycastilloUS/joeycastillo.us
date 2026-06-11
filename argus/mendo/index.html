@@ -93,9 +93,9 @@
   .plink{display:inline-flex;align-items:center;gap:5px;background:#0d0d0d;border:1px solid var(--line);color:var(--text);border-radius:7px;padding:5px 11px;font-size:.8rem;font-weight:600;text-decoration:none;}
   .plink:hover{border-color:var(--accent);color:var(--accent);} .plink.go{background:#16242b;border-color:#2a3f48;color:var(--accent);}
   .audithero{text-align:center;max-width:560px;margin:2px auto 18px;padding-bottom:18px;border-bottom:1px solid var(--line);} .audithero .empty-ico{margin-bottom:8px;} .audithero .empty-desc{margin:0 auto;}
-  .auditcard.emptycard{max-width:660px;margin:0 auto;}
+  .auditcard{max-width:580px;margin:0 auto;} .auditcard.emptycard{padding:34px 32px;border-radius:18px;}
   .auditmode.centered{justify-content:center;} .auditpick.centered{justify-content:center;}
-  .notpl{max-width:660px;margin:14px auto 0;text-align:center;font-size:.85rem;} .notpl .evlist{text-align:left;margin-top:8px;}
+  .notpl{max-width:580px;margin:14px auto 0;text-align:center;font-size:.85rem;} .notpl .evlist{text-align:left;margin-top:8px;}
   .savewrap{position:relative;display:inline-block;}
   .savebtn{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.4;white-space:nowrap;}
   .savebtn:hover{border-color:var(--accent);color:var(--accent);}
@@ -127,7 +127,7 @@
   .ev-pass{color:var(--ok);font-weight:800;} .ev-fail{color:var(--bad);font-weight:800;} .ev-skip{color:var(--dim);font-weight:800;}
   .auditmode{display:flex;gap:8px;margin:8px 0;} .amode{background:var(--surface);color:var(--dim);border:1px solid var(--line);border-radius:7px;padding:7px 14px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit;} .amode.on{background:#1d2a31;color:var(--accent);border-color:var(--accent);}
   .scopeflip{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 6px;} .scopebtn{background:var(--surface);color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px;} .scopebtn:hover:not(.on){color:var(--text);} .scopebtn.on{background:#1d2a31;color:var(--accent);border-color:var(--accent);}
-  #auditsel{min-width:280px;} #runaudit{background:var(--ok);color:#001a0e;border:none;border-radius:7px;padding:8px 16px;font-weight:800;cursor:pointer;font-family:inherit;}
+  #auditsel{min-width:280px;} #runaudit{background:var(--accent);color:#001016;border:none;border-radius:7px;padding:9px 16px;font-weight:800;cursor:pointer;font-family:inherit;}
   .auditlink{color:var(--accent);cursor:pointer;} .auditlink:hover{text-decoration:underline;}
   .lvl{display:inline-block;font-size:.58rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px;border:1px solid var(--line);color:var(--dim);}
   .lvl-template{background:#1a1407;color:var(--warn);border-color:var(--warn);} .lvl-network{background:#0e1a1f;color:var(--accent);border-color:#2a3f48;}
@@ -157,6 +157,9 @@
   .empty-pick button{padding:10px 22px;}
   .box{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:14px;}
   .hidden{display:none;}
+  @keyframes paneIn{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:none;}}
+  .panebox.anim{animation:paneIn .18s cubic-bezier(.2,.8,.2,1);}
+  @keyframes flashIn{from{opacity:.4;}to{opacity:1;}}
   .wifi-ap{color:var(--dim);}
   .wifi-flag{display:inline-flex;align-items:center;gap:5px;background:#3a2a00;color:#ffce85;border:1px solid #ffce85;border-radius:5px;padding:1px 8px;font-weight:700;font-size:.82rem;white-space:nowrap;}
   .tab .wic{vertical-align:-2px;margin-right:5px;}
@@ -260,6 +263,7 @@ const PW_KEY = "meraki_pw_v1";
 let PW = sessionStorage.getItem(PW_KEY) || "";
 let LAST = "";
 let TAB = "operations";
+let TAB_ANIM = false; // one-shot: animate the active pane on tab switch
 let SECTSTATE={}; // section key -> false when collapsed; persists across re-renders
 let SORTSTATE={}; // table key (sect-body id) -> {col,dir}; persists across re-renders. Default: first column ascending.
 let SHOWCHECKS=false, CHECKS=null; // audit methodology panel (every check + scoring), fetched once from /meraki/audit/checks
@@ -940,18 +944,19 @@ function render(){
 
   // Operations -- compact toolbar when loaded, a centered hero when empty
   const opsDesc="Toast POS devices on the POS VLAN, plus Konductor rollout health &mdash; every mapped device live and on VLAN 90.";
-  h+="<div id='pane-operations' class='panebox "+(TAB==="operations"?"":"hidden")+"'>"+
+  const paneCls=(t)=> "panebox "+(TAB===t ? (TAB_ANIM?"anim":"") : "hidden");
+  h+="<div id='pane-operations' class='"+paneCls("operations")+"'>"+
      (OPS.d ? pickerRow("operations",OPS)+exportRow()+slotHead(OPS)+opsContent(OPS)
             : emptyState("operations",OPS,"&#9776;","Operations",opsDesc))+"</div>";
   // Network
   const netDesc="Connected clients across this network &mdash; wired and Wi-Fi &mdash; plus the Meraki device inventory and every SSID. Rename any client or device inline.";
-  h+="<div id='pane-network' class='panebox "+(TAB==="network"?"":"hidden")+"'>"+
+  h+="<div id='pane-network' class='"+paneCls("network")+"'>"+
      (NETV.d ? pickerRow("network",NETV)+exportRow()+slotHead(NETV)+netContent(NETV)
             : emptyState("network",NETV,WIFI,"Network",netDesc))+"</div>";
   // Security Audit -- own target picker (always present, run/re-run any time)
-  h+="<div id='pane-audit' class='panebox "+(TAB==="audit"?"":"hidden")+"'>"+auditPane()+"</div>";
+  h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+auditPane()+"</div>";
 
-  document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
+  document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML; TAB_ANIM=false;
 }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
@@ -1149,7 +1154,7 @@ document.getElementById("report").addEventListener("mousedown", e=>{
 document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combolist.open").forEach(el=>el.classList.remove("open")); if(!e.target.closest(".savewrap")) document.querySelectorAll(".savewrap.open").forEach(el=>el.classList.remove("open")); });
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
-  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
+  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); TAB_ANIM=true; if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
   const pl=e.target.closest(".planlink"); if(pl){ e.stopImmediatePropagation(); const id=pl.getAttribute("data-plan"); PLAN_OPEN[id]=!PLAN_OPEN[id]; render(); return; }
   const rm=e.target.closest("[data-readmore]"); if(rm){ e.stopImmediatePropagation(); const id=rm.getAttribute("data-readmore"); READMORE[id]=!READMORE[id]; render(); return; }
   const ad=e.target.closest("[data-addremed]"); if(ad){ e.stopImmediatePropagation(); const a=ad.getAttribute("data-addremed").split("|"); addRemediable(a[0],a[1]); toast("“"+a[1]+"” added to Remediable — Argus can now apply fixes here, step by step"); render(); return; }
