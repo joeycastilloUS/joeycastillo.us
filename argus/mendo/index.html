@@ -75,6 +75,19 @@
   .fctitle{font-weight:700;font-size:.98rem;margin:2px 0;}
   .fcev{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;color:var(--text);background:#0d0d0d;border:1px solid var(--line);border-radius:6px;padding:6px 9px;margin:5px 0;word-break:break-word;}
   .fcrem{color:#b8c4c9;font-size:.9rem;line-height:1.5;} .fcrem b{color:var(--accent);}
+  .planlink{display:inline-block;margin-top:9px;color:var(--accent);font-size:.82rem;font-weight:700;cursor:pointer;user-select:none;}
+  .planlink:hover{text-decoration:underline;}
+  .plans{margin-top:10px;display:flex;flex-direction:column;gap:8px;}
+  .ptier{background:#0d0d0d;border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+  .ptier.t3box{border-color:#3a2f12;background:#15110a;}
+  .ptier-h{font-size:.84rem;font-weight:700;color:var(--text);margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .ptier-tag{font-size:.66rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:5px;padding:2px 7px;}
+  .ptier-tag.t1{background:#16323d;color:var(--accent);border:1px solid var(--accent);} .ptier-tag.t3{background:#3a2a00;color:var(--warn);border:1px solid var(--warn);}
+  .ptier-b{font-size:.88rem;color:#c8d2d7;line-height:1.55;} .pdash{color:var(--dim);font-size:.8rem;margin-top:5px;}
+  .ro-pill{background:#06251a;color:var(--ok);border:1px solid var(--ok);border-radius:5px;padding:0 7px;font-size:.66rem;font-weight:700;text-transform:uppercase;}
+  .pexec{margin-top:9px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+  .pbtn{background:var(--ok);color:#001a0e;border:none;border-radius:7px;padding:7px 13px;font-size:.82rem;font-weight:800;cursor:pointer;font-family:inherit;} .pbtn:disabled{background:#1d3a2c;color:#6f9c86;cursor:default;}
+  .ptag{color:var(--warn);font-size:.74rem;font-weight:700;}
   .tplnote{background:#16242b;border:1px solid #2a3f48;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:.86rem;color:var(--warn);}
   .evlist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:6px 0;}
   .evrow{padding:7px 11px;border-bottom:1px solid #1c1c1c;font-size:.86rem;} .evrow:last-child{border-bottom:none;}
@@ -667,6 +680,48 @@ function netContent(slot){
   return nameBar+sp+wifiHtml;
 }
 
+// --- Action Plans (per finding): Understand -> Fix-it-yourself (read-only) -> Let Argus fix it (lab write) ---
+let PLAN_OPEN={}; // finding id -> expanded?
+const CAT_WHY={
+  "Firewall":"Firewall rules decide what can reach this network. A gap here is a direct path in.",
+  "Exposure":"Port-forwards and 1:1 NAT punch holes straight through the firewall &mdash; the most common way internal services end up exposed to the internet.",
+  "Threat Protection":"Without IPS / AMP / content filtering, known-bad traffic crosses the edge un-inspected.",
+  "Wireless":"An open, weak, or rogue SSID is an unauthenticated doorway onto the network.",
+  "Switching":"Switch hygiene &mdash; native VLAN, trunk scope, unused ports, storm/STP guards &mdash; is where lateral movement and VLAN-hopping begin.",
+  "Ops":"Stale firmware and missing alerts leave you unpatched against known bugs and blind to problems.",
+  "Anomalies":"Configuration that doesn&rsquo;t match the rest of the fleet &mdash; worth a human look before it bites.",
+  "Overrides":"This network overrides its config template, so the template&rsquo;s hardening may not actually apply here.",
+  "Organization":"Org-wide admin, MFA, and login posture protects every network at once &mdash; weakness here is leverage for an attacker."
+};
+const CAT_DASH={
+  "Firewall":"Security &amp; SD-WAN &rsaquo; Firewall","Exposure":"Security &amp; SD-WAN &rsaquo; Firewall (Port forwarding / 1:1 NAT)",
+  "Threat Protection":"Security &amp; SD-WAN &rsaquo; Threat protection","Wireless":"Wireless &rsaquo; Access control / Air Marshal",
+  "Switching":"Switching &rsaquo; Switch ports / Switch settings","Ops":"Organization &rsaquo; Firmware upgrades &middot; Network-wide &rsaquo; Alerts",
+  "Anomalies":"the relevant network page","Overrides":"the bound config template","Organization":"Organization &rsaquo; Administrators / MFA / Login attempts"
+};
+// Checks safe + reversible enough for Argus to auto-apply (lab only). The rest stay manual by design.
+const EXECUTABLE={ "SW-NV1":1, "THR-03":1 };
+function actionPlans(f, labNet){
+  const why=CAT_WHY[f.category]||"This weakens the network&rsquo;s security posture.";
+  const dash=CAT_DASH[f.category]||"the Meraki dashboard";
+  const canExec=!!EXECUTABLE[f.id];
+  let x="<div class='plans'>";
+  x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>1 &middot; Understand</span> Why this matters</div><div class='ptier-b'>"+why+"</div></div>";
+  x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>2 &middot; Fix it yourself</span> <span class='ro-pill'>read-only</span> you make the change</div>"+
+     "<div class='ptier-b'><div>"+esc(f.remediation)+"</div><div class='pdash'>Dashboard: "+dash+"</div></div></div>";
+  x+="<div class='ptier t3box'><div class='ptier-h'><span class='ptier-tag t3'>3 &middot; Let Argus fix it</span> <span class='lab'>LAB</span> Argus applies it for you</div><div class='ptier-b'>";
+  if(canExec && labNet){
+    x+="<div class='muted'>Argus can apply this automatically &mdash; one step you approve at a time, or all at once &mdash; and roll back anything instantly.</div>"+
+       "<div class='pexec'><button class='pbtn' disabled>&#9654; Apply (step-by-step)</button> <button class='pbtn' disabled>&#9889; Apply all</button> <span class='ptag'>executor &mdash; lab write path, landing next</span></div>";
+  } else if(canExec){
+    x+="<div class='muted'>Argus-applied remediation runs on <b>lab networks only</b> (this network isn&rsquo;t lab). On a lab network you&rsquo;d get per-step <b>Apply</b>, <b>Apply all</b>, and one-tap <b>Roll back</b>.</div>";
+  } else {
+    x+="<div class='muted'>This fix can disconnect clients or change access &mdash; it stays <b>manual by design</b>. Argus won&rsquo;t auto-apply it.</div>";
+  }
+  x+="</div></div></div>";
+  return x;
+}
+
 // Security Audit pane: read-only firewall/security audit. Picks its own target (network / template / org).
 function auditPane(){
   let h=auditPicker(); // always present -- run, re-run, or switch target at any time
@@ -719,14 +774,18 @@ function auditPane(){
   const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
   if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No failures &mdash; passed every check.</div>"; }
   else {
+    const labNet = (AUD.view==="network" && AUD.tgt.network) ? isLabNet(AUD.tgt.network.name) : false;
     h+="<div class='feat-h' style='margin-top:14px;'>Action items &mdash; "+fs.length+"</div><div class='findings'>";
     fs.forEach(f=>{
+      const open=!!PLAN_OPEN[f.id];
       h+="<div class='fcard sev-l-"+esc(f.severity)+"' data-fcat='"+esc(f.category)+"'>"+
          "<div class='fchead'><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span>"+
          "<span class='fcid'>"+esc(f.id)+"</span><span class='fccat'>"+esc(f.category)+"</span>"+lvlBadge(f.level)+"</div>"+
          "<div class='fctitle'>"+esc(f.title)+"</div>"+
          "<div class='fcev'>"+esc(f.evidence)+"</div>"+
-         "<div class='fcrem'><b>Fix &middot;</b> "+esc(f.remediation)+"</div></div>";
+         "<div class='fcrem'><b>Fix &middot;</b> "+esc(f.remediation)+"</div>"+
+         "<a class='planlink' data-plan='"+esc(f.id)+"'>"+(open?"&#9662; Hide action plans":"&#9656; Review action plans")+"</a>"+
+         (open?actionPlans(f, labNet):"")+"</div>";
     });
     h+="</div>";
   }
@@ -774,7 +833,7 @@ function render(){
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
 function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const m={network:"Network",template:"Template",org:"Organization"}; return "Security Audit"+(AUD.view&&m[AUD.view]?" — "+m[AUD.view]:""); } return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
@@ -899,6 +958,7 @@ document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
   const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
+  const pl=e.target.closest(".planlink"); if(pl){ e.stopImmediatePropagation(); const id=pl.getAttribute("data-plan"); PLAN_OPEN[id]=!PLAN_OPEN[id]; render(); return; }
   const cj=e.target.closest(".catcard.jump"); if(cj){ const cat=cj.getAttribute("data-cat"); const tgt=document.querySelector(".fcard[data-fcat=\""+(cat||"").replace(/"/g,"")+"\"]"); if(tgt){ tgt.scrollIntoView({behavior:"smooth",block:"center"}); tgt.classList.add("flash"); setTimeout(()=>tgt.classList.remove("flash"),1200); } return; }
   const sc=e.target.closest("[data-scope]"); if(sc){ const s=sc.getAttribute("data-scope"); AUD.view=s; AUDITMODE=s; AUDITTARGET = s==="org" ? {type:"org",id:"org",name:"Organization"} : {type:s,id:(AUD.tgt[s]&&AUD.tgt[s].id)||"",name:(AUD.tgt[s]&&AUD.tgt[s].name)||""}; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
