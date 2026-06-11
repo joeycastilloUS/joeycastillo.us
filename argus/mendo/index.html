@@ -93,6 +93,16 @@
   .plink{display:inline-flex;align-items:center;gap:5px;background:#0d0d0d;border:1px solid var(--line);color:var(--text);border-radius:7px;padding:5px 11px;font-size:.8rem;font-weight:600;text-decoration:none;}
   .plink:hover{border-color:var(--accent);color:var(--accent);} .plink.go{background:#16242b;border-color:#2a3f48;color:var(--accent);}
   .audithero{text-align:center;max-width:580px;margin:6px auto 16px;} .audithero .empty-ico{margin-bottom:8px;} .audithero .empty-desc{margin:0 auto;}
+  .savewrap{position:relative;display:inline-block;}
+  .savebtn{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.4;white-space:nowrap;}
+  .savebtn:hover{border-color:var(--accent);color:var(--accent);}
+  .sect-h .savewrap{margin-left:auto;} .sect-h .savebtn{padding:1px 9px;font-size:.78rem;}
+  .savemenu{position:absolute;top:calc(100% + 4px);right:0;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:5px;min-width:152px;display:none;box-shadow:0 12px 30px rgba(0,0,0,.6);}
+  .savewrap.open .savemenu{display:block;}
+  .savemenu a{display:block;padding:8px 12px;font-size:.85rem;font-weight:600;color:var(--text);border-radius:6px;cursor:pointer;text-decoration:none;}
+  .savemenu a:hover{background:#1d2a31;color:var(--accent);} .savesep{height:1px;background:var(--line);margin:5px 4px;}
+  #argtoast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(16px);background:#16242b;color:var(--accent);border:1px solid var(--accent);border-radius:9px;padding:11px 18px;font-size:.88rem;font-weight:600;z-index:2000;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;max-width:90vw;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);}
+  #argtoast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .ro-pill{background:#06251a;color:var(--ok);border:1px solid var(--ok);border-radius:5px;padding:0 7px;font-size:.66rem;font-weight:700;text-transform:uppercase;}
   .pexec{margin-top:9px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
   .pbtn{background:var(--ok);color:#001a0e;border:none;border-radius:7px;padding:7px 13px;font-size:.82rem;font-weight:800;cursor:pointer;font-family:inherit;} .pbtn:disabled{background:#1d3a2c;color:#6f9c86;cursor:default;}
@@ -196,7 +206,7 @@
 <div class="gate" id="gate">
   <div class="gbox">
     <div class="gbrand">ARGUS</div>
-    <div class="gsub">network &amp; security audit &middot; confidential</div>
+    <div class="gsub">operations &middot; security &middot; remediation &middot; confidential</div>
     <form id="gform" autocomplete="off">
       <input id="gpw" type="password" placeholder="password" autofocus style="width:100%;">
       <button type="submit" style="width:100%;margin-top:.7rem;">Enter</button>
@@ -206,7 +216,7 @@
 </div>
 
 <div class="nav">
-  <span class="navbrand"><span class="be">ARGUS</span><span class="navsub">Network Operations &amp; Security Audit</span></span>
+  <span class="navbrand"><span class="be">ARGUS</span><span class="navsub">Meraki operations &middot; security audit &middot; guided remediation</span></span>
   <span class="navright"><button id="gear" class="iconbtn" title="Settings &mdash; device name map, Toast VLAN, lab features">&#9881; Settings</button><span class="ropill">read-only</span></span>
 </div>
 <div class="wrap">
@@ -308,7 +318,7 @@ function initSortables(){
     sortTable(table, st.col, st.dir);
   });
 }
-function sect(key,title,body,kind){ const open=SECTSTATE[key]!==false; const ref=kind?"<button class='secref' data-refresh='"+esc(kind)+"' title='Refresh this section'>&#x21bb; Refresh</button>":""; return "<h2 class='sect-h"+(open?"":" collapsed")+"' data-sect='"+esc(key)+"'><span class='chev'>&#9656;</span> "+title+ref+"</h2><div class='sect-body' id='secbody-"+esc(key)+"'"+(open?"":" style='display:none'")+">"+body+"</div>"; }
+function sect(key,title,body,kind){ const open=SECTSTATE[key]!==false; const ref=kind?"<button class='secref' data-refresh='"+esc(kind)+"' title='Refresh this section'>&#x21bb; Refresh</button>":""; return "<h2 class='sect-h"+(open?"":" collapsed")+"' data-sect='"+esc(key)+"'><span class='chev'>&#9656;</span> "+title+ref+saveMenu("sect:"+key)+"</h2><div class='sect-body' id='secbody-"+esc(key)+"'"+(open?"":" style='display:none'")+">"+body+"</div>"; }
 const WIFI="<svg class='wic' viewBox='0 0 24 24' width='13' height='13' fill='currentColor'><path d='M12 17.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 3C7.6 3 3.6 4.8.8 7.7l2.1 2.1C5.2 7.5 8.4 6 12 6s6.8 1.5 9.1 3.8l2.1-2.1C20.4 4.8 16.4 3 12 3zm0 5c-2.9 0-5.5 1.2-7.4 3.1l2.1 2.1C8 11 9.9 10 12 10s4 1 5.3 2.2l2.1-2.1C17.5 9.2 14.9 8 12 8z'/></svg>";
 
 // Always fetch fresh: no-store + a cache-bust param so a Refresh re-hits Meraki, never a cached GET.
@@ -518,7 +528,7 @@ function pickerRow(id, slot){
          (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"");
 }
 // Per-tab Export -- saves only the active tab's data (tab-sensitive).
-function exportRow(){ return "<div class='bar exprow'><button class='alt' data-export='html'>Export HTML</button> <button class='alt' data-export='pdf'>Export PDF</button> <span class='muted'>&mdash; exports this tab only</span></div>"; }
+function exportRow(){ return "<div class='bar exprow'>"+saveMenu("tab")+"<span class='muted'>this tab &mdash; Google Sheets, Excel, JSON, CSV, or print</span></div>"; }
 // Centered hero shown when a data tab has nothing loaded yet -- icon, title, one line, prominent search.
 function emptyState(id, slot, icon, title, desc){
   const btn = slot.loading ? "<button disabled><span class='spin'></span> loading&hellip;</button>" : "<button data-load='"+id+"'>Load</button>";
@@ -940,7 +950,7 @@ function render(){
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
 function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const m={network:"Network",template:"Template",org:"Organization"}; return "Security Audit"+(AUD.view&&m[AUD.view]?" — "+m[AUD.view]:""); } return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
@@ -951,8 +961,12 @@ function exportStore(){
   const t=AUD.tgt[AUD.view]; return (t&&t.name)||"";
 }
 function exportDoc(){
-  const store=exportStore(), title="Argus &mdash; "+viewName();
-  return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Argus "+viewName()+"</title><style>"+EXPORT_CSS+"</style></head><body><div style='font-size:18px;font-weight:bold;color:#0d6e8c'>"+esc(store)+" &mdash; "+title+"</div><div style='font-size:10px;color:#666;margin-bottom:8px'>"+esc(pacific())+"</div>"+activePaneHtml()+BRAND_FOOT+"</body></html>";
+  const store=exportStore();
+  const head="<div style='border-bottom:3px solid #6FC3DF;padding-bottom:9px;margin-bottom:14px'>"+
+    "<div style='font-size:21px;font-weight:800;letter-spacing:4px;color:#0d6e8c'>ARGUS</div>"+
+    "<div style='font-size:16px;font-weight:700;color:#16242b;margin-top:3px'>"+esc(store)+" &mdash; "+viewName()+"</div>"+
+    "<div style='font-size:10px;color:#777;margin-top:2px'>Generated "+esc(pacific())+" &middot; read-only</div></div>";
+  return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Argus "+esc(viewName())+" &mdash; "+esc(store)+"</title><style>"+EXPORT_CSS+"</style></head><body>"+head+activePaneHtml()+BRAND_FOOT+"</body></html>";
 }
 function exportHtml(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
@@ -965,6 +979,72 @@ function exportPdf(){
   const doc=f.contentWindow.document; doc.open(); doc.write(exportDoc()); doc.close();
   setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>{ try{document.body.removeChild(f);}catch(e){} }, 3000); }, 450);
 }
+
+// === Save / export: rendered data -> Google Sheets / Excel / JSON / CSV (+ printable HTML / PDF) ===
+// Data formats are built from the on-screen tables, so the JSON mirrors the screen with stable,
+// Meraki-derived column names. The audit exports the bridge's structured object directly.
+function _slug(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""); }
+function _fname(scope,ext){ return "argus-"+(_slug(exportStore())||"data")+"-"+_slug(scope)+"-"+pacific().replace(/[: ]/g,"-")+"."+ext; }
+function _dl(name,text,mime){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:mime})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{document.body.removeChild(a);URL.revokeObjectURL(a.href);}catch(e){} },1500); }
+async function _clip(t){ try{ await navigator.clipboard.writeText(t); return true; }catch(e){ return false; } }
+function _csvEsc(v){ v=String(v==null?"":v); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function tableData(tbl){
+  const heads=tbl.tHead?[...tbl.tHead.rows[0].cells].map(c=>c.textContent.replace(/[▲▼]/g,"").replace(/\s+/g," ").trim()):[];
+  const rows=[];
+  if(tbl.tBodies[0]) [...tbl.tBodies[0].rows].forEach(tr=>{ if(tr.classList.contains("histrow")) return; rows.push([...tr.cells].map(td=>td.textContent.replace(/\s+/g," ").trim())); });
+  return {headers:heads, rows};
+}
+function tableTitle(tbl){ const b=tbl.closest(".sect-body"); if(!b) return ""; const h=document.querySelector("[data-sect='"+(b.id.replace("secbody-","")).replace(/'/g,"")+"']"); if(!h) return ""; return h.textContent.replace(/↻\s*Refresh/g,"").replace(/[▸▾⤓]/g,"").replace(/\s+/g," ").trim(); }
+function dataCSV(d){ return [d.headers.map(_csvEsc).join(","), ...d.rows.map(r=>r.map(_csvEsc).join(","))].join("\r\n"); }
+function dataTSV(d){ const c=s=>String(s==null?"":s).replace(/[\t]/g," ").replace(/\r?\n/g," "); return [d.headers.map(c).join("\t"), ...d.rows.map(r=>r.map(c).join("\t"))].join("\n"); }
+function dataObjs(d){ return d.rows.map(r=>{ const o={}; d.headers.forEach((h,i)=>o[h||("col"+(i+1))]=r[i]!=null?r[i]:""); return o; }); }
+function scopeTables(scope){
+  let root;
+  if(scope.indexOf("sect:")===0){ root=document.getElementById("secbody-"+scope.slice(5)); }
+  else { const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; root=document.getElementById(id); }
+  return root ? [...root.querySelectorAll("table")].filter(t=>!t.classList.contains("histtbl")&&!t.classList.contains("nosort")) : [];
+}
+async function exportRun(fmt, scope){
+  if(fmt==="html"){ exportHtml(); return; }
+  if(fmt==="pdf"){ exportPdf(); return; }
+  const tables=scopeTables(scope);
+  if(fmt==="json"){
+    let obj;
+    if(scope==="tab" && TAB==="audit" && AUD.view && AUD.results[AUD.view]){
+      obj={ tool:"Argus", exportedAt:pacific(), scope:viewName(), audit:AUD.results[AUD.view] }; // stable bridge schema
+    } else {
+      const sections={};
+      tables.forEach((t,i)=>{ const ttl=tableTitle(t)||("table_"+(i+1)); sections[ttl]=dataObjs(tableData(t)); });
+      obj={ tool:"Argus", exportedAt:pacific(), network:exportStore(), scope:(scope==="tab"?viewName():(tables[0]&&tableTitle(tables[0]))||scope), sections };
+    }
+    _dl(_fname(scope,"json"), JSON.stringify(obj,null,2), "application/json"); return;
+  }
+  if(!tables.length){ toast("nothing to export here yet"); return; }
+  if(fmt==="csv"){ _dl(_fname(scope,"csv"), tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\r\n":"")+dataCSV(tableData(t)); }).join("\r\n\r\n"), "text/csv"); return; }
+  if(fmt==="excel"){
+    const body=tables.map(t=>{ const ttl=tableTitle(t), d=tableData(t); return (ttl&&tables.length>1?"<h3>"+esc(ttl)+"</h3>":"")+"<table border='1'><thead><tr>"+d.headers.map(h=>"<th>"+esc(h)+"</th>").join("")+"</tr></thead><tbody>"+d.rows.map(r=>"<tr>"+r.map(c=>"<td>"+esc(c)+"</td>").join("")+"</tr>").join("")+"</tbody></table><br>"; }).join("");
+    _dl(_fname(scope,"xls"), "<html xmlns:x='urn:schemas-microsoft-com:office:excel'><head><meta charset='utf-8'></head><body>"+body+"</body></html>", "application/vnd.ms-excel"); return;
+  }
+  if(fmt==="gsheets"){
+    const tsv=tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\n":"")+dataTSV(tableData(t)); }).join("\n\n");
+    const ok=await _clip(tsv); window.open("https://sheets.new","_blank");
+    toast(ok?"Data copied — click cell A1 in the new Google Sheet and paste (Ctrl/Cmd+V)":"Open a new sheet, then paste the data manually");
+    return;
+  }
+}
+// The Save menu (drops the redundant word "Export"): Google Sheets, Excel, JSON, CSV (+ page formats at tab level).
+function saveMenu(scope){
+  const tab=scope==="tab";
+  return "<span class='savewrap'><button class='savebtn' data-savemenu='"+esc(scope)+"'>&#10515; Save"+(tab?" &#9662;":"")+"</button>"+
+    "<div class='savemenu'>"+
+    "<a data-exp='gsheets' data-scope='"+esc(scope)+"'>Google Sheets</a>"+
+    "<a data-exp='excel' data-scope='"+esc(scope)+"'>Excel</a>"+
+    "<a data-exp='json' data-scope='"+esc(scope)+"'>JSON</a>"+
+    "<a data-exp='csv' data-scope='"+esc(scope)+"'>CSV</a>"+
+    (tab?"<div class='savesep'></div><a data-exp='html' data-scope='tab'>Printable HTML</a><a data-exp='pdf' data-scope='tab'>PDF</a>":"")+
+    "</div></span>";
+}
+function toast(msg){ let t=document.getElementById("argtoast"); if(!t){ t=document.createElement("div"); t.id="argtoast"; document.body.appendChild(t); } t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),4500); }
 
 // The one audited write: name a CLIENT by MAC. Shared by the map-suggested "Name it" button
 // and the inline rename of any connected client.
@@ -1017,7 +1097,8 @@ document.getElementById("report").addEventListener("click", async e=>{
   const ac=e.target.closest(".planchk"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); saveSettings(); render(); return; }
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
-  const ex=e.target.closest("[data-export]"); if(ex){ e.stopImmediatePropagation(); ex.getAttribute("data-export")==="pdf"?exportPdf():exportHtml(); return; }
+  const sm=e.target.closest("[data-savemenu]"); if(sm){ e.stopImmediatePropagation(); const w=sm.closest(".savewrap"); const wasOpen=w.classList.contains("open"); document.querySelectorAll(".savewrap.open").forEach(x=>x.classList.remove("open")); if(!wasOpen) w.classList.add("open"); return; }
+  const xp=e.target.closest("[data-exp]"); if(xp){ e.stopImmediatePropagation(); const w=xp.closest(".savewrap"); if(w) w.classList.remove("open"); exportRun(xp.getAttribute("data-exp"), xp.getAttribute("data-scope")); return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); const id=sr.closest("#pane-network")?"network":"operations"; refreshSection(id, sr.getAttribute("data-refresh"), sr); return; }
   const ck=e.target.closest("#showchecks"); if(ck){ e.stopImmediatePropagation(); SHOWCHECKS=!SHOWCHECKS; render(); if(SHOWCHECKS&&!CHECKS) pullChecks().then(render); return; }
   const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); const prior=AUD.tgt[AUDITMODE]; AUDITTARGET=AUDITMODE==="org"?{type:"org",id:"org",name:"Organization"}:(prior?{type:AUDITMODE,id:prior.id,name:prior.name}:{type:AUDITMODE,id:"",name:""}); if(AUD.results[AUDITMODE]) AUD.view=AUDITMODE; render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
@@ -1061,7 +1142,7 @@ document.getElementById("report").addEventListener("mousedown", e=>{
   const id=wrap.getAttribute("data-combo"); comboPick(id, parseInt(o.dataset.i,10));
   const inp=document.getElementById("ci-"+id); if(inp) inp.focus();
 });
-document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combolist.open").forEach(el=>el.classList.remove("open")); });
+document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combolist.open").forEach(el=>el.classList.remove("open")); if(!e.target.closest(".savewrap")) document.querySelectorAll(".savewrap.open").forEach(el=>el.classList.remove("open")); });
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
   const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
