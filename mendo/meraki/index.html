@@ -154,6 +154,7 @@ let LAST = "";
 let TAB = "switch";
 let SECTSTATE={}; // section key -> false when collapsed; persists across re-renders
 let SORTSTATE={}; // table key (sect-body id) -> {col,dir}; persists across re-renders. Default: first column ascending.
+let SHOWCHECKS=false, CHECKS=null; // audit methodology panel (every check + scoring), fetched once from /meraki/audit/checks
 // --- generic sortable tables: click a header to sort; default = first column, alphanumeric ascending ---
 function sortKeyOf(table){ const b=table.closest(".sect-body"); return b?b.id:""; }
 function cmpVals(a,b){ return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"}); }
@@ -289,6 +290,23 @@ async function refreshSection(kind, btn){
     if(kind==="wifi"||kind==="both") await pullWifi(net);
   }catch(e){ document.getElementById("err").textContent=e.message||"refresh error"; }
   render(); // rebuilds the report -- the button is recreated fresh + enabled
+}
+
+// Audit methodology: fetch the full check catalog + scoring once.
+async function pullChecks(){ if(CHECKS) return; try{ const r=await api("/meraki/audit/checks"); if(r.ok) CHECKS=await r.json(); }catch(e){} }
+function renderChecks(){
+  if(!CHECKS) return "<div class='box muted'><span class='spin'></span> loading checks&hellip;</div>";
+  const sc=CHECKS.scoring||{}, pen=sc.penalties||{};
+  let x="<div class='box'><div class='feat-h'>How scoring works</div>";
+  x+="<div class='muted'>"+esc(sc.model||"")+"</div>";
+  x+="<div class='muted' style='margin-top:4px;'>Penalty per finding: <span class='sev-critical'>critical &minus;"+(pen.critical)+"</span> &middot; <span class='sev-high'>high &minus;"+(pen.high)+"</span> &middot; <span class='sev-medium'>medium &minus;"+(pen.medium)+"</span> &middot; <span class='sev-low'>low &minus;"+(pen.low)+"</span></div>";
+  x+="<div class='muted' style='margin-top:2px;'>Grades: "+(sc.grades||[]).map(esc).join(" &middot; ")+"</div>";
+  (sc.notes||[]).forEach(n=>{ x+="<div class='muted' style='margin-top:2px;'>&bull; "+esc(n)+"</div>"; });
+  x+="<div class='feat-h' style='margin-top:12px;'>Every check &mdash; "+(CHECKS.checks||[]).length+"</div>";
+  x+="<table class='nosort'><thead><tr><th>ID</th><th>Severity</th><th>Category</th><th>Check</th><th>Reads (Meraki API)</th><th>Flags when</th></tr></thead><tbody>";
+  (CHECKS.checks||[]).forEach(c=>{ x+="<tr><td class='av'>"+esc(c.id)+"</td><td>"+esc(c.severity)+"</td><td>"+esc(c.category)+"</td><td><b>"+esc(c.title)+"</b></td><td class='ip'>"+esc(c.reads)+"</td><td class='muted'>"+esc(c.flags)+"</td></tr>"; });
+  x+="</tbody></table></div>";
+  return x;
 }
 
 // Read-only Firewall Security Audit for the current network (lazy: runs when the tab opens).
@@ -464,6 +482,9 @@ function render(){
     const A=LASTDATA.audit, S=A.summary||{};
     h+="<div class='auditbar'><span class='gradebig grade-"+esc(A.grade)+"'>"+esc(A.grade)+"</span><span class='scorebig'>"+esc(""+A.score)+"<small>/100</small></span>"+
        "<span class='sevsum'>"+(S.critical||0)+" <span class='sev-critical'>critical</span> &middot; "+(S.high||0)+" <span class='sev-high'>high</span> &middot; "+(S.medium||0)+" <span class='sev-medium'>medium</span> &middot; "+(S.low||0)+" <span class='sev-low'>low</span></span></div>";
+    const M=A.meta||{};
+    h+="<div class='stamp'>Scope: <b>"+(M.l3Rules||0)+"</b> L3 rules &middot; <b>"+(M.portForwards||0)+"</b> port-forwards &middot; <b>"+(M.oneToOneNat||0)+"</b> 1:1 NAT &middot; <b>"+(M.enabledSsids||0)+"</b> SSIDs &middot; <b>"+(M.clients||0)+"</b> clients &middot; <b>"+(M.devices||0)+"</b> devices &middot; <a class='moreinfo' id='showchecks'>"+(SHOWCHECKS?"&#9662; hide":"&#9656;")+" checks &amp; scoring</a></div>";
+    if(SHOWCHECKS) h+=renderChecks();
     if(A.skipped&&A.skipped.length) h+="<div class='stamp'>Skipped (not applicable / unlicensed): "+esc(A.skipped.join(", "))+"</div>";
     const rank={critical:0,high:1,medium:2,low:3};
     const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
@@ -540,6 +561,7 @@ document.getElementById("go").addEventListener("click", pull);
 document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); refreshSection(sr.getAttribute("data-refresh"), sr); return; }
+  const ck=e.target.closest("#showchecks"); if(ck){ e.stopImmediatePropagation(); SHOWCHECKS=!SHOWCHECKS; render(); if(SHOWCHECKS&&!CHECKS) pullChecks().then(render); return; }
   const ri=e.target.closest(".renameit"); if(ri){ e.stopImmediatePropagation(); openRename(ri); return; }
   const rs=e.target.closest(".rensave"); if(rs){ e.stopImmediatePropagation(); doRenameSave(rs); return; }
   const rc=e.target.closest(".rencancel"); if(rc){ e.stopImmediatePropagation(); render(); return; }
