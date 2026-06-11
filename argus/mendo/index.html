@@ -84,6 +84,15 @@
   .ptier-tag{font-size:.66rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:5px;padding:2px 7px;}
   .ptier-tag.t1{background:#16323d;color:var(--accent);border:1px solid var(--accent);} .ptier-tag.t3{background:#3a2a00;color:var(--warn);border:1px solid var(--warn);}
   .ptier-b{font-size:.88rem;color:#c8d2d7;line-height:1.55;} .pdash{color:var(--dim);font-size:.8rem;margin-top:5px;}
+  .readmore{color:var(--accent);font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;} .readmore:hover{text-decoration:underline;}
+  .rmore{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:11px;}
+  .rm-sec .rm-h{color:var(--accent);font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+  .rm-sec ul{margin:3px 0 0;padding-left:20px;} .rm-sec li{margin:2px 0;}
+  .rm-sec a{color:var(--accent);text-decoration:none;} .rm-sec a:hover{text-decoration:underline;}
+  .plinks{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;}
+  .plink{display:inline-flex;align-items:center;gap:5px;background:#0d0d0d;border:1px solid var(--line);color:var(--text);border-radius:7px;padding:5px 11px;font-size:.8rem;font-weight:600;text-decoration:none;}
+  .plink:hover{border-color:var(--accent);color:var(--accent);} .plink.go{background:#16242b;border-color:#2a3f48;color:var(--accent);}
+  .audithero{text-align:center;max-width:580px;margin:6px auto 16px;} .audithero .empty-ico{margin-bottom:8px;} .audithero .empty-desc{margin:0 auto;}
   .ro-pill{background:#06251a;color:var(--ok);border:1px solid var(--ok);border-radius:5px;padding:0 7px;font-size:.66rem;font-weight:700;text-transform:uppercase;}
   .pexec{margin-top:9px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
   .pbtn{background:var(--ok);color:#001a0e;border:none;border-radius:7px;padding:7px 13px;font-size:.82rem;font-weight:800;cursor:pointer;font-family:inherit;} .pbtn:disabled{background:#1d3a2c;color:#6f9c86;cursor:default;}
@@ -221,8 +230,8 @@
     <div class="remed-sec">
       <div class="feat-h">&#9211; Remediable networks <span class="lab">WRITE</span></div>
       <div class="muted" style="margin-bottom:8px;">The <b>only</b> networks Argus may <b>apply</b> security fixes to (Action Plans &rarr; tier 3). Add your lab/test boxes here &mdash; everything else is apply-blocked, enforced both here and server-side in the bridge. Production stays untouchable.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <select id="remedsel" style="min-width:280px;"></select>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+        <div id="remedpicker" style="flex:1 1 300px;max-width:340px;"></div>
         <button id="remedadd">Add</button>
         <span class="muted" id="remedmsg"></span>
       </div>
@@ -707,6 +716,20 @@ function netContent(slot){
 
 // --- Action Plans (per finding): Understand -> Fix-it-yourself (read-only) -> Let Argus fix it (lab write) ---
 let PLAN_OPEN={}; // finding id -> expanded?
+let CHECK_CONTENT=null, READMORE={}; // per-check deep content (origin/refs/links), loaded once
+async function loadCheckContent(){ if(CHECK_CONTENT) return; try{ const r=await fetch("checks-content.json?v=2",{cache:"no-store"}); if(r.ok) CHECK_CONTENT=await r.json(); }catch(e){} }
+// Build an exact Meraki dashboard deep-link from a network's dashboard url + the per-check page path.
+function merakiDeepLink(netId, path){ if(!path) return ""; const n=(NETS||[]).find(x=>x.id===netId); if(!n||!n.url) return ""; return n.url.replace(/\/manage\/.*$/,"/manage/")+path; }
+function readMoreBlock(cc){
+  let x="<div class='rmore'>";
+  if(cc.origin) x+="<div class='rm-sec'><div class='rm-h'>Origin &amp; history</div><div>"+esc(cc.origin)+"</div></div>";
+  if(cc.pros&&cc.pros.length) x+="<div class='rm-sec'><div class='rm-h'>Pros of fixing</div><ul>"+cc.pros.map(p=>"<li>"+esc(p)+"</li>").join("")+"</ul></div>";
+  if(cc.cons&&cc.cons.length) x+="<div class='rm-sec'><div class='rm-h'>Cons / tradeoffs</div><ul>"+cc.cons.map(p=>"<li>"+esc(p)+"</li>").join("")+"</ul></div>";
+  if(cc.ifNotSet) x+="<div class='rm-sec'><div class='rm-h'>&#9888; If left unset</div><div>"+esc(cc.ifNotSet)+"</div></div>";
+  if(cc.ifSet) x+="<div class='rm-sec'><div class='rm-h'>&check; If set / fixed</div><div>"+esc(cc.ifSet)+"</div></div>";
+  if(cc.refs&&cc.refs.length) x+="<div class='rm-sec'><div class='rm-h'>References</div><ul>"+cc.refs.map(r=>"<li><a href='"+esc(r.url)+"' target='_blank' rel='noopener'>"+esc(r.title)+" &#8599;</a></li>").join("")+"</ul></div>";
+  return x+"</div>";
+}
 const CAT_WHY={
   "Firewall":"Firewall rules decide what can reach this network. A gap here is a direct path in.",
   "Exposure":"Port-forwards and 1:1 NAT punch holes straight through the firewall &mdash; the most common way internal services end up exposed to the internet.",
@@ -733,10 +756,24 @@ function actionPlans(f, canApply){
   const why=CAT_WHY[f.category]||"This weakens the network&rsquo;s security posture.";
   const dash=CAT_DASH[f.category]||"the Meraki dashboard";
   const canExec=!!EXECUTABLE[f.id];
+  const cc = CHECK_CONTENT && CHECK_CONTENT[f.id];
   let x="<div class='plans'>";
-  x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>1 &middot; Understand</span> Why this matters</div><div class='ptier-b'>"+why+"</div></div>";
-  x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>2 &middot; Fix it yourself</span> <span class='ro-pill'>read-only</span> you make the change</div>"+
-     "<div class='ptier-b'><div>"+esc(f.remediation)+"</div><div class='pdash'>Dashboard: "+dash+"</div></div></div>";
+  // Tier 1 -- Understand + Read more (origin/history, pros/cons, consequences, references)
+  let t1="<div class='ptier-b'>"+why;
+  if(cc){ const ro=!!READMORE[f.id]; t1+=" <a class='readmore' data-readmore='"+esc(f.id)+"'>"+(ro?"&#9662; show less":"&#9656; read more")+"</a>"; if(ro) t1+=readMoreBlock(cc); }
+  x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>1 &middot; Understand</span> Why this matters</div>"+t1+"</div>";
+  // Tier 2 -- Fix it yourself + exact Meraki deep-link, help doc, how-to
+  let t2="<div class='ptier-b'><div>"+esc(f.remediation)+"</div><div class='pdash'>Dashboard: "+dash+"</div>";
+  if(cc){
+    const sNet = (AUD.view==="network"||AUD.view==="template") && AUD.tgt[AUD.view] ? AUD.tgt[AUD.view].id : null;
+    const deep = sNet ? merakiDeepLink(sNet, cc.merakiPath) : "";
+    let lk="<div class='plinks'>";
+    if(deep) lk+="<a class='plink go' href='"+esc(deep)+"' target='_blank' rel='noopener'>&#9654; Open in Meraki &#8599;</a>";
+    if(cc.helpUrl) lk+="<a class='plink' href='"+esc(cc.helpUrl)+"' target='_blank' rel='noopener'>&#128214; Meraki help &#8599;</a>";
+    if(cc.howToUrl && cc.howToUrl!==cc.helpUrl) lk+="<a class='plink' href='"+esc(cc.howToUrl)+"' target='_blank' rel='noopener'>&#129513; How-to &#8599;</a>";
+    t2+=lk+"</div>";
+  }
+  x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>2 &middot; Fix it yourself</span> <span class='ro-pill'>read-only</span> you make the change</div>"+t2+"</div>";
   x+="<div class='ptier t3box'><div class='ptier-h'><span class='ptier-tag t3'>3 &middot; Let Argus fix it</span> <span class='lab'>WRITE</span> Argus applies it for you</div><div class='ptier-b'>";
   if(canExec && canApply){ x+=execUI(f.id); }
   else if(canExec){ x+="<div class='muted'>Argus <b>can</b> apply this automatically &mdash; add this network to your <b>Remediable</b> allow-list (&#9881; Settings) to unlock per-step <b>Apply</b>, <b>Apply all</b>, and one-tap <b>Roll back</b>.</div>"; }
@@ -792,10 +829,12 @@ async function remediateRollback(cid, i){
 
 // Security Audit pane: read-only firewall/security audit. Picks its own target (network / template / org).
 function auditPane(){
-  let h=auditPicker(); // always present -- run, re-run, or switch target at any time
+  const scopesRun=["network","template","org"].filter(s=>AUD.results[s]);
+  // Consistent centered hero (shield + "Security Audit") when nothing has run yet -- matches Operations/Network.
+  const hero = (!scopesRun.length && !AUD.auditing) ? "<div class='audithero'><div class='empty-ico'>&#128737;</div><div class='empty-title'>Security Audit</div><div class='empty-desc'>Read-only audit of a network, a config template, or the whole organization &mdash; graded against best practice, with an action plan for every finding. Nothing is changed.</div></div>" : "";
+  let h=hero+auditPicker(); // picker always present -- run, re-run, or switch target at any time
   if(AUD.auditing){ return h+"<div class='box'><div class='muted'><span class='spin'></span> running read-only audit &amp; collecting config&hellip;</div></div>"; }
   if(AUD.auditError){ return h+"<div class='err'>audit failed: "+esc(AUD.auditError)+"</div>"+auditExtras(); }
-  const scopesRun=["network","template","org"].filter(s=>AUD.results[s]);
   if(!scopesRun.length){ return h+auditExtras(); }
   if(!AUD.view||!AUD.results[AUD.view]) AUD.view=scopesRun[0];
   // Flip between the scopes that have results (network / template / org).
@@ -901,7 +940,7 @@ function render(){
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML;
 }
 
-const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
+const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;font-size:11px}h2{color:#0d6e8c;font-size:14px;margin:16px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}";
 function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const m={network:"Network",template:"Template",org:"Organization"}; return "Security Audit"+(AUD.view&&m[AUD.view]?" — "+m[AUD.view]:""); } return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
@@ -970,7 +1009,7 @@ async function doRenameSave(btn){
 
 document.getElementById("gform").addEventListener("submit", async e=>{
   e.preventDefault(); PW=document.getElementById("gpw").value;
-  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); await loadSettings(); document.getElementById("gate").classList.add("hide"); render(); }
+  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); await loadSettings(); loadCheckContent(); document.getElementById("gate").classList.add("hide"); render(); }
   catch(_){ document.getElementById("gerr").textContent="wrong password"; PW=""; }
 });
 document.getElementById("report").addEventListener("click", async e=>{
@@ -1027,6 +1066,7 @@ document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
   const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
   const pl=e.target.closest(".planlink"); if(pl){ e.stopImmediatePropagation(); const id=pl.getAttribute("data-plan"); PLAN_OPEN[id]=!PLAN_OPEN[id]; render(); return; }
+  const rm=e.target.closest("[data-readmore]"); if(rm){ e.stopImmediatePropagation(); const id=rm.getAttribute("data-readmore"); READMORE[id]=!READMORE[id]; render(); return; }
   const ep=e.target.closest("[data-execplan]"); if(ep){ e.stopImmediatePropagation(); remediatePlan(ep.getAttribute("data-execplan")); return; }
   const ea=e.target.closest("[data-execapply]"); if(ea){ e.stopImmediatePropagation(); const a=ea.getAttribute("data-execapply").split(":"), cid=a[0], idx=+a[1]; const st=EXEC[cid]&&EXEC[cid].steps&&EXEC[cid].steps[idx]; if(st&&st.moderated){ const inp=document.getElementById("execval-"+cid+"-"+idx); if(inp) st.value=inp.value.trim(); } remediateApply(cid,idx); return; }
   const eal=e.target.closest("[data-execall]"); if(eal){ e.stopImmediatePropagation(); const cid=eal.getAttribute("data-execall"); const ex=EXEC[cid]; if(ex&&ex.steps){ ex.steps.forEach((s,i)=>{ if(s.moderated&&s.status!=="applied"){ const inp=document.getElementById("execval-"+cid+"-"+i); if(inp) s.value=inp.value.trim(); } }); } remediateApplyAll(cid); return; }
@@ -1035,13 +1075,19 @@ document.getElementById("report").addEventListener("click", e=>{
   const sc=e.target.closest("[data-scope]"); if(sc){ const s=sc.getAttribute("data-scope"); AUD.view=s; AUDITMODE=s; AUDITTARGET = s==="org" ? {type:"org",id:"org",name:"Organization"} : {type:s,id:(AUD.tgt[s]&&AUD.tgt[s].id)||"",name:(AUD.tgt[s]&&AUD.tgt[s].name)||""}; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
-document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show){ renderFeatures(); fillRemedSelect(); renderRemediable(); } });
-// Remediable-networks allow-list (Settings)
+document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show){ renderFeatures(); fillRemedPicker(); renderRemediable(); } });
+// Remediable-networks allow-list (Settings) -- searchable combo + removable chips
 function netNameById(id){ const n=(NETS||[]).find(x=>x.id===id); return n?n.name:id; }
-function fillRemedSelect(){ const sel=document.getElementById("remedsel"); if(!sel) return; sel.innerHTML=(NETS||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(n=>"<option value='"+esc(n.id)+"'>"+esc(n.name)+(n.configTemplateId?"":"  (no template)")+"</option>").join(""); }
+function fillRemedPicker(){ const el=document.getElementById("remedpicker"); if(!el) return; el.innerHTML=combo("remed", netItems(), {id:"",name:""}, "search a network…"); }
 function renderRemediable(){ const el=document.getElementById("remedlist"); if(!el) return; const a=remediableList(); el.innerHTML = a.length ? a.map(n=>"<span class='remchip'>"+esc(n.name||netNameById(n.id))+"<button class='remx' data-remid='"+esc(n.id)+"' title='Remove'>&times;</button></span>").join("") : "<span class='muted'>None yet &mdash; Argus can&rsquo;t apply a fix anywhere until you add a network.</span>"; }
-document.getElementById("remedadd").addEventListener("click", ()=>{ const sel=document.getElementById("remedsel"); if(sel&&sel.value){ addRemediable(sel.value, netNameById(sel.value)); renderRemediable(); document.getElementById("remedmsg").textContent="added · synced"; render(); } });
+document.getElementById("remedadd").addEventListener("click", ()=>{ const sel=comboResolve("remed"); if(sel.id){ addRemediable(sel.id, sel.name); fillRemedPicker(); renderRemediable(); document.getElementById("remedmsg").textContent="added · synced"; render(); } });
 document.getElementById("remedlist").addEventListener("click", e=>{ const x=e.target.closest(".remx"); if(x){ removeRemediable(x.getAttribute("data-remid")); renderRemediable(); document.getElementById("remedmsg").textContent="removed · synced"; render(); } });
+// Combo interaction also inside the Settings panel (the remediable picker lives here, outside #report)
+document.getElementById("settings").addEventListener("input", e=>{ const ci=e.target.closest(".comboinput"); if(!ci) return; const id=ci.id.slice(3), c=COMBOS[id]; if(c) c.sel={id:"",name:ci.value}; const cx=document.getElementById("cx-"+id); if(cx) cx.style.display=ci.value?"flex":"none"; comboFilter(id, ci.value.trim()); });
+document.getElementById("settings").addEventListener("focusin", e=>{ const ci=e.target.closest(".comboinput"); if(ci) comboFilter(ci.id.slice(3), ci.value.trim()); });
+document.getElementById("settings").addEventListener("keydown", e=>{ const ci=e.target.closest(".comboinput"); if(!ci) return; const id=ci.id.slice(3), c=COMBOS[id], el=document.getElementById("cl-"+id); if(!c) return; if(e.key==="ArrowDown"){ e.preventDefault(); if(c.active<c.filtered.length-1){ c.active++; comboDraw(id,ci.value.trim()); } } else if(e.key==="ArrowUp"){ e.preventDefault(); if(c.active>0){ c.active--; comboDraw(id,ci.value.trim()); } } else if(e.key==="Enter"){ e.preventDefault(); if(c.active>=0) comboPick(id,c.active); } else if(e.key==="Escape"){ if(el) el.classList.remove("open"); } });
+document.getElementById("settings").addEventListener("mousedown", e=>{ const o=e.target.closest(".comboopt"); if(!o) return; const wrap=o.closest("[data-combo]"); if(!wrap) return; const id=wrap.getAttribute("data-combo"); comboPick(id, parseInt(o.dataset.i,10)); const inp=document.getElementById("ci-"+id); if(inp) inp.focus(); });
+document.getElementById("settings").addEventListener("click", e=>{ const cx=e.target.closest(".combocx"); if(cx){ comboClear(cx.id.slice(3)); } });
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); saveSettings(); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings · synced"; render(); });
 document.getElementById("toastvlan").value=toastVlan();
 document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); saveSettings(); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlans().join(", ")+" · synced"; render(); });
@@ -1052,7 +1098,7 @@ document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.s
 document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
 renderFeatures();
 
-(async()=>{ if(PW){ try{ await loadNetworks(); await loadSettings(); document.getElementById("gate").classList.add("hide"); render(); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
+(async()=>{ if(PW){ try{ await loadNetworks(); await loadSettings(); loadCheckContent(); document.getElementById("gate").classList.add("hide"); render(); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
