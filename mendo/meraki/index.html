@@ -63,6 +63,12 @@
   .evid{font-family:ui-monospace,Consolas,monospace;color:var(--dim);font-size:.76rem;} .evcat{color:var(--dim);font-size:.76rem;}
   .evtitle{color:var(--text);font-weight:600;} .evev{color:var(--dim);font-size:.8rem;margin-top:2px;padding-left:21px;}
   .ev-pass{color:var(--ok);font-weight:800;} .ev-fail{color:var(--bad);font-weight:800;} .ev-skip{color:var(--dim);font-weight:800;}
+  .auditmode{display:flex;gap:8px;margin:8px 0;} .amode{background:var(--surface);color:var(--dim);border:1px solid var(--line);border-radius:7px;padding:7px 14px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit;} .amode.on{background:#1d2a31;color:var(--accent);border-color:var(--accent);}
+  #auditsel{min-width:280px;} #runaudit{background:var(--ok);color:#001a0e;border:none;border-radius:7px;padding:8px 16px;font-weight:800;cursor:pointer;font-family:inherit;}
+  .auditlink{color:var(--accent);cursor:pointer;} .auditlink:hover{text-decoration:underline;}
+  .lvl{display:inline-block;font-size:.58rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px;border:1px solid var(--line);color:var(--dim);}
+  .lvl-template{background:#1a1407;color:var(--warn);border-color:var(--warn);} .lvl-network{background:#0e1a1f;color:var(--accent);border-color:#2a3f48;}
+  .lvl-org{background:#1a0f1a;color:#d6a3ff;border-color:#7a4f9a;} .lvl-override{background:#1a0f0f;color:var(--bad);border-color:var(--bad);}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
   .panel textarea{width:100%;height:200px;background:#0d0d0d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;}
   .err{color:#ff8b8b;margin-top:10px;}
@@ -175,6 +181,30 @@ let TAB = "operations";
 let SECTSTATE={}; // section key -> false when collapsed; persists across re-renders
 let SORTSTATE={}; // table key (sect-body id) -> {col,dir}; persists across re-renders. Default: first column ascending.
 let SHOWCHECKS=false, CHECKS=null; // audit methodology panel (every check + scoring), fetched once from /meraki/audit/checks
+let AUDITMODE="network", AUDITTARGET={type:"network",id:"",name:""}, TEMPLATES=null, SHOWNOTPL=false; // audit tab: pick a network or a template, run on demand
+async function loadTemplates(){ if(TEMPLATES) return; try{ const r=await api("/meraki/templates"); if(r.ok) TEMPLATES=(await r.json()).templates||[]; }catch(e){} }
+function lvlBadge(l){ if(!l) return ""; return " <span class='lvl lvl-"+esc(l)+"'>"+esc(l)+"</span>"; }
+function auditControls(){
+  const mode=AUDITMODE, tgt=AUDITTARGET;
+  let x="<div class='box'><div class='feat-h'>Run a read-only security audit</div>";
+  x+="<div class='auditmode'><button class='amode"+(mode==="network"?" on":"")+"' data-amode='network'>Audit a Network</button>"+
+     "<button class='amode"+(mode==="template"?" on":"")+"' data-amode='template'>Audit a Template</button></div>";
+  if(mode==="network"){
+    const nets=(NETS||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+    x+="<select id='auditsel'>"+nets.map(n=>"<option value='"+esc(n.id)+"'"+(n.id===tgt.id?" selected":"")+">"+esc(n.name)+(n.configTemplateId?"":"  (no template)")+"</option>").join("")+"</select>";
+  } else {
+    x+= (TEMPLATES&&TEMPLATES.length) ? "<select id='auditsel'>"+TEMPLATES.map(t=>"<option value='"+esc(t.id)+"'"+(t.id===tgt.id?" selected":"")+">"+esc(t.name)+"</option>").join("")+"</select>" : "<span class='muted'><span class='spin'></span> loading templates&hellip;</span>";
+  }
+  x+=" <button id='runaudit'>&#9654; Run Audit</button>";
+  x+="<div class='muted' style='margin-top:8px;'>What happens: read-only Meraki calls collect this "+(mode==="template"?"<b>template</b>'s":"<b>network</b>'s")+" firewall, exposure, threat-protection, wireless"+(mode==="network"?", switching, anomaly and org":"")+" config, then grade it against best practice. Nothing is changed. Tap Run to start collecting.</div></div>";
+  if(mode==="network"){
+    const noTpl=(NETS||[]).filter(n=>!n.configTemplateId);
+    x+="<div class='box'><div class='feat-h'>Networks NOT using a config template <span class='muted'>("+noTpl.length+")</span> <a class='moreinfo' id='togglenotpl'>"+(SHOWNOTPL?"&#9662; hide":"&#9656; show")+"</a></div>";
+    if(SHOWNOTPL){ x+="<div class='muted' style='margin-bottom:6px;'>These run their own config &mdash; the template's hardening doesn't cover them. Click one to audit it.</div><div class='evlist'>"+noTpl.map(n=>"<div class='evrow'><a class='auditlink' data-netid='"+esc(n.id)+"' data-netname='"+esc(n.name)+"'>"+esc(n.name)+"</a></div>").join("")+"</div>"; }
+    x+="</div>";
+  }
+  return x;
+}
 // --- generic sortable tables: click a header to sort; default = first column, alphanumeric ascending ---
 function sortKeyOf(table){ const b=table.closest(".sect-body"); return b?b.id:""; }
 function cmpVals(a,b){ return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"}); }
@@ -333,10 +363,12 @@ function renderChecks(){
 
 // Read-only Firewall Security Audit for the current network (lazy: runs when the tab opens).
 async function pullAudit(){
-  if(!LASTDATA||!LASTDATA.net||LASTDATA.auditing) return;
-  LASTDATA.auditing=true; LASTDATA.auditError=""; render();
+  if(!LASTDATA||LASTDATA.auditing) return;
+  const t=AUDITTARGET; if(!t.id) return;
+  LASTDATA.auditing=true; LASTDATA.auditError=""; LASTDATA.audit=null; render();
   try{
-    const r=await api("/meraki/audit?network="+encodeURIComponent(LASTDATA.net));
+    const q = t.type==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
+    const r=await api("/meraki/audit?"+q);
     if(!r.ok) throw new Error("error "+r.status);
     LASTDATA.audit=await r.json();
   }catch(e){ LASTDATA.auditError=e.message||"audit error"; }
@@ -519,11 +551,12 @@ function render(){
 
   // --- Security Audit pane: read-only firewall/security audit of this network ---
   h+="<div id='pane-audit' class='"+(TAB==="audit"?"":"hidden")+"'>";
-  if(LASTDATA.auditing){ h+="<div class='muted'><span class='spin'></span> running security audit&hellip;</div>"; }
-  else if(LASTDATA.auditError){ h+="<div class='err'>audit failed: "+esc(LASTDATA.auditError)+"</div>"; }
-  else if(!LASTDATA.audit){ h+="<div class='muted'>Open this tab to run a read-only firewall security audit of <b>"+esc(d.name||"this network")+"</b>.</div>"; }
+  if(LASTDATA.auditing){ h+="<div class='box'><div class='muted'><span class='spin'></span> running read-only audit &amp; collecting config&hellip;</div></div>"; }
+  else if(LASTDATA.auditError){ h+="<div class='err'>audit failed: "+esc(LASTDATA.auditError)+"</div>"+auditControls(); }
+  else if(!LASTDATA.audit){ h+=auditControls(); }
   else {
     const A=LASTDATA.audit, S=A.summary||{};
+    h+="<div class='stamp'>Audited "+(A.isTemplate?"template":"network")+" <b>"+esc(A.store||"")+"</b> &middot; <a class='moreinfo' id='auditreset'>&#8635; change target / re-run</a></div>";
     // overall grade
     h+="<div class='auditbar'><span class='gradebig grade-"+esc(A.grade)+"'>"+esc(A.grade)+"</span><span class='scorebig'>"+esc(""+A.score)+"<small>/100</small></span>"+
        "<span class='sevsum'>"+(S.critical||0)+" <span class='sev-critical'>critical</span> &middot; "+(S.high||0)+" <span class='sev-high'>high</span> &middot; "+(S.medium||0)+" <span class='sev-medium'>medium</span> &middot; "+(S.low||0)+" <span class='sev-low'>low</span></span></div>";
@@ -554,7 +587,7 @@ function render(){
       fs.forEach(f=>{
         h+="<div class='fcard sev-l-"+esc(f.severity)+"'>"+
            "<div class='fchead'><span class='sevtag sev-"+esc(f.severity)+"'>"+esc((f.severity||"").toUpperCase())+"</span>"+
-           "<span class='fcid'>"+esc(f.id)+"</span><span class='fccat'>"+esc(f.category)+"</span></div>"+
+           "<span class='fcid'>"+esc(f.id)+"</span><span class='fccat'>"+esc(f.category)+"</span>"+lvlBadge(f.level)+"</div>"+
            "<div class='fctitle'>"+esc(f.title)+"</div>"+
            "<div class='fcev'>"+esc(f.evidence)+"</div>"+
            "<div class='fcrem'><b>Fix &middot;</b> "+esc(f.remediation)+"</div></div>";
@@ -568,7 +601,7 @@ function render(){
       h+="<div class='feat-h' style='margin-top:16px;'>Everything evaluated &mdash; "+A.results.length+" checks</div><div class='evlist'>";
       rs.forEach(r=>{
         const ic=r.status==='pass'?"<span class='ev-pass'>&check;</span>":r.status==='fail'?"<span class='ev-fail'>&#10007;</span>":"<span class='ev-skip'>&minus;</span>";
-        h+="<div class='evrow ev-"+esc(r.status)+"'><div class='evtop'>"+ic+" <span class='evid'>"+esc(r.id)+"</span> <span class='evcat'>"+esc(r.category)+"</span> <span class='evtitle'>"+esc(r.title)+"</span></div><div class='evev'>"+esc(r.evidence)+"</div></div>";
+        h+="<div class='evrow ev-"+esc(r.status)+"'><div class='evtop'>"+ic+" <span class='evid'>"+esc(r.id)+"</span> <span class='evcat'>"+esc(r.category)+"</span>"+lvlBadge(r.level)+" <span class='evtitle'>"+esc(r.title)+"</span></div><div class='evev'>"+esc(r.evidence)+"</div></div>";
       });
       h+="</div>";
     }
@@ -637,6 +670,11 @@ document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); refreshSection(sr.getAttribute("data-refresh"), sr); return; }
   const ck=e.target.closest("#showchecks"); if(ck){ e.stopImmediatePropagation(); SHOWCHECKS=!SHOWCHECKS; render(); if(SHOWCHECKS&&!CHECKS) pullChecks().then(render); return; }
+  const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); AUDITTARGET={type:AUDITMODE,id:"",name:""}; render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
+  const ra=e.target.closest("#runaudit"); if(ra){ e.stopImmediatePropagation(); const sel=document.getElementById("auditsel"); if(sel&&sel.value){ AUDITTARGET={type:AUDITMODE,id:sel.value,name:sel.options[sel.selectedIndex].text}; pullAudit(); } return; }
+  const tn=e.target.closest("#togglenotpl"); if(tn){ e.stopImmediatePropagation(); SHOWNOTPL=!SHOWNOTPL; render(); return; }
+  const al=e.target.closest(".auditlink"); if(al){ e.stopImmediatePropagation(); AUDITMODE="network"; AUDITTARGET={type:"network",id:al.getAttribute("data-netid"),name:al.getAttribute("data-netname")}; pullAudit(); return; }
+  const arst=e.target.closest("#auditreset"); if(arst){ e.stopImmediatePropagation(); LASTDATA.audit=null; LASTDATA.auditError=""; render(); return; }
   const ri=e.target.closest(".renameit"); if(ri){ e.stopImmediatePropagation(); openRename(ri); return; }
   const rs=e.target.closest(".rensave"); if(rs){ e.stopImmediatePropagation(); doRenameSave(rs); return; }
   const rc=e.target.closest(".rencancel"); if(rc){ e.stopImmediatePropagation(); render(); return; }
@@ -650,7 +688,7 @@ document.getElementById("report").addEventListener("keydown", e=>{
 });
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
-  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); render(); if(TAB==="audit"&&!LASTDATA.audit&&!LASTDATA.auditing) pullAudit(); return; }
+  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); if(TAB==="audit"){ if(!AUDITTARGET.id&&LASTDATA.net) AUDITTARGET={type:"network",id:LASTDATA.net,name:(LASTDATA.d&&LASTDATA.d.name)||""}; if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("exh").addEventListener("click", exportHtml);
