@@ -92,7 +92,7 @@
   .plinks{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;}
   .plink{display:inline-flex;align-items:center;gap:5px;background:#0d0d0d;border:1px solid var(--line);color:var(--text);border-radius:7px;padding:5px 11px;font-size:.8rem;font-weight:600;text-decoration:none;}
   .plink:hover{border-color:var(--accent);color:var(--accent);} .plink.go{background:#16242b;border-color:#2a3f48;color:var(--accent);}
-  .audithero{text-align:center;max-width:580px;margin:6px auto 16px;} .audithero .empty-ico{margin-bottom:8px;} .audithero .empty-desc{margin:0 auto;}
+  .audithero{text-align:center;max-width:560px;margin:2px auto 16px;padding-bottom:16px;border-bottom:1px solid var(--line);} .audithero .empty-ico{margin-bottom:8px;} .audithero .empty-desc{margin:0 auto;}
   .savewrap{position:relative;display:inline-block;}
   .savebtn{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.4;white-space:nowrap;}
   .savebtn:hover{border-color:var(--accent);color:var(--accent);}
@@ -206,7 +206,7 @@
 <div class="gate" id="gate">
   <div class="gbox">
     <div class="gbrand">ARGUS</div>
-    <div class="gsub">operations &middot; security &middot; remediation &middot; confidential</div>
+    <div class="gsub">NOC for Meraki &middot; confidential</div>
     <form id="gform" autocomplete="off">
       <input id="gpw" type="password" placeholder="password" autofocus style="width:100%;">
       <button type="submit" style="width:100%;margin-top:.7rem;">Enter</button>
@@ -216,7 +216,7 @@
 </div>
 
 <div class="nav">
-  <span class="navbrand"><span class="be">ARGUS</span><span class="navsub">Meraki operations &middot; security audit &middot; guided remediation</span></span>
+  <span class="navbrand"><span class="be">ARGUS</span><span class="navsub">NOC for Meraki</span></span>
   <span class="navright"><button id="gear" class="iconbtn" title="Settings &mdash; device name map, Toast VLAN, lab features">&#9881; Settings</button><span class="ropill">read-only</span></span>
 </div>
 <div class="wrap">
@@ -267,7 +267,10 @@ function lvlBadge(l){ if(!l) return ""; return " <span class='lvl lvl-"+esc(l)+"
 // audit tab (before AND after a run), so you can re-run or switch target without any reset step.
 function auditPicker(){
   const mode=AUDITMODE, tgt=AUDITTARGET;
-  let x="<div class='box'><div class='feat-h'>Run a read-only security audit</div>";
+  const noRes = !["network","template","org"].some(s=>AUD.results[s]);
+  let x="<div class='box'>";
+  if(noRes) x+="<div class='audithero'><div class='empty-ico'>&#128737;</div><div class='empty-title'>Security Audit</div><div class='empty-desc'>Read-only audit of a network, a config template, or the whole organization &mdash; graded against best practice, with an action plan for every finding. Nothing is changed.</div></div>";
+  x+="<div class='feat-h'>Run a read-only security audit</div>";
   x+="<div class='auditmode'><button class='amode"+(mode==="network"?" on":"")+"' data-amode='network'>Audit a Network</button>"+
      "<button class='amode"+(mode==="template"?" on":"")+"' data-amode='template'>Audit a Template</button>"+
      "<button class='amode"+(mode==="org"?" on":"")+"' data-amode='org'>Audit the Organization</button></div>";
@@ -840,9 +843,7 @@ async function remediateRollback(cid, i){
 // Security Audit pane: read-only firewall/security audit. Picks its own target (network / template / org).
 function auditPane(){
   const scopesRun=["network","template","org"].filter(s=>AUD.results[s]);
-  // Consistent centered hero (shield + "Security Audit") when nothing has run yet -- matches Operations/Network.
-  const hero = (!scopesRun.length && !AUD.auditing) ? "<div class='audithero'><div class='empty-ico'>&#128737;</div><div class='empty-title'>Security Audit</div><div class='empty-desc'>Read-only audit of a network, a config template, or the whole organization &mdash; graded against best practice, with an action plan for every finding. Nothing is changed.</div></div>" : "";
-  let h=hero+auditPicker(); // picker always present -- run, re-run, or switch target at any time
+  let h=auditPicker(); // picker always present (with the hero inside the box when nothing has run)
   if(AUD.auditing){ return h+"<div class='box'><div class='muted'><span class='spin'></span> running read-only audit &amp; collecting config&hellip;</div></div>"; }
   if(AUD.auditError){ return h+"<div class='err'>audit failed: "+esc(AUD.auditError)+"</div>"+auditExtras(); }
   if(!scopesRun.length){ return h+auditExtras(); }
