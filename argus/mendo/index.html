@@ -48,8 +48,8 @@
   .hint{color:var(--accent);font-size:.78rem;} .nameok{color:var(--ok);font-weight:700;} .namewarn{color:#ff8b8b;font-weight:700;font-size:.78rem;}
   .planned{color:var(--warn);font-weight:700;}
   .sdot{font-size:1rem;line-height:1;display:inline-block;vertical-align:middle;} .sdot-live{color:var(--ok);} .sdot-missing{color:var(--bad);} .sdot-planned{color:var(--warn);} .sdot-notlive{color:var(--dim);}
-  .acceptbtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 7px;margin-left:8px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
-  .acceptbtn:hover{color:var(--warn);border-color:var(--warn);} .acceptbtn.on{color:var(--warn);border-color:var(--warn);background:#2a1f08;}
+  .planchk{background:none;border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:1px 8px;margin-left:10px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;vertical-align:middle;}
+  .planchk:hover{color:var(--warn);border-color:var(--warn);} .planchk.on{color:var(--warn);border-color:var(--warn);background:#2a1f08;}
   .kbadge{display:inline-block;background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:3px;font-size:.6rem;font-weight:800;line-height:1;padding:1px 3px;vertical-align:middle;}
   .auditbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:12px 0 6px;}
   .gradebig{font-size:2.4rem;font-weight:800;line-height:1;border:2px solid currentColor;border-radius:10px;padding:6px 14px;}
@@ -512,9 +512,9 @@ function opsContent(slot){
         : "<span class='av'>&mdash;</span>";
       const lastSeen = (s && s.ls) ? esc(lastSeenPac(s.ls)) : "<span class='av'>&mdash;</span>";
       const macCell = (s && s.mac) ? esc(s.mac) : "<span class='av'>&mdash;</span>";
-      // Inline planned-missing toggle -- only meaningful when the device is NOT live.
+      // Inline planned-missing toggle -- a clear checkbox, only meaningful when the device is NOT live.
       const isLive = !!(s && s.online);
-      const toggle = isLive ? "" : " <button class='acceptbtn"+(isAccepted?" on":"")+"' data-acceptmiss='"+esc(ip)+"' title='"+(isAccepted?"Unmark -- this device must be present":"Mark as planned-missing (accepted) for this network")+"'>"+(isAccepted?"unmark":"plan")+"</button>";
+      const toggle = isLive ? "" : " <button class='planchk"+(isAccepted?" on":"")+"' data-acceptmiss='"+esc(ip)+"' title='"+(isAccepted?"Accepted as planned-missing for this store — click to require it present again":"Mark accepted: planned-missing for this store (won't break SOLID)")+"'>"+(isAccepted?"&#9745;":"&#9744;")+" planned</button>";
       rows+="<tr><td class='nw'>"+statusIcon(kind,word)+toggle+"</td><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td class='ip'>"+macCell+"</td><td>"+where+"</td><td>"+vlan+"</td><td class='av nw'>"+lastSeen+"</td></tr>";
     });
     const total=mapped.length, solid=(unaccounted===0); // SOLID when nothing is unexpectedly missing (planned-missing is fine)
@@ -832,7 +832,7 @@ document.getElementById("gform").addEventListener("submit", async e=>{
 });
 document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
-  const ac=e.target.closest(".acceptbtn"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); render(); return; }
+  const ac=e.target.closest(".planchk"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); render(); return; }
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const ex=e.target.closest("[data-export]"); if(ex){ e.stopImmediatePropagation(); ex.getAttribute("data-export")==="pdf"?exportPdf():exportHtml(); return; }
