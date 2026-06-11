@@ -717,17 +717,17 @@ function netContent(slot){
 // --- Action Plans (per finding): Understand -> Fix-it-yourself (read-only) -> Let Argus fix it (lab write) ---
 let PLAN_OPEN={}; // finding id -> expanded?
 let CHECK_CONTENT=null, READMORE={}; // per-check deep content (origin/refs/links), loaded once
-async function loadCheckContent(){ if(CHECK_CONTENT) return; try{ const r=await fetch("checks-content.json?v=2",{cache:"no-store"}); if(r.ok) CHECK_CONTENT=await r.json(); }catch(e){} }
+async function loadCheckContent(){ if(CHECK_CONTENT) return; try{ const r=await fetch("checks-content.json?v=3",{cache:"no-store"}); if(r.ok) CHECK_CONTENT=await r.json(); }catch(e){} }
 // Build an exact Meraki dashboard deep-link from a network's dashboard url + the per-check page path.
-function merakiDeepLink(netId, path){ if(!path) return ""; const n=(NETS||[]).find(x=>x.id===netId); if(!n||!n.url) return ""; return n.url.replace(/\/manage\/.*$/,"/manage/")+path; }
+function merakiDeepLink(netId, path){ const n=(NETS||[]).find(x=>x.id===netId); if(!n||!n.url) return ""; const base=n.url.replace(/\/manage\/.*$/,"/manage/"); return path ? base+path : base; }
 function readMoreBlock(cc){
   let x="<div class='rmore'>";
   if(cc.origin) x+="<div class='rm-sec'><div class='rm-h'>Origin &amp; history</div><div>"+esc(cc.origin)+"</div></div>";
   if(cc.pros&&cc.pros.length) x+="<div class='rm-sec'><div class='rm-h'>Pros of fixing</div><ul>"+cc.pros.map(p=>"<li>"+esc(p)+"</li>").join("")+"</ul></div>";
   if(cc.cons&&cc.cons.length) x+="<div class='rm-sec'><div class='rm-h'>Cons / tradeoffs</div><ul>"+cc.cons.map(p=>"<li>"+esc(p)+"</li>").join("")+"</ul></div>";
-  if(cc.ifNotSet) x+="<div class='rm-sec'><div class='rm-h'>&#9888; If left unset</div><div>"+esc(cc.ifNotSet)+"</div></div>";
-  if(cc.ifSet) x+="<div class='rm-sec'><div class='rm-h'>&check; If set / fixed</div><div>"+esc(cc.ifSet)+"</div></div>";
-  if(cc.refs&&cc.refs.length) x+="<div class='rm-sec'><div class='rm-h'>References</div><ul>"+cc.refs.map(r=>"<li><a href='"+esc(r.url)+"' target='_blank' rel='noopener'>"+esc(r.title)+" &#8599;</a></li>").join("")+"</ul></div>";
+  if(cc.ifNotSet) x+="<div class='rm-sec'><div class='rm-h'>If left unset</div><div>"+esc(cc.ifNotSet)+"</div></div>";
+  if(cc.ifSet) x+="<div class='rm-sec'><div class='rm-h'>If set / fixed</div><div>"+esc(cc.ifSet)+"</div></div>";
+  if(cc.refs&&cc.refs.length) x+="<div class='rm-sec'><div class='rm-h'>References</div><ul>"+cc.refs.map(r=>"<li><a href='"+esc(r.url)+"' target='_blank' rel='noopener'>"+esc(r.title)+"</a></li>").join("")+"</ul></div>";
   return x+"</div>";
 }
 const CAT_WHY={
@@ -768,9 +768,9 @@ function actionPlans(f, canApply){
     const sNet = (AUD.view==="network"||AUD.view==="template") && AUD.tgt[AUD.view] ? AUD.tgt[AUD.view].id : null;
     const deep = sNet ? merakiDeepLink(sNet, cc.merakiPath) : "";
     let lk="<div class='plinks'>";
-    if(deep) lk+="<a class='plink go' href='"+esc(deep)+"' target='_blank' rel='noopener'>&#9654; Open in Meraki &#8599;</a>";
-    if(cc.helpUrl) lk+="<a class='plink' href='"+esc(cc.helpUrl)+"' target='_blank' rel='noopener'>&#128214; Meraki help &#8599;</a>";
-    if(cc.howToUrl && cc.howToUrl!==cc.helpUrl) lk+="<a class='plink' href='"+esc(cc.howToUrl)+"' target='_blank' rel='noopener'>&#129513; How-to &#8599;</a>";
+    if(deep) lk+="<a class='plink go' href='"+esc(deep)+"' target='_blank' rel='noopener'>Open in Meraki</a>";
+    if(cc.helpUrl) lk+="<a class='plink' href='"+esc(cc.helpUrl)+"' target='_blank' rel='noopener'>Meraki help</a>";
+    if(cc.howToUrl && cc.howToUrl!==cc.helpUrl) lk+="<a class='plink' href='"+esc(cc.howToUrl)+"' target='_blank' rel='noopener'>How-to guide</a>";
     t2+=lk+"</div>";
   }
   x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>2 &middot; Fix it yourself</span> <span class='ro-pill'>read-only</span> you make the change</div>"+t2+"</div>";
