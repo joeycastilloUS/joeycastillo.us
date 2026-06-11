@@ -37,6 +37,7 @@
   .nethead{margin:6px 0 4px;font-size:1.05rem;} .nethead b{color:var(--accent);}
   .tmpl{font-size:.9rem;margin-bottom:4px;} .tmpl .bound{color:var(--ok);font-weight:700;} .tmpl .nb{color:#ffce85;font-weight:700;}
   .stamp{color:var(--dim);font-size:.82rem;margin-bottom:14px;}
+  .loadmetric{color:var(--accent);font-variant-numeric:tabular-nums;}
   h2{font-size:.95rem;color:var(--accent);margin:22px 0 8px;}
   table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.86rem;margin-bottom:8px;}
   th{text-align:left;color:var(--dim);font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;padding:5px 11px;border-bottom:1px solid var(--line);}
@@ -315,6 +316,17 @@ function resetRunLabel(){ const b=document.getElementById("runaudit"); if(b) b.i
 // Resolve a combo's selection at action time: if nothing committed, take the top match for what was typed.
 function comboResolve(id){ const c=COMBOS[id]; if(!c) return {id:"",name:""}; if(!c.sel.id){ comboFilter(id,(c.sel.name||"").trim()); if(c.filtered.length) comboPick(id,0); } return c.sel; }
 
+// --- operator settings sync: localStorage <-> Firestore (named DB 'argus') via the bridge ---
+// localStorage stays the instant cache; this makes settings follow the operator across machines.
+function settingsKeys(){ return [MAP_KEY, TOAST_KEY, LABKW_KEY, FEAT_KEY, ACCEPT_KEY]; }
+function settingsBlob(){ const o={}; settingsKeys().forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) o[k]=v; }); return o; }
+function applySettings(o){ if(!o||typeof o!=="object") return; settingsKeys().forEach(k=>{ if(o[k]!=null) localStorage.setItem(k,o[k]); }); NAMEMAP=parseMap(mapText()); FEATURES=loadFeatures(); }
+async function loadSettings(){ try{ const r=await api("/settings"); if(r.ok){ const d=await r.json(); if(d&&d.json){ applySettings(JSON.parse(d.json)); } } }catch(e){} }
+function saveSettings(){ try{ fetch(BRIDGE+"/settings",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({json:JSON.stringify(settingsBlob())})}); }catch(e){} }
+// load metrics formatting
+function fmtMs(ms){ return ms>=1000 ? (ms/1000).toFixed(1)+"s" : Math.round(ms)+"ms"; }
+function fmtBytes(b){ if(!b) return "0 B"; if(b<1024) return b+" B"; if(b<1048576) return (b/1024).toFixed(1)+" KB"; return (b/1048576).toFixed(2)+" MB"; }
+
 // --- pre-configured IP -> expected device name map (gear settings) ---
 const MAP_KEY="meraki_namemap_v1";
 const TOAST_KEY="argus_toastvlan_v1";
@@ -385,30 +397,32 @@ function slotById(id){ return id==="operations"?OPS:id==="network"?NETV:null; }
 
 // Source fetchers -- each writes only its slice of a slot + its own stamp, so a single section
 // refreshes without re-pulling the others.
-async function fetchPorts(slot,net){ const r=await api("/meraki/portmap?network="+encodeURIComponent(net)); if(!r.ok) throw new Error("switch error "+r.status); slot.d=await r.json(); slot.portStamp=pacific(); }
+async function fetchPorts(slot,net){ const r=await api("/meraki/portmap?network="+encodeURIComponent(net)); if(!r.ok) throw new Error("switch error "+r.status); const txt=await r.text(); slot._bytes=(slot._bytes||0)+txt.length; slot.d=JSON.parse(txt); slot.portStamp=pacific(); }
 // All SSIDs in the network, grouped. No SSID arg -- the network selection reveals every SSID.
-async function fetchWifi(slot,net){ const rw=await api("/meraki/wireless?network="+encodeURIComponent(net)); if(!rw.ok) throw new Error("Wi-Fi error "+rw.status); slot.wifi=await rw.json(); slot.wifiStamp=pacific(); }
+async function fetchWifi(slot,net){ const rw=await api("/meraki/wireless?network="+encodeURIComponent(net)); if(!rw.ok) throw new Error("Wi-Fi error "+rw.status); const txt=await rw.text(); slot._bytes=(slot._bytes||0)+txt.length; slot.wifi=JSON.parse(txt); slot.wifiStamp=pacific(); }
 
 // Load a tab's slot from its own picker (the <select id='pick-operations'|'pick-network'>).
 async function loadSlot(id){
   const slot=slotById(id); if(!slot) return;
   const sel=comboResolve("pick-"+id); if(!sel.id){ slot.error="pick a location"; render(); return; }
   slot.net=sel.id; slot.name=sel.name; slot.loading=true; slot.error=""; slot.stamp=pacific();
-  slot.d=null; slot.wifi=null; slot.portStamp=""; slot.wifiStamp=""; render();
+  slot.d=null; slot.wifi=null; slot.portStamp=""; slot.wifiStamp=""; slot._bytes=0; slot.loadMs=0; render();
+  const t0=Date.now();
   try{ await fetchPorts(slot,slot.net); try{ await fetchWifi(slot,slot.net); }catch(e){} }
   catch(e){ slot.error=e.message||"error"; }
-  slot.loading=false; render();
+  slot.loadMs=Date.now()-t0; slot.loading=false; render();
 }
 
 // Per-section refresh: re-pull only the source(s) behind the clicked section, in that tab's slot.
 async function refreshSection(id, kind, btn){
   const slot=slotById(id); if(!slot||!slot.net) return;
   if(btn){ btn.disabled=true; btn.innerHTML="<span class='spin'></span> refreshing&hellip;"; }
-  slot.error="";
+  slot.error=""; slot._bytes=0; const t0=Date.now();
   try{
     if(kind==="ports"||kind==="both") await fetchPorts(slot,slot.net);
     if(kind==="wifi"||kind==="both") await fetchWifi(slot,slot.net);
   }catch(e){ slot.error=e.message||"refresh error"; }
+  slot.loadMs=Date.now()-t0;
   render(); // rebuilds the report -- the button is recreated fresh + enabled
 }
 
@@ -451,7 +465,8 @@ function pickerRow(id, slot){
   const btn = slot.loading
     ? "<button disabled><span class='spin'></span> loading&hellip;</button>"
     : "<button data-load='"+id+"'>"+(slot.net?"Reload":"Load")+"</button>";
-  const label = slot.net ? "<span class='muted'>showing <b>"+esc(slot.name)+"</b></span>" : "<span class='muted'>type a location, then Load</span>";
+  const metric = slot.loadMs ? " <span class='loadmetric' title='load time &middot; data downloaded'>&middot; "+fmtMs(slot.loadMs)+" &middot; "+fmtBytes(slot._bytes)+"</span>" : "";
+  const label = slot.net ? "<span class='muted'>showing <b>"+esc(slot.name)+"</b>"+metric+"</span>" : "<span class='muted'>type a location, then Load</span>";
   return "<div class='bar'>"+combo("pick-"+id, netItems(), {id:slot.net,name:slot.name}, "type a location…")+btn+label+"</div>"+
          (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"");
 }
@@ -828,12 +843,12 @@ async function doRenameSave(btn){
 
 document.getElementById("gform").addEventListener("submit", async e=>{
   e.preventDefault(); PW=document.getElementById("gpw").value;
-  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); document.getElementById("gate").classList.add("hide"); render(); }
+  try{ await loadNetworks(); sessionStorage.setItem(PW_KEY,PW); await loadSettings(); document.getElementById("gate").classList.add("hide"); render(); }
   catch(_){ document.getElementById("gerr").textContent="wrong password"; PW=""; }
 });
 document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
-  const ac=e.target.closest(".planchk"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); render(); return; }
+  const ac=e.target.closest(".planchk"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); saveSettings(); render(); return; }
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const ex=e.target.closest("[data-export]"); if(ex){ e.stopImmediatePropagation(); ex.getAttribute("data-export")==="pdf"?exportPdf():exportHtml(); return; }
@@ -889,17 +904,17 @@ document.getElementById("report").addEventListener("click", e=>{
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show) renderFeatures(); });
-document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
+document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); saveSettings(); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings · synced"; render(); });
 document.getElementById("toastvlan").value=toastVlan();
-document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlans().join(", "); render(); });
+document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); saveSettings(); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlans().join(", ")+" · synced"; render(); });
 document.getElementById("namemap").value=mapText();
 // Lab Features: enable-for-production + configurable keywords
-document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); renderFeatures(); render(); } });
-document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", "); render(); });
+document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); saveSettings(); renderFeatures(); render(); } });
+document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); saveSettings(); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", ")+" · synced"; render(); });
 document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
 renderFeatures();
 
-(async()=>{ if(PW){ try{ await loadNetworks(); document.getElementById("gate").classList.add("hide"); render(); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
+(async()=>{ if(PW){ try{ await loadNetworks(); await loadSettings(); document.getElementById("gate").classList.add("hide"); render(); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
