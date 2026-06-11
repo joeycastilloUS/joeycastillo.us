@@ -47,6 +47,8 @@
   .st-conn{color:var(--ok);} .st-disc{color:var(--off);} .av{color:var(--dim);}
   .hint{color:var(--accent);font-size:.78rem;} .nameok{color:var(--ok);font-weight:700;} .namewarn{color:#ff8b8b;font-weight:700;font-size:.78rem;}
   .planned{color:var(--warn);font-weight:700;}
+  .acceptbtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 7px;margin-left:8px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .acceptbtn:hover{color:var(--warn);border-color:var(--warn);} .acceptbtn.on{color:var(--warn);border-color:var(--warn);background:#2a1f08;}
   .kbadge{display:inline-block;background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:3px;font-size:.6rem;font-weight:800;line-height:1;padding:1px 3px;vertical-align:middle;}
   .auditbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:12px 0 6px;}
   .gradebig{font-size:2.4rem;font-weight:800;line-height:1;border:2px solid currentColor;border-radius:10px;padding:6px 14px;}
@@ -190,9 +192,7 @@
     <div style="margin-top:8px;"><button id="savemap">Save</button> <span class="muted" id="savemsg"></span></div>
     <div class="muted" style="margin:12px 0 4px;"><b>Toast POS VLAN</b> &mdash; connected devices on this VLAN appear in the Toast section (Operations tab).</div>
     <input id="toastvlan" type="text" spellcheck="false" style="width:130px;"> <button id="savetoast">Save</button> <span class="muted" id="toastmsg"></span>
-    <div class="muted" style="margin:12px 0 4px;"><b>Planned-missing (accepted) Konductor devices</b> &mdash; these are allowed to be absent without breaking <b>SOLID</b>; they show as <span class='planned'>PLANNED</span> instead of <span class='namewarn'>MISSING</span>. Names or IPs, one per line or comma-separated.</div>
-    <textarea id="acceptmiss" spellcheck="false" style="height:70px;"></textarea>
-    <div style="margin-top:6px;"><button id="saveaccept">Save</button> <span class="muted" id="acceptmsg"></span></div>
+    <div class="muted" style="margin:12px 0 4px;"><b>Planned-missing (accepted) devices</b> are now set <b>inline &amp; per-network</b> &mdash; in the Konductor table, click <span class='planned'>mark planned</span> on any missing device. Accepted devices show <span class='planned'>PLANNED</span> instead of <span class='namewarn'>MISSING</span> and don&rsquo;t break <b>SOLID</b> (for that store only).</div>
   </div>
   <div id="report"></div>
 </div>
@@ -315,9 +315,12 @@ function comboResolve(id){ const c=COMBOS[id]; if(!c) return {id:"",name:""}; if
 const MAP_KEY="meraki_namemap_v1";
 const TOAST_KEY="argus_toastvlan_v1";
 function toastVlan(){ const v=localStorage.getItem(TOAST_KEY); return (v!=null&&v!=="")?v.trim():"100"; } // Toast POS VLAN (default 100)
-// Konductor devices accepted as planned-missing -- absent without breaking SOLID. Names or IPs, comma/newline-separated.
-const ACCEPT_KEY="argus_acceptmissing_v1";
-function acceptMissing(){ const set=new Set(); (localStorage.getItem(ACCEPT_KEY)||"").split(/[\n,]/).forEach(t=>{ t=t.trim().toLowerCase(); if(t) set.add(t); }); return set; }
+// Konductor devices accepted as planned-missing -- PER NETWORK (a device planned-missing at one store
+// isn't at another). Stored as { netId: [ip, ...] }. Set inline from the Konductor table.
+const ACCEPT_KEY="argus_acceptmissing_v2";
+function acceptMap(){ try{ return JSON.parse(localStorage.getItem(ACCEPT_KEY)||"{}"); }catch(e){ return {}; } }
+function acceptSet(netId){ const a=acceptMap()[netId]||[]; return new Set(a.map(x=>String(x).toLowerCase())); }
+function toggleAccept(netId, ip){ const m=acceptMap(); const arr=(m[netId]||[]).slice(); const i=arr.indexOf(ip); if(i>=0) arr.splice(i,1); else arr.push(ip); m[netId]=arr; localStorage.setItem(ACCEPT_KEY, JSON.stringify(m)); }
 const DEFAULT_MAP=["Bread Start\t10.90.100.50","Bread Finish\t10.90.100.58","Salad Start\t10.90.100.51",
 "Salad Finish\t10.90.100.59","Expo\t10.90.100.52","Digital Expo\t10.90.100.53","HerdServe\t10.90.100.55",
 "Injest\t10.90.100.101","Bread Printer\t10.90.100.70","Salad Printer\t10.90.100.71",
@@ -483,11 +486,11 @@ function opsContent(slot){
   let rollHtml="";
   const mapped=Object.keys(NAMEMAP);
   if(mapped.length){
-    const accept=acceptMissing(); // names/IPs allowed to be absent without breaking SOLID
+    const accept=acceptSet(slot.net); // this network's planned-missing IPs (per-network)
     let live=0, planned=0, unaccounted=0, rows="";
     mapped.forEach(ip=>{
       const nm=NAMEMAP[ip], s=seen[ip];
-      const isAccepted = accept.has(ip) || accept.has((nm||"").toLowerCase());
+      const isAccepted = accept.has(String(ip).toLowerCase());
       let st,cls;
       if(s && s.online){ st="LIVE"; cls="nameok"; live++; }
       else if(isAccepted){ st="PLANNED"; cls="planned"; planned++; }   // known-missing, accepted -- not a threat
@@ -504,7 +507,10 @@ function opsContent(slot){
         ? s.vlans.map(v=> esc(v) + (v==="90" ? " <span class='nameok'>&check;</span>" : " <span class='namewarn'>&#10007;</span>")).join(", ")
         : "<span class='av'>&mdash;</span>";
       const lastSeen = (s && s.ls) ? esc(lastSeenPac(s.ls)) : "<span class='av'>&mdash;</span>";
-      rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td>"+vlan+"</td><td>"+where+"</td><td class='av nw'>"+lastSeen+"</td><td class='"+cls+"'>"+st+"</td></tr>";
+      // Inline planned-missing toggle -- only meaningful when the device is NOT live.
+      const isLive = !!(s && s.online);
+      const toggle = isLive ? "" : " <button class='acceptbtn"+(isAccepted?" on":"")+"' data-acceptmiss='"+esc(ip)+"' title='"+(isAccepted?"Unmark -- this device must be present":"Mark as planned-missing (accepted) for this network")+"'>"+(isAccepted?"unmark":"mark planned")+"</button>";
+      rows+="<tr><td>"+esc(nm)+"</td><td class='ip'>"+esc(ip)+"</td><td>"+vlan+"</td><td>"+where+"</td><td class='av nw'>"+lastSeen+"</td><td><span class='"+cls+"'>"+st+"</span>"+toggle+"</td></tr>";
     });
     const total=mapped.length, solid=(unaccounted===0); // SOLID when nothing is unexpectedly missing (planned-missing is fine)
     const head="Konductor &mdash; "+live+"/"+total+" live"+(planned?" &middot; <span class='planned'>"+planned+" planned</span>":"")+" &middot; "+(solid?"<span class='nameok'>SOLID</span>":"<span class='namewarn'>NOT SOLID</span>");
@@ -801,6 +807,7 @@ document.getElementById("gform").addEventListener("submit", async e=>{
 });
 document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
+  const ac=e.target.closest(".acceptbtn"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); render(); return; }
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const ex=e.target.closest("[data-export]"); if(ex){ e.stopImmediatePropagation(); ex.getAttribute("data-export")==="pdf"?exportPdf():exportHtml(); return; }
@@ -858,8 +865,6 @@ document.getElementById("gear").addEventListener("click", ()=>{ const s=document
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings"; render(); });
 document.getElementById("toastvlan").value=toastVlan();
 document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlan(); render(); });
-document.getElementById("acceptmiss").value=localStorage.getItem(ACCEPT_KEY)||"";
-document.getElementById("saveaccept").addEventListener("click", ()=>{ localStorage.setItem(ACCEPT_KEY, document.getElementById("acceptmiss").value); document.getElementById("acceptmsg").textContent="saved · "+acceptMissing().size+" accepted"; render(); });
 document.getElementById("namemap").value=mapText();
 // Lab Features: enable-for-production + configurable keywords
 document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); renderFeatures(); render(); } });
