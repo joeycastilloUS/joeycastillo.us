@@ -22,9 +22,11 @@
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
   select,button,input{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:9px 12px;font-size:.9rem;font-family:inherit;}
   select{min-width:280px;} button{background:var(--accent);color:#000;font-weight:700;cursor:pointer;border:none;}
-  .combo{position:relative;min-width:320px;} .comboinput{width:100%;padding:10px 13px;}
+  .combo{position:relative;min-width:320px;text-align:left;} .comboinput{width:100%;padding:10px 36px 10px 13px;text-align:left;}
+  .combocx{position:absolute;right:7px;top:7px;width:24px;height:24px;display:none;align-items:center;justify-content:center;background:#222;color:var(--dim);border:none;border-radius:6px;cursor:pointer;font-size:1rem;line-height:1;font-family:inherit;padding:0;}
+  .combocx:hover{background:#333;color:var(--text);}
   .combolist{position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:340px;overflow-y:auto;overflow-x:hidden;display:none;padding:5px;box-shadow:0 12px 30px rgba(0,0,0,.6);}
-  .combolist.open{display:block;}
+  .combolist.open{display:block;} .combolist{text-align:left;}
   .comboopt{padding:10px 13px;cursor:pointer;font-size:.9rem;border-radius:7px;display:flex;align-items:center;gap:12px;}
   .comboopt:hover{background:#181818;} .comboopt.active{background:#1d2a31;color:#fff;}
   .comboname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -277,8 +279,10 @@ function scoreN(name,q){ name=name.toLowerCase(); q=q.toLowerCase(); if(!q) retu
 function hlq(name,q){ if(!q) return esc(name); const i=name.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(name); return esc(name.slice(0,i))+"<span class='hl'>"+esc(name.slice(i,i+q.length))+"</span>"+esc(name.slice(i+q.length)); }
 function combo(id, items, sel, placeholder){
   COMBOS[id]={items:items||[], sel:{id:(sel&&sel.id)||"",name:(sel&&sel.name)||""}, filtered:[], active:-1};
+  const hasVal=!!(sel&&sel.name);
   return "<div class='combo' data-combo='"+esc(id)+"'>"+
     "<input class='comboinput' id='ci-"+esc(id)+"' type='text' autocomplete='off' spellcheck='false' placeholder='"+esc(placeholder||"type to search…")+"' value=\""+esc((sel&&sel.name)||"").replace(/"/g,"&quot;")+"\">"+
+    "<button type='button' class='combocx' id='cx-"+esc(id)+"' title='Clear' style='display:"+(hasVal?"flex":"none")+"'>&times;</button>"+
     "<div class='combolist' id='cl-"+esc(id)+"'></div></div>";
 }
 function comboFilter(id,q){ const c=COMBOS[id]; if(!c) return;
@@ -291,7 +295,9 @@ function comboDraw(id,q){ const c=COMBOS[id], el=document.getElementById("cl-"+i
   el.innerHTML=c.filtered.map((n,i)=>"<div class='comboopt"+(i===c.active?" active":"")+"' data-i='"+i+"'><span class='comboname'>"+hlq(n.name,q)+"</span>"+(n.note?"<span class='comboNote'>"+esc(n.note)+"</span>":"")+"</div>").join("");
   el.classList.add("open");
 }
-function comboPick(id,i){ const c=COMBOS[id]; if(!c||i<0||i>=c.filtered.length) return; const n=c.filtered[i]; c.sel={id:n.id,name:n.name}; const inp=document.getElementById("ci-"+id); if(inp) inp.value=n.name; const el=document.getElementById("cl-"+id); if(el) el.classList.remove("open"); }
+function comboPick(id,i){ const c=COMBOS[id]; if(!c||i<0||i>=c.filtered.length) return; const n=c.filtered[i]; c.sel={id:n.id,name:n.name}; const inp=document.getElementById("ci-"+id); if(inp) inp.value=n.name; const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="flex"; const el=document.getElementById("cl-"+id); if(el) el.classList.remove("open"); }
+// Clear a combo's input + selection and reopen the full list, so you can search again.
+function comboClear(id){ const c=COMBOS[id]; if(c) c.sel={id:"",name:""}; const inp=document.getElementById("ci-"+id); if(inp){ inp.value=""; inp.focus(); } const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="none"; comboFilter(id,""); }
 // Resolve a combo's selection at action time: if nothing committed, take the top match for what was typed.
 function comboResolve(id){ const c=COMBOS[id]; if(!c) return {id:"",name:""}; if(!c.sel.id){ comboFilter(id,(c.sel.name||"").trim()); if(c.filtered.length) comboPick(id,0); } return c.sel; }
 
@@ -433,7 +439,7 @@ function emptyState(id, slot, icon, title, desc){
   return "<div class='empty'><div class='empty-ico'>"+icon+"</div>"+
     "<div class='empty-title'>"+esc(title)+"</div>"+
     "<div class='empty-desc'>"+desc+"</div>"+
-    "<div class='empty-pick'>"+combo("pick-"+id, netItems(), {id:slot.net,name:slot.name}, "type a location&hellip;")+btn+"</div>"+
+    "<div class='empty-pick'>"+combo("pick-"+id, netItems(), {id:slot.net,name:slot.name}, "type a location…")+btn+"</div>"+
     (slot.error?"<div class='err' style='margin-top:10px;'>"+esc(slot.error)+"</div>":"")+"</div>";
 }
 // Loaded-slot header: name, config template, pull stamps.
@@ -760,6 +766,7 @@ document.getElementById("gform").addEventListener("submit", async e=>{
 });
 document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
+  const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const ex=e.target.closest("[data-export]"); if(ex){ e.stopImmediatePropagation(); ex.getAttribute("data-export")==="pdf"?exportPdf():exportHtml(); return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); const id=sr.closest("#pane-network")?"network":"operations"; refreshSection(id, sr.getAttribute("data-refresh"), sr); return; }
@@ -783,6 +790,7 @@ document.getElementById("report").addEventListener("keydown", e=>{
 document.getElementById("report").addEventListener("input", e=>{
   const ci=e.target.closest(".comboinput"); if(!ci) return;
   const id=ci.id.slice(3), c=COMBOS[id]; if(c) c.sel={id:"",name:ci.value};
+  const cx=document.getElementById("cx-"+id); if(cx) cx.style.display=ci.value?"flex":"none";
   comboFilter(id, ci.value.trim());
 });
 document.getElementById("report").addEventListener("focusin", e=>{
