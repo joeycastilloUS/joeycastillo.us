@@ -71,6 +71,22 @@
   .fcard.flash{animation:fcflash 1.2s ease-out;} @keyframes fcflash{0%,40%{box-shadow:0 0 0 2px var(--accent);}100%{box-shadow:none;}}
   .catname{font-size:.82rem;color:var(--text);margin-top:3px;font-weight:600;} .catsub{font-size:.72rem;color:var(--dim);margin-top:1px;}
   .catwt{font-size:.62rem;color:var(--accent);margin-top:5px;letter-spacing:.5px;text-transform:uppercase;opacity:.8;}
+  /* Security Audit -- facts, not a grade */
+  .auditfacts{display:flex;flex-direction:column;gap:7px;margin:12px 0 10px;}
+  .af-top{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
+  .af-num{font-size:2.1rem;font-weight:800;line-height:1;} .af-num.bad{color:var(--warn);} .af-num.ok{color:var(--ok);}
+  .af-lbl{font-size:.92rem;color:var(--dim);margin-right:6px;}
+  .af-sev{display:inline-flex;gap:6px;flex-wrap:wrap;}
+  .sevc{font-size:.74rem;font-weight:600;border-radius:6px;padding:2px 9px;border:1px solid var(--line);background:#0e0e0e;color:var(--dim);}
+  .sevc b{font-weight:800;}
+  .sevc.sev-critical{color:var(--bad);border-color:#5a2222;} .sevc.sev-high{color:#ffae6b;border-color:#5a3a1a;} .sevc.sev-medium{color:var(--warn);border-color:#5a4a1a;} .sevc.sev-low{color:var(--accent);border-color:#2a4452;}
+  .sevc.z{opacity:.4;color:var(--dim)!important;border-color:var(--line)!important;}
+  .af-cov{font-size:.86rem;color:var(--dim);}
+  .catgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:6px;margin:8px 0 12px;}
+  .catrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0e0e0e;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:.84rem;}
+  .catrow.na{opacity:.5;} .catn{font-weight:700;color:var(--text);} .catf{font-size:.8rem;font-weight:700;}
+  .catf.bad{color:var(--warn);} .catf.ok{color:var(--ok);}
+  .catrow.jump{cursor:pointer;transition:border-color .12s;} .catrow.jump:hover{border-color:var(--accent);}
   .findings{display:flex;flex-direction:column;gap:10px;margin:12px 0;}
   .fcard{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:11px 14px;}
   .fcard.sev-l-critical{border-left-color:var(--bad);} .fcard.sev-l-high{border-left-color:#ffae6b;} .fcard.sev-l-medium{border-left-color:var(--warn);} .fcard.sev-l-low{border-left-color:var(--accent);}
@@ -1341,7 +1357,8 @@ function auditPane(){
     const lab={network:"Network",template:"Template",org:"Org"};
     h+="<div class='scopeflip'>";
     AUD.runs.forEach((r,i)=>{ const nm=r.scope==="org"?"Organization":esc(r.tgt.name);
-      const tail = r.loading ? " <span class='spin'></span>" : r.error ? " <span class='namewarn'>&#9888;</span>" : " <b class='grade-"+esc(r.result.grade)+"'>"+esc(r.result.grade)+"</b>";
+      const _rs=r.result&&r.result.summary||{}; const _rt=(_rs.critical||0)+(_rs.high||0)+(_rs.medium||0)+(_rs.low||0);
+      const tail = r.loading ? " <span class='spin'></span>" : r.error ? " <span class='namewarn'>&#9888;</span>" : (_rt?" <b class='bad'>"+_rt+"</b>":" <b class='ok'>&check;</b>");
       const cls = "scopebtn"+(AUD.view===i?" on":"")+(r.loading?" loadingbox":(r.error?"":" ready"));
       h+="<button class='"+cls+"' data-runview='"+i+"'>"+lab[r.scope]+" &middot; "+nm+tail+"</button>"; });
     h+="</div>";
@@ -1352,20 +1369,22 @@ function auditPane(){
   const scopeLabel = isOrg ? "Audited <b>organization</b>" : "Audited "+(A.isTemplate?"template":"network")+" <b>"+esc(A.store||run.tgt.name||"")+"</b>";
   h+=exportRow();
   h+="<div class='stamp'>"+scopeLabel+"</div>";
-  // overall grade
-  h+="<div class='auditbar'><span class='gradebig grade-"+esc(A.grade)+"'>"+esc(A.grade)+"</span><span class='scorebig'>"+esc(""+A.score)+"<small>/100</small></span>"+
-     "<span class='sevsum'>"+(S.critical||0)+" <span class='sev-critical'>critical</span> &middot; "+(S.high||0)+" <span class='sev-high'>high</span> &middot; "+(S.medium||0)+" <span class='sev-medium'>medium</span> &middot; "+(S.low||0)+" <span class='sev-low'>low</span></span></div>";
-  h+="<div class='muted' style='margin:-2px 0 4px;font-size:.8rem;'>Overall = importance-weighted average of the category grades below (weight shown on each card). It can&rsquo;t diverge from the report card.</div>";
-  // per-category report card
+  // FACTS, not a grade. Total findings + severity breakdown + coverage -- read it fast, judge it yourself.
+  const C0=A.coverage||{}; const totF=(S.critical||0)+(S.high||0)+(S.medium||0)+(S.low||0);
+  const sevc=(sev,n,lbl)=>"<span class='sevc sev-"+sev+((n||0)?"":" z")+"'><b>"+(n||0)+"</b> "+lbl+"</span>";
+  h+="<div class='auditfacts'>"+
+     "<div class='af-top'><span class='af-num "+(totF?"bad":"ok")+"'>"+totF+"</span><span class='af-lbl'>finding"+(totF===1?"":"s")+"</span>"+
+       "<span class='af-sev'>"+sevc("critical",S.critical,"critical")+sevc("high",S.high,"high")+sevc("medium",S.medium,"medium")+sevc("low",S.low,"low")+"</span></div>"+
+     "<div class='af-cov'><b>"+(C0.total||0)+"</b> checks &middot; <span class='ok'>"+(C0.passed||0)+" passed</span> &middot; <span class='bad'>"+(C0.failed||0)+" failed</span> &middot; <span class='muted'>"+(C0.skipped||0)+" skipped</span></div>"+
+     "</div>";
+  // Per-category breakdown -- finding counts only, no letter grade. Categories with findings first.
   if(A.categories&&A.categories.length){
-    h+="<div class='catcards'>";
-    A.categories.forEach(c=>{
-      const na=!c.applicable;
-      const wt = (c.weight!=null) ? "<div class='catwt' title='category weight in the overall grade'>weight &times;"+esc(""+c.weight)+"</div>" : "";
-      const clickable = c.findings>0; // jump to the first finding in this category
-      h+="<div class='catcard"+(na?" na":"")+(clickable?" jump":"")+"'"+(clickable?" data-cat='"+esc(c.category)+"' title='Jump to "+esc(c.category)+" findings'":"")+"><div class='catgrade grade-"+esc(c.grade)+"'>"+(na?"&ndash;":esc(c.grade))+"</div>"+
-         "<div class='catname'>"+esc(c.category)+"</div>"+
-         "<div class='catsub'>"+(na?"not applicable":(c.findings+" finding"+(c.findings===1?"":"s")))+"</div>"+wt+"</div>";
+    const cats=A.categories.slice().sort((a,b)=>(b.applicable?1:0)-(a.applicable?1:0)||(b.findings||0)-(a.findings||0)||String(a.category).localeCompare(String(b.category)));
+    h+="<div class='catgrid'>";
+    cats.forEach(c=>{
+      if(!c.applicable){ h+="<div class='catrow na'><span class='catn'>"+esc(c.category)+"</span><span class='catf muted'>n/a</span></div>"; return; }
+      const has=c.findings>0;
+      h+="<div class='catrow"+(has?" jump":"")+"'"+(has?" data-cat='"+esc(c.category)+"'":"")+"><span class='catn'>"+esc(c.category)+"</span><span class='catf "+(has?"bad":"ok")+"'>"+(has?c.findings+" finding"+(c.findings===1?"":"s"):"&check; clean")+"</span></div>";
     });
     h+="</div>";
   }
@@ -1376,7 +1395,6 @@ function auditPane(){
   else { h+="<div class='stamp'>Scope: <b>"+(M.l3Rules||0)+"</b> L3 rules &middot; <b>"+(M.portForwards||0)+"</b> port-forwards &middot; <b>"+(M.oneToOneNat||0)+"</b> 1:1 NAT &middot; <b>"+(M.enabledSsids||0)+"</b> SSIDs &middot; <b>"+(M.clients||0)+"</b> clients &middot; <b>"+(M.devices||0)+"</b> devices &middot;"+checksLink+"</div>"; }
   if(SHOWCHECKS) h+=renderChecks();
   const C=A.coverage||{}, T=A.template||{};
-  h+="<div class='stamp'>Coverage: <b>"+(C.total||0)+"</b> checks &middot; <span class='sev-low'>"+(C.passed||0)+" passed</span> &middot; <span class='sev-high'>"+(C.failed||0)+" failed</span> &middot; <span class='av'>"+(C.skipped||0)+" skipped</span></div>";
   if(T.bound) h+="<div class='tplnote'><span class='kbadge'>TPL</span> Bound to config template <b>"+esc(T.name||"")+"</b> &mdash; firewall / content / threat settings are read from the template, not per-network.</div>";
   else if(T.note) h+="<div class='stamp'>"+esc(T.note)+"</div>";
   if(A.skipped&&A.skipped.length) h+="<div class='stamp'>Endpoints not readable: "+esc(A.skipped.join(", "))+"</div>";
@@ -1420,7 +1438,8 @@ function render(){
   const wifiN=NETV.wifi, ssidGroups=(wifiN&&wifiN.ssids)||[];
   const ssidCount=wifiN?(wifiN.ssidCount!=null?wifiN.ssidCount:ssidGroups.length):0;
   const auditView = AUD.runs[AUD.view] ? AUD.runs[AUD.view].result : null;
-  const auditBadge = auditView ? " &middot; <b class='grade-"+esc(auditView.grade)+"'>"+esc(auditView.grade)+"</b>" : "";
+  const _av=auditView&&auditView.summary||{}; const _at=auditView?((_av.critical||0)+(_av.high||0)+(_av.medium||0)+(_av.low||0)):0;
+  const auditBadge = auditView ? (_at?" &middot; <b class='bad'>"+_at+"</b>":" &middot; <b class='ok'>&check;</b>") : "";
   h+="<div class='tabwrap'><div class='tabs'>"+
      "<button class='tab"+(TAB==="operations"?" on":"")+"' data-tab='operations'>&#9776; Operations</button>"+
      "<button class='tab"+(TAB==="network"?" on":"")+"' data-tab='network'>"+WIFI+"Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</button>"+
@@ -1723,7 +1742,7 @@ document.getElementById("report").addEventListener("click", e=>{
   const ef=e.target.closest("[data-execfill]"); if(ef){ e.stopImmediatePropagation(); const cid=ef.getAttribute("data-execfill"); const ex=EXEC[cid]; if(ex&&ex.steps){ const ai=document.getElementById("execall-"+cid); const av=ai?ai.value.trim():""; ex.allval=av; ex.steps.forEach(s=>{ if(s.moderated&&s.status!=="applied") s.value=av; }); render(); } return; }
   const eal=e.target.closest("[data-execall]"); if(eal){ e.stopImmediatePropagation(); const cid=eal.getAttribute("data-execall"); const ex=EXEC[cid]; if(ex&&ex.steps){ const ai=document.getElementById("execall-"+cid); const av=ai?ai.value.trim():""; ex.allval=av; ex.steps.forEach((s,i)=>{ if(s.moderated&&s.status!=="applied"){ const inp=document.getElementById("execval-"+cid+"-"+i); const rv=inp?inp.value.trim():""; s.value = rv || av; } }); } remediateApplyAll(cid); return; }
   const erb=e.target.closest("[data-execrb]"); if(erb){ e.stopImmediatePropagation(); const a=erb.getAttribute("data-execrb").split(":"); remediateRollback(a[0],+a[1]); return; }
-  const cj=e.target.closest(".catcard.jump"); if(cj){ const cat=cj.getAttribute("data-cat"); const tgt=document.querySelector(".fcard[data-fcat=\""+(cat||"").replace(/"/g,"")+"\"]"); if(tgt){ tgt.scrollIntoView({behavior:"smooth",block:"center"}); tgt.classList.add("flash"); setTimeout(()=>tgt.classList.remove("flash"),1200); } return; }
+  const cj=e.target.closest(".catrow.jump,.catcard.jump"); if(cj){ const cat=cj.getAttribute("data-cat"); const tgt=document.querySelector(".fcard[data-fcat=\""+(cat||"").replace(/"/g,"")+"\"]"); if(tgt){ tgt.scrollIntoView({behavior:"smooth",block:"center"}); tgt.classList.add("flash"); setTimeout(()=>tgt.classList.remove("flash"),1200); } return; }
   const sv=e.target.closest("[data-slotview]"); if(sv){ const a=sv.getAttribute("data-slotview").split(":"), slot=slotById(a[0]); if(slot){ const it=slot.items[+a[1]]; if(it&&it.loading) return; slot.view=+a[1]; syncSlot(slot); render(); } return; }
   const rv2=e.target.closest("[data-runview]"); if(rv2){ const i=+rv2.getAttribute("data-runview"); const r=AUD.runs[i]; if(r&&r.loading) return; AUD.view=i; if(r) AUDITMODE=r.scope; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
