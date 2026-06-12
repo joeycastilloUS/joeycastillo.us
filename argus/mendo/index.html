@@ -238,6 +238,32 @@
     table{border-color:#ccc;} th{color:#555;} td{border-color:#eee;} td.port{color:#000;}
     .nethead b,h2,.tmpl .bound,.st-conn{color:#000;} *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   }
+  /* --- W.O.P.R. debug console: WarGames green-on-black CRT --- */
+  #wopr{position:fixed;top:0;right:0;height:100vh;width:380px;max-width:92vw;z-index:9000;transform:translateX(105%);transition:transform .35s cubic-bezier(.2,.8,.2,1);pointer-events:none;}
+  #wopr.on{transform:translateX(0);pointer-events:auto;}
+  .wopr-inner{position:relative;height:100%;background:#020503;border-left:2px solid #19ff19;box-shadow:-10px 0 40px rgba(0,0,0,.7),inset 0 0 60px rgba(25,255,25,.06);
+    font-family:"Courier New",Consolas,monospace;color:#28ff28;text-shadow:0 0 6px rgba(40,255,40,.55);display:flex;flex-direction:column;padding:14px 14px 8px;box-sizing:border-box;overflow:hidden;}
+  .wopr-scan{position:absolute;inset:0;z-index:5;pointer-events:none;background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,20,0,.5) 3px,rgba(0,0,0,0) 4px);mix-blend-mode:overlay;animation:woprflick 3s steps(60) infinite;}
+  @keyframes woprflick{0%,97%{opacity:.5;}98%{opacity:.3;}100%{opacity:.5;}}
+  .wopr-h{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #0f7a0f;padding-bottom:6px;}
+  .wopr-title{font-size:1.5rem;font-weight:800;letter-spacing:8px;}
+  .wopr-x{background:none;border:1px solid #19ff19;color:#28ff28;border-radius:4px;width:24px;height:24px;cursor:pointer;font-family:inherit;text-shadow:inherit;}
+  .wopr-x:hover{background:#0a2a0a;}
+  .wopr-sub{font-size:.7rem;letter-spacing:2px;margin:6px 0 4px;opacity:.85;}
+  .wopr-sub .ok{color:#28ff28;} .wopr-sub .warn{color:#ffe14d;text-shadow:0 0 6px rgba(255,225,77,.5);}
+  .wopr-moves{overflow:auto;max-height:42vh;}
+  .wmove{border:1px solid #0f7a0f;border-radius:4px;padding:8px;margin:8px 0;background:rgba(10,40,10,.25);}
+  .wmh{font-size:.82rem;font-weight:700;margin-bottom:5px;} .wpath{color:#7dff7d;}
+  .wbody{font-size:.74rem;opacity:.92;margin-bottom:7px;} .wbody .wl{white-space:pre-wrap;word-break:break-all;} .wbody .wk{color:#ffe14d;}
+  .wbtns,.wopr-ctl{display:flex;gap:8px;flex-wrap:wrap;}.wopr-ctl{margin:8px 0;}
+  .wbtn{background:#031703;border:1px solid #19ff19;color:#28ff28;border-radius:4px;padding:5px 12px;font-family:inherit;font-size:.78rem;font-weight:700;letter-spacing:1px;cursor:pointer;text-shadow:inherit;}
+  .wbtn:hover{background:#0a3a0a;box-shadow:0 0 10px rgba(25,255,25,.4);}
+  .wbtn.go{background:#0a3a0a;border-color:#28ff28;} .wbtn.danger{border-color:#ff5555;color:#ff7777;} .wbtn.danger:hover{background:#3a0a0a;box-shadow:0 0 10px rgba(255,80,80,.4);}
+  .wopr-idle{font-size:.82rem;opacity:.8;margin:10px 0;letter-spacing:1px;}
+  .wopr-feed{flex:1;overflow:auto;border-top:1px solid #0f7a0f;margin-top:6px;padding-top:6px;font-size:.72rem;line-height:1.5;}
+  .wfeed{white-space:pre-wrap;word-break:break-all;opacity:.92;} .wfeed.scan{opacity:.55;} .wfeed.warn{color:#ffe14d;} .wfeed.ok{color:#39ff14;} .wfeed.bad{color:#ff6b6b;} .wfeed.hi{color:#7dff7d;font-weight:700;letter-spacing:1px;}
+  .wcursor{display:inline-block;animation:woprblink 1s steps(1) infinite;} @keyframes woprblink{50%{opacity:0;}}
+  @media (max-width:520px){ #wopr{width:100vw;} }
 </style>
 </head>
 <body>
@@ -267,6 +293,7 @@
       <div class="muted" style="margin-bottom:10px;">New / write-capable features start in <b>Lab Testing</b> &mdash; live only on lab/test locations. <b>Enable for Production</b> to roll out everywhere; after 7 days it&rsquo;s archived (shipped).</div>
       <div id="featlist"></div>
       <label class="set-toggle"><input type="checkbox" id="vlanvalidate"><span><b>Validate VLAN exists</b> before Argus sets it &mdash; reject a VLAN that isn&rsquo;t already on the network. <span class="muted">Applies to the Set VLAN feature. Default off (set any VLAN).</span></span></label>
+      <label class="set-toggle"><input type="checkbox" id="debugtoggle"><span><b>Debug mode (W.O.P.R.)</b> &mdash; hold every bridge <b>write</b> behind a side console; <b>skip</b>, <b>apply</b>, <b>apply all</b>, or <b>cancel</b> each move before it fires. <span class="muted">War games. Reads stream by; writes wait for you.</span></span></label>
       <div style="margin-top:12px;">
         <div class="muted" style="margin-bottom:4px;"><b>Lab/Test keywords</b> &mdash; a location qualifies only if its name contains one of these as a <b>whole word</b>. Comma-separated:</div>
         <input id="labkw" type="text" spellcheck="false" style="width:100%;max-width:360px;">
@@ -376,6 +403,90 @@ const WIFI="<svg class='wic' viewBox='0 0 24 24' width='13' height='13' fill='cu
 
 // Always fetch fresh: no-store + a cache-bust param so a Refresh re-hits Meraki, never a cached GET.
 function api(p){ const sep=p.indexOf("?")>=0?"&":"?"; return fetch(BRIDGE + p + sep + "_=" + (new Date().getTime()), { cache:"no-store", headers: { "Authorization": "Bearer " + PW } }); }
+
+// --- WOPR debug console: gate every bridge WRITE behind a WarGames-style side panel ---
+// When debug is on, a mutating bridge request (name / device-name / port-vlan / remediate) is held
+// until you APPLY / SKIP it -- or APPLY ALL (autoplay) / CANCEL the lot. Reads stream by as QUERY
+// lines in the feed. The interceptor wraps fetch once; no call site changes.
+const DEBUG_KEY="argus_debug_v1";
+let DEBUG_ON = localStorage.getItem(DEBUG_KEY)==="1";
+const WOPR={ queue:[], feed:[], autoplay:false };
+function woprGated(path){ return /^\/meraki\/(name|device-name|port-vlan|remediate\/(apply|rollback))/.test(path); }
+function woprShort(path){ return path.replace(/\?.*$/,""); }
+function woprLog(line, cls){ WOPR.feed.push({line:line, cls:cls||""}); if(WOPR.feed.length>120) WOPR.feed.shift(); renderWopr(); }
+const _argusFetch = window.fetch.bind(window);
+window.fetch = function(url, opts){
+  if(DEBUG_ON && typeof url==="string" && url.indexOf(BRIDGE)===0){
+    const path=url.slice(BRIDGE.length), method=((opts&&opts.method)||"GET").toUpperCase();
+    if(method!=="GET" && woprGated(path)){ return woprPrompt(url, opts, path, method); }
+    woprLog((method==="GET"?"QUERY":method)+" "+woprShort(path), "scan");
+  }
+  return _argusFetch(url, opts);
+};
+const WOPR_SKIP={ ok:false, status:0, _skipped:true, json:async()=>({error:"move aborted (WOPR)"}), text:async()=>"" };
+function woprPrompt(url, opts, path, method){
+  return new Promise(resolve=>{
+    let body=null; try{ body=opts&&opts.body?JSON.parse(opts.body):null; }catch(e){ body=opts&&opts.body||null; }
+    const item={url, opts, path, method, body, resolve, state:"pending"};
+    WOPR.queue.push(item);
+    woprLog("MOVE PROPOSED — "+method+" "+woprShort(path), "warn");
+    if(WOPR.autoplay) woprFire(item); else renderWopr();
+  });
+}
+function woprDequeue(item){ const i=WOPR.queue.indexOf(item); if(i>=0) WOPR.queue.splice(i,1); renderWopr(); }
+function woprFire(item){
+  if(item.state!=="pending") return; item.state="firing"; renderWopr();
+  _argusFetch(item.url, item.opts).then(r=>{ item.resolve(r); woprLog("EXECUTED — "+item.method+" "+woprShort(item.path), "ok"); })
+    .catch(e=>{ item.resolve({ok:false,status:0,json:async()=>({error:e.message}),text:async()=>""}); woprLog("FAULT — "+(e.message||"error"), "bad"); });
+  woprDequeue(item);
+}
+function woprSkip(item){ if(!item||item.state!=="pending") return; item.state="skipped"; item.resolve(WOPR_SKIP); woprLog("MOVE ABORTED — "+woprShort(item.path), "bad"); woprDequeue(item); }
+function woprApplyAll(){ WOPR.autoplay=true; woprLog("AUTOPLAY ENGAGED. A STRANGE GAME.", "warn"); WOPR.queue.slice().forEach(woprFire); renderWopr(); }
+function woprCancelAll(){ WOPR.autoplay=false; woprLog("THE ONLY WINNING MOVE IS NOT TO PLAY.", "bad"); WOPR.queue.slice().forEach(woprSkip); renderWopr(); }
+function woprStep(){ WOPR.autoplay=false; woprLog("AUTOPLAY DISENGAGED. AWAITING YOUR MOVE.", "scan"); renderWopr(); }
+function setDebug(on){
+  DEBUG_ON=!!on; localStorage.setItem(DEBUG_KEY, on?"1":"0");
+  if(on){ WOPR.feed=[]; WOPR.autoplay=false; woprLog("GREETINGS, JOSHUA.", "hi"); woprLog("W O P R — WAR OPERATION PLAN RESPONSE", "hi"); woprLog("SHALL WE PLAY A GAME?", "hi"); }
+  else { WOPR.queue.slice().forEach(woprSkip); }
+  renderWopr();
+}
+function woprEl(){ let e=document.getElementById("wopr"); if(!e){ e=document.createElement("div"); e.id="wopr"; document.body.appendChild(e);
+    e.addEventListener("click", ev=>{ const b=ev.target.closest("[data-wopr]"); if(!b) return; const act=b.getAttribute("data-wopr");
+      if(act==="close"){ setDebug(false); const c=document.getElementById("debugtoggle"); if(c) c.checked=false; }
+      else if(act==="applyall"){ woprApplyAll(); } else if(act==="cancelall"){ woprCancelAll(); } else if(act==="step"){ woprStep(); }
+      else if(act==="apply"){ woprFire(WOPR.queue[+b.getAttribute("data-i")]); } else if(act==="skip"){ woprSkip(WOPR.queue[+b.getAttribute("data-i")]); } }); }
+  return e; }
+function woprBodyLines(b){ if(b==null) return ""; if(typeof b!=="object") return "<div class='wl'>"+esc(String(b))+"</div>"; return Object.keys(b).map(k=>"<div class='wl'><span class='wk'>"+esc(k)+"</span> "+esc(typeof b[k]==="object"?JSON.stringify(b[k]):String(b[k]))+"</div>").join(""); }
+function renderWopr(){
+  const e=woprEl();
+  if(!DEBUG_ON){ e.classList.remove("on"); e.innerHTML=""; return; }
+  e.classList.add("on");
+  const pend=WOPR.queue.filter(x=>x.state==="pending");
+  let moves="";
+  if(pend.length){
+    moves="<div class='wopr-moves'>";
+    WOPR.queue.forEach((it,i)=>{ if(it.state!=="pending") return;
+      moves+="<div class='wmove'><div class='wmh'>&#9654; "+esc(it.method)+" <span class='wpath'>"+esc(woprShort(it.path))+"</span></div>"+
+        "<div class='wbody'>"+woprBodyLines(it.body)+"</div>"+
+        "<div class='wbtns'><button class='wbtn go' data-wopr='apply' data-i='"+i+"'>APPLY</button>"+
+        "<button class='wbtn' data-wopr='skip' data-i='"+i+"'>SKIP</button></div></div>"; });
+    moves+="</div>";
+  } else {
+    moves="<div class='wopr-idle'>"+(WOPR.autoplay?"AUTOPLAY ENGAGED. SCANNING FOR MOVES_":"AWAITING YOUR MOVE_")+"</div>";
+  }
+  const feed=WOPR.feed.map(f=>"<div class='wfeed "+esc(f.cls)+"'>"+esc(f.line)+"</div>").join("");
+  const ctl="<div class='wopr-ctl'>"+
+    (pend.length?"<button class='wbtn go' data-wopr='applyall'>APPLY ALL</button><button class='wbtn danger' data-wopr='cancelall'>CANCEL</button>":"")+
+    (WOPR.autoplay?"<button class='wbtn' data-wopr='step'>STEP</button>":"")+
+    "</div>";
+  e.innerHTML="<div class='wopr-scan'></div><div class='wopr-inner'>"+
+    "<div class='wopr-h'><span class='wopr-title'>W.O.P.R.</span><button class='wopr-x' data-wopr='close' title='Log off'>&#10005;</button></div>"+
+    "<div class='wopr-sub'>DEFENSE NETWORK — BRIDGE LINK "+(WOPR.autoplay?"<span class='warn'>AUTOPLAY</span>":"<span class='ok'>ARMED</span>")+(pend.length?" · <span class='warn'>"+pend.length+" PENDING</span>":"")+"</div>"+
+    moves+ctl+
+    "<div class='wopr-feed'>"+feed+"<div class='wcursor'>&#9608;</div></div>"+
+    "</div>";
+  const fe=e.querySelector(".wopr-feed"); if(fe) fe.scrollTop=fe.scrollHeight;
+}
 function esc(s){return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
 function pacific(){
   try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZoneName:'short'}).format(new Date()).replace(',',''); }
@@ -1472,6 +1583,9 @@ document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.s
 document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
 document.getElementById("vlanvalidate").checked = vlanValidateOn();
 document.getElementById("vlanvalidate").addEventListener("change", e=>{ localStorage.setItem(VLANCHK_KEY, e.target.checked?"1":"0"); saveSettings(); render(); });
+document.getElementById("debugtoggle").checked = DEBUG_ON;
+document.getElementById("debugtoggle").addEventListener("change", e=>{ setDebug(e.target.checked); });
+if(DEBUG_ON) renderWopr();
 renderFeatures();
 
 (async()=>{ if(PW){ try{ await loadNetworks(); await loadSettings(); loadCheckContent(); document.getElementById("gate").classList.add("hide"); render(); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
