@@ -610,6 +610,19 @@ function renderWopr(){
   const fe=e.querySelector(".wopr-feed"); if(fe) fe.scrollTop=fe.scrollHeight;
 }
 function esc(s){return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
+// Show the human error, never the JSON wrapper. Pulls the message out of Meraki/bridge payloads like
+// `Meraki 400: {"errors":["..."]}` or `{"error":"..."}` / `{"detail":"..."}`, and strips the status prefix.
+function cleanErr(s){
+  s=String(s==null?"":s);
+  const j=s.match(/\{[\s\S]*\}/);
+  if(j){ try{ const o=JSON.parse(j[0]); if(o){
+    if(Array.isArray(o.errors)&&o.errors.length) return o.errors.join("; ");
+    if(o.detail) return String(o.detail);
+    if(o.message) return String(o.message);
+    if(typeof o.error==="string") return cleanErr(o.error);
+  } }catch(e){} }
+  return s.replace(/^\s*(Meraki|HTTP|bridge)\s+\d+\s*:?\s*/i,"").trim() || s;
+}
 function pacific(){
   try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZoneName:'short'}).format(new Date()).replace(',',''); }
   catch(e){ return new Date().toISOString(); }
@@ -966,7 +979,7 @@ function rosterTargetSection(t,slot,seen){
   const wantVlan=optExpectedVlan(t);
   const accept=acceptSet(slot.net);
   const canName=featureActive("one-click-naming", slot.name);   // rename gated like the Network tab
-  const canVlan=featureActive("set-vlan", slot.name) && isRemediable(slot.net); // VLAN write: lab-feature + allow-listed
+  const canVlan=featureActive("set-vlan", slot.name); // VLAN write: gated like Set Name (lab toggle + TEST/LAB filter)
   let live=0, planned=0, unaccounted=0, rows="";
   mapped.forEach(ip=>{
     const nm=map[ip], s=seen[ip];
@@ -1011,7 +1024,7 @@ function statusIcon(kind,word){ const ch=kind==="live"?"&#9679;":kind==="planned
 function netContent(slot){
   const d=slot.d, wifi=slot.wifi, onlineOnly=true;
   const FEAT=featureActive("one-click-naming", d.name); // One-Click Naming active for this location?
-  const CANVLAN=featureActive("set-vlan", d.name) && isRemediable(slot.net); // inline VLAN / allowed-VLAN write
+  const CANVLAN=featureActive("set-vlan", d.name); // inline VLAN / allowed-VLAN write -- gated like Set Name (lab toggle + TEST/LAB filter)
   const ssidGroups=(wifi&&wifi.ssids)||[];
   let sp="", nameableCount=0;
   const dev=d.devices||[];
@@ -1225,7 +1238,7 @@ function execUI(cid){
   });
   return x+"</div>";
 }
-async function remPost(path, body){ const r=await fetch(BRIDGE+"/meraki/remediate/"+path,{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify(body)}); let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(d.detail||d.error||("HTTP "+r.status)); return d; }
+async function remPost(path, body){ const r=await fetch(BRIDGE+"/meraki/remediate/"+path,{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify(body)}); let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(cleanErr(d.detail||d.error||("HTTP "+r.status))); return d; }
 async function remediatePlan(cid){
   const _cr=AUD.runs[AUD.view]; const net=(_cr&&_cr.scope==="network")?_cr.tgt.id:null; if(!net) return;
   EXEC[cid]={loading:true,steps:null,error:"",network:net,checkId:cid}; render();
@@ -1507,13 +1520,13 @@ function toast(msg){ let t=document.getElementById("argtoast"); if(!t){ t=docume
 // and the inline rename of any connected client.
 async function writeName(mac, name, net){
   const r=await fetch(BRIDGE+"/meraki/name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:net||NETV.net,mac,name})});
-  if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
+  if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(cleanErr(d.detail||d.error||("HTTP "+r.status))); }
   const res=await r.json(); return res.applied_name||name;
 }
 // The second naming write: set a Meraki DEVICE's name (appliance/switch/AP) by serial.
 async function writeDeviceName(serial, name){
   const r=await fetch(BRIDGE+"/meraki/device-name",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({serial,name})});
-  if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(d.detail||d.error||("HTTP "+r.status)); }
+  if(!r.ok){ let d={}; try{ d=await r.json(); }catch(e){} throw new Error(cleanErr(d.detail||d.error||("HTTP "+r.status))); }
   const res=await r.json(); return res.applied_name||name;
 }
 
@@ -1559,7 +1572,7 @@ async function doPortVlanSave(btn){
   btn.disabled=true; const old=btn.innerHTML; btn.innerHTML="<span class='spin'></span>";
   const body = field==="vlan" ? {network:btn.dataset.net,target:btn.dataset.target,vlan:Number(v)} : {network:btn.dataset.net,target:btn.dataset.target,allowedVlans:v};
   try{ const r=await fetch(BRIDGE+"/meraki/port-vlan",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify(body)});
-    let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(d.detail||d.error||("HTTP "+r.status));
+    let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(cleanErr(d.detail||d.error||("HTTP "+r.status)));
     box.outerHTML="<span class='nameok'>&check; "+(field==="vlan"?"VLAN":"allowed")+" &rarr; "+esc(String(d.after!=null?d.after:v))+"</span>"; }
   catch(err){ btn.disabled=false; btn.innerHTML=old; box.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
 }
@@ -1571,7 +1584,7 @@ async function doSetVlan(btn){
   const v=(vlan||"").trim(); if(!/^\d{1,4}$/.test(v)){ btn.insertAdjacentHTML("afterend"," <span class='namewarn'>bad VLAN</span>"); return; }
   btn.disabled=true; const old=btn.innerHTML; btn.innerHTML="<span class='spin'></span> setting&hellip;";
   try{ const r=await fetch(BRIDGE+"/meraki/port-vlan",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:net,target:sp,vlan:Number(v)})});
-    let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(d.detail||d.error||("HTTP "+r.status));
+    let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(cleanErr(d.detail||d.error||("HTTP "+r.status)));
     btn.outerHTML="<span class='nameok'>&check; VLAN &rarr; "+esc(String(d.after!=null?d.after:v))+"</span>"; }
   catch(err){ btn.disabled=false; btn.innerHTML=old; btn.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
 }
