@@ -130,6 +130,9 @@
   .ev-pass{color:var(--ok);font-weight:800;} .ev-fail{color:var(--bad);font-weight:800;} .ev-skip{color:var(--dim);font-weight:800;}
   .auditmode{display:flex;gap:8px;margin:8px 0;} .amode{background:var(--surface);color:var(--dim);border:1px solid var(--line);border-radius:7px;padding:7px 14px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit;} .amode.on{background:#1d2a31;color:var(--accent);border-color:var(--accent);}
   .scopeflip{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 6px;} .scopebtn{background:var(--surface);color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px;} .scopebtn:hover:not(.on){color:var(--text);} .scopebtn.on{background:#1d2a31;color:var(--accent);border-color:var(--accent);}
+  .scopebtn.loadingbox{opacity:.6;cursor:progress;border-style:dashed;}
+  .scopebtn.ready:not(.on){border-color:#2c4a45;animation:readypulse 1.4s ease-out 1;}
+  .scopebtn .readytick{color:var(--ok);} @keyframes readypulse{0%{box-shadow:0 0 0 0 rgba(124,255,178,.5);}100%{box-shadow:0 0 0 7px rgba(124,255,178,0);}}
   #auditsel{min-width:280px;} #runaudit{background:var(--accent);color:#001016;border:none;border-radius:7px;padding:9px 16px;font-weight:800;cursor:pointer;font-family:inherit;}
   .auditlink{color:var(--accent);cursor:pointer;} .auditlink:hover{text-decoration:underline;}
   .lvl{display:inline-block;font-size:.58rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px;border:1px solid var(--line);color:var(--dim);}
@@ -567,13 +570,22 @@ async function loadSlot(id){
   let picks=comboPicks("pick-"+id);
   if(!picks.length && slot.items.length) picks=slot.items.map(it=>({id:it.net,name:it.name})); // Reload re-fetches the loaded set
   if(!picks.length){ slot.error="pick a location"; render(); return; }
-  slot.loading=true; slot.error=""; slot.items=[]; slot.view=0; slot._bytes=0; slot.loadMs=0; syncSlot(slot); render();
-  const t0=Date.now();
-  for(const p of picks){ const it={net:p.id,name:p.name,d:null,wifi:null,portStamp:"",wifiStamp:"",error:""};
-    try{ slot._bytes+=await fetchPorts(it,p.id); try{ slot._bytes+=await fetchWifi(it,p.id); }catch(e){} }
+  // Show every selected location as a box immediately, each in a loading state. Then fetch them in
+  // parallel and reveal each box the moment its data lands -- jumping the view to the first one ready.
+  slot.loading=true; slot.error=""; slot._bytes=0; slot.loadMs=0;
+  slot.items=picks.map(p=>({net:p.id,name:p.name,d:null,wifi:null,portStamp:"",wifiStamp:"",error:"",loading:true}));
+  slot.view=0; syncSlot(slot); render();
+  const t0=Date.now(); let firstDone=-1;
+  await Promise.all(slot.items.map(async it=>{
+    try{ slot._bytes+=await fetchPorts(it,it.net); try{ slot._bytes+=await fetchWifi(it,it.net); }catch(e){} }
     catch(e){ it.error=e.message||"error"; }
-    slot.items.push(it); }
-  slot.loadMs=Date.now()-t0; slot.loading=false; slot.view=0; syncSlot(slot); render();
+    it.loading=false;
+    const i=slot.items.indexOf(it);
+    if(firstDone<0 && !it.error){ firstDone=i; slot.view=i; } // jump to the first location that's ready
+    slot.loadMs=Date.now()-t0; syncSlot(slot); render(); // progressive: each finish updates its own box
+  }));
+  slot.loading=false; slot.loadMs=Date.now()-t0; if(firstDone<0) slot.view=0;
+  syncSlot(slot); render();
 }
 
 // Per-section refresh: re-pull only the source(s) behind the clicked section, for the VIEWED location.
@@ -609,21 +621,26 @@ function renderChecks(){
 // Read-only Firewall Security Audit -- runs one OR MANY targets, each result added to AUD.runs.
 async function pullAudit(targets){
   if(AUD.auditing || !targets || !targets.length) return;
-  AUD.auditing=true; AUD.auditError=""; AUD._bytes=0; const t0=Date.now(); render();
-  let firstNew=-1;
-  for(const t of targets){
+  AUD.auditing=true; AUD.auditError=""; AUD._bytes=0; const t0=Date.now();
+  // Seed a placeholder box per target so all show immediately with a spinner; fill them in parallel,
+  // revealing each result the moment it lands and jumping the view to the first one done.
+  AUD.runs=targets.map(t=>({key:t.type+":"+t.id, scope:t.type, tgt:{id:t.id,name:t.name}, result:null, loading:true, error:""}));
+  AUD.view=0; render();
+  let firstDone=-1;
+  await Promise.all(AUD.runs.map(async run=>{
+    const t={type:run.scope,id:run.tgt.id,name:run.tgt.name};
     try{
       const q = t.type==="org" ? "org=1" : t.type==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
       const r=await api("/meraki/audit?"+q); if(!r.ok) throw new Error("error "+r.status);
-      const txt=await r.text(); AUD._bytes+=txt.length; const result=JSON.parse(txt); const key=t.type+":"+t.id;
-      const run={key, scope:t.type, tgt:{id:t.id,name:t.name}, result};
-      let idx=AUD.runs.findIndex(x=>x.key===key);
-      if(idx>=0) AUD.runs[idx]=run; else idx=AUD.runs.push(run)-1;
-      if(firstNew<0) firstNew=idx;
-    }catch(e){ AUD.auditError=(t.name||t.type)+": "+(e.message||"audit error"); }
-  }
-  if(firstNew>=0) AUD.view=firstNew;
-  AUD.loadMs=Date.now()-t0; AUD.auditing=false; render();
+      const txt=await r.text(); AUD._bytes+=txt.length; run.result=JSON.parse(txt);
+    }catch(e){ run.error=(t.name||t.type)+": "+(e.message||"audit error"); AUD.auditError=run.error; }
+    run.loading=false;
+    const i=AUD.runs.indexOf(run);
+    if(firstDone<0 && !run.error){ firstDone=i; AUD.view=i; AUDITMODE=run.scope; }
+    AUD.loadMs=Date.now()-t0; render();
+  }));
+  if(firstDone<0) AUD.view=0;
+  AUD.auditing=false; AUD.loadMs=Date.now()-t0; render();
 }
 
 // All networks as combo items, with a "no template" hint on the ones that run their own config.
@@ -638,10 +655,14 @@ function pickerRow(id, slot){
   // Centered control box -- the same standard as the Security Audit picker.
   return "<div class='box auditcard'><div class='feat-h'>Load a location</div><div class='bar'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+label+"</div>"+
          (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"")+
-         (slot.items.length>1?slotFlip(id,slot):"")+"</div>";
+         ((slot.items.length>1||slot.loading)?slotFlip(id,slot):"")+"</div>";
 }
 // Flip bar to switch between multiple loaded locations in a tab.
-function slotFlip(id,slot){ return "<div class='scopeflip'>"+slot.items.map((it,i)=>"<button class='scopebtn"+(slot.view===i?" on":"")+"' data-slotview='"+esc(id)+":"+i+"'>"+esc(it.name)+(it.error?" <span class='namewarn'>&#9888;</span>":"")+"</button>").join("")+"</div>"; }
+function slotFlip(id,slot){ return "<div class='scopeflip'>"+slot.items.map((it,i)=>{
+  const tail = it.loading ? " <span class='spin'></span>" : it.error ? " <span class='namewarn'>&#9888;</span>" : " <span class='readytick'>&check;</span>";
+  const cls = "scopebtn"+(slot.view===i?" on":"")+(it.loading?" loadingbox":(it.error?"":" ready"));
+  return "<button class='"+cls+"' data-slotview='"+esc(id)+":"+i+"'>"+esc(it.name)+tail+"</button>";
+}).join("")+"</div>"; }
 // Per-tab Export -- saves only the active tab's data (tab-sensitive). Centered to match the control box.
 function exportRow(){ return "<div class='bar exprow' style='max-width:580px;margin:6px auto 16px;'>"+saveMenu("tab")+"<span class='muted'>this tab &mdash; Google Sheets, Excel, JSON, CSV, or print</span></div>"; }
 // Centered hero shown when a data tab has nothing loaded yet -- icon, title, one line, multi-select search.
@@ -992,19 +1013,22 @@ async function remediateRollback(cid, i){
 // Security Audit pane: read-only firewall/security audit. Picks its own target (network / template / org).
 function auditPane(){
   let h=auditPicker(); // picker always present (with the hero inside the box when nothing has run)
-  if(AUD.auditing){ return h+"<div class='box'><div class='muted'><span class='spin'></span> running read-only audit"+(AUD.runs.length?" ("+AUD.runs.length+" done so far)":"")+"&hellip;</div></div>"; }
-  if(!AUD.runs.length){ return h+(AUD.auditError?"<div class='err'>audit failed: "+esc(AUD.auditError)+"</div>":"")+auditExtras(); }
+  if(!AUD.runs.length){ if(AUD.auditing) return h+"<div class='box'><div class='muted'><span class='spin'></span> starting audit&hellip;</div></div>"; return h+(AUD.auditError?"<div class='err'>audit failed: "+esc(AUD.auditError)+"</div>":"")+auditExtras(); }
   if(AUD.view>=AUD.runs.length) AUD.view=0;
-  if(AUD.auditError) h+="<div class='err'>some audits failed: "+esc(AUD.auditError)+"</div>";
-  // Flip between every audited result.
-  if(AUD.runs.length>1){
+  if(AUD.auditError && !AUD.auditing) h+="<div class='err'>some audits failed: "+esc(AUD.auditError)+"</div>";
+  // Flip between every audited target -- boxes show immediately, each with a spinner until its grade lands.
+  if(AUD.runs.length>1 || AUD.auditing){
     const lab={network:"Network",template:"Template",org:"Org"};
     h+="<div class='scopeflip'>";
     AUD.runs.forEach((r,i)=>{ const nm=r.scope==="org"?"Organization":esc(r.tgt.name);
-      h+="<button class='scopebtn"+(AUD.view===i?" on":"")+"' data-runview='"+i+"'>"+lab[r.scope]+" &middot; "+nm+" <b class='grade-"+esc(r.result.grade)+"'>"+esc(r.result.grade)+"</b></button>"; });
+      const tail = r.loading ? " <span class='spin'></span>" : r.error ? " <span class='namewarn'>&#9888;</span>" : " <b class='grade-"+esc(r.result.grade)+"'>"+esc(r.result.grade)+"</b>";
+      const cls = "scopebtn"+(AUD.view===i?" on":"")+(r.loading?" loadingbox":(r.error?"":" ready"));
+      h+="<button class='"+cls+"' data-runview='"+i+"'>"+lab[r.scope]+" &middot; "+nm+tail+"</button>"; });
     h+="</div>";
   }
-  const run=AUD.runs[AUD.view], A=run.result, S=A.summary||{}, isOrg=run.scope==="org";
+  const run=AUD.runs[AUD.view];
+  if(!run || run.loading || !run.result){ h+="<div class='box'><div class='muted'><span class='spin'></span> "+(run&&run.error?esc(run.error):"loading <b>"+(run?esc(run.tgt.name||run.scope):"")+"</b>&hellip;")+"</div></div>"; return h; }
+  const A=run.result, S=A.summary||{}, isOrg=run.scope==="org";
   const scopeLabel = isOrg ? "Audited <b>organization</b>" : "Audited "+(A.isTemplate?"template":"network")+" <b>"+esc(A.store||run.tgt.name||"")+"</b>";
   h+=exportRow();
   h+="<div class='stamp'>"+scopeLabel+"</div>";
@@ -1086,7 +1110,7 @@ function render(){
   // Operations -- compact toolbar when loaded, a centered hero when empty
   const opsDesc="Toast POS devices on the POS VLAN, plus Konductor rollout health &mdash; every mapped device live and on VLAN 90.";
   const paneCls=(t)=> "panebox "+(TAB===t ? (TAB_ANIM?"anim":"") : "hidden");
-  const slotBody=(slot,fn)=>{ if(!slot.items.length) return null; if(slot.d) return exportRow()+slotHead(slot)+fn(slot); const it=slot.items[slot.view]; return "<div class='err'>"+esc((it&&it.error)||"load error")+"</div>"; };
+  const slotBody=(slot,fn)=>{ if(!slot.items.length) return null; const it=slot.items[slot.view]; if(slot.d) return exportRow()+slotHead(slot)+fn(slot); if(it&&it.loading) return "<div class='box'><div class='muted'><span class='spin'></span> loading <b>"+esc(it.name)+"</b>&hellip;</div></div>"; return "<div class='err'>"+esc((it&&it.error)||"load error")+"</div>"; };
   const opsBody=slotBody(OPS,opsContent);
   h+="<div id='pane-operations' class='"+paneCls("operations")+"'>"+
      (OPS.items.length ? pickerRow("operations",OPS)+opsBody : emptyState("operations",OPS,"&#9776;","Operations",opsDesc))+"</div>";
@@ -1378,8 +1402,8 @@ document.getElementById("report").addEventListener("click", e=>{
   const eal=e.target.closest("[data-execall]"); if(eal){ e.stopImmediatePropagation(); const cid=eal.getAttribute("data-execall"); const ex=EXEC[cid]; if(ex&&ex.steps){ ex.steps.forEach((s,i)=>{ if(s.moderated&&s.status!=="applied"){ const inp=document.getElementById("execval-"+cid+"-"+i); if(inp) s.value=inp.value.trim(); } }); } remediateApplyAll(cid); return; }
   const erb=e.target.closest("[data-execrb]"); if(erb){ e.stopImmediatePropagation(); const a=erb.getAttribute("data-execrb").split(":"); remediateRollback(a[0],+a[1]); return; }
   const cj=e.target.closest(".catcard.jump"); if(cj){ const cat=cj.getAttribute("data-cat"); const tgt=document.querySelector(".fcard[data-fcat=\""+(cat||"").replace(/"/g,"")+"\"]"); if(tgt){ tgt.scrollIntoView({behavior:"smooth",block:"center"}); tgt.classList.add("flash"); setTimeout(()=>tgt.classList.remove("flash"),1200); } return; }
-  const sv=e.target.closest("[data-slotview]"); if(sv){ const a=sv.getAttribute("data-slotview").split(":"), slot=slotById(a[0]); if(slot){ slot.view=+a[1]; syncSlot(slot); render(); } return; }
-  const rv2=e.target.closest("[data-runview]"); if(rv2){ AUD.view=+rv2.getAttribute("data-runview"); const r=AUD.runs[AUD.view]; if(r) AUDITMODE=r.scope; render(); return; }
+  const sv=e.target.closest("[data-slotview]"); if(sv){ const a=sv.getAttribute("data-slotview").split(":"), slot=slotById(a[0]); if(slot){ const it=slot.items[+a[1]]; if(it&&it.loading) return; slot.view=+a[1]; syncSlot(slot); render(); } return; }
+  const rv2=e.target.closest("[data-runview]"); if(rv2){ const i=+rv2.getAttribute("data-runview"); const r=AUD.runs[i]; if(r&&r.loading) return; AUD.view=i; if(r) AUDITMODE=r.scope; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show){ renderFeatures(); fillRemedPicker(); renderRemediable(); renderOpTargets(); } });
