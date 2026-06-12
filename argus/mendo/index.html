@@ -203,6 +203,9 @@
   .opt-sub{color:var(--dim);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 4px;}
   .setvlanit{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .setvlanit:hover{background:var(--accent);color:#001016;} .setvlanit:disabled{opacity:.6;cursor:default;}
+  .vlanedit{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 5px;margin-left:5px;font-size:.72rem;cursor:pointer;font-family:inherit;}
+  .vlanedit:hover{color:var(--accent);border-color:var(--accent);}
+  .vlanval{background:#141414;color:var(--fg,#eee);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-family:inherit;font-size:.82rem;}
   .featrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0e0e0e;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;}
   .featrow .fn{font-weight:700;} .featrow .fd{color:var(--dim);font-size:.82rem;flex:1 1 220px;}
   .badge{font-size:.66rem;font-weight:800;letter-spacing:.5px;border-radius:5px;padding:1px 8px;text-transform:uppercase;}
@@ -491,7 +494,7 @@ let NAMEMAP=rosterMap();
 const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
 const FEATURE_DEFS={
   "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." },
-  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) from Action Plans → “Let Argus fix it”. Lab networks only until you Enable for Production." }
+  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Production-enabled; writes are still limited to networks on the Remediable allow-list (server-enforced)." }
 };
 // VLAN id list must be comma-separated, no spaces (e.g. 90,100). Single VLAN = one number.
 function validVlanList(s){ return /^\d{1,4}(,\d{1,4})*$/.test(String(s||"").trim()); }
@@ -503,6 +506,9 @@ const VLAN_SET_CHECKS={ "SW-NV1":1, "SW-TRUNK":1 };
 function loadFeatures(){
   let s={}; try{ s=JSON.parse(localStorage.getItem(FEAT_KEY)||"{}"); }catch(e){}
   for(const k in FEATURE_DEFS){ if(!s[k]) s[k]={state:"lab",enabledForProdAt:null}; }
+  // Set VLAN is production-enabled by decision: the Remediable allow-list (server-enforced) is the real
+  // guard, so the lab-only gate is redundant friction. Migrate any lab-state install to prod once.
+  if(s["set-vlan"] && s["set-vlan"].state==="lab"){ s["set-vlan"].state="prod"; s["set-vlan"].enabledForProdAt=s["set-vlan"].enabledForProdAt||new Date().toISOString(); }
   const now=Date.now();
   for(const k in s){ if(s[k].state==="prod" && s[k].enabledForProdAt && now-new Date(s[k].enabledForProdAt).getTime()>=7*864e5) s[k].state="shipped"; }
   localStorage.setItem(FEAT_KEY, JSON.stringify(s)); return s;
@@ -749,6 +755,7 @@ function statusIcon(kind,word){ const ch=kind==="live"?"&#9679;":kind==="planned
 function netContent(slot){
   const d=slot.d, wifi=slot.wifi, onlineOnly=true;
   const FEAT=featureActive("one-click-naming", d.name); // One-Click Naming active for this location?
+  const CANVLAN=featureActive("set-vlan", d.name) && isRemediable(slot.net); // inline VLAN / allowed-VLAN write
   const ssidGroups=(wifi&&wifi.ssids)||[];
   let sp="", nameableCount=0;
   const dev=d.devices||[];
@@ -792,9 +799,12 @@ function netContent(slot){
       const hist=allClients.slice().sort((a,b)=>String(b.lastSeen||"").localeCompare(String(a.lastSeen||"")));
       const hasHist = hist.some(c=>(c.status||"").toLowerCase()!=="online");
       const moreLink = hasHist ? " <a class='moreinfo' data-hist='"+esc(key)+"'>24h &#9662;</a>" : "";
+      const tgt=(sw.serial||"")+"|"+p.port;
+      const vEdit = (CANVLAN && sw.serial) ? " <button class='vlanedit' data-target='"+esc(tgt)+"' data-field='vlan' data-cur='"+esc(p.vlan==null?"":String(p.vlan))+"' data-net='"+esc(slot.net)+"' title='Set native VLAN'>&#9998;</button>" : "";
+      const aEdit = (CANVLAN && sw.serial) ? " <button class='vlanedit' data-target='"+esc(tgt)+"' data-field='allowedVlans' data-cur='"+esc((p.allowedVlans||"")).replace(/'/g,"&#39;")+"' data-net='"+esc(slot.net)+"' title='Set allowed VLANs'>&#9998;</button>" : "";
       sb+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+
-        "</td><td class='"+(conn?"st-conn":"st-disc")+"'>"+esc(p.status||"")+"</td><td>"+esc(p.vlan)+
-        "</td><td class='av'>"+esc(p.allowedVlans||"")+"</td><td>"+desc+nameBtn+moreLink+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av nw'>"+ls+"</td></tr>";
+        "</td><td class='"+(conn?"st-conn":"st-disc")+"'>"+esc(p.status||"")+"</td><td class='nw'>"+esc(p.vlan)+vEdit+
+        "</td><td class='av nw'>"+esc(p.allowedVlans||"")+aEdit+"</td><td>"+desc+nameBtn+moreLink+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av nw'>"+ls+"</td></tr>";
       if(hasHist){
         let hr="<div class='histwrap'><div class='histcap'>Past 24 hours &middot; port "+esc(p.port)+" ("+hist.length+")</div>"+
           "<table class='histtbl'><thead><tr><th>Last seen (PT)</th><th>Status</th><th>Description</th><th>IP</th><th>MAC</th><th>VLAN</th></tr></thead><tbody>";
@@ -1263,6 +1273,26 @@ async function doRenameSave(btn){
   try{ const applied = btn.dataset.serial ? await writeDeviceName(btn.dataset.serial,name) : await writeName(btn.dataset.mac,name); box.outerHTML="<span class='nameok'>&check; named &ldquo;"+esc(applied)+"&rdquo;</span>"; }
   catch(err){ btn.disabled=false; btn.innerHTML=old; box.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
 }
+// Network-tab inline VLAN editor: pencil -> input+Save -> /meraki/port-vlan -> status.
+// field = "vlan" (native, one number) or "allowedVlans" (comma list / ranges). Gated like the op-target fix.
+function openVlanEdit(btn){
+  const cur=(btn.dataset.cur||"").replace(/"/g,"&quot;");
+  const field=btn.dataset.field, ph = field==="vlan" ? "VLAN e.g. 90" : "allowed e.g. 1,10,20";
+  btn.outerHTML="<span class='renbox'><input class='vlanval' value=\""+cur+"\" spellcheck='false' placeholder='"+ph+"' style='width:120px;'><button class='vlansave' data-target='"+esc(btn.dataset.target)+"' data-field='"+esc(field)+"' data-net='"+esc(btn.dataset.net||"")+"'>Save</button><button class='rencancel'>&#10005;</button></span>";
+  const inp=document.querySelector(".renbox .vlanval"); if(inp){ inp.focus(); inp.select(); }
+}
+async function doPortVlanSave(btn){
+  const box=btn.closest(".renbox"); if(!box) return;
+  const inp=box.querySelector(".vlanval"), v=(inp.value||"").trim(), field=btn.dataset.field;
+  if(field==="vlan"){ if(!/^\d{1,4}$/.test(v)){ inp.focus(); return; } }
+  else { if(!/^\d{1,4}(-\d{1,4})?(,\d{1,4}(-\d{1,4})?)*$/.test(v)){ inp.focus(); return; } }
+  btn.disabled=true; const old=btn.innerHTML; btn.innerHTML="<span class='spin'></span>";
+  const body = field==="vlan" ? {network:btn.dataset.net,target:btn.dataset.target,vlan:Number(v)} : {network:btn.dataset.net,target:btn.dataset.target,allowedVlans:v};
+  try{ const r=await fetch(BRIDGE+"/meraki/port-vlan",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify(body)});
+    let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(d.detail||d.error||("HTTP "+r.status));
+    box.outerHTML="<span class='nameok'>&check; "+(field==="vlan"?"VLAN":"allowed")+" &rarr; "+esc(String(d.after!=null?d.after:v))+"</span>"; }
+  catch(err){ btn.disabled=false; btn.innerHTML=old; box.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
+}
 // Op-targets inline VLAN fix: set ONE switch port's native VLAN. Gated UI-side (set-vlan + remediable)
 // AND server-side (lab + allow-list + capture-before-write) by the bridge. sp = "serial|portId".
 async function doSetVlan(btn){
@@ -1297,6 +1327,8 @@ document.getElementById("report").addEventListener("click", async e=>{
   const ri=e.target.closest(".renameit"); if(ri){ e.stopImmediatePropagation(); openRename(ri); return; }
   const rs=e.target.closest(".rensave"); if(rs){ e.stopImmediatePropagation(); doRenameSave(rs); return; }
   const rc=e.target.closest(".rencancel"); if(rc){ e.stopImmediatePropagation(); render(); return; }
+  const ve=e.target.closest(".vlanedit"); if(ve){ e.stopImmediatePropagation(); openVlanEdit(ve); return; }
+  const vs=e.target.closest(".vlansave"); if(vs){ e.stopImmediatePropagation(); doPortVlanSave(vs); return; }
   const sv=e.target.closest(".setvlanit"); if(sv){ e.stopImmediatePropagation(); doSetVlan(sv); return; }
   const nb=e.target.closest(".nameit"); if(nb){ e.stopPropagation(); doNameButton(nb); return; }
   const na=e.target.closest("#nameall"); if(na){ na.disabled=true; const msg=document.getElementById("nameallmsg"); const all=[...document.querySelectorAll(".nameit:not(:disabled)")]; if(msg) msg.innerHTML="<span class='spin'></span> naming "+all.length+"&hellip;"; await Promise.all(all.map(doNameButton)); if(msg) msg.textContent="done"; na.disabled=false; return; }
