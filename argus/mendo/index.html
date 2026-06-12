@@ -86,6 +86,16 @@
   .ptier-h{font-size:.84rem;font-weight:700;color:var(--text);margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .ptier-tag{font-size:.66rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:5px;padding:2px 7px;}
   .ptier-tag.t1{background:#16323d;color:var(--accent);border:1px solid var(--accent);} .ptier-tag.t3{background:#3a2a00;color:var(--warn);border:1px solid var(--warn);}
+  .ptier-tag.trec{background:#06251a;color:var(--ok);border:1px solid var(--ok);}
+  .ptier.trecbox{border-color:#1e5b44;background:#0c1812;}
+  .rec-setto{background:#06251a;border:1px solid #1e5b44;border-radius:7px;padding:8px 11px;font-size:.88rem;line-height:1.5;} .rec-setto b{color:var(--ok);}
+  .rec-where{font-size:.8rem;color:var(--dim);margin-top:6px;}
+  .rec-opt{width:100%;border-collapse:collapse;margin-top:8px;font-size:.8rem;background:#0d0d0d;border:1px solid var(--line);border-radius:7px;overflow:hidden;}
+  .rec-opt th{text-align:left;color:var(--dim);font-size:.62rem;text-transform:uppercase;letter-spacing:.5px;padding:6px 8px;border-bottom:1px solid var(--line);font-weight:700;}
+  .rec-opt td{padding:6px 8px;border-bottom:1px solid #1c1c1c;vertical-align:top;color:#c8d2d7;} .rec-opt tr:last-child td{border-bottom:none;} .rec-opt td b{color:var(--ok);}
+  .rec-opt th:nth-child(1),.rec-opt td:nth-child(1){width:30%;} .rec-opt th:nth-child(2),.rec-opt td:nth-child(2){width:28%;}
+  .rec-avoid{font-size:.82rem;color:var(--bad);margin-top:8px;} .rec-avoid b{color:var(--bad);}
+  .rec-std{font-size:.76rem;color:var(--dim);margin-top:6px;}
   .ptier-b{font-size:.88rem;color:#c8d2d7;line-height:1.55;} .pdash{color:var(--dim);font-size:.8rem;margin-top:5px;}
   .readmore{color:var(--accent);font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;} .readmore:hover{text-decoration:underline;}
   .rmore{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:11px;}
@@ -1170,6 +1180,20 @@ const EXECUTABLE={ "SW-NV1":1, "SW-UNUSED":1, "SW-TRUNK":1 };
 // Checks that stay manual FOREVER -- applying them can disconnect clients or impact people.
 const NEVER_AUTO={ "WIFI-01":1, "WIFI-07":1, "EXP-04":1, "EXP-05":1, "ORG-01":1, "ORG-02":1, "ORG-04":1, "FW-01":1, "FW-02":1, "FW-03":1 };
 let EXEC={}; // checkId -> { loading, error, network, checkId, steps:[{stepId,label,field,current,moderated,status,value,before,msg}] }
+// Recommended-setting card: the concrete value to set, options (when/why), what to avoid, the standard.
+function recommendBlock(rec){
+  if(!rec) return "";
+  let h="<div class='rec-setto'>&#9733; <b>Set it to:</b> "+esc(rec.setTo||"")+"</div>";
+  if(rec.where) h+="<div class='rec-where'>Dashboard: <code>"+esc(rec.where)+"</code></div>";
+  if(Array.isArray(rec.options)&&rec.options.length){
+    h+="<table class='rec-opt'><thead><tr><th>Option</th><th>When</th><th>Why</th></tr></thead><tbody>";
+    rec.options.forEach(o=>{ h+="<tr><td><b>"+esc(o.value)+"</b></td><td>"+esc(o.when)+"</td><td>"+esc(o.why)+"</td></tr>"; });
+    h+="</tbody></table>";
+  }
+  if(rec.avoid) h+="<div class='rec-avoid'>&#9888; <b>Avoid:</b> "+esc(rec.avoid)+"</div>";
+  if(rec.standard) h+="<div class='rec-std'>Standard: "+esc(rec.standard)+"</div>";
+  return h;
+}
 function actionPlans(f, canApply){
   const why=CAT_WHY[f.category]||"This weakens the network&rsquo;s security posture.";
   const canExec=!!EXECUTABLE[f.id];
@@ -1179,6 +1203,8 @@ function actionPlans(f, canApply){
   let t1="<div class='ptier-b'>"+why;
   if(cc){ const ro=!!READMORE[f.id]; t1+=" <a class='readmore' data-readmore='"+esc(f.id)+"'>"+(ro?"&#9662; show less":"&#9656; read more")+"</a>"; if(ro) t1+=readMoreBlock(cc); }
   x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>1 &middot; Understand</span> Why this matters</div>"+t1+"</div>";
+  // Recommended setting -- the bridge from "why" to "do": what to actually set it to, options + why.
+  if(cc && cc.recommend) x+="<div class='ptier trecbox'><div class='ptier-h'><span class='ptier-tag trec'>&#9733; Recommended</span> what to actually set it to</div><div class='ptier-b'>"+recommendBlock(cc.recommend)+"</div></div>";
   // Tier 2 -- Fix it yourself + exact Meraki deep-link, help doc, how-to
   let t2="<div class='ptier-b'><div>"+esc(f.remediation)+"</div>";
   if(cc){
