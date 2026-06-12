@@ -754,7 +754,7 @@ let NAMEMAP=rosterMap();
 const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
 const FEATURE_DEFS={
   "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." },
-  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Lab networks only until you Enable for Production; writes are always limited to the Remediable allow-list (server-enforced)." }
+  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Lab/test networks only (a location whose name contains a Lab/Test keyword). Not promotable to production — never writes a non-lab network.", labOnly:true }
 };
 // VLAN id list must be comma-separated, no spaces (e.g. 90,100). Single VLAN = one number.
 function validVlanList(s){ return /^\d{1,4}(,\d{1,4})*$/.test(String(s||"").trim()); }
@@ -766,24 +766,25 @@ const VLAN_SET_CHECKS={ "SW-NV1":1, "SW-TRUNK":1 };
 function loadFeatures(){
   let s={}; try{ s=JSON.parse(localStorage.getItem(FEAT_KEY)||"{}"); }catch(e){}
   for(const k in FEATURE_DEFS){ if(!s[k]) s[k]={state:"lab",enabledForProdAt:null}; }
-  // One-shot: set-vlan was briefly auto-production-enabled. Restore the manual Enable-for-Production
-  // choice (same as One-Click Naming) so the operator opts in deliberately. Runs once per machine.
-  if(localStorage.getItem("argus_setvlan_relab_v1")!=="1"){ if(s["set-vlan"]){ s["set-vlan"].state="lab"; s["set-vlan"].enabledForProdAt=null; } localStorage.setItem("argus_setvlan_relab_v1","1"); }
+  // Lab-only features (e.g. Set VLAN) can NEVER be promoted: clamp to lab every load, even if a
+  // synced/stored state says prod. The TEST/LAB keyword filter is the only thing that activates them.
+  for(const k in FEATURE_DEFS){ if(FEATURE_DEFS[k].labOnly && s[k]){ s[k].state="lab"; s[k].enabledForProdAt=null; } }
   const now=Date.now();
-  for(const k in s){ if(s[k].state==="prod" && s[k].enabledForProdAt && now-new Date(s[k].enabledForProdAt).getTime()>=7*864e5) s[k].state="shipped"; }
+  for(const k in s){ if(!(FEATURE_DEFS[k]&&FEATURE_DEFS[k].labOnly) && s[k].state==="prod" && s[k].enabledForProdAt && now-new Date(s[k].enabledForProdAt).getTime()>=7*864e5) s[k].state="shipped"; }
   localStorage.setItem(FEAT_KEY, JSON.stringify(s)); return s;
 }
 let FEATURES=loadFeatures();
 function saveFeatures(){ localStorage.setItem(FEAT_KEY, JSON.stringify(FEATURES)); }
 function labKeywords(){ const v=localStorage.getItem(LABKW_KEY); return (v!=null?v:"TEST, LAB").split(/[,\s]+/).filter(Boolean).map(x=>x.toUpperCase()); }
 function isLabNet(name){ const n=" "+(name||"").toUpperCase().replace(/\s+/g," ").trim()+" "; return labKeywords().some(k=>k&&n.indexOf(" "+k+" ")>=0); } // keyword must be a whole word; the name is space-padded so a keyword at the START or END also qualifies (e.g. "001 - Global FW Lab")
-function featureActive(key,netName){ const f=FEATURES[key]; if(!f) return false; if(f.state==="shipped"||f.state==="prod") return true; if(f.state==="lab") return isLabNet(netName); return false; }
+function featureActive(key,netName){ const f=FEATURES[key]; if(!f) return false; if(FEATURE_DEFS[key]&&FEATURE_DEFS[key].labOnly) return isLabNet(netName); if(f.state==="shipped"||f.state==="prod") return true; if(f.state==="lab") return isLabNet(netName); return false; }
 function daysLeft(iso){ if(!iso) return 0; return Math.max(0, 7-Math.floor((Date.now()-new Date(iso).getTime())/864e5)); }
 function renderFeatures(){
   const el=document.getElementById("featlist"); if(!el) return; let rows="";
   for(const k in FEATURE_DEFS){ const f=FEATURES[k]; if(!f||f.state==="shipped") continue; const def=FEATURE_DEFS[k];
     let badge,action;
-    if(f.state==="lab"){ badge="<span class='badge lab'>Lab Testing</span>"; action="<button data-feat-prod='"+esc(k)+"'>Enable for Production</button>"; }
+    if(def.labOnly){ badge="<span class='badge lab'>Lab Only</span>"; action="<span class='muted'>lab/test networks only &middot; not promotable</span>"; }
+    else if(f.state==="lab"){ badge="<span class='badge lab'>Lab Testing</span>"; action="<button data-feat-prod='"+esc(k)+"'>Enable for Production</button>"; }
     else { badge="<span class='badge prod'>Production</span>"; action="<span class='muted'>ships in "+daysLeft(f.enabledForProdAt)+"d &middot; then archived</span>"; }
     rows+="<div class='featrow'><span class='fn'>"+esc(def.name)+"</span>"+badge+"<span class='fd'>"+esc(def.desc)+"</span>"+action+"</div>";
   }
@@ -1759,7 +1760,7 @@ document.getElementById("optlist").addEventListener("click", e=>{ const b=e.targ
 document.getElementById("optadd-vlan").addEventListener("click", ()=>optAdd("vlan"));
 document.getElementById("optadd-roster").addEventListener("click", ()=>optAdd("roster"));
 // Lab Features: enable-for-production + configurable keywords
-document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); saveSettings(); renderFeatures(); render(); } });
+document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURE_DEFS[k]&&FEATURE_DEFS[k].labOnly) return; if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); saveSettings(); renderFeatures(); render(); } });
 document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); saveSettings(); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", ")+" · synced"; render(); });
 document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
 document.getElementById("vlanvalidate").checked = vlanValidateOn();
