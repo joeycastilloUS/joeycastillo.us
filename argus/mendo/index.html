@@ -271,7 +271,7 @@
   .wopr-x:hover{border-color:var(--bad);color:var(--bad);}
   .wopr-grid{display:flex;flex-direction:column;gap:10px;flex:1 1 auto;min-height:0;margin:10px 0 0;position:relative;z-index:6;}
   .wsec{border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;min-height:0;background:#101010;}
-  .wsec.s-moves{flex:0 0 auto;max-height:34%;} .wsec.s-out,.wsec.s-in{flex:1 1 0;min-height:80px;} .wsec.s-trace{flex:0 0 110px;}
+  .wsec.s-moves{flex:0 0 auto;max-height:30%;} .wsec.s-out,.wsec.s-in{flex:0 0 auto;max-height:26vh;} .wsec.s-trace{flex:1 1 auto;min-height:160px;}
   .wsec-h{font-size:.66rem;font-weight:700;letter-spacing:1.5px;padding:6px 9px;border-bottom:1px solid var(--line);color:var(--accent);background:#161616;flex:0 0 auto;border-radius:8px 8px 0 0;}
   .wsec-b{flex:1 1 auto;overflow:auto;padding:9px;min-height:0;}
   .wopr-moves{display:flex;flex-direction:column;gap:8px;}
@@ -286,9 +286,18 @@
   .wline{font-size:.76rem;margin-bottom:7px;word-break:break-all;color:var(--dim);} .wline .wm{color:var(--accent);font-weight:700;}
   .wjson{margin:0;font-family:Consolas,"Courier New",monospace;font-size:.74rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:var(--dim);}
   .wjson .jk{color:var(--accent);} .wjson .js{color:var(--ok);} .wjson .jn{color:#8ab4ff;} .wjson .jb{color:var(--warn);} .wdim{opacity:.5;}
-  .wopr-feed{height:100%;overflow:auto;font-family:Consolas,"Courier New",monospace;font-size:.72rem;line-height:1.55;}
-  .wfeed{white-space:pre-wrap;word-break:break-all;color:#aaa;} .wfeed.scan{color:#666;} .wfeed.warn{color:var(--warn);} .wfeed.ok{color:var(--ok);} .wfeed.bad{color:var(--bad);} .wfeed.hi{color:var(--accent);font-weight:700;}
-  .wcursor{display:inline-block;color:var(--accent);animation:woprblink 1.1s steps(1) infinite;} @keyframes woprblink{50%{opacity:0;}}
+  .wopr-feed{height:100%;overflow:auto;font-family:Consolas,"Courier New",monospace;font-size:.76rem;line-height:1.4;}
+  .wfeed{display:grid;grid-template-columns:auto 3px 1fr;column-gap:9px;align-items:stretch;padding:3px 6px;border-radius:4px;}
+  .wfeed:hover{background:rgba(255,255,255,.035);}
+  .wt{color:#5a5a5a;font-variant-numeric:tabular-nums;white-space:nowrap;padding-top:1px;}
+  .wbar{background:#333;border-radius:2px;}
+  .wmsg{color:#c4c4c4;word-break:break-word;}
+  .wfeed.scan .wmsg{color:#7c7c7c;} .wfeed.scan .wbar{background:#2c2c2c;}
+  .wfeed.warn .wmsg{color:var(--warn);} .wfeed.warn .wbar{background:var(--warn);}
+  .wfeed.ok .wmsg{color:var(--ok);} .wfeed.ok .wbar{background:var(--ok);}
+  .wfeed.bad .wmsg{color:var(--bad);} .wfeed.bad .wbar{background:var(--bad);}
+  .wfeed.hi .wmsg{color:var(--accent);font-weight:700;} .wfeed.hi .wbar{background:var(--accent);}
+  .wcursor{display:inline-block;color:var(--accent);margin-left:6px;animation:woprblink 1.1s steps(1) infinite;} @keyframes woprblink{50%{opacity:0;}}
   @media (max-width:520px){ #wopr:not(.collapsed){width:100vw!important;} body{padding-left:0!important;padding-right:0!important;} }
 </style>
 </head>
@@ -467,7 +476,8 @@ function woprCollapse(){ WOPR.collapsed=true; woprSaveLayout(); woprApplyLayout(
 function woprShow(){ WOPR.collapsed=false; woprSaveLayout(); woprApplyLayout(); renderWopr(); }
 function woprGated(path){ return /^\/meraki\/(name|device-name|port-vlan|remediate\/(apply|rollback))/.test(path); }
 function woprShort(path){ return path.replace(/\?.*$/,""); }
-function woprLog(line, cls){ WOPR.feed.push({line:line, cls:cls||""}); if(WOPR.feed.length>120) WOPR.feed.shift(); renderWopr(); }
+function woprClock(){ try{ return new Date().toLocaleTimeString("en-GB",{hour12:false}); }catch(e){ return ""; } }
+function woprLog(line, cls){ WOPR.feed.push({t:woprClock(), line:line, cls:cls||""}); if(WOPR.feed.length>250) WOPR.feed.shift(); renderWopr(); }
 const _argusFetch = window.fetch.bind(window);
 window.fetch = function(url, opts){
   if(DEBUG_ON && typeof url==="string" && url.indexOf(BRIDGE)===0){
@@ -538,12 +548,15 @@ window.addEventListener("DOMContentLoaded", ()=>{ const host=BRIDGE.replace(/^ht
 function woprJson(obj){
   if(obj===undefined||obj===null) return "<span class='wdim'>(none)</span>";
   let s; try{ s=JSON.stringify(obj,null,2); }catch(e){ return esc(String(obj)); }
-  s=esc(s);
-  s=s.replace(/"([^"]+)"(\s*:)/g,'<span class="jk">"$1"</span>$2')
-     .replace(/:\s*"([^"]*)"/g,': <span class="js">"$1"</span>')
-     .replace(/:\s*(-?\d+(?:\.\d+)?)/g,': <span class="jn">$1</span>')
-     .replace(/:\s*(true|false|null)/g,': <span class="jb">$1</span>');
-  return s;
+  s=esc(s); // & < > -> entities; quotes stay literal
+  // String-aware tokenizer: match whole strings (keys keep their trailing colon) before numbers/bools,
+  // so colons/digits INSIDE a string value (e.g. a MAC) are never mis-highlighted.
+  return s.replace(/("(?:\\.|[^"\\])*"(\s*:)?)|\b(true|false|null)\b|(-?\d+(?:\.\d+)?)/g,
+    function(m, str, colon, kw, num){
+      if(str!=null) return "<span class='"+(colon?"jk":"js")+"'>"+str+"</span>";
+      if(kw!=null) return "<span class='jb'>"+kw+"</span>";
+      return "<span class='jn'>"+num+"</span>";
+    });
 }
 function renderWopr(){
   const e=woprEl();
@@ -570,7 +583,9 @@ function renderWopr(){
   else if(WOPR.last&&WOPR.last.res){ const rs=WOPR.last.res; inBody="<div class='wline'>STATUS <span class='"+(rs.ok?"ok":"bad")+"'>"+esc(rs.status||0)+(rs.ok?" · CONFIRMED":" · REJECTED")+"</span></div><pre class='wjson'>"+woprJson(rs.body)+"</pre>"; }
   else { inBody="<div class='wopr-idle'>NO RESPONSE LOGGED</div>"; }
   // SECTION 4 -- AUDIT TRAIL: the running request/response log.
-  const trace=WOPR.feed.map(f=>"<div class='wfeed "+esc(f.cls)+"'>"+esc(f.line)+"</div>").join("");
+  const trace=WOPR.feed.length
+    ? WOPR.feed.map(f=>"<div class='wfeed "+esc(f.cls)+"'><span class='wt'>"+esc(f.t||"")+"</span><span class='wbar'></span><span class='wmsg'>"+esc(f.line)+"</span></div>").join("")
+    : "<div class='wopr-idle'>NO ACTIVITY LOGGED</div>";
   const status=(WOPR.autoplay?"<span class='warn'>STANDING AUTH</span>":"<span class='ok'>SECURE</span>")+(pend.length?" · <span class='warn'>"+pend.length+" PENDING</span>":"");
   const ctl=(pend.length?"<button class='wbtn go' data-wopr='applyall'>AUTHORIZE ALL</button><button class='wbtn danger' data-wopr='cancelall'>ABORT</button>":"")+
             (WOPR.autoplay?"<button class='wbtn' data-wopr='step'>MANUAL</button>":"");
