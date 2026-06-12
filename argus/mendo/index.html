@@ -180,6 +180,11 @@
   .secref:hover{border-color:var(--accent);} .secref:disabled{opacity:.55;cursor:default;} .secref .spin{vertical-align:0;}
   .feat-sec{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:14px;}
   .feat-h{color:var(--accent);font-size:.95rem;font-weight:700;margin-bottom:6px;}
+  .set-title{font-size:1.05rem;font-weight:800;margin-bottom:4px;}
+  .set-sec{border-top:1px solid var(--line);padding-top:16px;margin-top:16px;}
+  .set-sec.first{border-top:none;padding-top:10px;margin-top:10px;}
+  .set-toggle{display:flex;align-items:flex-start;gap:9px;background:#0e0e0e;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:10px;cursor:pointer;font-size:.86rem;line-height:1.45;}
+  .set-toggle input{margin-top:2px;flex:0 0 auto;accent-color:var(--accent);width:15px;height:15px;cursor:pointer;}
   .featrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0e0e0e;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;}
   .featrow .fn{font-weight:700;} .featrow .fd{color:var(--dim);font-size:.82rem;flex:1 1 220px;}
   .badge{font-size:.66rem;font-weight:800;letter-spacing:.5px;border-radius:5px;padding:1px 8px;text-transform:uppercase;}
@@ -230,31 +235,52 @@
 </div>
 <div class="wrap">
   <div class="panel" id="settings" style="display:none;">
-    <div class="feat-sec">
-      <div class="feat-h">Lab Features</div>
-      <div class="muted" style="margin-bottom:8px;">New features start in <b>Lab Testing</b> &mdash; live only on lab/test locations. Enable for Production to roll out everywhere; after 7 days it&rsquo;s archived and considered shipped.</div>
+    <div class="set-title">&#9881; Argus settings <span class="muted" style="font-weight:400">&middot; synced across your machines</span></div>
+
+    <!-- 1) Lab Features + their gates -->
+    <div class="set-sec first">
+      <div class="feat-h">Lab Features &amp; write controls</div>
+      <div class="muted" style="margin-bottom:10px;">New / write-capable features start in <b>Lab Testing</b> &mdash; live only on lab/test locations. <b>Enable for Production</b> to roll out everywhere; after 7 days it&rsquo;s archived (shipped).</div>
       <div id="featlist"></div>
-      <div style="margin-top:10px;">
-        <div class="muted" style="margin-bottom:4px;">Lab/Test keywords &mdash; a location qualifies only if its name contains one of these as a <b>whole word</b> (a space on both sides). Comma-separated:</div>
-        <input id="labkw" type="text" spellcheck="false" style="width:100%;">
+      <label class="set-toggle"><input type="checkbox" id="vlanvalidate"><span><b>Validate VLAN exists</b> before Argus sets it &mdash; reject a VLAN that isn&rsquo;t already on the network. <span class="muted">Applies to the Set VLAN feature. Default off (set any VLAN).</span></span></label>
+      <div style="margin-top:12px;">
+        <div class="muted" style="margin-bottom:4px;"><b>Lab/Test keywords</b> &mdash; a location qualifies only if its name contains one of these as a <b>whole word</b>. Comma-separated:</div>
+        <input id="labkw" type="text" spellcheck="false" style="width:100%;max-width:360px;">
         <div style="margin-top:6px;"><button id="savekw">Save keywords</button> <span class="muted" id="kwmsg"></span></div>
       </div>
     </div>
-    <div class="muted" style="margin-bottom:6px;">Pre-configured <b>Konductor</b> device names (the <span class='kbadge'>K</span> devices) &mdash; one per line: <code>Name &nbsp; IP</code>. These are the Konductor devices for this store; each pull hints/confirms/warns connected IPs against this.</div>
-    <textarea id="namemap" spellcheck="false"></textarea>
-    <div style="margin-top:8px;"><button id="savemap">Save</button> <span class="muted" id="savemsg"></span></div>
-    <div class="muted" style="margin:12px 0 4px;"><b>Toast POS VLAN(s)</b> &mdash; connected devices on these VLANs appear in the Toast section (Operations tab). One or more, comma-separated &mdash; e.g. <code>90,100</code>.</div>
-    <input id="toastvlan" type="text" spellcheck="false" style="width:180px;" placeholder="e.g. 90,100"> <button id="savetoast">Save</button> <span class="muted" id="toastmsg"></span>
-    <div class="muted" style="margin:12px 0 4px;"><b>Planned-missing (accepted) devices</b> are now set <b>inline &amp; per-network</b> &mdash; in the Konductor table, click <span class='planned'>mark planned</span> on any missing device. Accepted devices show <span class='planned'>PLANNED</span> instead of <span class='namewarn'>MISSING</span> and don&rsquo;t break <b>SOLID</b> (for that store only).</div>
-    <div class="remed-sec">
+
+    <!-- 2) Remediable networks (the write allow-list) -->
+    <div class="set-sec">
       <div class="feat-h">&#9211; Remediable networks <span class="lab">WRITE</span></div>
-      <div class="muted" style="margin-bottom:8px;">The <b>only</b> networks Argus may <b>apply</b> security fixes to (Action Plans &rarr; tier 3). Add your lab/test boxes here &mdash; everything else is apply-blocked, enforced both here and server-side in the bridge. Production stays untouchable.</div>
+      <div class="muted" style="margin-bottom:8px;">The <b>only</b> networks Argus may <b>apply</b> fixes to (Action Plans &rarr; &ldquo;Let Argus fix it&rdquo;). Add your lab/test boxes &mdash; everything else is apply-blocked, enforced here <em>and</em> server-side. Production stays untouchable.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
         <div id="remedpicker" style="flex:1 1 300px;max-width:340px;"></div>
         <button id="remedadd">Add</button>
         <span class="muted" id="remedmsg"></span>
       </div>
       <div id="remedlist" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- 3) Konductor device map -->
+    <div class="set-sec">
+      <div class="feat-h">Konductor device map <span class='kbadge'>K</span></div>
+      <div class="muted" style="margin-bottom:6px;">Expected Konductor device names &mdash; one per line: <code>Name &nbsp; IP</code>. Each pull hints / confirms / warns connected IPs against this.</div>
+      <textarea id="namemap" spellcheck="false"></textarea>
+      <div style="margin-top:8px;"><button id="savemap">Save</button> <span class="muted" id="savemsg"></span></div>
+    </div>
+
+    <!-- 4) Toast POS VLANs -->
+    <div class="set-sec">
+      <div class="feat-h">Toast POS VLAN(s)</div>
+      <div class="muted" style="margin-bottom:6px;">Connected devices on these VLANs appear in the Toast section (Operations). One or more, <b>comma-separated, no spaces</b> &mdash; e.g. <code>90,100</code>.</div>
+      <input id="toastvlan" type="text" spellcheck="false" style="width:180px;" placeholder="e.g. 90,100"> <button id="savetoast">Save</button> <span class="muted" id="toastmsg"></span>
+    </div>
+
+    <!-- 5) Planned-missing (informational) -->
+    <div class="set-sec">
+      <div class="feat-h">Planned-missing devices</div>
+      <div class="muted">Set <b>inline &amp; per-network</b> &mdash; in the Konductor table click <span class='planned'>mark planned</span> on any missing device. Accepted devices show <span class='planned'>PLANNED</span> not <span class='namewarn'>MISSING</span> and don&rsquo;t break <b>SOLID</b> (that store only).</div>
     </div>
   </div>
   <div id="report"></div>
@@ -387,7 +413,7 @@ function comboResolve(id){ const c=COMBOS[id]; if(!c) return {id:"",name:""}; if
 
 // --- operator settings sync: localStorage <-> Firestore (named DB 'argus') via the bridge ---
 // localStorage stays the instant cache; this makes settings follow the operator across machines.
-function settingsKeys(){ return [MAP_KEY, TOAST_KEY, LABKW_KEY, FEAT_KEY, ACCEPT_KEY, REMEDIABLE_KEY]; }
+function settingsKeys(){ return [MAP_KEY, TOAST_KEY, LABKW_KEY, FEAT_KEY, ACCEPT_KEY, REMEDIABLE_KEY, VLANCHK_KEY]; }
 function settingsBlob(){ const o={}; settingsKeys().forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) o[k]=v; }); return o; }
 function applySettings(o){ if(!o||typeof o!=="object") return; settingsKeys().forEach(k=>{ if(o[k]!=null) localStorage.setItem(k,o[k]); }); NAMEMAP=parseMap(mapText()); FEATURES=loadFeatures(); }
 async function loadSettings(){ try{ const r=await api("/settings"); if(r.ok){ const d=await r.json(); if(d&&d.json){ applySettings(JSON.parse(d.json)); } } }catch(e){} }
@@ -424,7 +450,17 @@ let NAMEMAP=parseMap(mapText());
 
 // --- Lab Features lifecycle: Lab Testing -> Production -> archived (shipped after 7 days) ---
 const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
-const FEATURE_DEFS={ "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." } };
+const FEATURE_DEFS={
+  "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." },
+  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) from Action Plans → “Let Argus fix it”. Lab networks only until you Enable for Production." }
+};
+// VLAN id list must be comma-separated, no spaces (e.g. 90,100). Single VLAN = one number.
+function validVlanList(s){ return /^\d{1,4}(,\d{1,4})*$/.test(String(s||"").trim()); }
+// Optional safety: only allow setting a VLAN Argus has seen on the network. Default OFF (no validation).
+const VLANCHK_KEY="argus_vlanvalidate_v1";
+function vlanValidateOn(){ return localStorage.getItem(VLANCHK_KEY)==="1"; }
+// Checks whose fix SETS a VLAN -- gated behind the "set-vlan" Lab Feature.
+const VLAN_SET_CHECKS={ "SW-NV1":1, "SW-TRUNK":1 };
 function loadFeatures(){
   let s={}; try{ s=JSON.parse(localStorage.getItem(FEAT_KEY)||"{}"); }catch(e){}
   for(const k in FEATURE_DEFS){ if(!s[k]) s[k]={state:"lab",enabledForProdAt:null}; }
@@ -818,7 +854,10 @@ function actionPlans(f, canApply){
   }
   x+="<div class='ptier'><div class='ptier-h'><span class='ptier-tag t1'>2 &middot; Fix it yourself</span> <span class='ro-pill'>read-only</span> you make the change</div>"+t2+"</div>";
   x+="<div class='ptier t3box'><div class='ptier-h'><span class='ptier-tag t3'>3 &middot; Let Argus fix it</span> <span class='lab'>WRITE</span> Argus does it &mdash; you decide every step</div><div class='ptier-b'>";
-  if(canExec && canApply){ x+=execUI(f.id); }
+  const _crN=AUD.runs[AUD.view]; const netName=(_crN&&_crN.scope==="network")?_crN.tgt.name:"";
+  const vlanGated = VLAN_SET_CHECKS[f.id] && !featureActive("set-vlan", netName); // Set VLAN is a Lab Feature
+  if(canExec && canApply && vlanGated){ x+="<div class='muted'>&#9211; <b>Set VLAN</b> is a Lab Feature &mdash; it changes switch-port VLANs. Turn it on in &#9881; Settings &rarr; Lab Features (and <b>Enable for Production</b> to use it beyond lab networks), then Argus can apply this step by step.</div>"; }
+  else if(canExec && canApply){ x+=execUI(f.id); }
   else if(canExec){
     const _cr=AUD.runs[AUD.view]; const t = (_cr&&_cr.scope==="network") ? _cr.tgt : null;
     x+="<div class='muted'>Argus walks this in one step you approve at a time &mdash; nothing changes without your tap, and you can roll back any step instantly. <b>You&rsquo;re the decision-maker.</b></div>";
@@ -855,12 +894,19 @@ async function remPost(path, body){ const r=await fetch(BRIDGE+"/meraki/remediat
 async function remediatePlan(cid){
   const _cr=AUD.runs[AUD.view]; const net=(_cr&&_cr.scope==="network")?_cr.tgt.id:null; if(!net) return;
   EXEC[cid]={loading:true,steps:null,error:"",network:net,checkId:cid}; render();
-  try{ const d=await remPost("plan",{network:net,checkId:cid}); EXEC[cid]={loading:false,error:"",network:net,checkId:cid,steps:(d.steps||[]).map(s=>({stepId:s.stepId,label:s.label,field:s.field,current:s.current,moderated:!!s.moderated,status:"pending",value:"",before:null,msg:""}))}; }
+  try{ const d=await remPost("plan",{network:net,checkId:cid}); EXEC[cid]={loading:false,error:"",network:net,checkId:cid,knownVlans:(d.knownVlans||[]).map(String),steps:(d.steps||[]).map(s=>({stepId:s.stepId,label:s.label,field:s.field,current:s.current,moderated:!!s.moderated,status:"pending",value:"",before:null,msg:""}))}; }
   catch(e){ EXEC[cid]={loading:false,error:e.message||"plan failed",network:net,checkId:cid,steps:null}; }
   render();
 }
 async function remediateApply(cid, i){
   const ex=EXEC[cid], st=ex&&ex.steps&&ex.steps[i]; if(!st||st.status==="applied"||st.status==="applying") return;
+  // VLAN input validation: format (comma-separated, no spaces) + optional exists-check.
+  if(st.field==="vlan" || st.field==="allowedVlans"){
+    const v=(st.value||"").trim();
+    const okFmt = st.field==="vlan" ? /^\d{1,4}$/.test(v) : validVlanList(v);
+    if(!okFmt){ st.status="failed"; st.msg=(st.field==="vlan"?"enter one VLAN number (e.g. 90)":"comma-separated VLANs, no spaces (e.g. 1,10,20)"); render(); return; }
+    if(vlanValidateOn() && ex.knownVlans && ex.knownVlans.length){ const bad=v.split(",").filter(x=>ex.knownVlans.indexOf(x)<0); if(bad.length){ st.status="failed"; st.msg="VLAN "+bad.join(",")+" not seen on this network (validation is on)"; render(); return; } }
+  }
   st.status="applying"; render();
   try{ const d=await remPost("apply",{network:ex.network,checkId:ex.checkId,stepId:st.stepId,value:st.value}); st.status="applied"; st.field=d.field||st.field; st.before=d.before; st.msg="applied"+(d.after!=null&&d.after!==""?" &rarr; "+d.after:""); }
   catch(e){ st.status="failed"; st.msg=e.message||"failed"; }
@@ -1248,12 +1294,14 @@ document.getElementById("settings").addEventListener("mousedown", e=>{ const o=e
 document.getElementById("settings").addEventListener("click", e=>{ const cx=e.target.closest(".combocx"); if(cx){ comboClear(cx.id.slice(3)); } });
 document.getElementById("savemap").addEventListener("click", ()=>{ const v=document.getElementById("namemap").value; localStorage.setItem(MAP_KEY,v); NAMEMAP=parseMap(v); saveSettings(); document.getElementById("savemsg").textContent="saved · "+Object.keys(NAMEMAP).length+" mappings · synced"; render(); });
 document.getElementById("toastvlan").value=toastVlan();
-document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); localStorage.setItem(TOAST_KEY,v); saveSettings(); document.getElementById("toastmsg").textContent="saved · VLAN "+toastVlans().join(", ")+" · synced"; render(); });
+document.getElementById("savetoast").addEventListener("click", ()=>{ const v=(document.getElementById("toastvlan").value||"").trim(); const msg=document.getElementById("toastmsg"); if(v && !validVlanList(v)){ msg.innerHTML="<span class='namewarn'>VLANs must be comma-separated with no spaces &mdash; e.g. 90,100</span>"; return; } localStorage.setItem(TOAST_KEY,v); saveSettings(); msg.textContent="saved · VLAN "+toastVlans().join(", ")+" · synced"; render(); });
 document.getElementById("namemap").value=mapText();
 // Lab Features: enable-for-production + configurable keywords
 document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); saveSettings(); renderFeatures(); render(); } });
 document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); saveSettings(); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", ")+" · synced"; render(); });
 document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
+document.getElementById("vlanvalidate").checked = vlanValidateOn();
+document.getElementById("vlanvalidate").addEventListener("change", e=>{ localStorage.setItem(VLANCHK_KEY, e.target.checked?"1":"0"); saveSettings(); render(); });
 renderFeatures();
 
 (async()=>{ if(PW){ try{ await loadNetworks(); await loadSettings(); loadCheckContent(); document.getElementById("gate").classList.add("hide"); render(); }catch(_){ sessionStorage.removeItem(PW_KEY); } } })();
