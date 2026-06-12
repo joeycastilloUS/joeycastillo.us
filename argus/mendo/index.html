@@ -195,9 +195,9 @@
   .tab{background:transparent;color:var(--dim);border:none;border-radius:9px;padding:11px 22px;font-size:.95rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;transition:background .12s,color .12s;}
   .tab:hover:not(.on){color:var(--text);background:#181818;}
   .tab.on{background:#1d2a31;color:var(--accent);box-shadow:inset 0 0 0 1px rgba(111,195,223,.35);}
-  .empty{max-width:580px;margin:6px auto 0;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:40px 32px;text-align:center;}
-  .empty-ico{font-size:2.6rem;line-height:1;color:var(--accent);margin-bottom:10px;}
-  .empty-title{font-size:1.35rem;font-weight:700;margin-bottom:7px;}
+  .empty{max-width:580px;margin:6px auto 0;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:48px 36px 42px;text-align:center;}
+  .empty-ico{font-size:2.6rem;line-height:1;color:var(--accent);margin-bottom:16px;}
+  .empty-title{font-size:1.35rem;font-weight:700;margin:0 0 12px;}
   .empty-desc{color:var(--dim);font-size:.92rem;line-height:1.6;margin:0 auto 22px;max-width:440px;}
   .empty-pick{display:flex;gap:10px;justify-content:center;align-items:flex-start;}
   .empty-pick .combo{min-width:0;flex:1 1 auto;max-width:360px;}
@@ -1456,7 +1456,7 @@ function render(){
      "</div>";
 
   // Operations -- compact toolbar when loaded, a centered hero when empty
-  const opsDesc="Toast POS devices on the POS VLAN, plus Konductor rollout health &mdash; every mapped device live and on VLAN 90.";
+  const opsDesc="Add <b>op-targets</b> to watch each location &mdash; check that specific devices (by IP) <b>exist, are live, and named right</b>; that they&rsquo;re on the <b>VLAN you expect</b>; or just list <b>everything on a VLAN</b>.";
   const paneCls=(t)=> "panebox "+(TAB===t ? (TAB_ANIM?"anim":"") : "hidden");
   const slotBody=(slot,fn)=>{ if(!slot.items.length) return null; const it=slot.items[slot.view]; if(slot.d) return slotHead(slot)+exportRow()+fn(slot); if(it&&it.loading) return "<div class='box'><div class='muted'><span class='spin'></span> loading <b>"+esc(it.name)+"</b>&hellip;</div></div>"; return "<div class='err'>"+esc((it&&it.error)||"load error")+"</div>"; };
   const opsBody=slotBody(OPS,opsContent);
@@ -1482,23 +1482,33 @@ function exportStore(){
   if(TAB==="network") return (NETV.d&&NETV.d.name)||NETV.name||"";
   const cr=AUD.runs[AUD.view]; if(!cr) return "Security Audit"; return cr.scope==="org"?"Organization":(cr.tgt.name||"");
 }
-function exportDoc(){
+// Build the printable doc. Tab scope -> the whole active pane; a section scope -> just that section's table(s).
+function exportDoc(scope){
   const store=exportStore();
+  const sect=scope && scope.indexOf("sect:")===0;
+  let title=viewName(), body;
+  if(sect){
+    const tables=scopeTables(scope);
+    const ttl0=tables.length?tableTitle(tables[0]):""; if(ttl0) title=ttl0;
+    body=tables.map(t=>{ const ttl=tableTitle(t), d=tableData(t);
+      return (ttl?"<h2>"+esc(ttl)+"</h2>":"")+"<table><thead><tr>"+d.headers.map(x=>"<th>"+esc(x)+"</th>").join("")+"</tr></thead><tbody>"+
+        d.rows.map(r=>"<tr>"+r.map(c=>"<td>"+esc(c)+"</td>").join("")+"</tr>").join("")+"</tbody></table>"; }).join("") || "<div>Nothing to export.</div>";
+  } else { body=activePaneHtml(); }
   const head="<div style='border-bottom:3px solid #6FC3DF;padding-bottom:9px;margin-bottom:14px'>"+
     "<div style='font-size:21px;font-weight:800;letter-spacing:4px;color:#0d6e8c'>ARGUS</div>"+
-    "<div style='font-size:16px;font-weight:700;color:#16242b;margin-top:3px'>"+esc(store)+" &mdash; "+viewName()+"</div>"+
+    "<div style='font-size:16px;font-weight:700;color:#16242b;margin-top:3px'>"+esc(store)+" &mdash; "+esc(title)+"</div>"+
     "<div style='font-size:10px;color:#777;margin-top:2px'>Generated "+esc(pacific())+" &middot; read-only</div></div>";
-  return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Argus "+esc(viewName())+" &mdash; "+esc(store)+"</title><style>"+EXPORT_CSS+"</style></head><body>"+head+activePaneHtml()+BRAND_FOOT+"</body></html>";
+  return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Argus "+esc(title)+" &mdash; "+esc(store)+"</title><style>"+EXPORT_CSS+"</style></head><body>"+head+body+BRAND_FOOT+"</body></html>";
 }
-function exportHtml(){
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc()],{type:"text/html"}));
-  a.download="argus-"+viewName().toLowerCase().replace(/ /g,"-")+"-"+pacific().replace(/[: ]/g,"-")+".html"; a.click();
+function exportHtml(scope){
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc(scope)],{type:"text/html"}));
+  a.download=_fname(scope||"tab","html"); a.click();
 }
-function exportPdf(){
+function exportPdf(scope){
   const f=document.createElement("iframe");
   f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
   document.body.appendChild(f);
-  const doc=f.contentWindow.document; doc.open(); doc.write(exportDoc()); doc.close();
+  const doc=f.contentWindow.document; doc.open(); doc.write(exportDoc(scope)); doc.close();
   setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>{ try{document.body.removeChild(f);}catch(e){} }, 3000); }, 450);
 }
 
@@ -1560,8 +1570,8 @@ function scopeTables(scope){
   return root ? [...root.querySelectorAll("table")].filter(t=>!t.classList.contains("histtbl")&&!t.classList.contains("nosort")) : [];
 }
 async function exportRun(fmt, scope){
-  if(fmt==="html"){ exportHtml(); return; }
-  if(fmt==="pdf"){ exportPdf(); return; }
+  if(fmt==="html"){ exportHtml(scope); return; }
+  if(fmt==="pdf"){ exportPdf(scope); return; }
   const tables=scopeTables(scope);
   if(fmt==="json"){
     let obj;
@@ -1583,11 +1593,13 @@ async function exportRun(fmt, scope){
   if(fmt==="gsheets"){
     if(!tables.length){ toast("nothing to export here yet"); return; }
     const tsv=tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\n":"")+dataTSV(tableData(t)); }).join("\n\n");
-    const ok=_clipSync(tsv);                            // sync copy (keeps the user gesture intact)...
-    try{ if(navigator.clipboard) navigator.clipboard.writeText(tsv); }catch(e){}  // ...also try the async API
-    const w=window.open("https://sheets.new","_blank"); // ...then open the new sheet
-    toast(!w ? "Pop-up blocked — data is copied; open a new Google Sheet and paste (Ctrl/Cmd+V)"
-            : (ok ? "Data copied — click cell A1 and paste (Ctrl/Cmd+V)" : "Sheet opened — re-copy if paste is empty"));
+    // Copy with the atomic, in-gesture execCommand ONLY -- the async clipboard API racing with the
+    // window.open below was wiping the clipboard, which is why the sheet pasted empty.
+    const ok=_clipSync(tsv);
+    const w=window.open("https://sheets.new","_blank");
+    if(!w) toast("Pop-up blocked — your data is copied. Open a new Google Sheet and paste (Ctrl/Cmd+V).");
+    else if(ok) toast("Google Sheet opened — click cell A1 and paste (Ctrl/Cmd+V). Your data is on the clipboard.");
+    else toast("Sheet opened, but the copy didn’t take — use Excel or CSV instead.");
     return;
   }
 }
@@ -1600,7 +1612,7 @@ function saveMenu(scope){
     "<a data-exp='excel' data-scope='"+esc(scope)+"'>Excel</a>"+
     "<a data-exp='json' data-scope='"+esc(scope)+"'>JSON</a>"+
     "<a data-exp='csv' data-scope='"+esc(scope)+"'>CSV</a>"+
-    (tab?"<div class='savesep'></div><a data-exp='html' data-scope='tab'>Printable HTML</a><a data-exp='pdf' data-scope='tab'>PDF</a>":"")+
+    "<div class='savesep'></div><a data-exp='html' data-scope='"+esc(scope)+"'>Printable HTML</a><a data-exp='pdf' data-scope='"+esc(scope)+"'>PDF</a>"+
     "</div></span>";
 }
 function toast(msg){ let t=document.getElementById("argtoast"); if(!t){ t=document.createElement("div"); t.id="argtoast"; document.body.appendChild(t); } t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),4500); }
