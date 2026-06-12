@@ -280,7 +280,7 @@ function auditPicker(){
   const noRes = !AUD.runs.length;
   let x="<div class='box auditcard"+(noRes?" emptycard":"")+"'>";
   if(noRes) x+="<div class='audithero'><div class='empty-ico'>&#128737;</div><div class='empty-title'>Security Audit</div><div class='empty-desc'>Read-only audit of one or more networks, config templates, or the whole organization &mdash; graded against best practice, with an action plan for every finding. Nothing is changed.</div></div>";
-  else x+="<div class='feat-h'>Run another audit</div>";
+  else { const met=AUD.loadMs?" <span class='loadmetric'>&middot; "+fmtMs(AUD.loadMs)+" &middot; "+fmtBytes(AUD._bytes)+"</span>":""; x+="<div class='feat-h'>Run another audit"+met+"</div>"; }
   x+="<div class='auditmode"+(noRes?" centered":"")+"'><button class='amode"+(mode==="network"?" on":"")+"' data-amode='network'>Network</button>"+
      "<button class='amode"+(mode==="template"?" on":"")+"' data-amode='template'>Template</button>"+
      "<button class='amode"+(mode==="org"?" on":"")+"' data-amode='org'>Organization</button></div>";
@@ -528,13 +528,13 @@ function renderChecks(){
 // Read-only Firewall Security Audit -- runs one OR MANY targets, each result added to AUD.runs.
 async function pullAudit(targets){
   if(AUD.auditing || !targets || !targets.length) return;
-  AUD.auditing=true; AUD.auditError=""; render();
+  AUD.auditing=true; AUD.auditError=""; AUD._bytes=0; const t0=Date.now(); render();
   let firstNew=-1;
   for(const t of targets){
     try{
       const q = t.type==="org" ? "org=1" : t.type==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
       const r=await api("/meraki/audit?"+q); if(!r.ok) throw new Error("error "+r.status);
-      const result=await r.json(); const key=t.type+":"+t.id;
+      const txt=await r.text(); AUD._bytes+=txt.length; const result=JSON.parse(txt); const key=t.type+":"+t.id;
       const run={key, scope:t.type, tgt:{id:t.id,name:t.name}, result};
       let idx=AUD.runs.findIndex(x=>x.key===key);
       if(idx>=0) AUD.runs[idx]=run; else idx=AUD.runs.push(run)-1;
@@ -542,7 +542,7 @@ async function pullAudit(targets){
     }catch(e){ AUD.auditError=(t.name||t.type)+": "+(e.message||"audit error"); }
   }
   if(firstNew>=0) AUD.view=firstNew;
-  AUD.auditing=false; render();
+  AUD.loadMs=Date.now()-t0; AUD.auditing=false; render();
 }
 
 // All networks as combo items, with a "no template" hint on the ones that run their own config.
@@ -554,14 +554,15 @@ function pickerRow(id, slot){
     : "<button data-load='"+id+"'>"+(slot.items.length?"Reload":"Load")+"</button>";
   const metric = slot.loadMs ? " &middot; <span class='loadmetric' title='load time &middot; data downloaded'>"+fmtMs(slot.loadMs)+" &middot; "+fmtBytes(slot._bytes)+"</span>" : "";
   const label = slot.items.length ? "<span class='muted'>showing <b>"+esc(slot.name)+"</b>"+(slot.items.length>1?" ("+(slot.view+1)+" of "+slot.items.length+")":"")+metric+"</span>" : "<span class='muted'>add one or more locations, then Load</span>";
-  return "<div class='bar'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+label+"</div>"+
+  // Centered control box -- the same standard as the Security Audit picker.
+  return "<div class='box auditcard'><div class='feat-h'>Load a location</div><div class='bar'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+label+"</div>"+
          (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"")+
-         (slot.items.length>1?slotFlip(id,slot):"");
+         (slot.items.length>1?slotFlip(id,slot):"")+"</div>";
 }
 // Flip bar to switch between multiple loaded locations in a tab.
 function slotFlip(id,slot){ return "<div class='scopeflip'>"+slot.items.map((it,i)=>"<button class='scopebtn"+(slot.view===i?" on":"")+"' data-slotview='"+esc(id)+":"+i+"'>"+esc(it.name)+(it.error?" <span class='namewarn'>&#9888;</span>":"")+"</button>").join("")+"</div>"; }
-// Per-tab Export -- saves only the active tab's data (tab-sensitive).
-function exportRow(){ return "<div class='bar exprow'>"+saveMenu("tab")+"<span class='muted'>this tab &mdash; Google Sheets, Excel, JSON, CSV, or print</span></div>"; }
+// Per-tab Export -- saves only the active tab's data (tab-sensitive). Centered to match the control box.
+function exportRow(){ return "<div class='bar exprow' style='max-width:580px;margin:6px auto 16px;'>"+saveMenu("tab")+"<span class='muted'>this tab &mdash; Google Sheets, Excel, JSON, CSV, or print</span></div>"; }
 // Centered hero shown when a data tab has nothing loaded yet -- icon, title, one line, multi-select search.
 function emptyState(id, slot, icon, title, desc){
   const btn = slot.loading ? "<button disabled><span class='spin'></span> loading&hellip;</button>" : "<button data-load='"+id+"'>Load</button>";
@@ -1096,9 +1097,11 @@ async function exportRun(fmt, scope){
   if(fmt==="gsheets"){
     if(!tables.length){ toast("nothing to export here yet"); return; }
     const tsv=tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\n":"")+dataTSV(tableData(t)); }).join("\n\n");
-    const ok=_clipSync(tsv);            // copy synchronously (keeps the user gesture intact)...
-    window.open("https://sheets.new","_blank"); // ...then open the new sheet (not popup-blocked)
-    toast(ok?"Data copied — click cell A1 in the new Google Sheet and paste (Ctrl/Cmd+V)":"Sheet opened — copy the data again if paste is empty");
+    const ok=_clipSync(tsv);                            // sync copy (keeps the user gesture intact)...
+    try{ if(navigator.clipboard) navigator.clipboard.writeText(tsv); }catch(e){}  // ...also try the async API
+    const w=window.open("https://sheets.new","_blank"); // ...then open the new sheet
+    toast(!w ? "Pop-up blocked — data is copied; open a new Google Sheet and paste (Ctrl/Cmd+V)"
+            : (ok ? "Data copied — click cell A1 and paste (Ctrl/Cmd+V)" : "Sheet opened — re-copy if paste is empty"));
     return;
   }
 }
@@ -1168,7 +1171,7 @@ document.getElementById("report").addEventListener("click", async e=>{
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const sm=e.target.closest("[data-savemenu]"); if(sm){ e.stopImmediatePropagation(); const w=sm.closest(".savewrap"); const wasOpen=w.classList.contains("open"); document.querySelectorAll(".savewrap.open").forEach(x=>x.classList.remove("open")); if(!wasOpen) w.classList.add("open"); return; }
-  const xp=e.target.closest("[data-exp]"); if(xp){ e.stopImmediatePropagation(); const w=xp.closest(".savewrap"); if(w) w.classList.remove("open"); exportRun(xp.getAttribute("data-exp"), xp.getAttribute("data-scope")); return; }
+  const xp=e.target.closest("[data-exp]"); if(xp){ e.stopImmediatePropagation(); const w=xp.closest(".savewrap"); if(w) w.classList.remove("open"); try{ const p=exportRun(xp.getAttribute("data-exp"), xp.getAttribute("data-scope")); if(p&&p.catch) p.catch(err=>toast("export failed: "+(err&&err.message||err))); }catch(err){ toast("export failed: "+(err&&err.message||err)); } return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); const id=sr.closest("#pane-network")?"network":"operations"; refreshSection(id, sr.getAttribute("data-refresh"), sr); return; }
   const ck=e.target.closest("#showchecks"); if(ck){ e.stopImmediatePropagation(); SHOWCHECKS=!SHOWCHECKS; render(); if(SHOWCHECKS&&!CHECKS) pullChecks().then(render); return; }
   const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
