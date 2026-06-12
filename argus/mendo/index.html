@@ -32,6 +32,9 @@
   .comboname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .comboopt .hl{color:var(--accent);font-weight:700;}
   .comboNote{color:var(--dim);flex:0 0 auto;font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}
+  .combochips{display:flex;flex-wrap:wrap;gap:6px;} .combochips:not(:empty){margin-bottom:7px;}
+  .cchip{display:inline-flex;align-items:center;gap:6px;background:#16242b;color:var(--accent);border:1px solid #2a3f48;border-radius:14px;padding:3px 6px 3px 11px;font-size:.82rem;font-weight:600;}
+  .cchipx{background:none;border:none;color:var(--accent);cursor:pointer;font-size:.95rem;line-height:1;padding:0 2px;font-family:inherit;} .cchipx:hover{color:#fff;}
   button.alt{background:var(--surface);color:var(--text);border:1px solid var(--line);font-weight:600;}
   .muted{color:var(--dim);font-size:.85rem;}
   .nethead{margin:6px 0 4px;font-size:1.05rem;} .nethead b{color:var(--accent);}
@@ -273,22 +276,19 @@ function lvlBadge(l){ if(!l) return ""; return " <span class='lvl lvl-"+esc(l)+"
 // Compact audit control bar -- mode buttons + a type-to-search dropdown + Run. ALWAYS shown in the
 // audit tab (before AND after a run), so you can re-run or switch target without any reset step.
 function auditPicker(){
-  const mode=AUDITMODE, tgt=AUDITTARGET;
-  const noRes = !["network","template","org"].some(s=>AUD.results[s]);
+  const mode=AUDITMODE;
+  const noRes = !AUD.runs.length;
   let x="<div class='box auditcard"+(noRes?" emptycard":"")+"'>";
-  if(noRes) x+="<div class='audithero'><div class='empty-ico'>&#128737;</div><div class='empty-title'>Security Audit</div><div class='empty-desc'>Read-only audit of a network, a config template, or the whole organization &mdash; graded against best practice, with an action plan for every finding. Nothing is changed.</div></div>";
+  if(noRes) x+="<div class='audithero'><div class='empty-ico'>&#128737;</div><div class='empty-title'>Security Audit</div><div class='empty-desc'>Read-only audit of one or more networks, config templates, or the whole organization &mdash; graded against best practice, with an action plan for every finding. Nothing is changed.</div></div>";
   else x+="<div class='feat-h'>Run another audit</div>";
   x+="<div class='auditmode"+(noRes?" centered":"")+"'><button class='amode"+(mode==="network"?" on":"")+"' data-amode='network'>Network</button>"+
      "<button class='amode"+(mode==="template"?" on":"")+"' data-amode='template'>Template</button>"+
      "<button class='amode"+(mode==="org"?" on":"")+"' data-amode='org'>Organization</button></div>";
   x+="<div class='bar auditpick"+(noRes?" centered":"")+"'>";
-  if(mode==="network"){ x+=combo("audit-net", netItems(), tgt.type==="network"?tgt:{id:"",name:""}, "type a network…"); }
-  else if(mode==="template"){ x+= (TEMPLATES&&TEMPLATES.length) ? combo("audit-tpl", TEMPLATES.map(t=>({id:t.id,name:t.name})), tgt.type==="template"?tgt:{id:"",name:""}, "type a template…") : "<span class='muted'><span class='spin'></span> loading templates&hellip;</span>"; }
+  if(mode==="network"){ x+=combo("audit-net", netItems(), {}, "add a network…", true); }
+  else if(mode==="template"){ x+= (TEMPLATES&&TEMPLATES.length) ? combo("audit-tpl", TEMPLATES.map(t=>({id:t.id,name:t.name})), {}, "add a template…", true) : "<span class='muted'><span class='spin'></span> loading templates&hellip;</span>"; }
   else { x+="<span class='muted'>org-wide &mdash; admins, MFA, login policy</span>"; }
-  // "Re-run" only when the CURRENT selection matches an already-run target for this mode -- otherwise it's a fresh Run.
-  const ran=AUD.results[mode], rt=AUD.tgt[mode];
-  const sameTarget = !!ran && !!rt && (mode==="org" || rt.id===tgt.id);
-  x+=" <button id='runaudit'>&#9654; "+(sameTarget?"Re-run":"Run Audit")+"</button></div></div>";
+  x+=" <button id='runaudit'>&#9654; Run Audit</button></div></div>";
   return x;
 }
 // One subtle line under the card: networks that run without a config template (network mode only).
@@ -346,13 +346,23 @@ async function loadNetworks(){
 const COMBOS={}; // id -> {items:[{id,name,note}], sel:{id,name}, filtered, active}
 function scoreN(name,q){ name=name.toLowerCase(); q=q.toLowerCase(); if(!q) return 1; const i=name.indexOf(q); return i<0?-1:(i===0?2:1); }
 function hlq(name,q){ if(!q) return esc(name); const i=name.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(name); return esc(name.slice(0,i))+"<span class='hl'>"+esc(name.slice(i,i+q.length))+"</span>"+esc(name.slice(i+q.length)); }
-function combo(id, items, sel, placeholder){
-  COMBOS[id]={items:items||[], sel:{id:(sel&&sel.id)||"",name:(sel&&sel.name)||""}, filtered:[], active:-1};
-  const hasVal=!!(sel&&sel.name);
-  return "<div class='combo' data-combo='"+esc(id)+"'>"+
-    "<input class='comboinput' id='ci-"+esc(id)+"' type='text' autocomplete='off' spellcheck='false' placeholder='"+esc(placeholder||"type to search…")+"' value=\""+esc((sel&&sel.name)||"").replace(/"/g,"&quot;")+"\">"+
+function combo(id, items, sel, placeholder, multi){
+  COMBOS[id]={items:items||[], sel:{id:(sel&&sel.id)||"",name:(sel&&sel.name)||""}, filtered:[], active:-1, multi:!!multi, picks:(multi&&sel&&Array.isArray(sel.picks))?sel.picks.slice():[]};
+  const hasVal=!!(sel&&sel.name&&!multi);
+  let h="<div class='combo"+(multi?" multi":"")+"' data-combo='"+esc(id)+"'>";
+  if(multi) h+="<div class='combochips' id='cc-"+esc(id)+"'>"+comboChips(id)+"</div>";
+  h+="<input class='comboinput' id='ci-"+esc(id)+"' type='text' autocomplete='off' spellcheck='false' placeholder='"+esc(placeholder||(multi?"add one or more…":"type to search…"))+"' value=\""+(multi?"":esc((sel&&sel.name)||"").replace(/"/g,"&quot;"))+"\">"+
     "<button type='button' class='combocx' id='cx-"+esc(id)+"' title='Clear' style='display:"+(hasVal?"flex":"none")+"'>&times;</button>"+
     "<div class='combolist' id='cl-"+esc(id)+"'></div></div>";
+  return h;
+}
+function comboChips(id){ const c=COMBOS[id]; if(!c||!c.multi||!c.picks.length) return ""; return c.picks.map((p,i)=>"<span class='cchip'>"+esc(p.name)+"<button class='cchipx' data-combo='"+esc(id)+"' data-ci='"+i+"' title='remove'>&times;</button></span>").join(""); }
+function comboDrawChips(id){ const el=document.getElementById("cc-"+id); if(el) el.innerHTML=comboChips(id); }
+// All committed picks for a multi-combo (plus the currently-typed entry, resolved to its top match).
+function comboPicks(id){ const c=COMBOS[id]; if(!c) return []; const picks=(c.picks||[]).slice();
+  const inp=document.getElementById("ci-"+id); const typed=inp?inp.value.trim():(c.sel&&c.sel.name||"").trim();
+  if(typed){ comboFilter(id,typed); if(c.filtered.length){ const n=c.filtered[0]; if(!picks.some(p=>p.id===n.id)) picks.push({id:n.id,name:n.name}); } }
+  return picks;
 }
 function comboFilter(id,q){ const c=COMBOS[id]; if(!c) return;
   c.filtered = !q ? c.items.slice(0,20)
@@ -364,7 +374,10 @@ function comboDraw(id,q){ const c=COMBOS[id], el=document.getElementById("cl-"+i
   el.innerHTML=c.filtered.map((n,i)=>"<div class='comboopt"+(i===c.active?" active":"")+"' data-i='"+i+"'><span class='comboname'>"+hlq(n.name,q)+"</span>"+(n.note?"<span class='comboNote'>"+esc(n.note)+"</span>":"")+"</div>").join("");
   el.classList.add("open");
 }
-function comboPick(id,i){ const c=COMBOS[id]; if(!c||i<0||i>=c.filtered.length) return; const n=c.filtered[i]; c.sel={id:n.id,name:n.name}; const inp=document.getElementById("ci-"+id); if(inp) inp.value=n.name; const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="flex"; const el=document.getElementById("cl-"+id); if(el) el.classList.remove("open"); }
+function comboPick(id,i){ const c=COMBOS[id]; if(!c||i<0||i>=c.filtered.length) return; const n=c.filtered[i];
+  if(c.multi){ if(!c.picks.some(p=>p.id===n.id)) c.picks.push({id:n.id,name:n.name}); comboDrawChips(id); const inp=document.getElementById("ci-"+id); if(inp){ inp.value=""; inp.focus(); } const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="none"; comboFilter(id,""); return; }
+  c.sel={id:n.id,name:n.name}; const inp=document.getElementById("ci-"+id); if(inp) inp.value=n.name; const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="flex"; const el=document.getElementById("cl-"+id); if(el) el.classList.remove("open"); }
+function comboRemoveChip(id,i){ const c=COMBOS[id]; if(!c||!c.picks) return; c.picks.splice(i,1); comboDrawChips(id); }
 // Clear a combo's input + selection and reopen the full list, so you can search again.
 function comboClear(id){ const c=COMBOS[id]; if(c) c.sel={id:"",name:""}; const inp=document.getElementById("ci-"+id); if(inp){ inp.value=""; inp.focus(); } const cx=document.getElementById("cx-"+id); if(cx) cx.style.display="none"; comboFilter(id,""); if(id.indexOf("audit-")===0) resetRunLabel(); }
 // After the audit target selection changes, the button is a fresh Run -- never a "Re-run".
@@ -450,42 +463,48 @@ function swOrder(n){ n=(n||"").toUpperCase(); if(n.indexOf("POS")>=0) return 0; 
 
 // Per-tab independent data. Operations and Network each hold their OWN location + pull, so the
 // two tabs can show different stores at the same time. The audit tab picks its own target.
-function newSlot(){ return {net:"",name:"",d:null,wifi:null,stamp:"",portStamp:"",wifiStamp:"",loading:false,error:""}; }
+// A slot can hold MULTIPLE loaded locations (items[]); `view` is the one on screen. net/name/d/wifi/...
+// mirror items[view] so the rest of the code reads slot.d/slot.net unchanged.
+function newSlot(){ return {items:[],view:0,net:"",name:"",d:null,wifi:null,portStamp:"",wifiStamp:"",loading:false,error:"",loadMs:0,_bytes:0}; }
+function syncSlot(slot){ const it=slot.items[slot.view]; if(it){ slot.net=it.net; slot.name=it.name; slot.d=it.d; slot.wifi=it.wifi; slot.portStamp=it.portStamp; slot.wifiStamp=it.wifiStamp; } else { slot.net=""; slot.name=""; slot.d=null; slot.wifi=null; slot.portStamp=""; slot.wifiStamp=""; } }
 let OPS=newSlot();   // Operations tab
 let NETV=newSlot();  // Network tab
-// Security Audit holds up to three independent results -- network / template / org -- so you can run
-// each and flip between them. `view` is which one is on screen; export scopes to the viewed result.
-let AUD={ results:{network:null,template:null,org:null}, tgt:{network:null,template:null,org:null}, view:null, auditing:false, auditError:"" };
+// Security Audit holds a list of runs (each = scope + target + result). Audit multiple networks/templates
+// at once; flip between every result. `view` indexes AUD.runs; export scopes to the viewed run.
+let AUD={ runs:[], view:0, auditing:false, auditError:"" };
 function slotById(id){ return id==="operations"?OPS:id==="network"?NETV:null; }
 
 // Source fetchers -- each writes only its slice of a slot + its own stamp, so a single section
 // refreshes without re-pulling the others.
-async function fetchPorts(slot,net){ const r=await api("/meraki/portmap?network="+encodeURIComponent(net)); if(!r.ok) throw new Error("switch error "+r.status); const txt=await r.text(); slot._bytes=(slot._bytes||0)+txt.length; slot.d=JSON.parse(txt); slot.portStamp=pacific(); }
+async function fetchPorts(it,net){ const r=await api("/meraki/portmap?network="+encodeURIComponent(net)); if(!r.ok) throw new Error("switch error "+r.status); const txt=await r.text(); it.d=JSON.parse(txt); it.portStamp=pacific(); return txt.length; }
 // All SSIDs in the network, grouped. No SSID arg -- the network selection reveals every SSID.
-async function fetchWifi(slot,net){ const rw=await api("/meraki/wireless?network="+encodeURIComponent(net)); if(!rw.ok) throw new Error("Wi-Fi error "+rw.status); const txt=await rw.text(); slot._bytes=(slot._bytes||0)+txt.length; slot.wifi=JSON.parse(txt); slot.wifiStamp=pacific(); }
+async function fetchWifi(it,net){ const rw=await api("/meraki/wireless?network="+encodeURIComponent(net)); if(!rw.ok) throw new Error("Wi-Fi error "+rw.status); const txt=await rw.text(); it.wifi=JSON.parse(txt); it.wifiStamp=pacific(); return txt.length; }
 
-// Load a tab's slot from its own picker (the <select id='pick-operations'|'pick-network'>).
+// Load a tab's slot from its own multi-picker -- loads ALL selected locations into items[].
 async function loadSlot(id){
   const slot=slotById(id); if(!slot) return;
-  const sel=comboResolve("pick-"+id); if(!sel.id){ slot.error="pick a location"; render(); return; }
-  slot.net=sel.id; slot.name=sel.name; slot.loading=true; slot.error=""; slot.stamp=pacific();
-  slot.d=null; slot.wifi=null; slot.portStamp=""; slot.wifiStamp=""; slot._bytes=0; slot.loadMs=0; render();
+  let picks=comboPicks("pick-"+id);
+  if(!picks.length && slot.items.length) picks=slot.items.map(it=>({id:it.net,name:it.name})); // Reload re-fetches the loaded set
+  if(!picks.length){ slot.error="pick a location"; render(); return; }
+  slot.loading=true; slot.error=""; slot.items=[]; slot.view=0; slot._bytes=0; slot.loadMs=0; syncSlot(slot); render();
   const t0=Date.now();
-  try{ await fetchPorts(slot,slot.net); try{ await fetchWifi(slot,slot.net); }catch(e){} }
-  catch(e){ slot.error=e.message||"error"; }
-  slot.loadMs=Date.now()-t0; slot.loading=false; render();
+  for(const p of picks){ const it={net:p.id,name:p.name,d:null,wifi:null,portStamp:"",wifiStamp:"",error:""};
+    try{ slot._bytes+=await fetchPorts(it,p.id); try{ slot._bytes+=await fetchWifi(it,p.id); }catch(e){} }
+    catch(e){ it.error=e.message||"error"; }
+    slot.items.push(it); }
+  slot.loadMs=Date.now()-t0; slot.loading=false; slot.view=0; syncSlot(slot); render();
 }
 
-// Per-section refresh: re-pull only the source(s) behind the clicked section, in that tab's slot.
+// Per-section refresh: re-pull only the source(s) behind the clicked section, for the VIEWED location.
 async function refreshSection(id, kind, btn){
-  const slot=slotById(id); if(!slot||!slot.net) return;
+  const slot=slotById(id), it=slot&&slot.items[slot.view]; if(!it) return;
   if(btn){ btn.disabled=true; btn.innerHTML="<span class='spin'></span> refreshing&hellip;"; }
   slot.error=""; slot._bytes=0; const t0=Date.now();
   try{
-    if(kind==="ports"||kind==="both") await fetchPorts(slot,slot.net);
-    if(kind==="wifi"||kind==="both") await fetchWifi(slot,slot.net);
+    if(kind==="ports"||kind==="both") slot._bytes+=await fetchPorts(it,it.net);
+    if(kind==="wifi"||kind==="both") slot._bytes+=await fetchWifi(it,it.net);
   }catch(e){ slot.error=e.message||"refresh error"; }
-  slot.loadMs=Date.now()-t0;
+  slot.loadMs=Date.now()-t0; syncSlot(slot);
   render(); // rebuilds the report -- the button is recreated fresh + enabled
 }
 
@@ -506,42 +525,50 @@ function renderChecks(){
   return x;
 }
 
-// Read-only Firewall Security Audit for the current network (lazy: runs when the tab opens).
-async function pullAudit(){
-  if(AUD.auditing) return;
-  const t=AUDITTARGET; if(!t.id) return;
-  const mode=t.type; // network | template | org
-  AUD.auditing=true; AUD.auditError=""; AUD.view=mode; render();
-  try{
-    const q = mode==="org" ? "org=1" : mode==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
-    const r=await api("/meraki/audit?"+q);
-    if(!r.ok) throw new Error("error "+r.status);
-    AUD.results[mode]=await r.json(); AUD.tgt[mode]={id:t.id,name:t.name}; AUD.view=mode;
-  }catch(e){ AUD.auditError=e.message||"audit error"; }
+// Read-only Firewall Security Audit -- runs one OR MANY targets, each result added to AUD.runs.
+async function pullAudit(targets){
+  if(AUD.auditing || !targets || !targets.length) return;
+  AUD.auditing=true; AUD.auditError=""; render();
+  let firstNew=-1;
+  for(const t of targets){
+    try{
+      const q = t.type==="org" ? "org=1" : t.type==="template" ? "template="+encodeURIComponent(t.id) : "network="+encodeURIComponent(t.id);
+      const r=await api("/meraki/audit?"+q); if(!r.ok) throw new Error("error "+r.status);
+      const result=await r.json(); const key=t.type+":"+t.id;
+      const run={key, scope:t.type, tgt:{id:t.id,name:t.name}, result};
+      let idx=AUD.runs.findIndex(x=>x.key===key);
+      if(idx>=0) AUD.runs[idx]=run; else idx=AUD.runs.push(run)-1;
+      if(firstNew<0) firstNew=idx;
+    }catch(e){ AUD.auditError=(t.name||t.type)+": "+(e.message||"audit error"); }
+  }
+  if(firstNew>=0) AUD.view=firstNew;
   AUD.auditing=false; render();
 }
 
 // All networks as combo items, with a "no template" hint on the ones that run their own config.
 function netItems(){ return (NETS||[]).map(n=>({id:n.id,name:n.name,note:n.configTemplateId?"":"no template"})); }
-// The picker row at the top of Operations and Network -- type-to-search dropdown, then Load.
+// The picker row at the top of Operations and Network -- multi-select dropdown, then Load all.
 function pickerRow(id, slot){
   const btn = slot.loading
     ? "<button disabled><span class='spin'></span> loading&hellip;</button>"
-    : "<button data-load='"+id+"'>"+(slot.net?"Reload":"Load")+"</button>";
-  const metric = slot.loadMs ? " <span class='loadmetric' title='load time &middot; data downloaded'>&middot; "+fmtMs(slot.loadMs)+" &middot; "+fmtBytes(slot._bytes)+"</span>" : "";
-  const label = slot.net ? "<span class='muted'>showing <b>"+esc(slot.name)+"</b>"+metric+"</span>" : "<span class='muted'>type a location, then Load</span>";
-  return "<div class='bar'>"+combo("pick-"+id, netItems(), {id:slot.net,name:slot.name}, "type a location…")+btn+label+"</div>"+
-         (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"");
+    : "<button data-load='"+id+"'>"+(slot.items.length?"Reload":"Load")+"</button>";
+  const metric = slot.loadMs ? " &middot; <span class='loadmetric' title='load time &middot; data downloaded'>"+fmtMs(slot.loadMs)+" &middot; "+fmtBytes(slot._bytes)+"</span>" : "";
+  const label = slot.items.length ? "<span class='muted'>showing <b>"+esc(slot.name)+"</b>"+(slot.items.length>1?" ("+(slot.view+1)+" of "+slot.items.length+")":"")+metric+"</span>" : "<span class='muted'>add one or more locations, then Load</span>";
+  return "<div class='bar'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+label+"</div>"+
+         (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"")+
+         (slot.items.length>1?slotFlip(id,slot):"");
 }
+// Flip bar to switch between multiple loaded locations in a tab.
+function slotFlip(id,slot){ return "<div class='scopeflip'>"+slot.items.map((it,i)=>"<button class='scopebtn"+(slot.view===i?" on":"")+"' data-slotview='"+esc(id)+":"+i+"'>"+esc(it.name)+(it.error?" <span class='namewarn'>&#9888;</span>":"")+"</button>").join("")+"</div>"; }
 // Per-tab Export -- saves only the active tab's data (tab-sensitive).
 function exportRow(){ return "<div class='bar exprow'>"+saveMenu("tab")+"<span class='muted'>this tab &mdash; Google Sheets, Excel, JSON, CSV, or print</span></div>"; }
-// Centered hero shown when a data tab has nothing loaded yet -- icon, title, one line, prominent search.
+// Centered hero shown when a data tab has nothing loaded yet -- icon, title, one line, multi-select search.
 function emptyState(id, slot, icon, title, desc){
   const btn = slot.loading ? "<button disabled><span class='spin'></span> loading&hellip;</button>" : "<button data-load='"+id+"'>Load</button>";
   return "<div class='empty'><div class='empty-ico'>"+icon+"</div>"+
     "<div class='empty-title'>"+esc(title)+"</div>"+
     "<div class='empty-desc'>"+desc+"</div>"+
-    "<div class='empty-pick'>"+combo("pick-"+id, netItems(), {id:slot.net,name:slot.name}, "type a location…")+btn+"</div>"+
+    "<div class='empty-pick'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+"</div>"+
     (slot.error?"<div class='err' style='margin-top:10px;'>"+esc(slot.error)+"</div>":"")+"</div>";
 }
 // Loaded-slot header: name, config template, pull stamps.
@@ -780,7 +807,7 @@ function actionPlans(f, canApply){
   // Tier 2 -- Fix it yourself + exact Meraki deep-link, help doc, how-to
   let t2="<div class='ptier-b'><div>"+esc(f.remediation)+"</div>";
   if(cc){
-    const sNet = (AUD.view==="network"||AUD.view==="template") && AUD.tgt[AUD.view] ? AUD.tgt[AUD.view].id : null;
+    const _cr=AUD.runs[AUD.view]; const sNet = (_cr&&(_cr.scope==="network"||_cr.scope==="template")) ? _cr.tgt.id : null;
     const deep = sNet ? merakiDeepLink(sNet, cc.merakiPath) : "";
     let lk="<div class='plinks'>";
     if(deep) lk+="<a class='plink go' href='"+esc(deep)+"' target='_blank' rel='noopener'>Open in Meraki</a>";
@@ -792,7 +819,7 @@ function actionPlans(f, canApply){
   x+="<div class='ptier t3box'><div class='ptier-h'><span class='ptier-tag t3'>3 &middot; Let Argus fix it</span> <span class='lab'>WRITE</span> Argus does it &mdash; you decide every step</div><div class='ptier-b'>";
   if(canExec && canApply){ x+=execUI(f.id); }
   else if(canExec){
-    const t = (AUD.view==="network" && AUD.tgt.network) ? AUD.tgt.network : null;
+    const _cr=AUD.runs[AUD.view]; const t = (_cr&&_cr.scope==="network") ? _cr.tgt : null;
     x+="<div class='muted'>Argus walks this in one step you approve at a time &mdash; nothing changes without your tap, and you can roll back any step instantly. <b>You&rsquo;re the decision-maker.</b></div>";
     if(t) x+="<div class='pexec'><button class='pbtn' data-addremed='"+esc(t.id)+"|"+esc(t.name)+"'>&#10003; Let Argus fix this on &ldquo;"+esc(t.name)+"&rdquo;</button> <span class='ptag'>adds it to your Remediable list, then you build &amp; approve the plan</span></div>";
     else x+="<div class='muted'>Run this as a <b>network</b> audit (and add that network to your Remediable list in &#9881; Settings) to let Argus do it step by step.</div>";
@@ -825,7 +852,7 @@ function execUI(cid){
 }
 async function remPost(path, body){ const r=await fetch(BRIDGE+"/meraki/remediate/"+path,{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify(body)}); let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(d.detail||d.error||("HTTP "+r.status)); return d; }
 async function remediatePlan(cid){
-  const net=AUD.tgt.network&&AUD.tgt.network.id; if(!net) return;
+  const _cr=AUD.runs[AUD.view]; const net=(_cr&&_cr.scope==="network")?_cr.tgt.id:null; if(!net) return;
   EXEC[cid]={loading:true,steps:null,error:"",network:net,checkId:cid}; render();
   try{ const d=await remPost("plan",{network:net,checkId:cid}); EXEC[cid]={loading:false,error:"",network:net,checkId:cid,steps:(d.steps||[]).map(s=>({stepId:s.stepId,label:s.label,field:s.field,current:s.current,moderated:!!s.moderated,status:"pending",value:"",before:null,msg:""}))}; }
   catch(e){ EXEC[cid]={loading:false,error:e.message||"plan failed",network:net,checkId:cid,steps:null}; }
@@ -849,22 +876,21 @@ async function remediateRollback(cid, i){
 
 // Security Audit pane: read-only firewall/security audit. Picks its own target (network / template / org).
 function auditPane(){
-  const scopesRun=["network","template","org"].filter(s=>AUD.results[s]);
   let h=auditPicker(); // picker always present (with the hero inside the box when nothing has run)
-  if(AUD.auditing){ return h+"<div class='box'><div class='muted'><span class='spin'></span> running read-only audit &amp; collecting config&hellip;</div></div>"; }
-  if(AUD.auditError){ return h+"<div class='err'>audit failed: "+esc(AUD.auditError)+"</div>"+auditExtras(); }
-  if(!scopesRun.length){ return h+auditExtras(); }
-  if(!AUD.view||!AUD.results[AUD.view]) AUD.view=scopesRun[0];
-  // Flip between the scopes that have results (network / template / org).
-  if(scopesRun.length>1){
-    const lab={network:"Network",template:"Template",org:"Organization"};
+  if(AUD.auditing){ return h+"<div class='box'><div class='muted'><span class='spin'></span> running read-only audit"+(AUD.runs.length?" ("+AUD.runs.length+" done so far)":"")+"&hellip;</div></div>"; }
+  if(!AUD.runs.length){ return h+(AUD.auditError?"<div class='err'>audit failed: "+esc(AUD.auditError)+"</div>":"")+auditExtras(); }
+  if(AUD.view>=AUD.runs.length) AUD.view=0;
+  if(AUD.auditError) h+="<div class='err'>some audits failed: "+esc(AUD.auditError)+"</div>";
+  // Flip between every audited result.
+  if(AUD.runs.length>1){
+    const lab={network:"Network",template:"Template",org:"Org"};
     h+="<div class='scopeflip'>";
-    scopesRun.forEach(s=>{ const R=AUD.results[s], t=AUD.tgt[s], nm=(s!=="org"&&t&&t.name)?" &middot; "+esc(t.name):"";
-      h+="<button class='scopebtn"+(AUD.view===s?" on":"")+"' data-scope='"+s+"'>"+lab[s]+nm+" <b class='grade-"+esc(R.grade)+"'>"+esc(R.grade)+"</b></button>"; });
+    AUD.runs.forEach((r,i)=>{ const nm=r.scope==="org"?"Organization":esc(r.tgt.name);
+      h+="<button class='scopebtn"+(AUD.view===i?" on":"")+"' data-runview='"+i+"'>"+lab[r.scope]+" &middot; "+nm+" <b class='grade-"+esc(r.result.grade)+"'>"+esc(r.result.grade)+"</b></button>"; });
     h+="</div>";
   }
-  const A=AUD.results[AUD.view], S=A.summary||{}, isOrg=AUD.view==="org";
-  const scopeLabel = isOrg ? "Audited <b>organization</b>" : "Audited "+(A.isTemplate?"template":"network")+" <b>"+esc(A.store||"")+"</b>";
+  const run=AUD.runs[AUD.view], A=run.result, S=A.summary||{}, isOrg=run.scope==="org";
+  const scopeLabel = isOrg ? "Audited <b>organization</b>" : "Audited "+(A.isTemplate?"template":"network")+" <b>"+esc(A.store||run.tgt.name||"")+"</b>";
   h+=exportRow();
   h+="<div class='stamp'>"+scopeLabel+"</div>";
   // overall grade
@@ -899,7 +925,7 @@ function auditPane(){
   const fs=(A.findings||[]).slice().sort((a,b)=>(rank[a.severity]==null?9:rank[a.severity])-(rank[b.severity]==null?9:rank[b.severity]));
   if(!fs.length){ h+="<div class='nameok' style='margin-top:10px;'>&check; No failures &mdash; passed every check.</div>"; }
   else {
-    const canApply = (AUD.view==="network" && AUD.tgt.network) ? isRemediable(AUD.tgt.network.id) : false;
+    const _cr=AUD.runs[AUD.view]; const canApply = (_cr&&_cr.scope==="network") ? isRemediable(_cr.tgt.id) : false;
     h+="<div class='feat-h' style='margin-top:14px;'>Action items &mdash; "+fs.length+"</div><div class='findings'>";
     fs.forEach(f=>{
       const open=!!PLAN_OPEN[f.id];
@@ -934,7 +960,7 @@ function render(){
   let h="";
   const wifiN=NETV.wifi, ssidGroups=(wifiN&&wifiN.ssids)||[];
   const ssidCount=wifiN?(wifiN.ssidCount!=null?wifiN.ssidCount:ssidGroups.length):0;
-  const auditView = (AUD.view&&AUD.results[AUD.view]) ? AUD.results[AUD.view] : null;
+  const auditView = AUD.runs[AUD.view] ? AUD.runs[AUD.view].result : null;
   const auditBadge = auditView ? " &middot; <b class='grade-"+esc(auditView.grade)+"'>"+esc(auditView.grade)+"</b>" : "";
   h+="<div class='tabwrap'><div class='tabs'>"+
      "<button class='tab"+(TAB==="operations"?" on":"")+"' data-tab='operations'>&#9776; Operations</button>"+
@@ -945,14 +971,15 @@ function render(){
   // Operations -- compact toolbar when loaded, a centered hero when empty
   const opsDesc="Toast POS devices on the POS VLAN, plus Konductor rollout health &mdash; every mapped device live and on VLAN 90.";
   const paneCls=(t)=> "panebox "+(TAB===t ? (TAB_ANIM?"anim":"") : "hidden");
+  const slotBody=(slot,fn)=>{ if(!slot.items.length) return null; if(slot.d) return exportRow()+slotHead(slot)+fn(slot); const it=slot.items[slot.view]; return "<div class='err'>"+esc((it&&it.error)||"load error")+"</div>"; };
+  const opsBody=slotBody(OPS,opsContent);
   h+="<div id='pane-operations' class='"+paneCls("operations")+"'>"+
-     (OPS.d ? pickerRow("operations",OPS)+exportRow()+slotHead(OPS)+opsContent(OPS)
-            : emptyState("operations",OPS,"&#9776;","Operations",opsDesc))+"</div>";
+     (OPS.items.length ? pickerRow("operations",OPS)+opsBody : emptyState("operations",OPS,"&#9776;","Operations",opsDesc))+"</div>";
   // Network
   const netDesc="Connected clients across this network &mdash; wired and Wi-Fi &mdash; plus the Meraki device inventory and every SSID. Rename any client or device inline.";
+  const netBody=slotBody(NETV,netContent);
   h+="<div id='pane-network' class='"+paneCls("network")+"'>"+
-     (NETV.d ? pickerRow("network",NETV)+exportRow()+slotHead(NETV)+netContent(NETV)
-            : emptyState("network",NETV,WIFI,"Network",netDesc))+"</div>";
+     (NETV.items.length ? pickerRow("network",NETV)+netBody : emptyState("network",NETV,WIFI,"Network",netDesc))+"</div>";
   // Security Audit -- own target picker (always present, run/re-run any time)
   h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+auditPane()+"</div>";
 
@@ -960,14 +987,13 @@ function render(){
 }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead{font-size:18px;font-weight:bold;margin-bottom:2px}.nethead b{color:#0d6e8c}.tmpl{margin-bottom:2px}.tmpl .bound{color:#1f7a4d;font-weight:bold}.tmpl .nb{color:#c0392b;font-weight:bold}.stamp{color:#666;font-size:10px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const m={network:"Network",template:"Template",org:"Organization"}; return "Security Audit"+(AUD.view&&m[AUD.view]?" — "+m[AUD.view]:""); } return "View"; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
   if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
   if(TAB==="network") return (NETV.d&&NETV.d.name)||NETV.name||"";
-  if(AUD.view==="org") return "Organization";
-  const t=AUD.tgt[AUD.view]; return (t&&t.name)||"";
+  const cr=AUD.runs[AUD.view]; if(!cr) return "Security Audit"; return cr.scope==="org"?"Organization":(cr.tgt.name||"");
 }
 function exportDoc(){
   const store=exportStore();
@@ -1052,8 +1078,8 @@ async function exportRun(fmt, scope){
   const tables=scopeTables(scope);
   if(fmt==="json"){
     let obj;
-    if(scope==="tab" && TAB==="audit" && AUD.view && AUD.results[AUD.view]){
-      obj={ tool:"Argus", exportedAt:pacific(), scope:viewName(), audit:AUD.results[AUD.view] }; // stable bridge schema
+    if(scope==="tab" && TAB==="audit" && AUD.runs[AUD.view]){
+      obj={ tool:"Argus", exportedAt:pacific(), scope:viewName(), audit:AUD.runs[AUD.view].result }; // stable bridge schema
     } else {
       const sections={};
       tables.forEach((t,i)=>{ const ttl=tableTitle(t)||("table_"+(i+1)); sections[ttl]=dataObjs(tableData(t)); });
@@ -1145,10 +1171,10 @@ document.getElementById("report").addEventListener("click", async e=>{
   const xp=e.target.closest("[data-exp]"); if(xp){ e.stopImmediatePropagation(); const w=xp.closest(".savewrap"); if(w) w.classList.remove("open"); exportRun(xp.getAttribute("data-exp"), xp.getAttribute("data-scope")); return; }
   const sr=e.target.closest(".secref"); if(sr){ e.stopImmediatePropagation(); const id=sr.closest("#pane-network")?"network":"operations"; refreshSection(id, sr.getAttribute("data-refresh"), sr); return; }
   const ck=e.target.closest("#showchecks"); if(ck){ e.stopImmediatePropagation(); SHOWCHECKS=!SHOWCHECKS; render(); if(SHOWCHECKS&&!CHECKS) pullChecks().then(render); return; }
-  const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); const prior=AUD.tgt[AUDITMODE]; AUDITTARGET=AUDITMODE==="org"?{type:"org",id:"org",name:"Organization"}:(prior?{type:AUDITMODE,id:prior.id,name:prior.name}:{type:AUDITMODE,id:"",name:""}); if(AUD.results[AUDITMODE]) AUD.view=AUDITMODE; render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
-  const ra=e.target.closest("#runaudit"); if(ra){ e.stopImmediatePropagation(); if(AUDITMODE==="org"){ AUDITTARGET={type:"org",id:"org",name:"Organization"}; pullAudit(); return; } const cid=AUDITMODE==="template"?"audit-tpl":"audit-net"; const sel=comboResolve(cid); if(sel.id){ AUDITTARGET={type:AUDITMODE,id:sel.id,name:sel.name}; pullAudit(); } return; }
+  const am=e.target.closest(".amode"); if(am){ e.stopImmediatePropagation(); AUDITMODE=am.getAttribute("data-amode"); render(); if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); return; }
+  const ra=e.target.closest("#runaudit"); if(ra){ e.stopImmediatePropagation(); if(AUDITMODE==="org"){ pullAudit([{type:"org",id:"org",name:"Organization"}]); return; } const cid=AUDITMODE==="template"?"audit-tpl":"audit-net"; const picks=comboPicks(cid); if(picks.length) pullAudit(picks.map(p=>({type:AUDITMODE,id:p.id,name:p.name}))); return; }
   const tn=e.target.closest("#togglenotpl"); if(tn){ e.stopImmediatePropagation(); SHOWNOTPL=!SHOWNOTPL; render(); return; }
-  const al=e.target.closest(".auditlink"); if(al){ e.stopImmediatePropagation(); AUDITMODE="network"; AUDITTARGET={type:"network",id:al.getAttribute("data-netid"),name:al.getAttribute("data-netname")}; pullAudit(); return; }
+  const al=e.target.closest(".auditlink"); if(al){ e.stopImmediatePropagation(); AUDITMODE="network"; pullAudit([{type:"network",id:al.getAttribute("data-netid"),name:al.getAttribute("data-netname")}]); return; }
   const ri=e.target.closest(".renameit"); if(ri){ e.stopImmediatePropagation(); openRename(ri); return; }
   const rs=e.target.closest(".rensave"); if(rs){ e.stopImmediatePropagation(); doRenameSave(rs); return; }
   const rc=e.target.closest(".rencancel"); if(rc){ e.stopImmediatePropagation(); render(); return; }
@@ -1186,10 +1212,12 @@ document.getElementById("report").addEventListener("mousedown", e=>{
   const id=wrap.getAttribute("data-combo"); comboPick(id, parseInt(o.dataset.i,10));
   const inp=document.getElementById("ci-"+id); if(inp) inp.focus();
 });
+document.getElementById("report").addEventListener("click", e=>{ const x=e.target.closest(".cchipx"); if(x){ e.stopImmediatePropagation(); comboRemoveChip(x.getAttribute("data-combo"), parseInt(x.getAttribute("data-ci"),10)); } });
+document.getElementById("settings").addEventListener("click", e=>{ const x=e.target.closest(".cchipx"); if(x){ comboRemoveChip(x.getAttribute("data-combo"), parseInt(x.getAttribute("data-ci"),10)); } });
 document.addEventListener("click", e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combolist.open").forEach(el=>el.classList.remove("open")); if(!e.target.closest(".savewrap")) document.querySelectorAll(".savewrap.open").forEach(el=>el.classList.remove("open")); });
 document.getElementById("report").addEventListener("click", e=>{
   const m=e.target.closest("[data-hist]"); if(m){ const r=document.getElementById("hist-"+m.getAttribute("data-hist")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"table-row"; m.classList.toggle("open",!open); } return; }
-  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); TAB_ANIM=true; if(TAB==="audit"){ const base=NETV.net?NETV:OPS; if(!AUDITTARGET.id&&base.net){ AUDITMODE="network"; AUDITTARGET={type:"network",id:base.net,name:base.name||(base.d&&base.d.name)||""}; } if(AUDITMODE==="template"&&!TEMPLATES) loadTemplates().then(render); } render(); return; }
+  const t=e.target.closest("[data-tab]"); if(t){ TAB=t.getAttribute("data-tab"); TAB_ANIM=true; if(TAB==="audit" && AUDITMODE==="template" && !TEMPLATES) loadTemplates().then(render); render(); return; }
   const pl=e.target.closest(".planlink"); if(pl){ e.stopImmediatePropagation(); const id=pl.getAttribute("data-plan"); PLAN_OPEN[id]=!PLAN_OPEN[id]; render(); return; }
   const rm=e.target.closest("[data-readmore]"); if(rm){ e.stopImmediatePropagation(); const id=rm.getAttribute("data-readmore"); READMORE[id]=!READMORE[id]; render(); return; }
   const ad=e.target.closest("[data-addremed]"); if(ad){ e.stopImmediatePropagation(); const a=ad.getAttribute("data-addremed").split("|"); addRemediable(a[0],a[1]); toast("“"+a[1]+"” added to Remediable — Argus can now apply fixes here, step by step"); render(); return; }
@@ -1198,7 +1226,8 @@ document.getElementById("report").addEventListener("click", e=>{
   const eal=e.target.closest("[data-execall]"); if(eal){ e.stopImmediatePropagation(); const cid=eal.getAttribute("data-execall"); const ex=EXEC[cid]; if(ex&&ex.steps){ ex.steps.forEach((s,i)=>{ if(s.moderated&&s.status!=="applied"){ const inp=document.getElementById("execval-"+cid+"-"+i); if(inp) s.value=inp.value.trim(); } }); } remediateApplyAll(cid); return; }
   const erb=e.target.closest("[data-execrb]"); if(erb){ e.stopImmediatePropagation(); const a=erb.getAttribute("data-execrb").split(":"); remediateRollback(a[0],+a[1]); return; }
   const cj=e.target.closest(".catcard.jump"); if(cj){ const cat=cj.getAttribute("data-cat"); const tgt=document.querySelector(".fcard[data-fcat=\""+(cat||"").replace(/"/g,"")+"\"]"); if(tgt){ tgt.scrollIntoView({behavior:"smooth",block:"center"}); tgt.classList.add("flash"); setTimeout(()=>tgt.classList.remove("flash"),1200); } return; }
-  const sc=e.target.closest("[data-scope]"); if(sc){ const s=sc.getAttribute("data-scope"); AUD.view=s; AUDITMODE=s; AUDITTARGET = s==="org" ? {type:"org",id:"org",name:"Organization"} : {type:s,id:(AUD.tgt[s]&&AUD.tgt[s].id)||"",name:(AUD.tgt[s]&&AUD.tgt[s].name)||""}; render(); return; }
+  const sv=e.target.closest("[data-slotview]"); if(sv){ const a=sv.getAttribute("data-slotview").split(":"), slot=slotById(a[0]); if(slot){ slot.view=+a[1]; syncSlot(slot); render(); } return; }
+  const rv2=e.target.closest("[data-runview]"); if(rv2){ AUD.view=+rv2.getAttribute("data-runview"); const r=AUD.runs[AUD.view]; if(r) AUDITMODE=r.scope; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show){ renderFeatures(); fillRemedPicker(); renderRemediable(); } });
