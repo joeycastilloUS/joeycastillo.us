@@ -235,7 +235,13 @@
   .badge{font-size:.66rem;font-weight:800;letter-spacing:.5px;border-radius:5px;padding:1px 8px;text-transform:uppercase;}
   .badge.lab{background:#3a2a00;color:var(--warn);border:1px solid var(--warn);}
   .badge.prod{background:#06251a;color:var(--ok);border:1px solid var(--ok);}
+  .badge.off{background:#1a1a1a;color:var(--dim);border:1px solid var(--line);}
   .featrow button{background:var(--accent);color:#001016;border:none;border-radius:6px;padding:6px 11px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;}
+  .featrow button.labtog{background:var(--surface);color:var(--dim);border:1px solid var(--line);display:inline-flex;align-items:center;gap:7px;}
+  .featrow button.labtog .dot{width:9px;height:9px;border-radius:50%;background:#555;flex:0 0 auto;}
+  .featrow button.labtog.on{color:var(--ok);border-color:var(--ok);}
+  .featrow button.labtog.on .dot{background:var(--ok);box-shadow:0 0 6px rgba(124,255,178,.6);}
+  .featrow button.labtog:hover{border-color:var(--accent);color:var(--accent);}
   .nameit{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:0 8px;margin-left:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .nameit:hover{background:var(--accent);color:#001016;} .nameit:disabled{opacity:.6;cursor:default;}
   .cline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;} .cline+.cline{margin-top:5px;border-top:1px dashed #222;padding-top:5px;}
@@ -774,7 +780,8 @@ function vlanValidateOn(){ return localStorage.getItem(VLANCHK_KEY)==="1"; }
 const VLAN_SET_CHECKS={ "SW-NV1":1, "SW-TRUNK":1 };
 function loadFeatures(){
   let s={}; try{ s=JSON.parse(localStorage.getItem(FEAT_KEY)||"{}"); }catch(e){}
-  for(const k in FEATURE_DEFS){ if(!s[k]) s[k]={state:"lab",enabledForProdAt:null}; }
+  // lab = the Lab Testing on/off toggle (active on lab/test nets). state = the production track.
+  for(const k in FEATURE_DEFS){ if(!s[k]) s[k]={state:"lab",enabledForProdAt:null,lab:true}; else if(s[k].lab===undefined) s[k].lab=true; }
   // Lab-only features (e.g. Set VLAN) can NEVER be promoted: clamp to lab every load, even if a
   // synced/stored state says prod. The TEST/LAB keyword filter is the only thing that activates them.
   for(const k in FEATURE_DEFS){ if(FEATURE_DEFS[k].labOnly && s[k]){ s[k].state="lab"; s[k].enabledForProdAt=null; } }
@@ -786,15 +793,22 @@ let FEATURES=loadFeatures();
 function saveFeatures(){ localStorage.setItem(FEAT_KEY, JSON.stringify(FEATURES)); }
 function labKeywords(){ const v=localStorage.getItem(LABKW_KEY); return (v!=null?v:"TEST, LAB").split(/[,\s]+/).filter(Boolean).map(x=>x.toUpperCase()); }
 function isLabNet(name){ const n=" "+(name||"").toUpperCase().replace(/\s+/g," ").trim()+" "; return labKeywords().some(k=>k&&n.indexOf(" "+k+" ")>=0); } // keyword must be a whole word; the name is space-padded so a keyword at the START or END also qualifies (e.g. "001 - Global FW Lab")
-function featureActive(key,netName){ const f=FEATURES[key]; if(!f) return false; if(FEATURE_DEFS[key]&&FEATURE_DEFS[key].labOnly) return isLabNet(netName); if(f.state==="shipped"||f.state==="prod") return true; if(f.state==="lab") return isLabNet(netName); return false; }
+function featureActive(key,netName){ const f=FEATURES[key]; if(!f) return false; const labOn=f.lab!==false; if(FEATURE_DEFS[key]&&FEATURE_DEFS[key].labOnly) return labOn && isLabNet(netName); if(f.state==="shipped"||f.state==="prod") return true; if(f.state==="lab") return labOn && isLabNet(netName); return false; }
 function daysLeft(iso){ if(!iso) return 0; return Math.max(0, 7-Math.floor((Date.now()-new Date(iso).getTime())/864e5)); }
 function renderFeatures(){
   const el=document.getElementById("featlist"); if(!el) return; let rows="";
   for(const k in FEATURE_DEFS){ const f=FEATURES[k]; if(!f||f.state==="shipped") continue; const def=FEATURE_DEFS[k];
+    const labOn=f.lab!==false;
     let badge,action;
-    if(def.labOnly){ badge="<span class='badge lab'>Lab Only</span>"; action="<span class='muted'>lab/test networks only &middot; not promotable</span>"; }
-    else if(f.state==="lab"){ badge="<span class='badge lab'>Lab Testing</span>"; action="<button data-feat-prod='"+esc(k)+"'>Enable for Production</button>"; }
-    else { badge="<span class='badge prod'>Production</span>"; action="<span class='muted'>ships in "+daysLeft(f.enabledForProdAt)+"d &middot; then archived</span>"; }
+    if(f.state==="prod"){ // promoted — live everywhere
+      badge="<span class='badge prod'>Production</span>";
+      action="<span class='muted'>live everywhere &middot; ships in "+daysLeft(f.enabledForProdAt)+"d, then archived</span>";
+    } else { // lab track — independent lab toggle + (unless lab-only) a separate prod button
+      badge = !labOn ? "<span class='badge off'>Disabled</span>" : (def.labOnly ? "<span class='badge lab'>Lab Only</span>" : "<span class='badge lab'>Lab Testing</span>");
+      const tog="<button class='labtog"+(labOn?" on":"")+"' data-feat-lab='"+esc(k)+"' title='Enable/disable this feature on lab/test networks'><span class='dot'></span>Lab testing &middot; "+(labOn?"ON":"OFF")+"</button>";
+      const prod = def.labOnly ? "<span class='muted'>not promotable</span>" : "<button data-feat-prod='"+esc(k)+"'>Enable for Production</button>";
+      action=tog+prod;
+    }
     rows+="<div class='featrow'><span class='fn'>"+esc(def.name)+"</span>"+badge+"<span class='fd'>"+esc(def.desc)+"</span>"+action+"</div>";
   }
   el.innerHTML = rows || "<div class='muted'>No features in testing &mdash; all shipped.</div>";
@@ -1769,7 +1783,10 @@ document.getElementById("optlist").addEventListener("click", e=>{ const b=e.targ
 document.getElementById("optadd-vlan").addEventListener("click", ()=>optAdd("vlan"));
 document.getElementById("optadd-roster").addEventListener("click", ()=>optAdd("roster"));
 // Lab Features: enable-for-production + configurable keywords
-document.getElementById("featlist").addEventListener("click", e=>{ const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURE_DEFS[k]&&FEATURE_DEFS[k].labOnly) return; if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); saveSettings(); renderFeatures(); render(); } });
+document.getElementById("featlist").addEventListener("click", e=>{
+  const lt=e.target.closest("[data-feat-lab]");
+  if(lt){ const k=lt.getAttribute("data-feat-lab"); if(FEATURES[k]){ FEATURES[k].lab=(FEATURES[k].lab===false); saveFeatures(); saveSettings(); renderFeatures(); render(); } return; }
+  const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURE_DEFS[k]&&FEATURE_DEFS[k].labOnly) return; if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); saveSettings(); renderFeatures(); render(); } });
 document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); saveSettings(); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", ")+" · synced"; render(); });
 document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
 document.getElementById("vlanvalidate").checked = vlanValidateOn();
