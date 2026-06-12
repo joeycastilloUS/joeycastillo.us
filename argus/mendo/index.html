@@ -204,6 +204,11 @@
   .optbtn.save{background:var(--accent);color:#001016;border-color:var(--accent);}
   .optbtn.danger:hover{border-color:var(--bad);color:var(--bad);}
   .opt-sub{color:var(--dim);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 4px;}
+  .optlink{color:var(--accent);font-size:.82rem;font-weight:700;cursor:pointer;text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:2px 9px;}
+  .optlink:hover{border-color:var(--accent);background:#0e2230;}
+  .empty-link{margin-top:12px;font-size:.85rem;}
+  .set-sec.flash{animation:setflash 1.2s ease-out 1;border-radius:8px;}
+  @keyframes setflash{0%{box-shadow:0 0 0 2px var(--accent);}100%{box-shadow:0 0 0 2px rgba(111,195,223,0);}}
   .setvlanit{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .setvlanit:hover{background:var(--accent);color:#001016;} .setvlanit:disabled{opacity:.6;cursor:default;}
   .vlanedit{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 5px;margin-left:5px;font-size:.72rem;cursor:pointer;font-family:inherit;}
@@ -608,7 +613,7 @@ let NAMEMAP=rosterMap();
 const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
 const FEATURE_DEFS={
   "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." },
-  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Production-enabled; writes are still limited to networks on the Remediable allow-list (server-enforced)." }
+  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Lab networks only until you Enable for Production; writes are always limited to the Remediable allow-list (server-enforced)." }
 };
 // VLAN id list must be comma-separated, no spaces (e.g. 90,100). Single VLAN = one number.
 function validVlanList(s){ return /^\d{1,4}(,\d{1,4})*$/.test(String(s||"").trim()); }
@@ -620,9 +625,9 @@ const VLAN_SET_CHECKS={ "SW-NV1":1, "SW-TRUNK":1 };
 function loadFeatures(){
   let s={}; try{ s=JSON.parse(localStorage.getItem(FEAT_KEY)||"{}"); }catch(e){}
   for(const k in FEATURE_DEFS){ if(!s[k]) s[k]={state:"lab",enabledForProdAt:null}; }
-  // Set VLAN is production-enabled by decision: the Remediable allow-list (server-enforced) is the real
-  // guard, so the lab-only gate is redundant friction. Migrate any lab-state install to prod once.
-  if(s["set-vlan"] && s["set-vlan"].state==="lab"){ s["set-vlan"].state="prod"; s["set-vlan"].enabledForProdAt=s["set-vlan"].enabledForProdAt||new Date().toISOString(); }
+  // One-shot: set-vlan was briefly auto-production-enabled. Restore the manual Enable-for-Production
+  // choice (same as One-Click Naming) so the operator opts in deliberately. Runs once per machine.
+  if(localStorage.getItem("argus_setvlan_relab_v1")!=="1"){ if(s["set-vlan"]){ s["set-vlan"].state="lab"; s["set-vlan"].enabledForProdAt=null; } localStorage.setItem("argus_setvlan_relab_v1","1"); }
   const now=Date.now();
   for(const k in s){ if(s[k].state==="prod" && s[k].enabledForProdAt && now-new Date(s[k].enabledForProdAt).getTime()>=7*864e5) s[k].state="shipped"; }
   localStorage.setItem(FEAT_KEY, JSON.stringify(s)); return s;
@@ -764,7 +769,8 @@ function pickerRow(id, slot){
   const metric = slot.loadMs ? " &middot; <span class='loadmetric' title='load time &middot; data downloaded'>"+fmtMs(slot.loadMs)+" &middot; "+fmtBytes(slot._bytes)+"</span>" : "";
   const label = slot.items.length ? "<span class='muted'>showing <b>"+esc(slot.name)+"</b>"+(slot.items.length>1?" ("+(slot.view+1)+" of "+slot.items.length+")":"")+metric+"</span>" : "<span class='muted'>add one or more locations, then Load</span>";
   // Centered control box -- the same standard as the Security Audit picker.
-  return "<div class='box auditcard'><div class='feat-h'>Load a location</div><div class='bar'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+label+"</div>"+
+  const optl = id==="operations" ? "<a class='optlink' data-openopt='1' title='Add, reorder, edit op-targets'>&#9881; Manage op-targets</a>" : "";
+  return "<div class='box auditcard'><div class='feat-h'>Load a location"+(optl?"<span class='sect-tools'>"+optl+"</span>":"")+"</div><div class='bar'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+label+"</div>"+
          (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"")+
          ((slot.items.length>1||slot.loading)?slotFlip(id,slot):"")+"</div>";
 }
@@ -783,6 +789,7 @@ function emptyState(id, slot, icon, title, desc){
     "<div class='empty-title'>"+esc(title)+"</div>"+
     "<div class='empty-desc'>"+desc+"</div>"+
     "<div class='empty-pick'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+"</div>"+
+    (id==="operations"?"<div class='empty-link'><a class='optlink' data-openopt='1'>&#9881; Manage op-targets</a> <span class='muted'>&mdash; Toast, Konductor, and any you add</span></div>":"")+
     (slot.error?"<div class='err' style='margin-top:10px;'>"+esc(slot.error)+"</div>":"")+"</div>";
 }
 // Loaded-slot header: name, config template, pull stamps.
@@ -1450,6 +1457,7 @@ document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
   const ac=e.target.closest(".planchk"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); saveSettings(); render(); return; }
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
+  const oo=e.target.closest("[data-openopt]"); if(oo){ e.stopImmediatePropagation(); openSettingsOpt(); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const sm=e.target.closest("[data-savemenu]"); if(sm){ e.stopImmediatePropagation(); const w=sm.closest(".savewrap"); const wasOpen=w.classList.contains("open"); document.querySelectorAll(".savewrap.open").forEach(x=>x.classList.remove("open")); if(!wasOpen) w.classList.add("open"); return; }
   const xp=e.target.closest("[data-exp]"); if(xp){ e.stopImmediatePropagation(); const w=xp.closest(".savewrap"); if(w) w.classList.remove("open"); try{ const p=exportRun(xp.getAttribute("data-exp"), xp.getAttribute("data-scope")); if(p&&p.catch) p.catch(err=>toast("export failed: "+(err&&err.message||err))); }catch(err){ toast("export failed: "+(err&&err.message||err)); } return; }
@@ -1518,6 +1526,8 @@ document.getElementById("report").addEventListener("click", e=>{
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
 document.getElementById("gear").addEventListener("click", ()=>{ const s=document.getElementById("settings"); const show=s.style.display==="none"; s.style.display = show?"block":"none"; if(show){ renderFeatures(); fillRemedPicker(); renderRemediable(); renderOpTargets(); } });
+// Jump straight to the op-targets editor from the Operations tab.
+function openSettingsOpt(){ const s=document.getElementById("settings"); s.style.display="block"; renderFeatures(); fillRemedPicker(); renderRemediable(); renderOpTargets(); const el=document.getElementById("optlist"); if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); const sec=el.closest(".set-sec"); if(sec){ sec.classList.add("flash"); setTimeout(()=>sec.classList.remove("flash"),1200); } } }
 // Remediable-networks allow-list (Settings) -- searchable combo + removable chips
 function netNameById(id){ const n=(NETS||[]).find(x=>x.id===id); return n?n.name:id; }
 function fillRemedPicker(){ const el=document.getElementById("remedpicker"); if(!el) return; el.innerHTML=combo("remed", netItems(), {id:"",name:""}, "search a network…"); }
