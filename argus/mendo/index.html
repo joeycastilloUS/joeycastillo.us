@@ -146,6 +146,8 @@
   .ip-pill .ip-icon{font-size:11px;line-height:1;}
   .ip-pill.ip-secret{color:var(--warn);background:rgba(255,206,133,0.10);border:1px solid rgba(255,206,133,0.55);}
   .ip-pill.ip-owner{color:var(--accent);background:rgba(111,195,223,0.08);border:1px solid rgba(111,195,223,0.50);}
+  #api-pill{color:var(--dim);background:rgba(111,195,223,0.05);border:1px solid var(--line);text-decoration:none;text-transform:none;letter-spacing:1px;}
+  #api-pill:hover{color:var(--accent);border-color:var(--accent);}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
   .panel textarea{width:100%;height:200px;background:#0d0d0d;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;}
   .err{color:#ff8b8b;margin-top:10px;}
@@ -354,7 +356,17 @@
       <div class="muted">Set <b>inline &amp; per-network</b> &mdash; in a roster op-target&rsquo;s table click <span class='planned'>mark planned</span> on any missing device. Accepted devices show <span class='planned'>PLANNED</span> not <span class='namewarn'>MISSING</span> and don&rsquo;t break <b>SOLID</b> (that store only).</div>
     </div>
 
-    <!-- 5) Debug mode -- always last -->
+    <!-- 5) API endpoint (read-only info) -->
+    <div class="set-sec">
+      <div class="feat-h">&#128225; API endpoint</div>
+      <div class="muted" style="margin-bottom:6px;">Every Argus REST call goes to this bridge &mdash; a read-only proxy. The org API key lives only on the bridge, never in your browser.</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div><span class="muted">REST endpoint:</span> <code id="api-endpoint">&hellip;</code></div>
+        <div><span class="muted">Upstream:</span> <code>Meraki Dashboard API v1 &mdash; https://api.meraki.com/api/v1</code></div>
+      </div>
+    </div>
+
+    <!-- 6) Debug mode -- always last -->
     <div class="set-sec">
       <div class="feat-h">&#128737; Debug mode</div>
       <label class="set-toggle"><input type="checkbox" id="debugtoggle"><span><b>Debug mode &mdash; Privileged Ops</b> &mdash; hold every bridge <b>write</b> behind a secure console requiring operator <b>authorization</b>; authorize, deny, authorize-all, or abort each request, and watch the outbound request &rarr; response audit trail. <span class="muted">Dock it left or right; drag the inner edge to resize; collapse to a tab. Reads stream by; writes wait for your clearance.</span></span></label>
@@ -520,6 +532,8 @@ function woprEl(){ let e=document.getElementById("wopr"); if(!e){ e=document.cre
   }
   return e; }
 window.addEventListener("resize", ()=>{ if(DEBUG_ON) woprApplyLayout(); });
+// Surface the REST endpoint Argus calls (footer pill + Settings), sourced from BRIDGE so it never drifts.
+window.addEventListener("DOMContentLoaded", ()=>{ const host=BRIDGE.replace(/^https?:\/\//,""); const ap=document.getElementById("api-pill"); if(ap){ ap.textContent="API · "+host; ap.href=BRIDGE; } const ae=document.getElementById("api-endpoint"); if(ae) ae.textContent=BRIDGE; });
 // Pretty + lightly syntax-highlighted JSON for the OUTBOUND / INBOUND panes.
 function woprJson(obj){
   if(obj===undefined||obj===null) return "<span class='wdim'>(none)</span>";
@@ -549,7 +563,7 @@ function renderWopr(){
   // SECTION 2 -- OUTBOUND: the JSON we'll send (front pending = preview; else the last one transmitted).
   const reqSrc = pend.length ? {method:pend[0].method, path:pend[0].path, body:pend[0].body} : (WOPR.last&&WOPR.last.req);
   const reqTag = pend.length ? "<span class='warn'>PENDING APPROVAL</span>" : (WOPR.last?"<span class='ok'>TRANSMITTED</span>":"");
-  const outBody = reqSrc ? "<div class='wline'><span class='wm'>"+esc(reqSrc.method)+"</span> "+esc(woprShort(reqSrc.path))+"</div><pre class='wjson'>"+woprJson(reqSrc.body)+"</pre>" : "<div class='wopr-idle'>NO OUTBOUND TRAFFIC</div>";
+  const outBody = reqSrc ? "<div class='wline'><span class='wm'>"+esc(reqSrc.method)+"</span> "+esc(BRIDGE+woprShort(reqSrc.path))+"</div><pre class='wjson'>"+woprJson(reqSrc.body)+"</pre>" : "<div class='wopr-idle'>NO OUTBOUND TRAFFIC</div>";
   // SECTION 3 -- RESPONSE: what the bridge/Meraki returned.
   let inBody;
   if(WOPR.last&&WOPR.last.firing){ inBody="<div class='wopr-idle'><span class='spin'></span> AWAITING RESPONSE</div>"; }
@@ -1702,6 +1716,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
+  <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
     <span class="ip-pill ip-secret"><span class="ip-icon">&#x1F512;</span> CONFIDENTIAL &middot; TRADE SECRET</span>
