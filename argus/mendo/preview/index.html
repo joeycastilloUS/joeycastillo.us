@@ -270,6 +270,17 @@
   /* compact picker: slim the big Load-a-location card */
   .auditcard{padding:9px 13px!important;} .auditcard .feat-h{font-size:.85rem!important;margin-bottom:6px!important;}
   .navsub{opacity:.65;}
+  .pvpickbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 16px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .pvpickbar .pvloc-ico{color:var(--accent);font-size:1.05rem;}
+  .pvpickbar .pvloc{color:var(--accent);font-weight:700;}
+  .pvpickbar .combo{min-width:230px;max-width:300px;margin:0;}
+  .pvpickbar .optlink{color:var(--dim);font-size:.8rem;cursor:pointer;} .pvpickbar .optlink:hover{color:var(--accent);}
+  .pvdet{margin-top:14px;}
+  .pvdet>summary{cursor:pointer;color:var(--accent);font-size:.74rem;text-transform:uppercase;letter-spacing:.8px;padding:8px 0;list-style:none;outline:none;}
+  .pvdet>summary::-webkit-details-marker{display:none;} .pvdet>summary::marker{content:"";}
+  .pvdet>summary:hover{color:#fff;}
+  .pvdet-body{padding-top:8px;}
+  .pvtitle{font-size:1.15rem;font-weight:700;color:#fff;margin:0 0 12px;} .pvtitle .pin{color:var(--accent);}
   .poetog{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .poetog:hover{color:var(--accent);border-color:var(--accent);} .poetog:disabled{opacity:.6;cursor:default;}
   .tplctl{display:inline-flex;align-items:center;gap:6px;margin-left:8px;vertical-align:middle;}
@@ -1526,10 +1537,10 @@ function netDash(slot){
   const ps="<div class='pvrow'><span><span class='pvdot ok'></span>Delivering power</span><b class='ok'>"+poePow+"</b></div>"+
     "<div class='pvrow'><span><span class='pvdot ac'></span>Enabled, idle</span><b class='ac'>"+Math.max(poeOn-poePow,0)+"</b></div>"+
     "<div class='pvrow'><span><span class='pvdot off'></span>PoE off</span><b>"+Math.max(total-poeOn,0)+"</b></div>";
-  return "<div class='pvdash'>"+k+"<div class='pvgrid'>"+
+  return "<div class='pvdash'><div class='pvtitle'><span class='pin'>&#9737;</span> "+esc(d.name||"")+"</div>"+k+"<div class='pvgrid'>"+
     "<div class='pvcard'><h3>Switch health</h3>"+sh+"</div>"+
     "<div class='pvcard'><h3>PoE summary</h3>"+ps+"</div>"+
-    "</div><div class='pvdetail'>&#9662; full detail below</div></div>";
+    "</div></div>";
 }
 function pvSeen(slot){ const d=slot.d, seen={}; if(!d) return seen;
   const note=c=>{ if(!c.ip) return; const on=(c.status||"").toLowerCase()==="online"; const s=seen[c.ip]||(seen[c.ip]={online:false}); if(on) s.online=true; };
@@ -1539,7 +1550,7 @@ function pvSeen(slot){ const d=slot.d, seen={}; if(!d) return seen;
 function opsDash(slot){
   if(!slot.d) return "";
   const targets=(typeof activeOpTargets==="function"?activeOpTargets():[]);
-  if(!targets.length) return pvHint("No op-targets yet — add one in Settings to see the Operations dashboard.");
+  if(!targets.length) return "";
   const seen=pvSeen(slot); let live=0,missing=0,solid=0;
   const rows=targets.map(t=>{
     if(t.kind!=="roster"){ return "<div class='pvrow'><span><span class='pvdot ac'></span>"+esc(t.title)+"</span><span class='pvmeta'>VLAN "+esc(String(t.vlans||""))+"</span></div>"; }
@@ -1554,11 +1565,11 @@ function opsDash(slot){
     pvKpi(live,"Devices live","","ok")+
     pvKpi(missing,"Missing","",missing?"bad":"ok")+
   "</div>";
-  return "<div class='pvdash'>"+k+"<div class='pvgrid'><div class='pvcard'><h3>Op-target status</h3>"+rows+"</div></div><div class='pvdetail'>&#9662; full detail below</div></div>";
+  return "<div class='pvdash'><div class='pvtitle'><span class='pin'>&#9737;</span> "+esc(slot.d.name||"")+"</div>"+k+"<div class='pvgrid'><div class='pvcard'><h3>Op-target status</h3>"+rows+"</div></div></div>";
 }
 function secDash(){
   const runs=(typeof AUD!=="undefined"&&AUD.runs)||[];
-  if(!runs.length) return pvHint("Run a Security Audit to populate the dashboard.");
+  if(!runs.length) return "";
   let crit=0,high=0,med=0,low=0; runs.forEach(r=>{ const s=(r.result&&r.result.summary)||{}; crit+=s.critical||0; high+=s.high||0; med+=s.medium||0; low+=s.low||0; });
   const total=crit+high+med+low;
   const k="<div class='pvkpis'>"+
@@ -1578,6 +1589,22 @@ function pvDash(tab,slot){ try{
   if(tab==="operations") return slot&&slot.d?opsDash(slot):"";
   if(tab==="audit") return secDash();
 }catch(e){ return "<div class='pvdash'><div class='pvhint'>dashboard error: "+esc(e.message)+"</div></div>"; } return ""; }
+// slim picker bar -- a pill, not the big "Load a location" card
+function pvPickbar(id,slot){
+  const btn = slot.loading ? "<button disabled><span class='spin'></span></button>" : "<button data-load='"+id+"'>"+(slot.items.length?"Reload":"Load")+"</button>";
+  const lbl = slot.items.length ? "<span class='pvloc'>"+esc(slot.name)+(slot.items.length>1?" <span class='muted'>(+"+(slot.items.length-1)+")</span>":"")+"</span>" : "<span class='muted'>pick a location</span>";
+  const opt = id==="operations" ? " <a class='optlink' data-openopt='1'>&#9881; op-targets</a>" : "";
+  return "<div class='pvpickbar'><span class='pvloc-ico'>&#9737;</span>"+combo("pick-"+id, netItems(), {}, "location…", true)+btn+lbl+opt+
+    ((slot.items.length>1||slot.loading)?slotFlip(id,slot):"")+"</div>";
+}
+// clean pane: slim picker -> dashboard -> legacy tables collapsed in a <details>
+function pvPane(id,slot,body,dash){
+  let p=pvPickbar(id,slot);
+  if(slot.d) p+=(dash||"")+"<details class='pvdet'><summary>&#9656; Full detail &amp; tables</summary><div class='pvdet-body'>"+body+"</div></details>";
+  else if(body) p+=body;            // loading / error box
+  else p+="<div class='pvhint'>Pick a location above to see the dashboard.</div>";
+  return p;
+}
 
 function render(){
   let h="";
@@ -1602,15 +1629,13 @@ function render(){
   const netCanTpl = NETV.d ? featureActive("set-template", NETV.d.name) : false;
   if(netCanTpl && TEMPLATES===null && !TPL_REQUESTED){ TPL_REQUESTED=true; loadTemplates().then(render); }
   const opsBody=slotBody(OPS,opsContent);
-  h+="<div id='pane-operations' class='"+paneCls("operations")+"'>"+
-     (OPS.items.length ? pickerRow("operations",OPS)+pvDash("operations",OPS)+opsBody : emptyState("operations",OPS,"&#9776;","Operations",opsDesc))+"</div>";
+  h+="<div id='pane-operations' class='"+paneCls("operations")+"'>"+pvPane("operations",OPS,opsBody,opsDash(OPS))+"</div>";
   // Network
   const netDesc="Connected clients across this network &mdash; wired and Wi-Fi &mdash; plus the Meraki device inventory and every SSID. Rename any client or device inline.";
   const netBody=slotBody(NETV,netContent,netCanTpl);
-  h+="<div id='pane-network' class='"+paneCls("network")+"'>"+
-     (NETV.items.length ? pickerRow("network",NETV)+pvDash("network",NETV)+netBody : emptyState("network",NETV,WIFI,"Network",netDesc))+"</div>";
+  h+="<div id='pane-network' class='"+paneCls("network")+"'>"+pvPane("network",NETV,netBody,netDash(NETV))+"</div>";
   // Security Audit -- own target picker (always present, run/re-run any time)
-  h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+pvDash("audit",null)+auditPane()+"</div>";
+  h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+(AUD.runs.length?secDash():"")+auditPane()+"</div>";
 
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML; TAB_ANIM=false;
 }
