@@ -241,6 +241,9 @@
   .setvlanit:hover{background:var(--accent);color:#001016;} .setvlanit:disabled{opacity:.6;cursor:default;}
   .vlanedit{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 5px;margin-left:5px;font-size:.72rem;cursor:pointer;font-family:inherit;}
   .vlanedit:hover{color:var(--accent);border-color:var(--accent);}
+  .poeon{color:var(--accent);}
+  .poetog{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .poetog:hover{color:var(--accent);border-color:var(--accent);} .poetog:disabled{opacity:.6;cursor:default;}
   .vlanval{background:#141414;color:var(--fg,#eee);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-family:inherit;font-size:.82rem;}
   .featrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0e0e0e;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;}
   .featrow .fn{font-weight:700;} .featrow .fd{color:var(--dim);font-size:.82rem;flex:1 1 220px;}
@@ -513,7 +516,7 @@ function woprApplyLayout(){ const e=document.getElementById("wopr"); if(!e) retu
 function woprDock(pos){ WOPR.pos=pos; woprSaveLayout(); woprApplyLayout(); renderWopr(); }
 function woprCollapse(){ WOPR.collapsed=true; woprSaveLayout(); woprApplyLayout(); renderWopr(); }
 function woprShow(){ WOPR.collapsed=false; woprSaveLayout(); woprApplyLayout(); renderWopr(); }
-function woprGated(path){ return /^\/meraki\/(name|device-name|port-vlan|remediate\/(apply|rollback))/.test(path); }
+function woprGated(path){ return /^\/meraki\/(name|device-name|port-vlan|port-poe|remediate\/(apply|rollback))/.test(path); }
 function woprShort(path){ return path.replace(/\?.*$/,""); }
 function woprClock(){ try{ return new Date().toLocaleTimeString("en-GB",{hour12:false}); }catch(e){ return ""; } }
 function woprLog(line, cls){ WOPR.feed.push({t:woprClock(), line:line, cls:cls||""}); if(WOPR.feed.length>250) WOPR.feed.shift(); renderWopr(); }
@@ -780,7 +783,8 @@ let NAMEMAP=rosterMap();
 const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
 const FEATURE_DEFS={
   "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." },
-  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Lab/test networks only (a location whose name contains a Lab/Test keyword). Not promotable to production — never writes a non-lab network.", labOnly:true }
+  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Lab/test networks only (a location whose name contains a Lab/Test keyword). Not promotable to production — never writes a non-lab network.", labOnly:true },
+  "set-poe":{ name:"Set PoE", desc:"Let Argus enable/disable Power-over-Ethernet on a switch port — inline in the Network tab and on op-target devices. Disabling PoE de-powers whatever the port feeds (AP / phone / camera), so it is lab/test networks only (a location whose name contains a Lab/Test keyword). Not promotable to production — never writes a non-lab network.", labOnly:true }
 };
 // VLAN id list must be comma-separated, no spaces (e.g. 90,100). Single VLAN = one number.
 function validVlanList(s){ return /^\d{1,4}(,\d{1,4})*$/.test(String(s||"").trim()); }
@@ -982,16 +986,24 @@ function portTag(swName){ const n=(swName||"").toUpperCase(); if(n.indexOf("POS"
 
 // Operations content: a stack of op-targets (active, in order), each rendered from this slot's data.
 // Shared column header so every op-target table lines up exactly.
-const OPS_HEAD="<thead><tr><th>Status</th><th>Device</th><th>IP</th><th>MAC</th><th>Port / SSID</th><th>VLAN</th><th>Last seen (PT)</th></tr></thead>";
+const OPS_HEAD="<thead><tr><th>Status</th><th>Device</th><th>IP</th><th>MAC</th><th>Port / SSID</th><th>PoE</th><th>VLAN</th><th>Last seen (PT)</th></tr></thead>";
+// PoE cell for the Operations tables. poe = {on,pow} for a switch-port device, or null (Wi-Fi / unknown).
+// Toggle shows only when the Set PoE lab feature is active for this net AND we know the port (sp = serial|portId).
+function poeOpsCell(poe,sp,net,canPoe){
+  if(!poe) return "<span class='av'>&mdash;</span>";
+  const lbl = poe.on ? (poe.pow ? "<span class='nameok'>On &middot; powered</span>" : "<span class='poeon'>On</span>") : "<span class='av'>Off</span>";
+  const btn = (canPoe && sp) ? " <button class='poetog' data-target='"+esc(sp)+"' data-net='"+esc(net)+"' data-enabled='"+(poe.on?"1":"0")+"' title='"+(poe.on?"Disable PoE on this port":"Enable PoE on this port")+"'>"+(poe.on?"Disable":"Enable")+"</button>" : "";
+  return lbl+btn;
+}
 function opsContent(slot){
   const d=slot.d, wifi=slot.wifi;
   // Build the "seen" index once -- every IP's live state, where, VLAN(s), name, mac, and (switch) serial|portId.
   const seen={};
-  function noteSeen(ip,on,where,isWifi,vlan,ls,mac,name,sp){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[],vlans:[],ls:"",mac:"",name:"",sp:""}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); const v=(vlan==null?"":String(vlan)).trim(); if(v && s.vlans.indexOf(v)<0) s.vlans.push(v); const t=(ls==null?"":String(ls)); if(t && t>s.ls) s.ls=t; if(mac && !s.mac) s.mac=String(mac); if(on && name && !s.name) s.name=String(name); if(on && sp && !s.sp) s.sp=String(sp); }
+  function noteSeen(ip,on,where,isWifi,vlan,ls,mac,name,sp,poe){ if(!ip) return; const s=seen[ip]||(seen[ip]={online:false,wheres:[],vlans:[],ls:"",mac:"",name:"",sp:"",poe:null}); if(on) s.online=true; if(where && !s.wheres.some(w=>w.label===where)) s.wheres.push({label:where,wifi:!!isWifi}); const v=(vlan==null?"":String(vlan)).trim(); if(v && s.vlans.indexOf(v)<0) s.vlans.push(v); const t=(ls==null?"":String(ls)); if(t && t>s.ls) s.ls=t; if(mac && !s.mac) s.mac=String(mac); if(on && name && !s.name) s.name=String(name); if(on && sp && !s.sp){ s.sp=String(sp); s.poe=poe||null; } }
   (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>(p.clients||[]).forEach(c=>{
-    noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false,p.vlan,c.lastSeen,c.mac,c.name,(sw.serial||"")+"|"+p.port);
+    noteSeen(c.ip,(c.status||"").toLowerCase()==="online",portTag(sw.name)+"-"+p.port,false,p.vlan,c.lastSeen,c.mac,c.name,(sw.serial||"")+"|"+p.port,{on:!!p.poeEnabled,pow:(typeof p.poeDraw==="number"&&p.poeDraw>0)});
   })));
-  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||g.ssid,true,c.vlan,c.lastSeen,c.mac,c.name,""); }));
+  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ noteSeen(c.ip,(c.status||"").toLowerCase()==="online",c.ssid||g.ssid,true,c.vlan,c.lastSeen,c.mac,c.name,"",null); }));
 
   const lists=activeOpTargets();
   if(!lists.length) return "<div class='muted'>No op-targets yet &mdash; add one in &#9881; Settings &rarr; Op-targets.</div>";
@@ -1003,12 +1015,13 @@ function whereCell(wheres){ const wlist = wheres.some(w=>!w.wifi) ? wheres.filte
 function vlanTargetSection(t,d,wifi){
   const tvlans=String(t.vlans||"").split(/[,\s]+/).map(x=>x.trim()).filter(Boolean);
   const inV=(v)=>tvlans.indexOf(String(v))>=0, rows=[];
-  (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>{ if(inV(p.vlan)) (p.clients||[]).filter(c=>(c.status||"").toLowerCase()==="online").forEach(c=>rows.push({name:c.name,ip:c.ip,mac:c.mac,where:portTag(sw.name)+"-"+p.port,vlan:p.vlan,lastSeen:c.lastSeen})); }));
-  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ if(inV(c.vlan) && (c.status||"").toLowerCase()==="online") rows.push({name:c.name,ip:c.ip,mac:c.mac,where:"<span class='wifi-flag'>"+WIFI+esc(c.ssid||g.ssid)+"</span>",vlan:c.vlan,lastSeen:c.lastSeen,wifi:true}); }));
+  const canPoe=featureActive("set-poe", d.name), net=d.network; // PoE toggle gated like Set VLAN
+  (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>{ if(inV(p.vlan)) (p.clients||[]).filter(c=>(c.status||"").toLowerCase()==="online").forEach(c=>rows.push({name:c.name,ip:c.ip,mac:c.mac,where:portTag(sw.name)+"-"+p.port,vlan:p.vlan,lastSeen:c.lastSeen,poe:{on:!!p.poeEnabled,pow:(typeof p.poeDraw==="number"&&p.poeDraw>0)},sp:(sw.serial||"")+"|"+p.port})); }));
+  ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ if(inV(c.vlan) && (c.status||"").toLowerCase()==="online") rows.push({name:c.name,ip:c.ip,mac:c.mac,where:"<span class='wifi-flag'>"+WIFI+esc(c.ssid||g.ssid)+"</span>",vlan:c.vlan,lastSeen:c.lastSeen,wifi:true,poe:null,sp:""}); }));
   let tr="";
   rows.sort((a,b)=>(a.ip||"").localeCompare(b.ip||"",undefined,{numeric:true})).forEach(r=>{
     const whereC = r.wifi ? r.where : "<span class='port'>"+esc(r.where||"")+"</span>";
-    tr+="<tr><td class='nw'>"+statusIcon("live","LIVE")+"</td><td>"+esc(r.name||"(unnamed)")+"</td><td class='ip'>"+esc(r.ip||"")+"</td><td class='ip'>"+esc(r.mac||"")+"</td><td>"+whereC+"</td><td>"+esc(r.vlan==null?"":r.vlan)+"</td><td class='av nw'>"+esc(lastSeenPac(r.lastSeen))+"</td></tr>";
+    tr+="<tr><td class='nw'>"+statusIcon("live","LIVE")+"</td><td>"+esc(r.name||"(unnamed)")+"</td><td class='ip'>"+esc(r.ip||"")+"</td><td class='ip'>"+esc(r.mac||"")+"</td><td>"+whereC+"</td><td class='nw'>"+poeOpsCell(r.poe,r.sp,net,canPoe)+"</td><td>"+esc(r.vlan==null?"":r.vlan)+"</td><td class='av nw'>"+esc(lastSeenPac(r.lastSeen))+"</td></tr>";
   });
   const vlanLabel=tvlans.join(", ")||"(none set)";
   const body = rows.length
@@ -1026,6 +1039,7 @@ function rosterTargetSection(t,slot,seen){
   const accept=acceptSet(slot.net);
   const canName=featureActive("one-click-naming", slot.name);   // rename gated like the Network tab
   const canVlan=featureActive("set-vlan", slot.name); // VLAN write: gated like Set Name (lab toggle + TEST/LAB filter)
+  const canPoe=featureActive("set-poe", slot.name); // PoE enable/disable: gated like Set VLAN
   let live=0, planned=0, unaccounted=0, rows="";
   mapped.forEach(ip=>{
     const nm=map[ip], s=seen[ip];
@@ -1057,7 +1071,8 @@ function rosterTargetSection(t,slot,seen){
     }
     const isLive = !!(s && s.online);
     const toggle = isLive ? "" : " <button class='planchk"+(isAccepted?" on":"")+"' data-acceptmiss='"+esc(ip)+"' title='"+(isAccepted?"Accepted as planned-missing for this store — click to require it present again":"Mark accepted: planned-missing for this store (won't break SOLID)")+"'>"+(isAccepted?"&#9745;":"&#9744;")+" planned</button>";
-    rows+="<tr><td class='nw'>"+statusIcon(kind,word)+toggle+"</td><td>"+dcell+"</td><td class='ip'>"+esc(ip)+"</td><td class='ip'>"+macCell+"</td><td>"+where+"</td><td>"+vlan+"</td><td class='av nw'>"+lastSeen+"</td></tr>";
+    const poeC = poeOpsCell(s?s.poe:null, s?s.sp:"", slot.net, canPoe);
+    rows+="<tr><td class='nw'>"+statusIcon(kind,word)+toggle+"</td><td>"+dcell+"</td><td class='ip'>"+esc(ip)+"</td><td class='ip'>"+macCell+"</td><td>"+where+"</td><td class='nw'>"+poeC+"</td><td>"+vlan+"</td><td class='av nw'>"+lastSeen+"</td></tr>";
   });
   const total=mapped.length, solid=(unaccounted===0);
   const head=esc(t.title)+" &mdash; "+live+"/"+total+" live"+(planned?" &middot; <span class='planned'>"+planned+" planned</span>":"")+" &middot; "+(solid?"<span class='nameok'>SOLID</span>":"<span class='namewarn'>NOT SOLID</span>");
@@ -1071,11 +1086,12 @@ function netContent(slot){
   const d=slot.d, wifi=slot.wifi, onlineOnly=true;
   const FEAT=featureActive("one-click-naming", d.name); // One-Click Naming active for this location?
   const CANVLAN=featureActive("set-vlan", d.name); // inline VLAN / allowed-VLAN write -- gated like Set Name (lab toggle + TEST/LAB filter)
+  const CANPOE=featureActive("set-poe", d.name); // inline PoE enable/disable -- gated like Set VLAN (lab toggle + TEST/LAB filter)
   const ssidGroups=(wifi&&wifi.ssids)||[];
   let sp="", nameableCount=0;
   const dev=d.devices||[];
   (d.switches||[]).slice().sort((a,b)=>swOrder(a.name)-swOrder(b.name)||(a.name||"").localeCompare(b.name)).forEach(sw=>{
-    let sb="<table><thead><tr><th>Port</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th><th>Description</th><th>IP address</th><th>MAC address</th><th>Last seen (PT)</th></tr></thead><tbody>";
+    let sb="<table><thead><tr><th>Port</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th><th>PoE</th><th>Description</th><th>IP address</th><th>MAC address</th><th>Last seen (PT)</th></tr></thead><tbody>";
     const ports=(sw.ports||[]).slice().sort((a,b)=>parseInt(a.port,10)-parseInt(b.port,10));
     ports.forEach(p=>{
       const conn=(p.status||"").toLowerCase()==="connected";
@@ -1117,16 +1133,20 @@ function netContent(slot){
       const tgt=(sw.serial||"")+"|"+p.port;
       const vEdit = (CANVLAN && sw.serial) ? " <button class='vlanedit' data-target='"+esc(tgt)+"' data-field='vlan' data-cur='"+esc(p.vlan==null?"":String(p.vlan))+"' data-net='"+esc(slot.net)+"' title='Set native VLAN'>&#9998;</button>" : "";
       const aEdit = (CANVLAN && sw.serial) ? " <button class='vlanedit' data-target='"+esc(tgt)+"' data-field='allowedVlans' data-cur='"+esc((p.allowedVlans||"")).replace(/'/g,"&#39;")+"' data-net='"+esc(slot.net)+"' title='Set allowed VLANs'>&#9998;</button>" : "";
+      // PoE: enabled (config) + whether it's actually delivering power now (live draw > 0). Optional toggle.
+      const poeOn=!!p.poeEnabled, poePow=(typeof p.poeDraw==="number" && p.poeDraw>0);
+      const poeLbl = poeOn ? (poePow ? "<span class='nameok' title='PoE enabled and delivering power'>On &middot; powered</span>" : "<span class='poeon' title='PoE enabled, no power drawn'>On</span>") : "<span class='av' title='PoE disabled on this port'>Off</span>";
+      const poeBtn = (CANPOE && sw.serial) ? " <button class='poetog' data-target='"+esc(tgt)+"' data-net='"+esc(slot.net)+"' data-enabled='"+(poeOn?"1":"0")+"' title='"+(poeOn?"Disable PoE on this port":"Enable PoE on this port")+"'>"+(poeOn?"Disable":"Enable")+"</button>" : "";
       sb+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+
         "</td><td class='"+(conn?"st-conn":"st-disc")+"'>"+esc(p.status||"")+"</td><td class='nw'>"+esc(p.vlan)+vEdit+
-        "</td><td class='av nw'>"+esc(p.allowedVlans||"")+aEdit+"</td><td>"+desc+nameBtn+moreLink+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av nw'>"+ls+"</td></tr>";
+        "</td><td class='av nw'>"+esc(p.allowedVlans||"")+aEdit+"</td><td class='nw'>"+poeLbl+poeBtn+"</td><td>"+desc+nameBtn+moreLink+"</td><td class='ip'>"+ips+"</td><td class='ip'>"+macs+"</td><td class='av nw'>"+ls+"</td></tr>";
       if(hasHist){
         let hr="<div class='histwrap'><div class='histcap'>Past 24 hours &middot; port "+esc(p.port)+" ("+hist.length+")</div>"+
           "<table class='histtbl'><thead><tr><th>Last seen (PT)</th><th>Status</th><th>Description</th><th>IP</th><th>MAC</th><th>VLAN</th></tr></thead><tbody>";
         hist.forEach(c=>{ const on=(c.status||"").toLowerCase()==="online";
           hr+="<tr><td class='av'>"+esc(lastSeenPac(c.lastSeen))+"</td><td class='"+(on?"st-conn":"st-disc")+"'>"+esc(c.status||"")+"</td><td>"+esc(c.name||"")+"</td><td class='ip'>"+esc(c.ip||"")+"</td><td class='ip'>"+esc(c.mac||"")+"</td><td>"+esc(c.vlan||"")+"</td></tr>"; });
         hr+="</tbody></table></div>";
-        sb+="<tr class='histrow' id='hist-"+esc(key)+"' style='display:none'><td colspan='8'>"+hr+"</td></tr>";
+        sb+="<tr class='histrow' id='hist-"+esc(key)+"' style='display:none'><td colspan='9'>"+hr+"</td></tr>";
       }
     });
     sb+="</tbody></table>";
@@ -1673,6 +1693,18 @@ async function doSetVlan(btn){
     btn.outerHTML="<span class='nameok'>&check; VLAN &rarr; "+esc(String(d.after!=null?d.after:v))+"</span>"; }
   catch(err){ btn.disabled=false; btn.innerHTML=old; btn.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
 }
+// PoE toggle (Network tab + op-targets): flip poeEnabled on ONE switch port. Gated UI-side (set-poe) AND
+// server-side (lab + allow-list + capture-before-write) by the bridge. target = "serial|portId".
+async function doPortPoe(btn){
+  if(!btn || btn.disabled) return;
+  const tgt=btn.dataset.target, net=btn.dataset.net, cur=btn.dataset.enabled==="1", next=!cur;
+  btn.disabled=true; const old=btn.innerHTML; btn.innerHTML="<span class='spin'></span> "+(next?"enabling":"disabling")+"&hellip;";
+  try{ const r=await fetch(BRIDGE+"/meraki/port-poe",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:net,target:tgt,enabled:next})});
+    let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(cleanErr(d.detail||d.error||("HTTP "+r.status)));
+    const onNow=(d.after!=null? d.after==="true"||d.after===true : next);
+    btn.outerHTML="<span class='nameok'>&check; PoE &rarr; "+(onNow?"On":"Off")+"</span>"; }
+  catch(err){ btn.disabled=false; btn.innerHTML=old; btn.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
+}
 
 document.getElementById("gform").addEventListener("submit", async e=>{
   e.preventDefault(); PW=document.getElementById("gpw").value;
@@ -1699,6 +1731,7 @@ document.getElementById("report").addEventListener("click", async e=>{
   const ve=e.target.closest(".vlanedit"); if(ve){ e.stopImmediatePropagation(); openVlanEdit(ve); return; }
   const vs=e.target.closest(".vlansave"); if(vs){ e.stopImmediatePropagation(); doPortVlanSave(vs); return; }
   const sv=e.target.closest(".setvlanit"); if(sv){ e.stopImmediatePropagation(); doSetVlan(sv); return; }
+  const pt=e.target.closest(".poetog"); if(pt){ e.stopImmediatePropagation(); doPortPoe(pt); return; }
   const nb=e.target.closest(".nameit"); if(nb){ e.stopPropagation(); doNameButton(nb); return; }
   const na=e.target.closest("#nameall"); if(na){ na.disabled=true; const msg=document.getElementById("nameallmsg"); const all=[...document.querySelectorAll(".nameit:not(:disabled)")]; if(msg) msg.innerHTML="<span class='spin'></span> naming "+all.length+"&hellip;"; await Promise.all(all.map(doNameButton)); if(msg) msg.textContent="done"; na.disabled=false; return; }
 });
