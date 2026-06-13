@@ -1159,7 +1159,9 @@ function netContent(slot){
       const vEdit = (CANVLAN && sw.serial) ? " <button class='vlanedit' data-target='"+esc(tgt)+"' data-field='vlan' data-cur='"+esc(p.vlan==null?"":String(p.vlan))+"' data-net='"+esc(slot.net)+"' title='Set native VLAN'>&#9998;</button>" : "";
       const aEdit = (CANVLAN && sw.serial) ? " <button class='vlanedit' data-target='"+esc(tgt)+"' data-field='allowedVlans' data-cur='"+esc((p.allowedVlans||"")).replace(/'/g,"&#39;")+"' data-net='"+esc(slot.net)+"' title='Set allowed VLANs'>&#9998;</button>" : "";
       // PoE: enabled (config) + whether it's actually delivering power now (live draw > 0). Optional toggle.
-      const poeOn=!!p.poeEnabled, poePow=(typeof p.poeDraw==="number" && p.poeDraw>0);
+      // "powered" requires the port to be CONNECTED now -- poeDraw (powerUsageInWh) is cumulative over the
+      // window, so a since-unplugged port still reads >0. A disconnected port can't deliver power -> no bolt.
+      const poeOn=!!p.poeEnabled, poePow=(conn && typeof p.poeDraw==="number" && p.poeDraw>0);
       const poeLbl = poeBadge(poeOn,poePow);
       const poeBtn = (CANPOE && sw.serial) ? " <button class='poetog' data-target='"+esc(tgt)+"' data-net='"+esc(slot.net)+"' data-enabled='"+(poeOn?"1":"0")+"' title='"+(poeOn?"Disable PoE on this port":"Enable PoE on this port")+"'>"+(poeOn?"Disable":"Enable")+"</button>" : "";
       sb+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+
