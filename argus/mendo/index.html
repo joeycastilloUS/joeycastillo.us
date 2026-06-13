@@ -242,6 +242,7 @@
   .vlanedit{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 5px;margin-left:5px;font-size:.72rem;cursor:pointer;font-family:inherit;}
   .vlanedit:hover{color:var(--accent);border-color:var(--accent);}
   .poeon{color:var(--accent);}
+  .poepow{color:var(--ok);font-weight:700;white-space:nowrap;}
   .poetog{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .poetog:hover{color:var(--accent);border-color:var(--accent);} .poetog:disabled{opacity:.6;cursor:default;}
   .vlanval{background:#141414;color:var(--fg,#eee);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-family:inherit;font-size:.82rem;}
@@ -988,11 +989,14 @@ function portTag(swName){ const n=(swName||"").toUpperCase(); if(n.indexOf("POS"
 // Operations content: a stack of op-targets (active, in order), each rendered from this slot's data.
 // Shared column header so every op-target table lines up exactly.
 const OPS_HEAD="<thead><tr><th>Status</th><th>Device</th><th>IP</th><th>MAC</th><th>Port / SSID</th><th>PoE</th><th>VLAN</th><th>Last seen (PT)</th></tr></thead>";
+// Compact PoE badge — same in both views. "On" + a bolt when actually drawing power; "Off" when disabled.
+// Tight on purpose: the old "On · powered" ate the column. The bolt carries "powered"; the tooltip says it.
+function poeBadge(on,pow){ return on ? (pow ? "<span class='poepow' title='PoE on — delivering power'>On&#8202;&#9889;</span>" : "<span class='poeon' title='PoE on — idle'>On</span>") : "<span class='av' title='PoE off'>Off</span>"; }
 // PoE cell for the Operations tables. poe = {on,pow} for a switch-port device, or null (Wi-Fi / unknown).
 // Toggle shows only when the Set PoE lab feature is active for this net AND we know the port (sp = serial|portId).
 function poeOpsCell(poe,sp,net,canPoe){
   if(!poe) return "<span class='av'>&mdash;</span>";
-  const lbl = poe.on ? (poe.pow ? "<span class='nameok'>On &middot; powered</span>" : "<span class='poeon'>On</span>") : "<span class='av'>Off</span>";
+  const lbl = poeBadge(poe.on,poe.pow);
   const btn = (canPoe && sp) ? " <button class='poetog' data-target='"+esc(sp)+"' data-net='"+esc(net)+"' data-enabled='"+(poe.on?"1":"0")+"' title='"+(poe.on?"Disable PoE on this port":"Enable PoE on this port")+"'>"+(poe.on?"Disable":"Enable")+"</button>" : "";
   return lbl+btn;
 }
@@ -1136,7 +1140,7 @@ function netContent(slot){
       const aEdit = (CANVLAN && sw.serial) ? " <button class='vlanedit' data-target='"+esc(tgt)+"' data-field='allowedVlans' data-cur='"+esc((p.allowedVlans||"")).replace(/'/g,"&#39;")+"' data-net='"+esc(slot.net)+"' title='Set allowed VLANs'>&#9998;</button>" : "";
       // PoE: enabled (config) + whether it's actually delivering power now (live draw > 0). Optional toggle.
       const poeOn=!!p.poeEnabled, poePow=(typeof p.poeDraw==="number" && p.poeDraw>0);
-      const poeLbl = poeOn ? (poePow ? "<span class='nameok' title='PoE enabled and delivering power'>On &middot; powered</span>" : "<span class='poeon' title='PoE enabled, no power drawn'>On</span>") : "<span class='av' title='PoE disabled on this port'>Off</span>";
+      const poeLbl = poeBadge(poeOn,poePow);
       const poeBtn = (CANPOE && sw.serial) ? " <button class='poetog' data-target='"+esc(tgt)+"' data-net='"+esc(slot.net)+"' data-enabled='"+(poeOn?"1":"0")+"' title='"+(poeOn?"Disable PoE on this port":"Enable PoE on this port")+"'>"+(poeOn?"Disable":"Enable")+"</button>" : "";
       sb+="<tr class='"+(conn?"":"disc")+"'><td class='port'>"+esc(p.port)+
         "</td><td class='"+(conn?"st-conn":"st-disc")+"'>"+esc(p.status||"")+"</td><td class='nw'>"+esc(p.vlan)+vEdit+
