@@ -266,6 +266,7 @@
   .nameit{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:0 8px;margin-left:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .nameit:hover{background:var(--accent);color:#001016;} .nameit:disabled{opacity:.6;cursor:default;}
   .cline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;} .cline+.cline{margin-top:5px;border-top:1px dashed #222;padding-top:5px;}
+  .cnp{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;} /* name + ✎ stay glued; never orphan the pencil */
   .cline .nameit,.cline .renameit{margin-left:0;}
   .renameit{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.74rem;cursor:pointer;font-family:inherit;}
   .renameit:hover{color:var(--accent);border-color:var(--accent);}
@@ -1132,14 +1133,14 @@ function netContent(slot){
         // (no more orphaned pencil on its own line).
         desc = cs.map(c=>{
           const cname=c.name||"";
-          let acts="";
+          let pen="", nb="";
           if(FEAT && c.mac){
-            acts+="<button class='renameit' data-mac='"+esc(c.mac)+"' data-cur='"+esc(cname).replace(/'/g,"&#39;")+"' title='Rename this client'>&#9998;</button>";
+            pen="<button class='renameit' data-mac='"+esc(c.mac)+"' data-cur='"+esc(cname).replace(/'/g,"&#39;")+"' title='Rename this client'>&#9998;</button>";
             const exp=NAMEMAP[c.ip], a=cname.trim().toLowerCase();
             const mism = exp && (!a || a===(c.mac||"").toLowerCase() || a!==exp.toLowerCase());
-            if(mism){ nameableCount++; acts+="<button class='nameit' data-mac='"+esc(c.mac)+"' data-name='"+esc(exp)+"'>Name it &rarr; "+esc(exp)+"</button>"; }
+            if(mism){ nameableCount++; nb="<button class='nameit' data-mac='"+esc(c.mac)+"' data-name='"+esc(exp)+"'>Name it &rarr; "+esc(exp)+"</button>"; }
           }
-          return "<div class='cline'><span class='cn'>"+esc(cname||"(unnamed)")+"</span>"+acts+"</div>";
+          return "<div class='cline'><span class='cnp'><span class='cn'>"+esc(cname||"(unnamed)")+"</span>"+pen+"</span>"+nb+"</div>";
         }).join("");
       } else if(conn && String(p.vlan)==="100" && cs.length===0){
         // Connected POS-VLAN (100) port with no live client -> almost always a Toast POS receipt printer.
@@ -1183,7 +1184,7 @@ function netContent(slot){
   if(dev.length){
     let db="<table><thead><tr><th>Name</th><th>Model</th><th>Serial</th><th>MAC</th></tr></thead><tbody>";
     dev.forEach(x=>{ const pen = (FEAT && x.serial) ? " <button class='renameit' data-serial='"+esc(x.serial)+"' data-cur='"+esc(x.name||"").replace(/'/g,"&#39;")+"' title='Rename this Meraki device'>&#9998;</button>" : "";
-      db+="<tr><td><span class='cn'>"+esc(x.name||"(no name)")+"</span>"+pen+"</td><td>"+esc(x.model)+"</td><td>"+esc(x.serial)+"</td><td class='ip'>"+esc(x.mac)+"</td></tr>"; });
+      db+="<tr><td><span class='cnp'><span class='cn'>"+esc(x.name||"(no name)")+"</span>"+pen+"</span></td><td>"+esc(x.model)+"</td><td>"+esc(x.serial)+"</td><td class='ip'>"+esc(x.mac)+"</td></tr>"; });
     db+="</tbody></table>";
     sp+=sect("devices","Meraki Devices ("+dev.length+")", db, "ports");
   }
@@ -1203,14 +1204,14 @@ function netContent(slot){
       else {
         wb="<table><thead><tr><th>Description</th><th>IP address</th><th>MAC address</th><th>VLAN</th><th>AP</th><th>Device</th><th>Status</th><th>Last seen (PT)</th></tr></thead><tbody>";
         gc.forEach(c=>{ const on=(c.status||"").toLowerCase()==="online";
-          const cname=c.name||""; let acts="";
+          const cname=c.name||""; let pen="", nb="";
           if(FEAT && c.mac){
-            acts+="<button class='renameit' data-mac='"+esc(c.mac)+"' data-cur='"+esc(cname).replace(/'/g,"&#39;")+"' title='Rename / describe this Wi-Fi client'>&#9998;</button>";
+            pen="<button class='renameit' data-mac='"+esc(c.mac)+"' data-cur='"+esc(cname).replace(/'/g,"&#39;")+"' title='Rename / describe this Wi-Fi client'>&#9998;</button>";
             const exp=NAMEMAP[c.ip], a=cname.trim().toLowerCase();
             const mism = exp && (!a || a===(c.mac||"").toLowerCase() || a!==exp.toLowerCase());
-            if(mism){ nameableCount++; acts+="<button class='nameit' data-mac='"+esc(c.mac)+"' data-name='"+esc(exp)+"'>Name it &rarr; "+esc(exp)+"</button>"; }
+            if(mism){ nameableCount++; nb="<button class='nameit' data-mac='"+esc(c.mac)+"' data-name='"+esc(exp)+"'>Name it &rarr; "+esc(exp)+"</button>"; }
           }
-          wb+="<tr class='"+(on?"":"disc")+"'><td><div class='cline'><span class='cn'>"+esc(cname)+"</span>"+nameCheck(c.ip||"",c.name,c.mac)+acts+"</div></td>"+
+          wb+="<tr class='"+(on?"":"disc")+"'><td><div class='cline'><span class='cnp'><span class='cn'>"+esc(cname)+"</span>"+nameCheck(c.ip||"",c.name,c.mac)+pen+"</span>"+nb+"</div></td>"+
             "<td class='ip'>"+esc(c.ip||"")+"</td><td class='ip'>"+esc(c.mac||"")+"</td><td>"+esc(c.vlan||"")+"</td>"+
             "<td class='wifi-ap'>"+esc(c.ap||"")+"</td><td class='av'>"+esc([c.manufacturer,c.os].filter(Boolean).join(" / "))+"</td>"+
             "<td class='"+(on?"st-conn":"st-disc")+"'>"+esc(c.status||"")+"</td><td class='av nw'>"+esc(lastSeenPac(c.lastSeen))+"</td></tr>"; });
