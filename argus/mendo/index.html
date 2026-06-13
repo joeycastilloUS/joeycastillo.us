@@ -245,6 +245,11 @@
   .poepow{color:var(--ok);font-weight:700;white-space:nowrap;}
   .poetog{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;padding:0 6px;margin-left:6px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .poetog:hover{color:var(--accent);border-color:var(--accent);} .poetog:disabled{opacity:.6;cursor:default;}
+  .tplctl{display:inline-flex;align-items:center;gap:6px;margin-left:8px;vertical-align:middle;}
+  .tplsel{min-width:160px;width:auto;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-family:inherit;font-size:.82rem;}
+  .tplbind,.tplunbind{background:#16323d;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:1px 9px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .tplbind:hover,.tplunbind:hover{background:var(--accent);color:#001016;} .tplbind:disabled,.tplunbind:disabled{opacity:.6;cursor:default;}
+  .tplunbind{color:var(--warn);border-color:var(--warn);} .tplunbind:hover{background:var(--warn);color:#1a1407;}
   .vlanval{background:#141414;color:var(--fg,#eee);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-family:inherit;font-size:.82rem;}
   .featrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0e0e0e;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;}
   .featrow .fn{font-weight:700;} .featrow .fd{color:var(--dim);font-size:.82rem;flex:1 1 220px;}
@@ -437,6 +442,7 @@ let SECTSTATE={}; // section key -> false when collapsed; persists across re-ren
 let SORTSTATE={}; // table key (sect-body id) -> {col,dir}; persists across re-renders. Default: first column ascending.
 let SHOWCHECKS=false, CHECKS=null; // audit methodology panel (every check + scoring), fetched once from /meraki/audit/checks
 let AUDITMODE="network", AUDITTARGET={type:"network",id:"",name:""}, TEMPLATES=null, SHOWNOTPL=false; // audit tab: pick a network or a template, run on demand
+let TPL_REQUESTED=false; // one-shot guard: load the template list when Bind Template is first active
 async function loadTemplates(){ if(TEMPLATES) return; try{ const r=await api("/meraki/templates"); if(r.ok) TEMPLATES=(await r.json()).templates||[]; }catch(e){} }
 function lvlBadge(l){ if(!l) return ""; return " <span class='lvl lvl-"+esc(l)+"'>"+esc(l)+"</span>"; }
 // Compact audit control bar -- mode buttons + a type-to-search dropdown + Run. ALWAYS shown in the
@@ -516,7 +522,7 @@ function woprApplyLayout(){ const e=document.getElementById("wopr"); if(!e) retu
 function woprDock(pos){ WOPR.pos=pos; woprSaveLayout(); woprApplyLayout(); renderWopr(); }
 function woprCollapse(){ WOPR.collapsed=true; woprSaveLayout(); woprApplyLayout(); renderWopr(); }
 function woprShow(){ WOPR.collapsed=false; woprSaveLayout(); woprApplyLayout(); renderWopr(); }
-function woprGated(path){ return /^\/meraki\/(name|device-name|port-vlan|port-poe|remediate\/(apply|rollback))/.test(path); }
+function woprGated(path){ return /^\/meraki\/(name|device-name|port-vlan|port-poe|template|remediate\/(apply|rollback))/.test(path); }
 function woprShort(path){ return path.replace(/\?.*$/,""); }
 function woprClock(){ try{ return new Date().toLocaleTimeString("en-GB",{hour12:false}); }catch(e){ return ""; } }
 function woprLog(line, cls){ WOPR.feed.push({t:woprClock(), line:line, cls:cls||""}); if(WOPR.feed.length>250) WOPR.feed.shift(); renderWopr(); }
@@ -784,7 +790,8 @@ const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
 const FEATURE_DEFS={
   "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." },
   "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Lab Testing runs on lab/test-named locations; Enable for Production to use it elsewhere. The bridge still writes only lab/test-named OR Remediable-allow-listed networks — production stays gated by the allow-list." },
-  "set-poe":{ name:"Set PoE", desc:"Let Argus enable/disable Power-over-Ethernet on a switch port — inline in the Network tab and on op-target devices. Disabling PoE de-powers whatever the port feeds (AP / phone / camera). Lab Testing runs on lab/test-named locations; Enable for Production to use it elsewhere. The bridge still writes only lab/test-named OR Remediable-allow-listed networks — production stays gated by the allow-list." }
+  "set-poe":{ name:"Set PoE", desc:"Let Argus enable/disable Power-over-Ethernet on a switch port — inline in the Network tab and on op-target devices. Disabling PoE de-powers whatever the port feeds (AP / phone / camera). Lab Testing runs on lab/test-named locations; Enable for Production to use it elsewhere. The bridge still writes only lab/test-named OR Remediable-allow-listed networks — production stays gated by the allow-list." },
+  "set-template":{ name:"Bind Template", desc:"Let Argus unbind a network from its config template and bind it to a different one — from the Network header. Rebinding swaps the template a location inherits its config from (a big change). Lab Testing runs on lab/test-named locations; Enable for Production to use it elsewhere. The bridge still writes only lab/test-named OR Remediable-allow-listed networks — production stays gated by the allow-list." }
 };
 // VLAN id list must be comma-separated, no spaces (e.g. 90,100). Single VLAN = one number.
 function validVlanList(s){ return /^\d{1,4}(,\d{1,4})*$/.test(String(s||"").trim()); }
@@ -975,12 +982,25 @@ function emptyState(id, slot, icon, title, desc){
     (slot.error?"<div class='err' style='margin-top:10px;'>"+esc(slot.error)+"</div>":"")+"</div>";
 }
 // Loaded-slot header: name, config template, pull stamps.
-function slotHead(slot){
+function slotHead(slot,canTpl){
   const d=slot.d; let h="";
   h+="<div class='nethead'>Network: <b>"+esc(d.name||"")+"</b></div>";
   const tmplRef=" <button class='secref' data-refresh='ports' title='Refresh config template'>&#x21bb;</button>";
-  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span>"+tmplRef+"</div>"; }
-  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span>"+tmplRef+"</div>"; }
+  // Bind Template (gated): unbind from the current template / bind to another, from the Network header.
+  let tplCtl="";
+  if(canTpl){
+    if(TEMPLATES===null){ tplCtl=" <span class='muted'>loading templates&hellip;</span>"; }
+    else {
+      const cur=d.boundTemplate?d.boundTemplate.id:"";
+      const opts="<option value=''>&mdash; pick a template &mdash;</option>"+(TEMPLATES||[]).map(t=>"<option value='"+esc(t.id)+"'"+(t.id===cur?" selected":"")+">"+esc(t.name)+"</option>").join("");
+      tplCtl=" <span class='tplctl'><select class='tplsel' data-net='"+esc(d.network)+"'>"+opts+"</select>"+
+        "<button class='tplbind' data-net='"+esc(d.network)+"' title='Bind this network to the selected template'>Bind</button>"+
+        (d.boundTemplate?"<button class='tplunbind' data-net='"+esc(d.network)+"' title='Unbind from the current template (configs retained)'>Unbind</button>":"")+
+        "<span class='tplmsg'></span></span>";
+    }
+  }
+  if(d.boundTemplate){ h+="<div class='tmpl'>Config template: <span class='bound'>"+esc(d.boundTemplate.name||d.boundTemplate.id)+"</span>"+tmplRef+tplCtl+"</div>"; }
+  else { h+="<div class='tmpl'>Config template: <span class='nb'>NOT BOUND</span>"+tmplRef+tplCtl+"</div>"; }
   h+="<div class='stamp'>Switch pulled "+esc(slot.portStamp||slot.stamp)+(slot.wifiStamp?" &middot; Wi-Fi pulled "+esc(slot.wifiStamp):"")+" &middot; connected-now only</div>";
   return h;
 }
@@ -1467,13 +1487,16 @@ function render(){
   // Operations -- compact toolbar when loaded, a centered hero when empty
   const opsDesc="Add <b>op-targets</b> to watch each location &mdash; check that specific devices (by IP) <b>exist, are live, and named right</b>; that they&rsquo;re on the <b>VLAN you expect</b>; or just list <b>everything on a VLAN</b>.";
   const paneCls=(t)=> "panebox "+(TAB===t ? (TAB_ANIM?"anim":"") : "hidden");
-  const slotBody=(slot,fn)=>{ if(!slot.items.length) return null; const it=slot.items[slot.view]; if(slot.d) return slotHead(slot)+exportRow()+fn(slot); if(it&&it.loading) return "<div class='box'><div class='muted'><span class='spin'></span> loading <b>"+esc(it.name)+"</b>&hellip;</div></div>"; return "<div class='err'>"+esc((it&&it.error)||"load error")+"</div>"; };
+  const slotBody=(slot,fn,canTpl)=>{ if(!slot.items.length) return null; const it=slot.items[slot.view]; if(slot.d) return slotHead(slot,canTpl)+exportRow()+fn(slot); if(it&&it.loading) return "<div class='box'><div class='muted'><span class='spin'></span> loading <b>"+esc(it.name)+"</b>&hellip;</div></div>"; return "<div class='err'>"+esc((it&&it.error)||"load error")+"</div>"; };
+  // Bind Template is a Network-only write. Load the template list once when the feature is active.
+  const netCanTpl = NETV.d ? featureActive("set-template", NETV.d.name) : false;
+  if(netCanTpl && TEMPLATES===null && !TPL_REQUESTED){ TPL_REQUESTED=true; loadTemplates().then(render); }
   const opsBody=slotBody(OPS,opsContent);
   h+="<div id='pane-operations' class='"+paneCls("operations")+"'>"+
      (OPS.items.length ? pickerRow("operations",OPS)+opsBody : emptyState("operations",OPS,"&#9776;","Operations",opsDesc))+"</div>";
   // Network
   const netDesc="Connected clients across this network &mdash; wired and Wi-Fi &mdash; plus the Meraki device inventory and every SSID. Rename any client or device inline.";
-  const netBody=slotBody(NETV,netContent);
+  const netBody=slotBody(NETV,netContent,netCanTpl);
   h+="<div id='pane-network' class='"+paneCls("network")+"'>"+
      (NETV.items.length ? pickerRow("network",NETV)+netBody : emptyState("network",NETV,WIFI,"Network",netDesc))+"</div>";
   // Security Audit -- own target picker (always present, run/re-run any time)
@@ -1710,6 +1733,29 @@ async function doPortPoe(btn){
     btn.outerHTML="<span class='nameok'>&check; PoE &rarr; "+(onNow?"On":"Off")+"</span>"; }
   catch(err){ btn.disabled=false; btn.innerHTML=old; btn.insertAdjacentHTML("afterend"," <span class='namewarn'>"+esc(err.message)+"</span>"); }
 }
+// Bind Template (Network header): bind the network to the selected template, or unbind. Gated UI-side
+// (set-template) AND server-side (lab + allow-list). After the write, re-pull ports so the header reflects it.
+async function doTemplateBind(btn){
+  if(!btn||btn.disabled) return;
+  const net=btn.dataset.net, ctl=btn.closest(".tplctl"), sel=ctl&&ctl.querySelector(".tplsel"), msg=ctl&&ctl.querySelector(".tplmsg");
+  const tid=sel?sel.value:""; if(!tid){ if(msg) msg.innerHTML=" <span class='namewarn'>pick a template</span>"; return; }
+  btn.disabled=true; const old=btn.innerHTML; btn.innerHTML="<span class='spin'></span>"; if(msg) msg.innerHTML="";
+  try{ const r=await fetch(BRIDGE+"/meraki/template",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:net,templateId:tid})});
+    let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(cleanErr(d.detail||d.error||("HTTP "+r.status)));
+    if(msg) msg.innerHTML=" <span class='nameok'>&check; "+esc(d.action||"bound")+" &mdash; refreshing&hellip;</span>";
+    await refreshSection("network","ports",null); }
+  catch(err){ btn.disabled=false; btn.innerHTML=old; if(msg) msg.innerHTML=" <span class='namewarn'>"+esc(err.message)+"</span>"; }
+}
+async function doTemplateUnbind(btn){
+  if(!btn||btn.disabled) return;
+  const net=btn.dataset.net, ctl=btn.closest(".tplctl"), msg=ctl&&ctl.querySelector(".tplmsg");
+  btn.disabled=true; const old=btn.innerHTML; btn.innerHTML="<span class='spin'></span>"; if(msg) msg.innerHTML="";
+  try{ const r=await fetch(BRIDGE+"/meraki/template",{method:"POST",headers:{"Authorization":"Bearer "+PW,"Content-Type":"application/json"},body:JSON.stringify({network:net,templateId:""})});
+    let d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(cleanErr(d.detail||d.error||("HTTP "+r.status)));
+    if(msg) msg.innerHTML=" <span class='nameok'>&check; unbound &mdash; refreshing&hellip;</span>";
+    await refreshSection("network","ports",null); }
+  catch(err){ btn.disabled=false; btn.innerHTML=old; if(msg) msg.innerHTML=" <span class='namewarn'>"+esc(err.message)+"</span>"; }
+}
 
 document.getElementById("gform").addEventListener("submit", async e=>{
   e.preventDefault(); PW=document.getElementById("gpw").value;
@@ -1737,6 +1783,8 @@ document.getElementById("report").addEventListener("click", async e=>{
   const vs=e.target.closest(".vlansave"); if(vs){ e.stopImmediatePropagation(); doPortVlanSave(vs); return; }
   const sv=e.target.closest(".setvlanit"); if(sv){ e.stopImmediatePropagation(); doSetVlan(sv); return; }
   const pt=e.target.closest(".poetog"); if(pt){ e.stopImmediatePropagation(); doPortPoe(pt); return; }
+  const tb=e.target.closest(".tplbind"); if(tb){ e.stopImmediatePropagation(); doTemplateBind(tb); return; }
+  const tu=e.target.closest(".tplunbind"); if(tu){ e.stopImmediatePropagation(); doTemplateUnbind(tu); return; }
   const nb=e.target.closest(".nameit"); if(nb){ e.stopPropagation(); doNameButton(nb); return; }
   const na=e.target.closest("#nameall"); if(na){ na.disabled=true; const msg=document.getElementById("nameallmsg"); const all=[...document.querySelectorAll(".nameit:not(:disabled)")]; if(msg) msg.innerHTML="<span class='spin'></span> naming "+all.length+"&hellip;"; await Promise.all(all.map(doNameButton)); if(msg) msg.textContent="done"; na.disabled=false; return; }
 });
