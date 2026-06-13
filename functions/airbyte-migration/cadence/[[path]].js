@@ -23,9 +23,24 @@ export async function onRequest(context) {
   const { request, env, params } = context;
 
   // 1. Gate check.
+  // For a top-level browser navigation (Accept includes text/html), redirect
+  // 302 to the gate page so the password overlay shows up automatically.
+  // For XHR/fetch (dashboard's own JS subcalls when the cookie expires mid-
+  // session), keep the plain 401 with a helpful body -- a 302 to an HTML page
+  // would just confuse the JSON parser on the client side.
   const cookie = request.headers.get("cookie") || "";
   const m = /(?:^|;\s*)airbyte_gate_token=([0-9a-f]{64})/.exec(cookie);
   if (!m || m[1] !== REQUIRED_GATE_HASH) {
+    const acceptsHtml = (request.headers.get("accept") || "").includes("text/html");
+    if (acceptsHtml) {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          "location": "/airbyte-migration/",
+          "cache-control": "no-store, no-cache, must-revalidate",
+        },
+      });
+    }
     return new Response(
       "Unauthorized -- enter password at /airbyte-migration/\n\n(received cookie: " +
       (cookie ? cookie.substring(0, 200) : "<none>") + ")",
