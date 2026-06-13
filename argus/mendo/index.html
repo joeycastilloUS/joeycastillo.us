@@ -1016,7 +1016,7 @@ function whereCell(wheres){ const wlist = wheres.some(w=>!w.wifi) ? wheres.filte
 function vlanTargetSection(t,d,wifi){
   const tvlans=String(t.vlans||"").split(/[,\s]+/).map(x=>x.trim()).filter(Boolean);
   const inV=(v)=>tvlans.indexOf(String(v))>=0, rows=[];
-  const canPoe=featureActive("set-poe", d.name), net=d.network; // PoE toggle gated like Set VLAN
+  const canPoe=false, net=d.network; // Operations is read-only — PoE shows status only; the toggle lives in the Network view
   (d.switches||[]).forEach(sw=>(sw.ports||[]).forEach(p=>{ if(inV(p.vlan)) (p.clients||[]).filter(c=>(c.status||"").toLowerCase()==="online").forEach(c=>rows.push({name:c.name,ip:c.ip,mac:c.mac,where:portTag(sw.name)+"-"+p.port,vlan:p.vlan,lastSeen:c.lastSeen,poe:{on:!!p.poeEnabled,pow:(typeof p.poeDraw==="number"&&p.poeDraw>0)},sp:(sw.serial||"")+"|"+p.port})); }));
   ((wifi&&wifi.ssids)||[]).forEach(g=>(g.clients||[]).forEach(c=>{ if(inV(c.vlan) && (c.status||"").toLowerCase()==="online") rows.push({name:c.name,ip:c.ip,mac:c.mac,where:"<span class='wifi-flag'>"+WIFI+esc(c.ssid||g.ssid)+"</span>",vlan:c.vlan,lastSeen:c.lastSeen,wifi:true,poe:null,sp:""}); }));
   let tr="";
@@ -1038,9 +1038,9 @@ function rosterTargetSection(t,slot,seen){
   if(!mapped.length) return sect("opt-"+t.id, esc(t.title)+" &mdash; <span class='muted'>no devices mapped</span>", "<div class='muted'>No devices mapped for &ldquo;"+esc(t.title)+"&rdquo; &mdash; add them in &#9881; Settings &rarr; Op-targets.</div>", "both");
   const wantVlan=optExpectedVlan(t);
   const accept=acceptSet(slot.net);
-  const canName=featureActive("one-click-naming", slot.name);   // rename gated like the Network tab
-  const canVlan=featureActive("set-vlan", slot.name); // VLAN write: gated like Set Name (lab toggle + TEST/LAB filter)
-  const canPoe=featureActive("set-poe", slot.name); // PoE enable/disable: gated like Set VLAN
+  // Operations is READ-ONLY. Every device write — name, VLAN, allowed-VLAN, PoE — happens in the Network view.
+  // The Operations boards show live status only (incl. the real PoE state per device's port); no edit affordances.
+  const canName=false, canVlan=false, canPoe=false;
   let live=0, planned=0, unaccounted=0, rows="";
   mapped.forEach(ip=>{
     const nm=map[ip], s=seen[ip];
