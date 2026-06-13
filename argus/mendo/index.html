@@ -364,7 +364,6 @@
       <div class="scope"><span class="lbl">Applies to</span><span class="chip">Operations</span><span class="chip">Network</span><span class="chip">Security Audit</span></div>
       <div class="muted" style="margin-bottom:10px;">New / write-capable features start in <b>Lab Testing</b> &mdash; live only on lab/test locations. <b>Enable for Production</b> to roll out everywhere; after 7 days it&rsquo;s archived (shipped).</div>
       <div id="featlist"></div>
-      <label class="set-toggle"><input type="checkbox" id="vlanvalidate"><span><b>Validate VLAN exists</b> before Argus sets it &mdash; reject a VLAN that isn&rsquo;t already on the network. <span class="muted">Applies to the Set VLAN feature. Default off (set any VLAN).</span></span></label>
       <div style="margin-top:12px;">
         <div class="muted" style="margin-bottom:4px;"><b>Lab/Test keywords</b> &mdash; a location qualifies only if its name contains one of these as a <b>whole word</b>. Comma-separated:</div>
         <input id="labkw" type="text" spellcheck="false" style="width:100%;max-width:360px;">
@@ -783,8 +782,8 @@ let NAMEMAP=rosterMap();
 const FEAT_KEY="argus_features_v1", LABKW_KEY="argus_labkw_v1";
 const FEATURE_DEFS={
   "one-click-naming":{ name:"One-Click Naming", desc:"Press “Name it” to write a device’s likely Konductor name to the connected client in Meraki, or ✎ to rename any connected client." },
-  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Lab/test networks only (a location whose name contains a Lab/Test keyword). Not promotable to production — never writes a non-lab network.", labOnly:true },
-  "set-poe":{ name:"Set PoE", desc:"Let Argus enable/disable Power-over-Ethernet on a switch port — inline in the Network tab and on op-target devices. Disabling PoE de-powers whatever the port feeds (AP / phone / camera), so it is lab/test networks only (a location whose name contains a Lab/Test keyword). Not promotable to production — never writes a non-lab network.", labOnly:true }
+  "set-vlan":{ name:"Set VLAN", desc:"Let Argus change switch-port VLANs (native VLAN / allowed VLANs) — inline in the Network tab, in op-targets, and in Action Plans. Lab Testing runs on lab/test-named locations; Enable for Production to use it elsewhere. The bridge still writes only lab/test-named OR Remediable-allow-listed networks — production stays gated by the allow-list." },
+  "set-poe":{ name:"Set PoE", desc:"Let Argus enable/disable Power-over-Ethernet on a switch port — inline in the Network tab and on op-target devices. Disabling PoE de-powers whatever the port feeds (AP / phone / camera). Lab Testing runs on lab/test-named locations; Enable for Production to use it elsewhere. The bridge still writes only lab/test-named OR Remediable-allow-listed networks — production stays gated by the allow-list." }
 };
 // VLAN id list must be comma-separated, no spaces (e.g. 90,100). Single VLAN = one number.
 function validVlanList(s){ return /^\d{1,4}(,\d{1,4})*$/.test(String(s||"").trim()); }
@@ -824,6 +823,8 @@ function renderFeatures(){
       const prod = def.labOnly ? "<span class='muted'>not promotable</span>" : "<button data-feat-prod='"+esc(k)+"'>Enable for Production</button>";
       action=tog+prod;
     }
+    // Set VLAN carries its own option: validate the VLAN exists on the network before writing it.
+    if(k==="set-vlan"){ const vv=vlanValidateOn(); action+="<button class='labtog"+(vv?" on":"")+"' data-feat-vv='1' title='Reject a VLAN that is not already on the network'><span class='dot'></span>Validate VLAN exists &middot; "+(vv?"ON":"OFF")+"</button>"; }
     rows+="<div class='featrow'><span class='fn'>"+esc(def.name)+"</span>"+badge+"<span class='fd'>"+esc(def.desc)+"</span>"+action+"</div>";
   }
   el.innerHTML = rows || "<div class='muted'>No features in testing &mdash; all shipped.</div>";
@@ -1852,11 +1853,10 @@ document.getElementById("optadd-roster").addEventListener("click", ()=>optAdd("r
 document.getElementById("featlist").addEventListener("click", e=>{
   const lt=e.target.closest("[data-feat-lab]");
   if(lt){ const k=lt.getAttribute("data-feat-lab"); if(FEATURES[k]){ FEATURES[k].lab=(FEATURES[k].lab===false); saveFeatures(); saveSettings(); renderFeatures(); render(); } return; }
+  const vv=e.target.closest("[data-feat-vv]"); if(vv){ localStorage.setItem(VLANCHK_KEY, vlanValidateOn()?"0":"1"); saveSettings(); renderFeatures(); render(); return; }
   const b=e.target.closest("[data-feat-prod]"); if(!b) return; const k=b.getAttribute("data-feat-prod"); if(FEATURE_DEFS[k]&&FEATURE_DEFS[k].labOnly) return; if(FEATURES[k]){ FEATURES[k].state="prod"; FEATURES[k].enabledForProdAt=new Date().toISOString(); saveFeatures(); saveSettings(); renderFeatures(); render(); } });
 document.getElementById("savekw").addEventListener("click", ()=>{ localStorage.setItem(LABKW_KEY, document.getElementById("labkw").value); saveSettings(); document.getElementById("kwmsg").textContent="saved · "+labKeywords().join(", ")+" · synced"; render(); });
 document.getElementById("labkw").value = (localStorage.getItem(LABKW_KEY)!=null?localStorage.getItem(LABKW_KEY):"TEST, LAB");
-document.getElementById("vlanvalidate").checked = vlanValidateOn();
-document.getElementById("vlanvalidate").addEventListener("change", e=>{ localStorage.setItem(VLANCHK_KEY, e.target.checked?"1":"0"); saveSettings(); render(); });
 document.getElementById("debugtoggle").checked = DEBUG_ON;
 document.getElementById("debugtoggle").addEventListener("change", e=>{ setDebug(e.target.checked); });
 if(DEBUG_ON){ renderWopr(); woprApplyLayout(); }
