@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Inspect &middot; Meraki Anti-Patterns (ReSharper for Meraki) &middot; Argus</title>
+<style>
+  :root{--bg:#111;--surface:#1A1A1A;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--warn:#ffce85;--ok:#7CFFB2;--bad:#ff8b8b;}
+  *{box-sizing:border-box;} body{background:var(--bg);color:var(--text);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;margin:0;line-height:1.6;}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid var(--accent);padding:14px 20px;font-weight:700;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center;}
+  nav .be{color:var(--accent);} nav .pub{color:var(--dim);font-weight:400;font-size:.8rem;}
+  .wrap{max-width:940px;margin:0 auto;padding:28px 20px 70px;}
+  h1{font-size:1.55rem;margin:0 0 4px;} h2{font-size:1.1rem;color:var(--accent);margin:30px 0 8px;border-bottom:1px solid #262626;padding-bottom:6px;}
+  .sub{color:var(--dim);margin:0 0 18px;font-size:.95rem;} p{margin:.55rem 0;} ul{margin:.4rem 0;padding-left:20px;} li{margin:.3rem 0;}
+  code{background:#000;padding:1px 5px;border-radius:3px;color:var(--accent);font-size:.8em;}
+  table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:8px;overflow:hidden;font-size:.8rem;margin-top:6px;}
+  th{text-align:left;color:var(--dim);font-size:.64rem;text-transform:uppercase;letter-spacing:.5px;padding:7px 9px;border-bottom:1px solid #262626;}
+  td{padding:7px 9px;border-bottom:1px solid #1f1f1f;vertical-align:top;} tr:last-child td{border-bottom:none;}
+  .big{background:linear-gradient(180deg,#16242b,#141414);border:1px solid #2a3f48;border-radius:10px;padding:16px 20px;margin:14px 0;}
+  .have{color:var(--ok);font-weight:700;} .new{color:var(--warn);font-weight:700;}
+  .C{color:var(--bad);font-weight:800;} .H{color:#ffae6b;font-weight:800;} .M{color:var(--warn);font-weight:700;} .L{color:var(--accent);font-weight:700;}
+  .src{color:var(--dim);font-size:.78rem;} a{color:var(--accent);}
+  footer{color:var(--dim);font-size:.8rem;margin-top:40px;border-top:1px solid #262626;padding-top:14px;}
+</style>
+</head>
+<body>
+<nav><span><span class="be">ARGUS</span> &middot; Meraki Anti-Pattern Reference</span><span class="pub">read-only</span></nav>
+<div class="wrap">
+  <h1>Meraki Anti-Patterns &mdash; "ReSharper for Meraki"</h1>
+  <p class="sub">What every network engineer should <em>not</em> do: the bad decisions, hacks, workarounds, and gotchas.
+  Each is a candidate audit check. Goal &mdash; make a network airtight by flagging the stuff people get wrong.</p>
+
+  <div class="big"><strong>The thesis:</strong> a great linter doesn't just check "is it valid" &mdash; it knows the
+  <em>mistakes</em>. This catalog turns 40 years of "don't do that" into checks. <span class="have">green = already in the
+  audit</span>, <span class="new">amber = new, to build</span>. The biggest gap is <strong>Switching</strong> &mdash;
+  almost entirely unbuilt and where the worst footguns live.</p>
+
+  <h2>1. The #1 Meraki gotcha (must surface loudly)</h2>
+  <p><strong>Port-forwards and 1:1 NAT BYPASS the L3 firewall.</strong> Engineers add an L3 "deny" thinking it protects an
+  exposed service &mdash; it doesn't. Inbound port-forward / NAT traffic is allowed regardless of L3 outbound rules. So an
+  RDP port-forward is reachable from the whole internet even with a deny rule sitting right above it. <span class="new">NEW:
+  when a port-forward exists, explicitly warn that L3 rules do NOT protect it &mdash; scope it on the rule's own allowed-IPs
+  or use VPN.</span></p>
+
+  <h2>2. Switching anti-patterns (the big gap)</h2>
+  <p>Reads: <code>devices/{serial}/switch/ports</code>, <code>networkSwitchDhcpServerPolicy</code>,
+  <code>networkSwitchStormControl</code>, <code>networkSwitchStp</code>, <code>networkSwitchSettings</code>.</p>
+  <table>
+    <tr><th>ID</th><th>Sev</th><th>Anti-pattern (don't do this)</th><th>Detect</th></tr>
+    <tr><td class="new">SW-NV1</td><td class="M">M</td><td>Native VLAN left as <strong>VLAN 1</strong> on trunks</td><td>trunk port with native/untagged VLAN = 1</td></tr>
+    <tr><td class="new">SW-TRUNK</td><td class="M">M</td><td>Trunk/port allows <strong>ALL VLANs</strong> (1-1000) when it shouldn't</td><td>access port (or edge trunk) with allowedVlans = "all"/"1-1000"</td></tr>
+    <tr><td class="new">SW-UNUSED</td><td class="L">L</td><td><strong>Unused ports left enabled</strong> (not shut + parked)</td><td>enabled port, link down, no client, not an uplink</td></tr>
+    <tr><td class="new">SW-DHCP</td><td class="M">M</td><td>No <strong>DHCP guard</strong> / server policy (rogue DHCP)</td><td>dhcpServerPolicy = allow-any</td></tr>
+    <tr><td class="new">SW-STORM</td><td class="L">L</td><td>No <strong>storm control</strong></td><td>storm control thresholds unset/disabled</td></tr>
+    <tr><td class="new">SW-STP</td><td class="M">M</td><td>No <strong>RSTP / loop &amp; BPDU guard</strong> on switch-to-switch ports</td><td>STP disabled, or no BPDU/loop guard on uplink/trunk ports</td></tr>
+    <tr><td class="new">SW-PORTSEC</td><td class="L">L</td><td>No <strong>port security / 802.1X</strong> on access ports</td><td>access port with no access policy and no MAC limit</td></tr>
+    <tr><td class="new">SW-MGMT1</td><td class="M">M</td><td><strong>Management VLAN = 1</strong> (left default)</td><td>switch management interface VLAN = 1</td></tr>
+  </table>
+
+  <h2>3. Firewall &amp; exposure</h2>
+  <table>
+    <tr><th>ID</th><th>Sev</th><th>Anti-pattern</th><th>State</th></tr>
+    <tr><td>FW-02</td><td class="H">H</td><td>"Any/Any" allow rule</td><td class="have">have</td></tr>
+    <tr><td>FW-01</td><td class="M">M</td><td>No default-deny outbound</td><td class="have">have</td></tr>
+    <tr><td>FW-03</td><td class="M">M</td><td>IP spoofing = Log not Block</td><td class="have">have</td></tr>
+    <tr><td>EXP-01/02/03</td><td class="C">C</td><td>Port-forward to Any / sensitive port / broad NAT</td><td class="have">have</td></tr>
+    <tr><td class="new">EXP-04</td><td class="H">H</td><td>RDP/SSH/SMB exposed at all &mdash; should be VPN-only</td><td class="new">new (sharpen EXP-02 + the bypass warning)</td></tr>
+    <tr><td class="new">EXP-05</td><td class="M">M</td><td>Inbound rules / WAN appliance services left open (ping, etc.)</td><td class="new">new (inboundFirewallRules)</td></tr>
+  </table>
+
+  <h2>4. Wireless</h2>
+  <table>
+    <tr><th>ID</th><th>Sev</th><th>Anti-pattern</th><th>State</th></tr>
+    <tr><td>WIFI-01/02</td><td class="C">C</td><td>Open/WEP (by isolation) / legacy WPA1</td><td class="have">have</td></tr>
+    <tr><td>WIFI-05</td><td class="L">L</td><td>Default/brand SSID name</td><td class="have">have</td></tr>
+    <tr><td class="new">WIFI-03</td><td class="H">H</td><td>Guest SSID not isolated from LAN</td><td class="new">new (ssid L3 rules + vlan)</td></tr>
+    <tr><td class="new">WIFI-06</td><td class="M">M</td><td>Per-SSID L3 rule silently blocking LAN (the classic support gotcha)</td><td class="new">new (ssid firewall rules)</td></tr>
+    <tr><td class="new">WIFI-07</td><td class="H">H</td><td>Rogue AP / SSID spoof present</td><td class="new">new (Air Marshal)</td></tr>
+  </table>
+
+  <h2>5. Threat protection &amp; operations</h2>
+  <table>
+    <tr><th>ID</th><th>Sev</th><th>Anti-pattern</th><th>State</th></tr>
+    <tr><td>THR-01/02/03</td><td class="H">H</td><td>IDS detection-only / AMP off / content filtering off</td><td class="have">have</td></tr>
+    <tr><td class="new">OPS-01</td><td class="M">M</td><td>Firmware behind / EOL (unpatched)</td><td class="new">new (firmwareUpgrades)</td></tr>
+    <tr><td class="new">OPS-02</td><td class="L">L</td><td>No syslog / SNMP (blind to events)</td><td class="new">new (syslogServers / snmp)</td></tr>
+    <tr><td class="new">OPS-03</td><td class="L">L</td><td>No Dashboard alerts configured</td><td class="new">new (alertsSettings)</td></tr>
+    <tr><td class="new">VPN-01</td><td class="M">M</td><td>Site-to-site VPN: weak/mismatched, over-broad subnets advertised</td><td class="new">new (vpnSiteToSiteVpn)</td></tr>
+  </table>
+
+  <h2>6. Org / identity (whole-org, future)</h2>
+  <table>
+    <tr><th>ID</th><th>Sev</th><th>Anti-pattern</th></tr>
+    <tr><td class="new">ORG-01</td><td class="M">M</td><td>&lt; 2 full admins (lockout risk)</td></tr>
+    <tr><td class="new">ORG-02</td><td class="H">H</td><td>Admin without MFA</td></tr>
+    <tr><td class="new">ORG-04</td><td class="M">M</td><td>Weak login policy (no lockout, long idle, no IP allow-list)</td></tr>
+    <tr><td class="new">ORG-05</td><td class="L">L</td><td>API access broad / many callers unreviewed</td></tr>
+  </table>
+
+  <h2>7. Anomalies ("strange things")</h2>
+  <table>
+    <tr><th>ID</th><th>Anti-pattern / oddity</th><th>State</th></tr>
+    <tr><td>ANOM-01</td><td>Device on link-local (DHCP failed)</td><td class="have">have</td></tr>
+    <tr><td>ANOM-02</td><td>Duplicate IP (conflict/spoof)</td><td class="have">have</td></tr>
+    <tr><td class="new">ANOM-03</td><td>Expected Meraki device offline</td><td class="new">new (device statuses)</td></tr>
+    <tr><td class="new">ANOM-04</td><td>Konductor device on wrong VLAN</td><td class="new">new (portmap)</td></tr>
+    <tr><td class="new">ANOM-05</td><td>Over-broad trunk on an access port w/ a client</td><td class="new">new (portmap)</td></tr>
+    <tr><td class="new">ANOM-06</td><td>Unknown/unexpected device on a critical VLAN</td><td class="new">new (portmap + allow-list)</td></tr>
+  </table>
+
+  <h2>Build order (highest value first)</h2>
+  <ol>
+    <li><strong>Switching category</strong> (SW-*) &mdash; native-VLAN-1, trunk-all, unused-enabled, DHCP guard, STP/BPDU/loop guard, storm control, port security. The biggest unguarded surface; needs <code>switch/ports</code> + switch settings reads.</li>
+    <li><strong>Port-forward bypass warning</strong> + EXP-04/05 &mdash; the highest-impact single gotcha.</li>
+    <li><strong>Wireless</strong> WIFI-03/06/07 (guest isolation, per-SSID LAN block, rogue AP/Air Marshal).</li>
+    <li><strong>Ops</strong> OPS-01/02/03 + VPN-01 (firmware, logging, alerts, S2S VPN).</li>
+    <li><strong>Org</strong> ORG-* (whole-org pass).</li>
+    <li><strong>Anomalies</strong> ANOM-03..06 (fold portmap + device statuses into the audit).</li>
+  </ol>
+
+  <h2>Sources</h2>
+  <ul class="src">
+    <li><a href="https://documentation.meraki.com/Architectures_and_Best_Practices/Cisco_Meraki_Best_Practice_Design/Best_Practice_Design_-_MS_Switching/General_MS_Best_Practices">Cisco Meraki — General MS (Switching) Best Practices</a> · <a href="https://documentation.meraki.com/MS/Port_and_VLAN_Configuration/Configuring_Spanning_Tree_on_Meraki_Switches_(MS)">STP on MS</a></li>
+    <li><a href="https://networkwords.com/how-to-fix-vlan-misconfiguration-issues-on-meraki-ms-switches/">VLAN misconfiguration on Meraki MS</a> · <a href="https://community.meraki.com/t5/Switching/Native-VLAN-and-Spanning-Tree/td-p/271707">Native VLAN &amp; Spanning Tree (community)</a></li>
+    <li><a href="https://community.meraki.com/t5/Security-SD-WAN/Port-Forwarding-and-Firewall-Rules/m-p/133569">Port-forward bypasses L3 firewall (community)</a> · <a href="https://www.hummingbirdnetworks.com/articles/meraki-port-forwarding-secure-access-to-internal-services">Meraki Port Forwarding Security</a></li>
+    <li><a href="https://ocsecurityaudit.com/how-to/how-to-secure-network-switches/">Switch hardening checklist (unused ports, DHCP snooping, storm/loop/BPDU guard, port security)</a> · <a href="https://www.tufin.com/blog/15-cisco-meraki-firewall-best-practices">Tufin — 15 Meraki Firewall Best Practices</a></li>
+    <li><a href="https://documentation.meraki.com/General_Administration/Cross-Platform_Content/Network_Alerts_and_Notifications/Dashboard_Alerts_-_Configuration_Issues">Meraki Dashboard config-issue alerts</a></li>
+  </ul>
+
+  <footer>&copy; 2026 Joseph M. Castillo &middot; All rights reserved &middot; CONFIDENTIAL &middot; TRADE SECRET &middot; Fully owned by Joseph M. Castillo.</footer>
+</div>
+</body>
+</html>
