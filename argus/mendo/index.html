@@ -57,6 +57,9 @@
   .pickbar-h .chev{transition:transform .15s;display:inline-block;font-size:.8rem;}
   .pickbar.collapsed .pickbar-h .chev{transform:rotate(-90deg);}
   .pickbar-b{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:0 14px 13px;}
+  .recents{flex-basis:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:3px;}
+  .recentnet{background:#101c22;border:1px solid #244;color:var(--accent);border-radius:13px;padding:2px 11px;font-size:.8rem;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .recentnet:hover{background:var(--accent);color:#001016;border-color:var(--accent);}
   .tmpl{font-size:.9rem;margin-bottom:4px;} .tmpl .bound{color:var(--ok);font-weight:700;} .tmpl .nb{color:#ffce85;font-weight:700;}
   .stamp{color:var(--dim);font-size:.82rem;margin-bottom:14px;}
   .loadmetric{color:var(--accent);font-variant-numeric:tabular-nums;}
@@ -380,7 +383,6 @@
     </form>
     <a class="gate-sig" href="https://joeycastillo.us" target="_blank" rel="noopener" title="Joey Castillo &mdash; joeycastillo.us">
       <img src="sig-jc.png" alt="Joey Castillo">
-      <span class="who">Joey Castillo</span>
     </a>
   </div>
 </div>
@@ -900,11 +902,16 @@ async function fetchPorts(it,net){ const r=await api("/meraki/portmap?network="+
 async function fetchWifi(it,net){ const rw=await api("/meraki/wireless?network="+encodeURIComponent(net)); if(!rw.ok) throw new Error("Wi-Fi error "+rw.status); const txt=await rw.text(); it.wifi=JSON.parse(txt); it.wifiStamp=pacific(); return txt.length; }
 
 // Load a tab's slot from its own multi-picker -- loads ALL selected locations into items[].
-async function loadSlot(id){
+// Recent-network history -- the last networks you loaded (any tab), so you can re-pick them fast.
+const RECENT_KEY="argus_recent_nets_v1";
+function recentNets(){ try{ const r=JSON.parse(localStorage.getItem(RECENT_KEY)||"[]"); return Array.isArray(r)?r:[]; }catch(e){ return []; } }
+function pushRecent(picks){ if(!picks||!picks.length) return; let r=recentNets(); picks.forEach(p=>{ if(!p||!p.id) return; r=r.filter(x=>x.id!==p.id); r.unshift({id:p.id,name:p.name||p.id}); }); localStorage.setItem(RECENT_KEY, JSON.stringify(r.slice(0,8))); }
+async function loadSlot(id, picksOverride){
   const slot=slotById(id); if(!slot) return;
-  let picks=comboPicks("pick-"+id);
+  let picks=picksOverride||comboPicks("pick-"+id);
   if(!picks.length && slot.items.length) picks=slot.items.map(it=>({id:it.net,name:it.name})); // Reload re-fetches the loaded set
-  if(!picks.length){ slot.error="pick a location"; render(); return; }
+  if(!picks.length){ slot.error="pick a network"; render(); return; }
+  pushRecent(picks);
   // Show every selected location as a box immediately, each in a loading state. Then fetch them in
   // parallel and reveal each box the moment its data lands -- jumping the view to the first one ready.
   slot.loading=true; slot.error=""; slot._bytes=0; slot.loadMs=0;
@@ -997,7 +1004,9 @@ function pickBar(id, slot){
   const metric = slot.loadMs ? " &middot; <span class='loadmetric' title='load time &middot; data downloaded'>"+fmtMs(slot.loadMs)+" &middot; "+fmtBytes(slot._bytes)+"</span>" : "";
   const label = slot.items.length ? "<span class='muted'>"+cx.show+" <b>"+esc(slot.name)+"</b>"+(slot.items.length>1?" ("+(slot.view+1)+" of "+slot.items.length+")":"")+metric+"</span>" : "<span class='muted'>type a network name, then "+esc(cx.act)+"</span>";
   const optl = id==="operations" ? " <a class='optlink' data-openopt='1' title='Add, reorder, edit op-targets'>&#9881; Manage op-targets</a>" : "";
-  const body = open ? "<div class='pickbar-b'>"+combo("pick-"+id, netItems(), {}, "Search networks&hellip;", true)+btn+label+optl+
+  const rec=recentNets();
+  const recHtml = rec.length ? "<div class='recents'><span class='muted'>Recent:</span> "+rec.map(n=>"<button class='recentnet' data-rtab='"+esc(id)+"' data-rid='"+esc(n.id)+"' data-rname='"+esc(n.name).replace(/'/g,"&#39;")+"' title='Load "+esc(n.name)+"'>"+esc(n.name)+"</button>").join("")+"</div>" : "";
+  const body = open ? "<div class='pickbar-b'>"+combo("pick-"+id, netItems(), {}, "Search networks…", true)+btn+label+optl+recHtml+
       (slot.error?"<div class='err' style='flex-basis:100%'>"+esc(slot.error)+"</div>":"")+
       ((slot.items.length>1||slot.loading)?slotFlip(id,slot):"")+"</div>" : "";
   return "<div class='pickbar"+(open?"":" collapsed")+"'><div class='pickbar-h' data-pickhdr='"+esc(id)+"'><span class='chev'>&#9662;</span> "+esc(cx.sel)+"</div>"+body+"</div>";
@@ -1807,6 +1816,7 @@ document.getElementById("report").addEventListener("click", async e=>{
   const ac=e.target.closest(".planchk"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); saveSettings(); render(); return; }
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
   const ph=e.target.closest("[data-pickhdr]"); if(ph){ e.stopImmediatePropagation(); const id=ph.getAttribute("data-pickhdr"); PICKOPEN[id]=(PICKOPEN[id]===false); render(); return; }
+  const rn=e.target.closest(".recentnet"); if(rn){ e.stopImmediatePropagation(); loadSlot(rn.getAttribute("data-rtab"), [{id:rn.getAttribute("data-rid"), name:rn.getAttribute("data-rname")}]); return; }
   const oo=e.target.closest("[data-openopt]"); if(oo){ e.stopImmediatePropagation(); openSettingsOpt(); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const sm=e.target.closest("[data-savemenu]"); if(sm){ e.stopImmediatePropagation(); const w=sm.closest(".savewrap"); const wasOpen=w.classList.contains("open"); document.querySelectorAll(".savewrap.open").forEach(x=>x.classList.remove("open")); if(!wasOpen) w.classList.add("open"); return; }
@@ -1961,7 +1971,6 @@ renderFeatures();
   <span id="brand-mark">ARGUS</span>
   <a id="brand-sig" href="https://joeycastillo.us" target="_blank" rel="noopener" title="Joey Castillo &mdash; joeycastillo.us">
     <img src="sig-jc.png" alt="Joey Castillo">
-    <span class="who">Joey Castillo</span>
   </a>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
