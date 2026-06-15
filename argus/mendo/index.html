@@ -57,9 +57,9 @@
   .pickbar-h .chev{transition:transform .15s;display:inline-block;font-size:.8rem;}
   .pickbar.collapsed .pickbar-h .chev{transform:rotate(-90deg);}
   .pickbar-b{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:0 14px 13px;}
-  .recents{flex-basis:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:3px;}
-  .recentnet{background:#101c22;border:1px solid #244;color:var(--accent);border-radius:13px;padding:2px 11px;font-size:.8rem;cursor:pointer;font-family:inherit;white-space:nowrap;}
-  .recentnet:hover{background:var(--accent);color:#001016;border-color:var(--accent);}
+  .comboopt.recent{background:rgba(111,195,223,0.05);}
+  .comborecent{margin-left:auto;color:var(--dim);font-size:.7rem;letter-spacing:.5px;white-space:nowrap;}
+  .comboopt.recent .comborecent{color:var(--accent);}
   .tmpl{font-size:.9rem;margin-bottom:4px;} .tmpl .bound{color:var(--ok);font-weight:700;} .tmpl .nb{color:#ffce85;font-weight:700;}
   .stamp{color:var(--dim);font-size:.82rem;margin-bottom:14px;}
   .loadmetric{color:var(--accent);font-variant-numeric:tabular-nums;}
@@ -717,8 +717,8 @@ async function loadNetworks(){
 const COMBOS={}; // id -> {items:[{id,name,note}], sel:{id,name}, filtered, active}
 function scoreN(name,q){ name=name.toLowerCase(); q=q.toLowerCase(); if(!q) return 1; const i=name.indexOf(q); return i<0?-1:(i===0?2:1); }
 function hlq(name,q){ if(!q) return esc(name); const i=name.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(name); return esc(name.slice(0,i))+"<span class='hl'>"+esc(name.slice(i,i+q.length))+"</span>"+esc(name.slice(i+q.length)); }
-function combo(id, items, sel, placeholder, multi){
-  COMBOS[id]={items:items||[], sel:{id:(sel&&sel.id)||"",name:(sel&&sel.name)||""}, filtered:[], active:-1, multi:!!multi, picks:(multi&&sel&&Array.isArray(sel.picks))?sel.picks.slice():[]};
+function combo(id, items, sel, placeholder, multi, recent){
+  COMBOS[id]={items:items||[], sel:{id:(sel&&sel.id)||"",name:(sel&&sel.name)||""}, filtered:[], active:-1, multi:!!multi, recent:!!recent, picks:(multi&&sel&&Array.isArray(sel.picks))?sel.picks.slice():[]};
   const hasVal=!!(sel&&sel.name&&!multi);
   let h="<div class='combo"+(multi?" multi":"")+"' data-combo='"+esc(id)+"'>";
   if(multi) h+="<div class='combochips' id='cc-"+esc(id)+"'>"+comboChips(id)+"</div>";
@@ -736,13 +736,21 @@ function comboPicks(id){ const c=COMBOS[id]; if(!c) return []; const picks=(c.pi
   return picks;
 }
 function comboFilter(id,q){ const c=COMBOS[id]; if(!c) return;
-  c.filtered = !q ? c.items.slice(0,20)
-    : c.items.map(n=>({n,s:scoreN(n.name,q)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s||a.n.name.localeCompare(b.n.name)).slice(0,20).map(x=>x.n);
+  if(!q && c.recent){
+    // empty + recent-aware: show your recent networks first, then the rest of the list
+    const rec=recentNets(), recIds=new Set(rec.map(r=>r.id));
+    const recItems=rec.map(r=>{ const it=c.items.find(x=>x.id===r.id); return it?Object.assign({},it,{_recent:true}):{id:r.id,name:r.name,note:"",_recent:true}; });
+    const rest=c.items.filter(x=>!recIds.has(x.id)).slice(0, Math.max(0,20-recItems.length));
+    c.filtered=recItems.concat(rest);
+  } else {
+    c.filtered = !q ? c.items.slice(0,20)
+      : c.items.map(n=>({n,s:scoreN(n.name,q)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s||a.n.name.localeCompare(b.n.name)).slice(0,20).map(x=>x.n);
+  }
   c.active=c.filtered.length?0:-1; comboDraw(id,q);
 }
 function comboDraw(id,q){ const c=COMBOS[id], el=document.getElementById("cl-"+id); if(!c||!el) return;
   if(!c.filtered.length){ el.classList.remove("open"); el.innerHTML=""; return; }
-  el.innerHTML=c.filtered.map((n,i)=>"<div class='comboopt"+(i===c.active?" active":"")+"' data-i='"+i+"'><span class='comboname'>"+hlq(n.name,q)+"</span>"+(n.note?"<span class='comboNote'>"+esc(n.note)+"</span>":"")+"</div>").join("");
+  el.innerHTML=c.filtered.map((n,i)=>"<div class='comboopt"+(i===c.active?" active":"")+(n._recent?" recent":"")+"' data-i='"+i+"'><span class='comboname'>"+hlq(n.name,q)+"</span>"+(n._recent?"<span class='comborecent'>&#8617; recent</span>":(n.note?"<span class='comboNote'>"+esc(n.note)+"</span>":""))+"</div>").join("");
   el.classList.add("open");
 }
 function comboPick(id,i){ const c=COMBOS[id]; if(!c||i<0||i>=c.filtered.length) return; const n=c.filtered[i];
@@ -1004,9 +1012,7 @@ function pickBar(id, slot){
   const metric = slot.loadMs ? " &middot; <span class='loadmetric' title='load time &middot; data downloaded'>"+fmtMs(slot.loadMs)+" &middot; "+fmtBytes(slot._bytes)+"</span>" : "";
   const label = slot.items.length ? "<span class='muted'>"+cx.show+" <b>"+esc(slot.name)+"</b>"+(slot.items.length>1?" ("+(slot.view+1)+" of "+slot.items.length+")":"")+metric+"</span>" : "<span class='muted'>type a network name, then "+esc(cx.act)+"</span>";
   const optl = id==="operations" ? " <a class='optlink' data-openopt='1' title='Add, reorder, edit op-targets'>&#9881; Manage op-targets</a>" : "";
-  const rec=recentNets();
-  const recHtml = rec.length ? "<div class='recents'><span class='muted'>Recent:</span> "+rec.map(n=>"<button class='recentnet' data-rtab='"+esc(id)+"' data-rid='"+esc(n.id)+"' data-rname='"+esc(n.name).replace(/'/g,"&#39;")+"' title='Load "+esc(n.name)+"'>"+esc(n.name)+"</button>").join("")+"</div>" : "";
-  const body = open ? "<div class='pickbar-b'>"+combo("pick-"+id, netItems(), {}, "Search networks…", true)+btn+label+optl+recHtml+
+  const body = open ? "<div class='pickbar-b'>"+combo("pick-"+id, netItems(), {}, "Search networks…", true, true)+btn+label+optl+
       (slot.error?"<div class='err' style='flex-basis:100%'>"+esc(slot.error)+"</div>":"")+
       ((slot.items.length>1||slot.loading)?slotFlip(id,slot):"")+"</div>" : "";
   return "<div class='pickbar"+(open?"":" collapsed")+"'><div class='pickbar-h' data-pickhdr='"+esc(id)+"'><span class='chev'>&#9662;</span> "+esc(cx.sel)+"</div>"+body+"</div>";
@@ -1816,7 +1822,6 @@ document.getElementById("report").addEventListener("click", async e=>{
   const ac=e.target.closest(".planchk"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); saveSettings(); render(); return; }
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
   const ph=e.target.closest("[data-pickhdr]"); if(ph){ e.stopImmediatePropagation(); const id=ph.getAttribute("data-pickhdr"); PICKOPEN[id]=(PICKOPEN[id]===false); render(); return; }
-  const rn=e.target.closest(".recentnet"); if(rn){ e.stopImmediatePropagation(); loadSlot(rn.getAttribute("data-rtab"), [{id:rn.getAttribute("data-rid"), name:rn.getAttribute("data-rname")}]); return; }
   const oo=e.target.closest("[data-openopt]"); if(oo){ e.stopImmediatePropagation(); openSettingsOpt(); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const sm=e.target.closest("[data-savemenu]"); if(sm){ e.stopImmediatePropagation(); const w=sm.closest(".savewrap"); const wasOpen=w.classList.contains("open"); document.querySelectorAll(".savewrap.open").forEach(x=>x.classList.remove("open")); if(!wasOpen) w.classList.add("open"); return; }
