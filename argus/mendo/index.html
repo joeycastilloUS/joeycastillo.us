@@ -9,18 +9,18 @@
 <style>
   :root{--bg:#0a0a0a;--surface:#141414;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--ok:#7CFFB2;--off:#777;--warn:#ffce85;--bad:#ff6b6b;}
   *{box-sizing:border-box;} body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);line-height:1.5;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;}
-  .nav{background:#000;border-bottom:2px solid var(--accent);padding:12px 24px;display:flex;justify-content:space-between;align-items:center;letter-spacing:.5px;position:sticky;top:0;z-index:60;}
+  .nav{background:#000;border-bottom:2px solid var(--accent);padding:8px 24px;display:flex;justify-content:space-between;align-items:center;letter-spacing:.5px;position:sticky;top:0;z-index:60;}
   /* Section tabs as a fixed LEFT sidebar */
-  #tabnav{position:fixed;left:0;top:0;bottom:0;width:188px;background:var(--surface);border-right:1px solid var(--line);z-index:50;overflow:auto;padding:74px 10px 14px;}
+  #tabnav{position:fixed;left:0;top:0;bottom:0;width:188px;background:var(--surface);border-right:1px solid var(--line);z-index:50;overflow:auto;padding:54px 10px 14px;}
   .tabnav-inner{display:flex;flex-direction:column;gap:6px;}
   .tabv{display:flex;align-items:center;gap:10px;background:transparent;color:var(--dim);border:1px solid transparent;border-radius:9px;padding:11px 13px;font-size:.92rem;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;width:100%;transition:background .12s,color .12s;}
   .tabv .ti{display:inline-flex;width:18px;justify-content:center;font-size:1.02rem;} .tabv .tl{flex:1;}
   .tabv:hover{color:var(--text);background:#161616;}
   .tabv.on{background:#1d2a31;color:var(--accent);border-color:rgba(111,195,223,.35);}
-  @media(max-width:640px){ #tabnav{width:132px;padding:70px 6px 10px;} .tabv{padding:10px 9px;font-size:.84rem;gap:7px;} .wrap,#brand-strip{margin-left:132px!important;} }
+  @media(max-width:640px){ #tabnav{width:132px;padding:52px 6px 10px;} .tabv{padding:10px 9px;font-size:.84rem;gap:7px;} .wrap,#brand-strip{margin-left:132px!important;} }
   .nav .be{color:var(--accent);font-weight:800;font-size:1.15rem;letter-spacing:3px;} .nav .r{color:var(--dim);font-size:.78rem;}
-  .navbrand{display:flex;flex-direction:column;line-height:1.05;}
-  .navsub{color:var(--dim);font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;} .navsub b{color:var(--accent);font-weight:800;}
+  .navbrand{display:flex;flex-direction:row;align-items:baseline;gap:9px;min-width:0;line-height:1.05;}
+  .navsub{color:var(--dim);font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .navsub b{color:var(--accent);font-weight:800;}
   .navright{display:flex;align-items:center;gap:14px;}
   .iconbtn{background:transparent;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 13px;cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit;}
   .iconbtn:hover{border-color:var(--accent);color:var(--accent);}
@@ -45,7 +45,18 @@
   .cchipx{background:none;border:none;color:var(--accent);cursor:pointer;font-size:.95rem;line-height:1;padding:0 2px;font-family:inherit;} .cchipx:hover{color:#fff;}
   button.alt{background:var(--surface);color:var(--text);border:1px solid var(--line);font-weight:600;}
   .muted{color:var(--dim);font-size:.85rem;}
-  .nethead{margin:6px 0 4px;font-size:1.05rem;} .nethead b{color:var(--accent);}
+  .nethead{margin:0;font-size:1.05rem;} .nethead b{color:var(--accent);}
+  /* top row of the scrollable page: network on the left, Save on the right, full width */
+  .netbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2px 0 3px;}
+  .netbar-r{flex-shrink:0;}
+  /* the default look: a full-width, collapsible network picker */
+  .pickbar{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;margin:10px 0 16px;}
+  .pickbar-h{display:flex;align-items:center;gap:9px;padding:10px 14px;cursor:pointer;font-weight:700;color:var(--accent);user-select:none;border-radius:10px;}
+  .pickbar:not(.collapsed) .pickbar-h{border-radius:10px 10px 0 0;}
+  .pickbar-h:hover{background:#161616;}
+  .pickbar-h .chev{transition:transform .15s;display:inline-block;font-size:.8rem;}
+  .pickbar.collapsed .pickbar-h .chev{transform:rotate(-90deg);}
+  .pickbar-b{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:0 14px 13px;}
   .tmpl{font-size:.9rem;margin-bottom:4px;} .tmpl .bound{color:var(--ok);font-weight:700;} .tmpl .nb{color:#ffce85;font-weight:700;}
   .stamp{color:var(--dim);font-size:.82rem;margin-bottom:14px;}
   .loadmetric{color:var(--accent);font-variant-numeric:tabular-nums;}
@@ -970,18 +981,29 @@ async function pullAudit(targets){
 // All networks as combo items, with a "no template" hint on the ones that run their own config.
 function netItems(){ return (NETS||[]).map(n=>({id:n.id,name:n.name,note:n.configTemplateId?"":"no template"})); }
 // The picker row at the top of Operations and Network -- multi-select dropdown, then Load all.
-function pickerRow(id, slot){
+// Per-tab plain English -- say what we're actually doing on this tab.
+const PICK_CTX={
+  operations:{sel:"Select a network to check its operational targets", act:"Check op-targets", show:"Checking op-targets at"},
+  network:{sel:"Select a network to inspect", act:"Open network", show:"Showing"}
+};
+let PICKOPEN={}; // per-tab picker collapse state -- default open
+// The default look on every data tab: a full-width, collapsible network picker.
+function pickBar(id, slot){
+  const cx=PICK_CTX[id]||PICK_CTX.network;
+  const open = PICKOPEN[id]!==false;
   const btn = slot.loading
     ? "<button disabled><span class='spin'></span> loading&hellip;</button>"
-    : "<button data-load='"+id+"'>"+(slot.items.length?"Reload":"Load")+"</button>";
+    : "<button data-load='"+id+"'>"+cx.act+"</button>";
   const metric = slot.loadMs ? " &middot; <span class='loadmetric' title='load time &middot; data downloaded'>"+fmtMs(slot.loadMs)+" &middot; "+fmtBytes(slot._bytes)+"</span>" : "";
-  const label = slot.items.length ? "<span class='muted'>showing <b>"+esc(slot.name)+"</b>"+(slot.items.length>1?" ("+(slot.view+1)+" of "+slot.items.length+")":"")+metric+"</span>" : "<span class='muted'>add one or more locations, then Load</span>";
-  // Centered control box -- the same standard as the Security Audit picker.
-  const optl = id==="operations" ? "<a class='optlink' data-openopt='1' title='Add, reorder, edit op-targets'>&#9881; Manage op-targets</a>" : "";
-  return "<div class='box auditcard'><div class='feat-h'>Load a location"+(optl?"<span class='sect-tools'>"+optl+"</span>":"")+"</div><div class='bar'>"+combo("pick-"+id, netItems(), {}, "add a location…", true)+btn+label+"</div>"+
-         (slot.error?"<div class='err'>"+esc(slot.error)+"</div>":"")+
-         ((slot.items.length>1||slot.loading)?slotFlip(id,slot):"")+"</div>";
+  const label = slot.items.length ? "<span class='muted'>"+cx.show+" <b>"+esc(slot.name)+"</b>"+(slot.items.length>1?" ("+(slot.view+1)+" of "+slot.items.length+")":"")+metric+"</span>" : "<span class='muted'>type a network name, then "+esc(cx.act)+"</span>";
+  const optl = id==="operations" ? " <a class='optlink' data-openopt='1' title='Add, reorder, edit op-targets'>&#9881; Manage op-targets</a>" : "";
+  const body = open ? "<div class='pickbar-b'>"+combo("pick-"+id, netItems(), {}, "Search networks&hellip;", true)+btn+label+optl+
+      (slot.error?"<div class='err' style='flex-basis:100%'>"+esc(slot.error)+"</div>":"")+
+      ((slot.items.length>1||slot.loading)?slotFlip(id,slot):"")+"</div>" : "";
+  return "<div class='pickbar"+(open?"":" collapsed")+"'><div class='pickbar-h' data-pickhdr='"+esc(id)+"'><span class='chev'>&#9662;</span> "+esc(cx.sel)+"</div>"+body+"</div>";
 }
+// Top row of the scrollable page: which network we're on + the Save/export menu, full width.
+function topBar(slot){ return "<div class='netbar'><span class='nethead'>Network: <b>"+esc(slot.d.name||"")+"</b></span><span class='netbar-r'>"+saveMenu("tab")+"</span></div>"; }
 // Flip bar to switch between multiple loaded locations in a tab.
 function slotFlip(id,slot){ return "<div class='scopeflip'>"+slot.items.map((it,i)=>{
   const tail = it.loading ? " <span class='spin'></span>" : it.error ? " <span class='namewarn'>&#9888;</span>" : " <span class='readytick'>&check;</span>";
@@ -1003,7 +1025,6 @@ function emptyState(id, slot, icon, title, desc){
 // Loaded-slot header: name, config template, pull stamps.
 function slotHead(slot,canTpl){
   const d=slot.d; let h="";
-  h+="<div class='nethead'>Network: <b>"+esc(d.name||"")+"</b></div>";
   const tmplRef=" <button class='secref' data-refresh='ports' title='Refresh config template'>&#x21bb;</button>";
   // Bind Template (gated): unbind from the current template / bind to another, from the Network header.
   let tplCtl="";
@@ -1508,18 +1529,16 @@ function render(){
   // Operations -- compact toolbar when loaded, a centered hero when empty
   const opsDesc="Add <b>op-targets</b> to watch each location &mdash; check that specific devices (by IP) <b>exist, are live, and named right</b>; that they&rsquo;re on the <b>VLAN you expect</b>; or just list <b>everything on a VLAN</b>.";
   const paneCls=(t)=> "panebox "+(TAB===t ? (TAB_ANIM?"anim":"") : "hidden");
-  const slotBody=(slot,fn,canTpl)=>{ if(!slot.items.length) return null; const it=slot.items[slot.view]; if(slot.d) return slotHead(slot,canTpl)+exportRow()+fn(slot); if(it&&it.loading) return "<div class='box'><div class='muted'><span class='spin'></span> loading <b>"+esc(it.name)+"</b>&hellip;</div></div>"; return "<div class='err'>"+esc((it&&it.error)||"load error")+"</div>"; };
+  // Loaded: [Network + Save] top row, then template/stamps, then the collapsible picker, then content.
+  // Not loaded: just the picker (the default look — always present).
+  const slotBody=(id,slot,fn,canTpl)=>{ const pick=pickBar(id,slot); if(slot.d) return topBar(slot)+slotHead(slot,canTpl)+pick+fn(slot); const it=slot.items[slot.view]; if(it&&it.loading) return pick+"<div class='box'><div class='muted'><span class='spin'></span> loading <b>"+esc(it.name)+"</b>&hellip;</div></div>"; if(it) return pick+"<div class='err'>"+esc(it.error||"load error")+"</div>"; return pick; };
   // Bind Template is a Network-only write. Load the template list once when the feature is active.
   const netCanTpl = NETV.d ? featureActive("set-template", NETV.d.name) : false;
   if(netCanTpl && TEMPLATES===null && !TPL_REQUESTED){ TPL_REQUESTED=true; loadTemplates().then(render); }
-  const opsBody=slotBody(OPS,opsContent);
-  h+="<div id='pane-operations' class='"+paneCls("operations")+"'>"+
-     (OPS.items.length ? pickerRow("operations",OPS)+opsBody : emptyState("operations",OPS,"&#9776;","Operations",opsDesc))+"</div>";
+  h+="<div id='pane-operations' class='"+paneCls("operations")+"'>"+slotBody("operations",OPS,opsContent)+"</div>";
   // Network
   const netDesc="Connected clients across this network &mdash; wired and Wi-Fi &mdash; plus the Meraki device inventory and every SSID. Rename any client or device inline.";
-  const netBody=slotBody(NETV,netContent,netCanTpl);
-  h+="<div id='pane-network' class='"+paneCls("network")+"'>"+
-     (NETV.items.length ? pickerRow("network",NETV)+netBody : emptyState("network",NETV,WIFI,"Network",netDesc))+"</div>";
+  h+="<div id='pane-network' class='"+paneCls("network")+"'>"+slotBody("network",NETV,netContent,netCanTpl)+"</div>";
   // Security Audit -- own target picker (always present, run/re-run any time)
   h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+auditPane()+"</div>";
 
@@ -1787,6 +1806,7 @@ document.getElementById("report").addEventListener("click", async e=>{
   const th=e.target.closest("th.sortable"); if(th){ e.stopImmediatePropagation(); const table=th.closest("table"), col=[...th.parentNode.cells].indexOf(th); const same=(SORTSTATE[sortKeyOf(table)]||{}); const dir=(same.col===col&&same.dir===1)?-1:1; sortTable(table,col,dir); LAST=document.getElementById("report").innerHTML; return; }
   const ac=e.target.closest(".planchk"); if(ac){ e.stopImmediatePropagation(); if(OPS.net) toggleAccept(OPS.net, ac.getAttribute("data-acceptmiss")); saveSettings(); render(); return; }
   const cx=e.target.closest(".combocx"); if(cx){ e.stopImmediatePropagation(); comboClear(cx.id.slice(3)); return; }
+  const ph=e.target.closest("[data-pickhdr]"); if(ph){ e.stopImmediatePropagation(); const id=ph.getAttribute("data-pickhdr"); PICKOPEN[id]=(PICKOPEN[id]===false); render(); return; }
   const oo=e.target.closest("[data-openopt]"); if(oo){ e.stopImmediatePropagation(); openSettingsOpt(); return; }
   const ld=e.target.closest("[data-load]"); if(ld){ e.stopImmediatePropagation(); loadSlot(ld.getAttribute("data-load")); return; }
   const sm=e.target.closest("[data-savemenu]"); if(sm){ e.stopImmediatePropagation(); const w=sm.closest(".savewrap"); const wasOpen=w.classList.contains("open"); document.querySelectorAll(".savewrap.open").forEach(x=>x.classList.remove("open")); if(!wasOpen) w.classList.add("open"); return; }
