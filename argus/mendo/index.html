@@ -1575,6 +1575,30 @@ function exportStore(){
   if(TAB==="network") return (NETV.d&&NETV.d.name)||NETV.name||"";
   const cr=AUD.runs[AUD.view]; if(!cr) return "Security Audit"; return cr.scope==="org"?"Organization":(cr.tgt.name||"");
 }
+// One report-metadata model, shared by EVERY export format (PDF, HTML, JSON, CSV, TSV, Excel) so they're
+// consistent and professional: what the report is, its subject, the data source, when the data was pulled,
+// the config template, the API query cost, and when the report was generated.
+function reportMeta(scope){
+  const sect = scope && scope.indexOf("sect:")===0;
+  const isAudit = TAB==="audit";
+  const slot = TAB==="operations"?OPS:TAB==="network"?NETV:null;
+  const rtype = sect ? ((scopeTables(scope)[0]&&tableTitle(scopeTables(scope)[0]))||viewName())
+    : (TAB==="operations"?"Operations Report":TAB==="network"?"Network Report":"Security Audit Report");
+  const tmpl = (slot&&slot.d) ? (slot.d.boundTemplate?(slot.d.boundTemplate.name||slot.d.boundTemplate.id):"none (runs its own config)") : "";
+  const asOf = slot ? [slot.portStamp?("Switch pulled "+slot.portStamp):"", slot.wifiStamp?("Wi-Fi pulled "+slot.wifiStamp):""].filter(Boolean).join(" · ") : "";
+  const loadMs = isAudit ? AUD.loadMs : (slot&&slot.loadMs);
+  const bytes = isAudit ? AUD._bytes : (slot&&slot._bytes);
+  const query = [loadMs?fmtMs(loadMs):"", bytes?fmtBytes(bytes):""].filter(Boolean).join(" · ");
+  return { report:rtype, subject:exportStore(), dataSource:"Cisco Meraki Dashboard API · read-only proxy",
+    dataAsOf:(asOf?asOf+" · connected-now only":""), configTemplate:tmpl,
+    apiQuery:(query?query+" transferred":""), generated:pacific() };
+}
+// The metadata as ordered [field,value] pairs (empties dropped) -- for the tabular formats (CSV/TSV/Excel).
+function reportMetaRows(scope){ const m=reportMeta(scope); return [
+  ["Report", m.report], ["Subject", m.subject], ["Data source", m.dataSource],
+  m.dataAsOf?["Data as of", m.dataAsOf]:null, m.configTemplate?["Config template", m.configTemplate]:null,
+  m.apiQuery?["API query", m.apiQuery]:null, ["Report generated", m.generated]
+].filter(Boolean); }
 // Build the printable doc. Tab scope -> the whole active pane; a section scope -> just that section's table(s).
 function exportDoc(scope){
   const store=exportStore();
@@ -1587,24 +1611,14 @@ function exportDoc(scope){
       return (ttl?"<h2>"+esc(ttl)+"</h2>":"")+"<table><thead><tr>"+d.headers.map(x=>"<th>"+esc(x)+"</th>").join("")+"</tr></thead><tbody>"+
         d.rows.map(r=>"<tr>"+r.map(c=>"<td>"+esc(c)+"</td>").join("")+"</tr>").join("")+"</tbody></table>"; }).join("") || "<div>Nothing to export.</div>";
   } else { body=activePaneHtml(); }
-  // Report letterhead -- lead with WHAT the report is, then the subject, then a metadata block.
-  const slot = TAB==="operations"?OPS:TAB==="network"?NETV:null;
-  const rtype = sect ? title : (TAB==="operations"?"Operations Report":TAB==="network"?"Network Report":"Security Audit Report");
-  const tmpl = (slot&&slot.d) ? (slot.d.boundTemplate ? esc(slot.d.boundTemplate.name||slot.d.boundTemplate.id) : "none (runs its own config)") : "";
-  const asOf = slot ? [slot.portStamp?("Switch pulled "+esc(slot.portStamp)):"", slot.wifiStamp?("Wi-Fi pulled "+esc(slot.wifiStamp)):""].filter(Boolean).join(" &middot; ") : "";
-  const query = slot ? [slot.loadMs?fmtMs(slot.loadMs):"", slot._bytes?fmtBytes(slot._bytes):""].filter(Boolean).join(" &middot; ") : "";
-  const meta = "<table class='rpt-meta'>"+
-    "<tr><td>Data source</td><td>Cisco Meraki Dashboard API &middot; read-only proxy</td></tr>"+
-    (asOf?"<tr><td>Data as of</td><td>"+asOf+" &middot; connected-now only</td></tr>":"")+
-    (tmpl?"<tr><td>Config template</td><td>"+tmpl+"</td></tr>":"")+
-    (query?"<tr><td>API query</td><td>"+query+" transferred</td></tr>":"")+
-    "<tr><td>Report generated</td><td>"+esc(pacific())+"</td></tr>"+
-    "</table>";
-  const head="<div class='rpt-head'>"+
-    "<div class='rpt-brand'>ARGUS <span>&middot; NOC for Meraki</span></div>"+
-    "<div class='rpt-title'>"+esc(rtype)+"</div>"+
-    "<div class='rpt-subject'>"+esc(store)+"</div>"+meta+"</div>";
-  return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>"+esc(store)+" &mdash; "+esc(rtype)+" &middot; Argus</title><style>"+EXPORT_CSS+"</style></head><body>"+head+body+BRAND_FOOT+"</body></html>";
+  // Report letterhead -- lead with WHAT the report is, then the subject, then the shared metadata block.
+  const m=reportMeta(scope);
+  const mrow=(k,v)=>v?"<tr><td>"+esc(k)+"</td><td>"+esc(v)+"</td></tr>":"";
+  const meta="<table class='rpt-meta'>"+mrow("Data source",m.dataSource)+mrow("Data as of",m.dataAsOf)+
+    mrow("Config template",m.configTemplate)+mrow("API query",m.apiQuery)+mrow("Report generated",m.generated)+"</table>";
+  const head="<div class='rpt-head'><div class='rpt-brand'>ARGUS <span>&middot; NOC for Meraki</span></div>"+
+    "<div class='rpt-title'>"+esc(m.report)+"</div><div class='rpt-subject'>"+esc(m.subject)+"</div>"+meta+"</div>";
+  return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>"+esc(m.subject)+" &mdash; "+esc(m.report)+" &middot; Argus</title><style>"+EXPORT_CSS+"</style></head><body>"+head+body+BRAND_FOOT+"</body></html>";
 }
 function exportHtml(scope){
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([exportDoc(scope)],{type:"text/html"}));
@@ -1680,25 +1694,32 @@ async function exportRun(fmt, scope){
   if(fmt==="pdf"){ exportPdf(scope); return; }
   const tables=scopeTables(scope);
   if(fmt==="json"){
-    let obj;
+    let obj; const meta=reportMeta(scope);
     if(scope==="tab" && TAB==="audit" && AUD.runs[AUD.view]){
-      obj={ tool:"Argus", exportedAt:pacific(), scope:viewName(), audit:AUD.runs[AUD.view].result }; // stable bridge schema
+      obj={ report:meta, audit:AUD.runs[AUD.view].result }; // report metadata + stable bridge schema
     } else {
       const sections={};
       tables.forEach((t,i)=>{ const ttl=tableTitle(t)||("table_"+(i+1)); sections[ttl]=dataObjs(tableData(t)); });
-      obj={ tool:"Argus", exportedAt:pacific(), network:exportStore(), scope:(scope==="tab"?viewName():(tables[0]&&tableTitle(tables[0]))||scope), sections };
+      obj={ report:meta, sections };
     }
     _dl(_fname(scope,"json"), JSON.stringify(obj,null,2), "application/json"); return;
   }
   if(!tables.length){ toast("nothing to export here yet"); return; }
-  if(fmt==="csv"){ _dl(_fname(scope,"csv"), tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\r\n":"")+dataCSV(tableData(t)); }).join("\r\n\r\n"), "text/csv"); return; }
+  if(fmt==="csv"){
+    const mh=reportMetaRows(scope).map(p=>_csvEsc(p[0])+","+_csvEsc(p[1])).join("\r\n");
+    const data=tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\r\n":"")+dataCSV(tableData(t)); }).join("\r\n\r\n");
+    _dl(_fname(scope,"csv"), mh+"\r\n\r\n"+data, "text/csv"); return;
+  }
   if(fmt==="excel"){
-    const blocks=tables.map((t,i)=>{ const d=tableData(t); return {name:(tableTitle(t)||("Sheet"+(i+1))), headers:d.headers, rows:d.rows}; });
+    const info={name:"Report", headers:["Field","Value"], rows:reportMetaRows(scope)}; // a cover sheet of report metadata
+    const blocks=[info].concat(tables.map((t,i)=>{ const d=tableData(t); return {name:(tableTitle(t)||("Sheet"+(i+1))), headers:d.headers, rows:d.rows}; }));
     _dl(_fname(scope,"xlsx"), _xlsx(blocks), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); return;
   }
   if(fmt==="gsheets"){
     if(!tables.length){ toast("nothing to export here yet"); return; }
-    const tsv=tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\n":"")+dataTSV(tableData(t)); }).join("\n\n");
+    const mh=reportMetaRows(scope).map(p=>p[0]+"\t"+p[1]).join("\n");
+    const data=tables.map(t=>{ const ttl=tableTitle(t); return (ttl&&tables.length>1?ttl+"\n":"")+dataTSV(tableData(t)); }).join("\n\n");
+    const tsv=mh+"\n\n"+data;
     // Copy with the atomic, in-gesture execCommand ONLY -- the async clipboard API racing with the
     // window.open below was wiping the clipboard, which is why the sheet pasted empty.
     const ok=_clipSync(tsv);
@@ -1995,7 +2016,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r193 · aba2367 · 2026-06-16</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r194 · bbe7a98 · 2026-06-16</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
