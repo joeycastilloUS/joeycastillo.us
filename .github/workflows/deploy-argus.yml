@@ -45,27 +45,19 @@ jobs:
         run: |
           for d in argus.com.ai www.argus.com.ai; do
             echo "== attaching $d =="
-            code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" -X POST \
+            resp=$(curl -sS -X POST \
               "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT}/domains" \
               -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
               -H "Content-Type: application/json" \
               --data "{\"name\":\"$d\"}")
-            echo "HTTP $code"; cat /tmp/resp.json
-            python3 - "$d" <<'PY'
-import json,sys
-d=sys.argv[1]
-try: r=json.load(open('/tmp/resp.json'))
-except Exception as e: print("  parse error",e); sys.exit(0)
-if r.get('success'):
-    print(f"  OK: {d} attached")
-else:
-    errs=r.get('errors',[])
-    # 8000007 / "already exists" is fine on re-run (idempotent)
-    if any('exist' in str(e.get('message','')).lower() for e in errs):
-        print(f"  already attached: {d}")
-    else:
-        print(f"  NOTE for {d}: {errs}")
-PY
+            echo "$resp"
+            if echo "$resp" | grep -q '"success":true'; then
+              echo "  OK: $d attached"
+            elif echo "$resp" | grep -qi 'already\|exist'; then
+              echo "  already attached: $d (idempotent)"
+            else
+              echo "  NOTE: $d attach returned a non-success body (see above)"
+            fi
           done
 
       - name: Verify the edge serves the home
@@ -78,5 +70,4 @@ PY
             if [ "$code" = "200" ] && [ "$hit" -ge 1 ]; then echo "LIVE + VERIFIED"; exit 0; fi
             sleep 10
           done
-          echo "NOTE: not yet serving at deploy time (DNS/cert can take a few minutes on first attach)."
-          echo "Pages deploy + domain attach succeeded; the edge will follow once the cert provisions."
+          echo "NOTE: deploy + domain attach succeeded; first-time cert/DNS can take a few minutes."
