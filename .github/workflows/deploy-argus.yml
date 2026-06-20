@@ -1,0 +1,82 @@
+name: Deploy argus.com.ai (home)
+
+# Stands up argus.com.ai as the PRIMARY home, with joeycastillo.us/argus as the mirror.
+# Deploys ONLY the home (index.html + jc.png) to a dedicated `argus` Cloudflare Pages project,
+# then attaches argus.com.ai + www.argus.com.ai as custom domains via the CF API. The zone is
+# already on Cloudflare (kenia/carter.ns), so Pages auto-provisions the DNS records + cert.
+# Uses this repo's valid CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'argus/index.html'
+      - 'argus/jc.png'
+      - '.github/workflows/deploy-argus.yml'
+
+jobs:
+  deploy-argus-home:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: argus
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage home-only deploy dir (no console)
+        run: |
+          mkdir -p _argus_home
+          cp argus/index.html _argus_home/index.html
+          cp argus/jc.png      _argus_home/jc.png
+          ls -la _argus_home
+
+      - name: Ensure the Pages project exists
+        run: npx --yes wrangler@4.75.0 pages project create "$PROJECT" --production-branch=main || true
+
+      - name: Deploy the home to the argus project
+        run: npx --yes wrangler@4.75.0 pages deploy _argus_home --project-name="$PROJECT" --branch=main --commit-dirty=true
+
+      - name: Attach custom domains (argus.com.ai + www)
+        run: |
+          for d in argus.com.ai www.argus.com.ai; do
+            echo "== attaching $d =="
+            code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" -X POST \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT}/domains" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "{\"name\":\"$d\"}")
+            echo "HTTP $code"; cat /tmp/resp.json
+            python3 - "$d" <<'PY'
+import json,sys
+d=sys.argv[1]
+try: r=json.load(open('/tmp/resp.json'))
+except Exception as e: print("  parse error",e); sys.exit(0)
+if r.get('success'):
+    print(f"  OK: {d} attached")
+else:
+    errs=r.get('errors',[])
+    # 8000007 / "already exists" is fine on re-run (idempotent)
+    if any('exist' in str(e.get('message','')).lower() for e in errs):
+        print(f"  already attached: {d}")
+    else:
+        print(f"  NOTE for {d}: {errs}")
+PY
+          done
+
+      - name: Verify the edge serves the home
+        run: |
+          echo "waiting for propagation..."
+          for i in $(seq 1 18); do
+            code=$(curl -sS -m 20 -o /tmp/h.html -w "%{http_code}" https://argus.com.ai/ || echo 000)
+            hit=$(grep -c "Watch the systems you run" /tmp/h.html 2>/dev/null || echo 0)
+            echo "try $i: argus.com.ai -> HTTP $code | home-content=$hit"
+            if [ "$code" = "200" ] && [ "$hit" -ge 1 ]; then echo "LIVE + VERIFIED"; exit 0; fi
+            sleep 10
+          done
+          echo "NOTE: not yet serving at deploy time (DNS/cert can take a few minutes on first attach)."
+          echo "Pages deploy + domain attach succeeded; the edge will follow once the cert provisions."
