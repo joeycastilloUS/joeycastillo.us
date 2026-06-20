@@ -51,12 +51,46 @@ jobs:
               -H "Content-Type: application/json" \
               --data "{\"name\":\"$d\"}")
             echo "$resp"
-            if echo "$resp" | grep -q '"success":true'; then
+            if echo "$resp" | grep -Eq '"success" *: *true'; then
               echo "  OK: $d attached"
             elif echo "$resp" | grep -qi 'already\|exist'; then
               echo "  already attached: $d (idempotent)"
             else
               echo "  NOTE: $d attach returned a non-success body (see above)"
+            fi
+          done
+
+      - name: Ensure DNS records point at the Pages project
+        run: |
+          API="https://api.cloudflare.com/client/v4"
+          AUTH="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+          # Canonical pages.dev hostname for this project (e.g. argus-3pn.pages.dev)
+          TARGET=$(curl -sS -H "$AUTH" "$API/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT}" \
+            | python3 -c "import sys,json;print(json.load(sys.stdin)['result']['subdomain'])")
+          echo "Pages target: $TARGET"
+          # Find the argus.com.ai zone visible to this token
+          ZID=$(curl -sS -H "$AUTH" "$API/zones?name=argus.com.ai" \
+            | python3 -c "import sys,json;r=json.load(sys.stdin).get('result') or [];print(r[0]['id'] if r else '')")
+          if [ -z "$ZID" ]; then
+            echo "::warning::argus.com.ai zone not visible to this token/account — cannot auto-create DNS."
+            echo "Manual one-time step: in the Cloudflare zone for argus.com.ai add proxied CNAMEs:"
+            echo "  argus.com.ai      CNAME  $TARGET  (proxied)"
+            echo "  www.argus.com.ai  CNAME  $TARGET  (proxied)"
+            exit 0
+          fi
+          echo "zone id: $ZID"
+          for name in argus.com.ai www.argus.com.ai; do
+            body="{\"type\":\"CNAME\",\"name\":\"$name\",\"content\":\"$TARGET\",\"proxied\":true}"
+            rid=$(curl -sS -H "$AUTH" "$API/zones/$ZID/dns_records?name=$name" \
+              | python3 -c "import sys,json;r=json.load(sys.stdin).get('result') or [];print(r[0]['id'] if r else '')")
+            if [ -n "$rid" ]; then
+              echo "== updating $name ($rid) -> $TARGET =="
+              curl -sS -X PUT "$API/zones/$ZID/dns_records/$rid" -H "$AUTH" -H "Content-Type: application/json" --data "$body" \
+                | python3 -c "import sys,json;d=json.load(sys.stdin);print('  OK' if d.get('success') else '  ERR '+str(d.get('errors')))"
+            else
+              echo "== creating $name -> $TARGET =="
+              curl -sS -X POST "$API/zones/$ZID/dns_records" -H "$AUTH" -H "Content-Type: application/json" --data "$body" \
+                | python3 -c "import sys,json;d=json.load(sys.stdin);print('  OK' if d.get('success') else '  ERR '+str(d.get('errors')))"
             fi
           done
 
