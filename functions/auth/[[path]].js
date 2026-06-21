@@ -7,7 +7,7 @@
 // pass straight through; CORS lets the operator's sites read /auth/me with credentials.
 //
 // One identity provider, many sites. Add a site by adding its origin to ALLOW.
-const EDGE = "https://yosemite-conditions-692654781984.us-west1.run.app";
+const EDGE = "https://discord-edge-d5vc4tye3a-uw.a.run.app";  // dedicated Discord jacket (acmedevUS/discord-edge)
 const ALLOW = ["https://yosemite.camp", "https://joeycastillo.us"];
 
 export async function onRequest(context) {
