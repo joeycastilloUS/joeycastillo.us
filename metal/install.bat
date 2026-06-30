@@ -103,21 +103,32 @@ if !errorlevel! equ 0 (
     echo   Authenticated.
 )
 
-rem === Step 4: Clone metal ===
+rem === Step 4: Clone or self-heal metal ===
+rem ONE STOP SHOP: no prompt, never leaves a dirty tree blocking the launch.
+rem be/otel.jsonl + be/prompts.jsonl are runtime-only now; a legacy clone that
+rem still tracks them (and carries ~auto-flush divergence) is reconciled to
+rem origin/main by be/tools/autoheal-pull.ps1 -- fetched from origin first if an
+rem ancient clone predates it. Real local work is stashed, never lost.
 if exist "C:\metal\.git" (
-    echo [4/6] Pulling latest metal...
+    echo [4/6] Reconciling metal to latest ^(self-heal, no prompt^)...
     pushd C:\metal
-    git pull --ff-only
+    git fetch -q origin main 2>nul
+    if not exist "be\tools\autoheal-pull.ps1" git checkout origin/main -- be/tools/autoheal-pull.ps1 2>nul
+    if exist "be\tools\autoheal-pull.ps1" (
+        powershell -NoProfile -ExecutionPolicy Bypass -File "be\tools\autoheal-pull.ps1"
+    ) else (
+        git reset --hard -q origin/main 2>nul
+    )
     popd
 ) else (
     echo [4/6] Cloning metal...
-    gh repo clone joeycastilloUS/metal C:\metal
+    gh repo clone kastil-systems/metal-console C:\metal
 )
 if not exist "C:\metal\go.bat" (
     echo.
     echo   ERROR: metal repo not found at C:\metal
     echo   Clone may have failed. Try manually:
-    echo     gh repo clone joeycastilloUS/metal C:\metal
+    echo     gh repo clone kastil-systems/metal-console C:\metal
     goto :error
 )
 

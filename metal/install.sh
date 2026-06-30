@@ -102,11 +102,24 @@ METAL_DIR="$HOME/metal"
 [ ! -d "$METAL_DIR" ] && [ -d "C:/metal" ] && METAL_DIR="C:/metal"
 
 if [[ -d "$METAL_DIR/.git" ]]; then
-    echo "[4/6] Pulling latest metal..."
-    git -C "$METAL_DIR" pull --ff-only
+    # ONE STOP SHOP: no prompt, never aborts (the bare `git pull --ff-only`
+    # under `set -e` used to kill the whole install on a dirty/diverged clone).
+    # be/otel.jsonl + be/prompts.jsonl are runtime-only now; reconcile a legacy
+    # clone to origin/main via be/tools/autoheal-pull.sh -- fetched from origin
+    # first if an ancient clone predates it. Real local work is stashed, never lost.
+    echo "[4/6] Reconciling metal to latest (self-heal, no prompt)..."
+    git -C "$METAL_DIR" fetch -q origin main 2>/dev/null || true
+    if [ ! -f "$METAL_DIR/be/tools/autoheal-pull.sh" ]; then
+        git -C "$METAL_DIR" checkout origin/main -- be/tools/autoheal-pull.sh 2>/dev/null || true
+    fi
+    if [ -f "$METAL_DIR/be/tools/autoheal-pull.sh" ]; then
+        sh "$METAL_DIR/be/tools/autoheal-pull.sh" || true
+    else
+        git -C "$METAL_DIR" reset --hard -q origin/main 2>/dev/null || true
+    fi
 else
     echo "[4/6] Cloning metal..."
-    gh repo clone joeycastilloUS/metal "$HOME/metal"
+    gh repo clone kastil-systems/metal-console "$HOME/metal"
     METAL_DIR="$HOME/metal"
 fi
 
@@ -114,7 +127,7 @@ if [ ! -f "$METAL_DIR/go.sh" ]; then
     echo ""
     echo "  ERROR: metal repo not found at $METAL_DIR"
     echo "  Clone may have failed. Try manually:"
-    echo "    gh repo clone joeycastilloUS/metal ~/metal"
+    echo "    gh repo clone kastil-systems/metal-console ~/metal"
     exit 1
 fi
 
