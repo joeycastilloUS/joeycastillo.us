@@ -17,6 +17,10 @@
   .tabv .ti{display:inline-flex;width:18px;justify-content:center;font-size:1.02rem;} .tabv .tl{flex:1;}
   .tabv:hover{color:var(--text);background:#161616;}
   .tabv.on{background:#1d2a31;color:var(--accent);border-color:rgba(111,195,223,.35);}
+  .appsel{display:flex;gap:4px;margin-bottom:8px;background:#0c1418;border:1px solid var(--line);border-radius:10px;padding:4px;}
+  .appbtn{flex:1;background:transparent;color:var(--dim);border:0;border-radius:7px;padding:8px 6px;font-size:.82rem;font-weight:800;letter-spacing:.03em;cursor:pointer;font-family:inherit;transition:.12s;}
+  .appbtn:hover{color:var(--accent);} .appbtn.on{background:var(--accent);color:#06222c;}
+  .appsel-lbl{color:var(--dim);font-size:.55rem;letter-spacing:2px;text-transform:uppercase;margin:2px 4px 8px;font-weight:700;}
   @media(max-width:640px){ #tabnav{width:132px;padding:44px 6px 10px;} .tabv{padding:10px 9px;font-size:.84rem;gap:7px;} .wrap,#brand-strip{margin-left:132px!important;} }
   .nav .be{color:var(--accent);font-weight:800;font-size:1.15rem;letter-spacing:3px;} .nav .r{color:var(--dim);font-size:.78rem;}
   .navbrand{display:flex;flex-direction:row;align-items:baseline;gap:9px;min-width:0;line-height:1.05;}
@@ -486,6 +490,14 @@ let PW = sessionStorage.getItem(PW_KEY) || "";
 let LAST = "";
 let TAB = "operations";
 let TAB_ANIM = false; // one-shot: animate the active pane on tab switch
+// Argus applications — Meraki and Zendesk are separate apps; the app selector picks which one (= the tool).
+let APP = localStorage.getItem("argus_app") || "meraki";
+const APPS = {
+  meraki:  { label:"Meraki",  tabs:["operations","network","audit"] },
+  zendesk: { label:"Zendesk", tabs:["apibrowser"], source:"zendesk" }
+};
+if(!APPS[APP]) APP="meraki";
+if(APPS[APP].tabs.indexOf(TAB)<0) TAB=APPS[APP].tabs[0];
 let SECTSTATE={}; // section key -> false when collapsed; persists across re-renders
 let SORTSTATE={}; // table key (sect-body id) -> {col,dir}; persists across re-renders. Default: first column ascending.
 let SHOWCHECKS=false, CHECKS=null; // audit methodology panel (every check + scoring), fetched once from /meraki/audit/checks
@@ -1655,7 +1667,6 @@ function abInner(){
     +"<div class='muted' style='margin-bottom:12px'>Browse a tool’s API and read the raw response. Pick a tool, pick an endpoint, run it. No writes — ever.</div>";
   // controls
   h+="<div class='abctl'>";
-  h+="<label class='abl'>Tool<select data-ab='source'>"+Object.keys(SOURCES).map(k=>"<option value='"+k+"'"+(k===AB.source?" selected":"")+">"+SOURCES[k].label+"</option>").join("")+"</select></label>";
   if(cat.length){
     h+="<label class='abl'>Endpoint<select data-ab='entry'>"+cat.map(e=>"<option value='"+abEsc(e.id)+"'"+(e.id===AB.entry?" selected":"")+">"+abEsc(e.label)+"</option>").join("")+"</select></label>";
     if(cur) cur.params.forEach(p=>{ h+="<label class='abl'>"+abEsc(p)+"<input class='abin' data-abp='"+abEsc(p)+"' value='"+abEsc(AB.params[p]||"")+"' placeholder='"+abEsc(p)+"' autocomplete='off'></label>"; });
@@ -1688,13 +1699,22 @@ function render(){
   const _av=auditView&&auditView.summary||{}; const _at=auditView?((_av.critical||0)+(_av.high||0)+(_av.medium||0)+(_av.low||0)):0;
   const auditBadge = auditView ? (_at?" &middot; <b class='bad'>"+_at+"</b>":" &middot; <b class='ok'>&check;</b>") : "";
   // Section tabs live in the fixed LEFT sidebar (#tabnav), not in the scrolling content.
+  // The chosen application drives the source for the API Browser + which tabs appear.
+  if(APPS[APP].source) AB.source=APPS[APP].source;
+  if(TAB==="apibrowser" && AB.cat===null && !AB.busy && !AB.err) abLoadCatalog();
+  const nsb=document.querySelector(".navsub"); if(nsb) nsb.innerHTML="<b>"+APPS[APP].label+"</b> &mdash; "+(APP==="zendesk"?"Support · read-only":"Operationally Driven, Network Operations Center");
+  const tabHtml={
+    operations:"<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>",
+    network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
+    audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
+    apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>"
+  };
   const tn=document.getElementById("tabnav");
-  if(tn) tn.innerHTML="<div class='tabnav-inner'>"+
-     "<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>"+
-     "<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>"+
-     "<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>"+
-     "<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>"+
-     "</div>";
+  if(tn) tn.innerHTML="<div class='tabnav-inner'>"
+     +"<div class='appsel'>"+Object.keys(APPS).map(a=>"<button class='appbtn"+(a===APP?" on":"")+"' data-app='"+a+"'>"+APPS[a].label+"</button>").join("")+"</div>"
+     +"<div class='appsel-lbl'>"+APPS[APP].label+" application</div>"
+     +APPS[APP].tabs.map(t=>tabHtml[t]).join("")
+     +"</div>";
 
   // Operations -- compact toolbar when loaded, a centered hero when empty
   const opsDesc="Add <b>op-targets</b> to watch each location &mdash; check that specific devices (by IP) <b>exist, are live, and named right</b>; that they&rsquo;re on the <b>VLAN you expect</b>; or just list <b>everything on a VLAN</b>.";
@@ -2094,6 +2114,8 @@ document.getElementById("report").addEventListener("click", e=>{
 });
 // API Browser (read-only) — lazy-load the catalog on first entry, and its own delegated controls.
 document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-tab='apibrowser']") && AB.cat===null && !AB.busy){ abLoadCatalog(); } });
+// Application selector (Meraki / Zendesk) — switch the active app, its tabs, and the API Browser source.
+document.getElementById("tabnav").addEventListener("click", e=>{ const a=e.target.closest("[data-app]"); if(!a) return; const x=a.getAttribute("data-app"); if(!APPS[x]||x===APP) return; APP=x; localStorage.setItem("argus_app",x); TAB=APPS[x].tabs[0]; TAB_ANIM=true; if(APPS[x].source) AB.source=APPS[x].source; if(TAB==="apibrowser" && AB.cat===null && !AB.busy) abLoadCatalog(); render(); });
 document.getElementById("report").addEventListener("change", e=>{
   const s=e.target.closest("[data-ab]"); if(!s) return; const k=s.getAttribute("data-ab");
   if(k==="source"){ AB.source=s.value; abLoadCatalog(); }
@@ -2193,7 +2215,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r250 · 1d23580 · 2026-06-30</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r252 · 12e44d3 · 2026-06-30</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
