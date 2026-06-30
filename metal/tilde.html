@@ -27,6 +27,41 @@
   .approx { color:#7a6a3a; font-size:.72rem; }
   .err { color:#ff8b8b; }
   .foot { color:#555; font-size:.75rem; margin-top:40px; border-top:1px solid #1c1c1c; padding-top:14px; }
+
+  /* COMMENT SYSTEM (pattern + style from bahalaka.com) */
+  .comment-toggle { display:inline-flex; align-items:center; gap:6px; background:none; border:1px solid #333; color:#888; padding:6px 14px; border-radius:20px; font-size:12px; cursor:pointer; transition:all .2s; }
+  .comment-toggle:hover { border-color:#4ec9b0; color:#4ec9b0; }
+  .comment-toggle .count { background:#4ec9b0; color:#000; font-weight:700; padding:1px 7px; border-radius:10px; font-size:10px; }
+  .comment-thread { display:none; margin-top:16px; }
+  .comment-thread.open { display:block; }
+  .comment-entry { background:#141414; border:1px solid #1e1e1e; border-radius:8px; padding:14px; margin:8px 0; }
+  .comment-entry .meta { display:block; border:none; padding:0; font-size:11px; color:#888; margin-bottom:6px; }
+  .comment-entry .meta strong { color:#4ec9b0; }
+  .comment-entry .body { font-size:13px; color:#ccc; white-space:pre-wrap; }
+  .comment-entry .edit-form { margin-top:8px; }
+  .comment-entry .edit-form textarea { width:100%; background:#0a0a0a; border:1px solid #4ec9b0; color:#ddd; padding:8px; border-radius:6px; font-size:13px; font-family:inherit; resize:vertical; min-height:40px; }
+  .comment-entry .edit-form .edit-actions { display:flex; gap:6px; margin-top:6px; }
+  .comment-entry .edit-form .edit-actions button { padding:4px 12px; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer; border:none; }
+  .comment-entry .edit-form .save-btn { background:#4ec9b0; color:#000; }
+  .comment-entry .edit-form .cancel-btn { background:none; border:1px solid #333; color:#888; }
+  .comment-entry .edited-tag { font-size:10px; color:#888; font-style:italic; }
+  .comment-entry .actions { display:flex; gap:6px; margin-top:6px; }
+  .comment-entry .action-btn { background:none; border:1px solid #333; color:#888; padding:2px 8px; border-radius:4px; font-size:10px; cursor:pointer; }
+  .comment-entry .action-btn:hover { border-color:#4ec9b0; color:#4ec9b0; }
+  .comment-replies { margin-top:10px; padding-left:16px; border-left:2px solid #333; }
+  .comment-replies .comment-entry { background:#0f0f0f; margin:6px 0; padding:10px 12px; }
+  .comment-form, .reply-form { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .cf-identity { display:flex; align-items:center; gap:8px; width:100%; font-size:12px; color:#888; }
+  .cf-identity strong { color:#4ec9b0; font-size:13px; }
+  .cf-change { background:none; border:none; color:#888; font-size:11px; cursor:pointer; text-decoration:underline; padding:0; }
+  .cf-change:hover { color:#4ec9b0; }
+  .cf-name-row { display:flex; gap:8px; width:100%; }
+  .comment-form input[type=text], .reply-form input[type=text] { flex:1; max-width:220px; background:#0a0a0a; border:1px solid #333; color:#ddd; padding:8px 12px; border-radius:6px; font-size:13px; }
+  .comment-form input:focus, .comment-form textarea:focus, .reply-form input:focus, .reply-form textarea:focus { border-color:#4ec9b0; outline:none; }
+  .cf-body { display:flex; gap:8px; width:100%; }
+  .comment-form textarea, .reply-form textarea { flex:1; background:#0a0a0a; border:1px solid #333; color:#ddd; padding:8px 12px; border-radius:6px; font-size:13px; resize:vertical; min-height:40px; font-family:inherit; }
+  .comment-form button.cf-post, .reply-form button { background:#4ec9b0; color:#000; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  @media (max-width:520px){ .comment-form input[type=text]{ max-width:100%; } }
 </style>
 </head>
 <body>
@@ -59,6 +94,8 @@ fetch('/metal/tildes.json').then(r=>r.json()).then(data=>{
   document.title = 'metal · '+t.cmd+' — '+t.name;
   var approx = t.datesApprox ? ' <span class="approx">(approx — file-level)</span>' : '';
   var aliases = (t.aliases||[]).map(function(a){return '<code>'+esc(a)+'</code>';}).join(' ');
+  // section id for comments — stable per tilde, e.g. ~b -> tilde-b, ~WTF -> tilde-wtf
+  var sid = 'tilde-' + t.cmd.replace(/^~/,'').toLowerCase().replace(/[^a-z0-9-]/g,'-');
   w.innerHTML =
     '<div class="cmd">'+esc(t.cmd)+'<span class="cat">'+esc(t.cat)+'</span></div>'+
     '<div class="name">'+esc(t.name)+'</div>'+
@@ -74,10 +111,128 @@ fetch('/metal/tildes.json').then(r=>r.json()).then(data=>{
     '<div class="card ai"><div class="lbl">'+esc(data.model||'Claude Code')+' &mdash; when you run '+esc(t.cmd)+'</div>'+esc(t.aiDoes)+'</div>'+
     '<h2>Source of truth</h2>'+
     '<div class="card"><code class="src">'+esc(t.source)+'</code><div style="color:#777;font-size:.78rem;margin-top:8px">Mirrored from the metal kernel on '+esc(data.mirroredOn)+'. This page renders <code>/metal/tildes.json</code> directly, so it stays in sync with reality.</div></div>'+
+    '<h2>Notes &amp; comments</h2>'+
+    '<div class="comment-toggle" onclick="toggleComments(\''+sid+'\')"><span>Comments</span> <span class="count" id="count-'+sid+'">·</span></div>'+
+    '<div class="comment-thread" id="thread-'+sid+'"></div>'+
     '<div class="foot">metal console &middot; tilde reference &middot; '+esc(data.model||'')+'</div>';
+  // prime the comment count for this tilde
+  if (window.metalComments) window.metalComments.count(sid);
 }).catch(function(e){
   document.getElementById('wrap').innerHTML = '<p class="err">Could not load tildes.json: '+esc(String(e))+'</p>';
 });
+</script>
+
+<!-- ════════════════════ COMMENT ENGINE — Firestore REST (pattern from bahalaka.com) ════════════════════ -->
+<script>
+(function(){
+  var PROJECT = 'acmedev-platform-hq';
+  var DB = 'joeycastillo-website';
+  var API_KEY = 'AIzaSyBXUdmkeTgBjASYOcYKvyMTq2psxZ4Bfac';
+  var BASE = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/' + DB + '/documents';
+  var NAME_KEY = 'metal_name';
+  var cache = {};
+
+  function apiUrl(p){ return BASE + p + '?key=' + API_KEY; }
+  function escHtml(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+  function formatTime(ts){ var d=new Date(ts); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}); }
+
+  function fetchComments(sectionId, cb){
+    fetch(apiUrl('/comments/'+sectionId+'/entries')).then(function(r){return r.json();}).then(function(data){
+      var comments=[];
+      if(data.documents){ data.documents.forEach(function(doc){ var f=doc.fields;
+        comments.push({ id:doc.name.split('/').pop(), name:f.name?f.name.stringValue:'', text:f.text?f.text.stringValue:'', time:f.time?f.time.stringValue:'', edited:f.edited?f.edited.booleanValue:false }); }); }
+      cache[sectionId]=comments; cb(comments);
+    }).catch(function(){ cb(cache[sectionId]||[]); });
+  }
+  function updateCount(sectionId,n){ var el=document.getElementById('count-'+sectionId); if(el) el.textContent=n; }
+
+  function renderThread(sectionId){
+    fetchComments(sectionId, function(comments){
+      var thread=document.getElementById('thread-'+sectionId); if(!thread) return;
+      updateCount(sectionId, comments.length);
+      var html='';
+      comments.forEach(function(c){
+        var nameEsc=escHtml(c.name).replace(/'/g,"\\'");
+        html+='<div class="comment-entry" id="entry-'+c.id+'">';
+        html+='<div class="meta"><strong>'+escHtml(c.name)+'</strong> &middot; '+escHtml(c.time);
+        if(c.edited) html+=' <span class="edited-tag">(edited)</span>';
+        html+='</div><div class="body">'+escHtml(c.text)+'</div>';
+        html+='<div class="actions">';
+        html+='<button class="action-btn" onclick="editComment(\''+sectionId+'\',\''+c.id+'\',\''+nameEsc+'\')">Edit</button>';
+        html+='<button class="action-btn" onclick="toggleReply(\''+sectionId+'\',\''+c.id+'\')">Reply</button>';
+        html+='</div><div class="comment-replies" id="replies-'+c.id+'"></div><div id="reply-form-'+c.id+'"></div></div>';
+      });
+      var lastName=localStorage.getItem(NAME_KEY)||'';
+      html+='<div class="comment-form">';
+      if(lastName){
+        html+='<div class="cf-identity" id="identity-'+sectionId+'">Posting as <strong>'+escHtml(lastName)+'</strong> <button class="cf-change" onclick="changeName(\''+sectionId+'\')">change</button></div>';
+        html+='<div class="cf-name-row" id="namerow-'+sectionId+'" style="display:none"><input type="text" id="name-'+sectionId+'" placeholder="Your name" value="'+escHtml(lastName)+'"></div>';
+      } else {
+        html+='<div class="cf-identity" id="identity-'+sectionId+'" style="display:none"></div>';
+        html+='<div class="cf-name-row" id="namerow-'+sectionId+'"><input type="text" id="name-'+sectionId+'" placeholder="Your name" value=""></div>';
+      }
+      html+='<div class="cf-body"><textarea id="text-'+sectionId+'" placeholder="Add a note…" rows="2"></textarea><button class="cf-post" onclick="postComment(\''+sectionId+'\')">Post</button></div></div>';
+      thread.innerHTML=html;
+      comments.forEach(function(c){ renderReplies(sectionId, c.id, document.getElementById('replies-'+c.id)); });
+    });
+  }
+  function renderReplies(sectionId, commentId, container){
+    if(!container) return;
+    fetch(apiUrl('/comments/'+sectionId+'/entries/'+commentId+'/replies')).then(function(r){return r.json();}).then(function(data){
+      var html='';
+      if(data.documents){ data.documents.forEach(function(doc){ var f=doc.fields;
+        html+='<div class="comment-entry"><div class="meta"><strong>'+escHtml(f.name?f.name.stringValue:'')+'</strong> &middot; '+escHtml(f.time?f.time.stringValue:'')+'</div><div class="body">'+escHtml(f.text?f.text.stringValue:'')+'</div></div>'; }); }
+      container.innerHTML=html;
+    }).catch(function(){ container.innerHTML=''; });
+  }
+
+  window.toggleComments=function(sectionId){ var t=document.getElementById('thread-'+sectionId); t.classList.toggle('open'); if(t.classList.contains('open')) renderThread(sectionId); };
+  window.changeName=function(sectionId){ document.getElementById('identity-'+sectionId).style.display='none'; var nr=document.getElementById('namerow-'+sectionId); nr.style.display='flex'; document.getElementById('name-'+sectionId).focus(); };
+  window.postComment=function(sectionId){
+    var name=(document.getElementById('name-'+sectionId).value||'').trim();
+    var textEl=document.getElementById('text-'+sectionId); var text=(textEl.value||'').trim();
+    if(!name||!text) return; localStorage.setItem(NAME_KEY,name);
+    var btn=textEl.parentElement.querySelector('button'); btn.textContent='…'; btn.disabled=true;
+    fetch(apiUrl('/comments/'+sectionId+'/entries'),{ method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields:{name:{stringValue:name},text:{stringValue:text},time:{stringValue:formatTime(new Date())},edited:{booleanValue:false}}}) })
+    .then(function(){ renderThread(sectionId); }).catch(function(){ btn.textContent='Post'; btn.disabled=false; alert('Failed to post. Try again.'); });
+  };
+  window.toggleReply=function(sectionId, commentId){
+    var c=document.getElementById('reply-form-'+commentId); if(c.innerHTML){ c.innerHTML=''; return; }
+    var lastName=localStorage.getItem(NAME_KEY)||'';
+    c.innerHTML='<div class="reply-form"><input type="text" id="rname-'+commentId+'" placeholder="Your name" value="'+escHtml(lastName)+'"><textarea id="rtext-'+commentId+'" placeholder="Reply…" rows="1"></textarea><button onclick="postReply(\''+sectionId+'\',\''+commentId+'\')">Reply</button></div>';
+  };
+  window.postReply=function(sectionId, commentId){
+    var name=(document.getElementById('rname-'+commentId).value||'').trim();
+    var textEl=document.getElementById('rtext-'+commentId); var text=(textEl.value||'').trim();
+    if(!name||!text) return; localStorage.setItem(NAME_KEY,name);
+    var btn=textEl.parentElement.querySelector('button'); btn.textContent='…'; btn.disabled=true;
+    fetch(apiUrl('/comments/'+sectionId+'/entries/'+commentId+'/replies'),{ method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields:{name:{stringValue:name},text:{stringValue:text},time:{stringValue:formatTime(new Date())},edited:{booleanValue:false}}}) })
+    .then(function(){ document.getElementById('reply-form-'+commentId).innerHTML=''; renderReplies(sectionId, commentId, document.getElementById('replies-'+commentId)); })
+    .catch(function(){ btn.textContent='Reply'; btn.disabled=false; });
+  };
+  window.editComment=function(sectionId, docId, originalName){
+    var who=prompt('Enter your name to edit this comment:');
+    if(!who||who.trim()!==originalName){ if(who!==null) alert('Name doesn\'t match. Only the original author can edit.'); return; }
+    var entry=document.getElementById('entry-'+docId); var actions=entry.querySelector('.actions'); if(actions) actions.style.display='none';
+    var cur=entry.querySelector('.body').textContent;
+    var form=document.createElement('div'); form.className='edit-form';
+    form.innerHTML='<textarea>'+escHtml(cur)+'</textarea><div class="edit-actions"><button class="save-btn" onclick="saveEdit(\''+sectionId+'\',\''+docId+'\',this)">Save</button><button class="cancel-btn" onclick="cancelEdit(\''+sectionId+'\')">Cancel</button></div>';
+    entry.appendChild(form);
+  };
+  window.saveEdit=function(sectionId, docId, btn){
+    var entry=document.getElementById('entry-'+docId); var newText=(entry.querySelector('.edit-form textarea').value||'').trim(); if(!newText) return;
+    btn.textContent='…'; btn.disabled=true;
+    var c=(cache[sectionId]||[]).find(function(x){return x.id===docId;}); if(!c) return;
+    fetch(apiUrl('/comments/'+sectionId+'/entries/'+docId)+'&updateMask.fieldPaths=text&updateMask.fieldPaths=edited',{ method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields:{name:{stringValue:c.name},text:{stringValue:newText},time:{stringValue:c.time},edited:{booleanValue:true}}}) })
+    .then(function(r){ if(!r.ok) throw new Error('x'); renderThread(sectionId); }).catch(function(){ btn.textContent='Save'; btn.disabled=false; alert('Failed to save. Try again.'); });
+  };
+  window.cancelEdit=function(sectionId){ renderThread(sectionId); };
+
+  window.metalComments={ count: function(sid){ fetchComments(sid, function(cs){ updateCount(sid, cs.length); }); } };
+})();
 </script>
 </body>
 </html>
