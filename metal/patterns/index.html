@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>metal · patterns</title>
+<link rel="icon" type="image/svg+xml" href="/metal/favicon-m.svg">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0a0a0a; color:#ddd; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.6; }
+  a { color:#4ec9b0; }
+  .nav { padding:14px 24px; border-bottom:1px solid #1c1c1c; font-size:.8rem; }
+  .nav a { color:#666; text-decoration:none; margin-right:16px; } .nav a:hover { color:#4ec9b0; }
+  .wrap { max-width:880px; margin:0 auto; padding:34px 22px 80px; }
+  h1 { color:#4ec9b0; font-size:1.9rem; letter-spacing:1px; }
+  .lede { color:#aaa; margin:8px 0 8px; }
+  .note { color:#7a6a3a; font-size:.78rem; border:1px solid #2a2410; background:#14110a; border-radius:6px; padding:9px 12px; margin:14px 0 26px; }
+  h2 { color:#fff; font-size:1.35rem; margin:30px 0 2px; }
+  .pname { color:#4ec9b0; font-family:Consolas,monospace; }
+  .status { display:inline-block; font-size:.66rem; text-transform:uppercase; letter-spacing:.1em; color:#8fd; border:1px solid #2c4a44; border-radius:10px; padding:1px 9px; margin-left:8px; vertical-align:middle; }
+  .status.proposed { color:#ffce85; border-color:#5a4a22; }
+  .intent { color:#cdd6da; border-left:3px solid #4ec9b0; padding-left:13px; margin:8px 0 14px; }
+  .aka { color:#777; font-size:.8rem; margin-bottom:12px; }
+  .card { background:#121212; border:1px solid #1e1e1e; border-radius:8px; padding:14px 18px; margin-bottom:12px; }
+  .lbl { color:#4ec9b0; font-size:.72rem; text-transform:uppercase; letter-spacing:.12em; margin-bottom:5px; }
+  ul { margin:4px 0 4px 20px; } li { margin-bottom:4px; }
+  pre { background:#000; border:1px solid #222; border-radius:8px; padding:12px; overflow:auto; font-family:Consolas,monospace; font-size:.74rem; color:#bfe9f7; line-height:1.45; }
+  .practices li { color:#bbb; }
+  .foot { color:#555; font-size:.75rem; margin-top:44px; border-top:1px solid #1c1c1c; padding-top:14px; }
+</style>
+</head>
+<body>
+<div class="nav">
+  <a href="/metal">&larr; metal</a>
+  <a href="/metal/reference.html">reference</a>
+  <a href="/metal/patterns/">patterns</a>
+</div>
+<div class="wrap" id="wrap"><p style="color:#666">Loading…</p></div>
+<script>
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+fetch('/metal/patterns/patterns.json').then(r=>r.json()).then(function(d){
+  var h = '<h1>kASTIL Patterns &amp; Practices</h1>'+
+    '<p class="lede">'+esc(d.intro)+'</p>'+
+    '<div class="note">'+esc(d._note)+'</div>';
+  d.patterns.forEach(function(p){
+    var st = /proposed/i.test(p.status) ? 'proposed' : '';
+    h += '<h2><span class="pname">'+esc(p.name)+'</span><span class="status '+st+'">'+esc(p.status)+'</span></h2>';
+    h += '<div class="intent">'+esc(p.intent)+'</div>';
+    if(p.aka) h += '<div class="aka">aka: '+esc(p.aka)+'</div>';
+    h += '<div class="card"><div class="lbl">Problem</div>'+esc(p.problem)+'</div>';
+    if(p.forces){ h += '<div class="card"><div class="lbl">Forces</div><ul>'+p.forces.map(function(f){return '<li>'+esc(f)+'</li>';}).join('')+'</ul></div>'; }
+    h += '<div class="card"><div class="lbl">Solution</div>'+esc(p.solution)+'</div>';
+    if(p.structure) h += '<div class="card"><div class="lbl">Structure</div><pre>'+esc(p.structure)+'</pre></div>';
+    h += '<div class="card"><div class="lbl">Consequences</div>'+esc(p.consequences)+'</div>';
+    h += '<div class="card"><div class="lbl">Known uses</div>'+esc(p.knownUses)+'</div>';
+    h += '<div class="card"><div class="lbl">Related</div>'+esc(p.related)+'</div>';
+    h += '<div class="card"><div class="lbl">Anti-patterns</div>'+esc(p.antipatterns)+'</div>';
+  });
+  h += '<h2>Practices <span style="font-size:.8rem;color:#777">— always-do rules across every pattern</span></h2>';
+  h += '<div class="card practices"><ul>'+d.practices.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></div>';
+  h += '<div class="foot">metal console &middot; patterns mirrored from kastil-systems/a-d-d &middot; '+esc((d._note.match(/\d{4}-\d{2}-\d{2}/)||[''])[0])+' &middot; architectural level only — crypto wire-internals stay private.</div>';
+  document.getElementById('wrap').innerHTML = h;
+}).catch(function(e){ document.getElementById('wrap').innerHTML = '<p style="color:#ff8b8b">Could not load patterns.json: '+esc(String(e))+'</p>'; });
+</script>
+</body>
+</html>

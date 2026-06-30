@@ -1,0 +1,79 @@
+{
+  "_note": "Public mirror of the kASTIL pattern catalog (kastil-systems/a-d-d/patterns). Architectural level only — crypto wire-internals (byte layouts, KDF iterations, key material) are kept in the private a-d-d, never here. Mirrored 2026-06-30.",
+  "intro": "A pattern is a reusable solution to a recurring architectural problem — named, with its forces and trade-offs, extracted from real built systems (never invented in the abstract). A practice is an always-do rule that cuts across every pattern. Patterns are human-owned and AI-stewarded.",
+  "practices": [
+    "Bare Metal — pure C99 for the substrate; libc + OS primitives only; cryptography built from the math up. One boundary: a third-party manufacturer's API is wrapped in a thin C# jacket — jacket only, never our logic.",
+    "Roll Your Own — if a primitive isn't in tree, write it. Dependencies are liabilities you don't control.",
+    "Your domain is the key — identity is the FQDN; the domain vouches for keys and hosts trust surfaces.",
+    "One secret, offline — the operator's key is the single root secret and never leaves the operator's machine.",
+    "Seal everything stored — no unsealed records at rest.",
+    "Trust is membership, not certificates — operator-signed rosters, key pinning over X.509 chains.",
+    "The mesh is the network — new capability joins the mesh, it doesn't open a new public port.",
+    "One role per node — the binary hosts many skills; capability grows by adding skills, not services.",
+    "Ship to production, externally verified — done = reachable + correct from a machine that isn't the operator's.",
+    "Flow up before down — architecture → tests → code; insight from code flows back up to the spec first.",
+    "Talk to Purcius over the wire — the substrate is reached only via the wire protocol, never HTTP/REST/SDK into it.",
+    "Auth and security are substrate — kastil-systems, pure C, always. Products consume the auth skill; they never reimplement it."
+  ],
+  "patterns": [
+    {
+      "id": "trust",
+      "name": "Trust",
+      "status": "active",
+      "intent": "Expose a hollow, secret-free edge to the untrusted world; keep brains and secrets in a sealed core on trusted substrate; bind the secrets to your FQDN so the edge can never betray them.",
+      "aka": "Cladding; Hollow Edge / Sealed Core; Blind Edge",
+      "problem": "You must expose a capability to an untrusted or foreign environment — a public API, a cheap serverless runtime, a third-party or AI caller — but the capability needs brains and secrets you do not want living in that exposed place. Put them there for convenience and you have extended your trust boundary to your most-attacked surface.",
+      "forces": [
+        "Reach pulls outward — the exposed tier is where it's easy (public HTTPS, CORS, cheap compute, someone else's uptime).",
+        "Trust pulls inward — every secret or decision in the exposed tier is one a compromise hands to an attacker.",
+        "The exposed tier often serves its own auth surface, so 'just encrypt client-side' is theater if the untrusted tier served the page that does the encrypting."
+      ],
+      "solution": "Split into three named parts and let an identity you already own carry the trust: a Hollow Edge (exposed, deliberately dumb — translation + transport only, no brains, no secrets), a Sealed Core (on trusted pure-C substrate — all logic and secrets, reached over an encrypted wire), and an Anchor Seal (secrets sealed client-side to a public key published under and served from the operator FQDN). The edge only ever relays an opaque sealed blob; the core unseals.",
+      "structure": "caller ──▶ HOLLOW EDGE ──wire──▶ GATEWAY ──▶ SEALED CORE ──▶ (secret use)\n (untrusted)  dumb, blind        bridge       brains+secrets\n                  ▲\n  human ──seal at FQDN page──┘   (secret sealed to FQDN-published key; edge relays blind)",
+      "consequences": "Gain: the exposed tier's convenience without extending trust to it. Pay: an extra hop (edge→gateway→core) and a client-side sealing step. Blast radius of a fully-compromised edge: zero secrets, no impersonation — it is blind to credentials in transit and cannot subvert the sealing.",
+      "knownUses": "switchboard — C# edge (Cloud Run) ▸ nous wire ▸ relay ▸ pure-C switchboard skill in the prime; session creds sealed in the browser at joeycastillo.us, unsealed only in the prime. Edge half live + externally verified.",
+      "related": "Slot (sibling) — Trust is the boundary around the core; Slot is how capability gets into it. Practices: Your domain is the key, Bare Metal, One secret offline.",
+      "antipatterns": "Fat Edge (logic/secrets in the exposed tier 'just to ship'). Edge-served sealing (the untrusted edge serves the page that encrypts the secret). Master key on the edge (giving the hollow edge the operator key so it can 'talk to the core')."
+    },
+    {
+      "id": "slot",
+      "name": "Slot",
+      "status": "active",
+      "intent": "Grow a running C binary's capability by seating a self-contained skill in a conventional slot and wiring it with one line — compiled in, no loader, no framework.",
+      "aka": "Skill-Socket; Slot / Pin / Bus",
+      "problem": "You have one long-lived binary — a prime, a relay — and its capabilities must grow over time for years. You want that growth to be addition, not surgery: a new capability lives in one obvious place, wires up in one obvious line, and is impossible to half-attach. The thing you must not do is reach for a plugin runtime or a framework.",
+      "forces": [
+        "The seat is raw by rule — Bare Metal + Roll Your Own forbid a plugin runtime, a dynamic loader, a framework registry.",
+        "Capability pulls toward sprawl — each feature wants to touch main(), the router, the build, config.",
+        "Frameworks promise easy extension and charge for it in loader attack surface, version skew, and magic that hides the wire.",
+        "Silent half-wiring is the enemy — a capability that compiles but isn't reachable is the worst failure."
+      ],
+      "solution": "Define a Slot: a fixed convention for what a skill is and exactly one place it registers. Three named parts — the Slot (conventional location + shape; the folder layout is the contract), the Pin (one line in the dispatch table mapping op name to handler — the whole act of going live), and the Bus (the dispatcher that routes every inbound request by name to whatever is pinned). The skill compiles into the binary; cut the slot, set the pin, rebuild.",
+      "structure": "request ──▶  BUS  (name → handler dispatch table)\n               │   {\"auth\",  wire_handle_auth}\n               │   {\"switchboard\", wire_handle_switchboard}  ◀── the PIN (one line)\n               ▼\n       skill/<name>/  <name>.c  <name>.h  skill.json   ◀── the SLOT\n               └──── compiled INTO the binary (no loader) ────┘",
+      "consequences": "Gain: capability grows by addition — a new skill touches its own slot + one pin line + one build entry, reviewable and greppable. Gain: zero runtime cost, no loader attack surface, no dependency. Pay: extension requires recompile + redeploy (a feature for long-lived primes — nothing sideloads). Blast radius of a bad skill: contained to its slot and its pin.",
+      "knownUses": "nous prime — skills seated under skill/<name>/ (catalog, code, config, vault, auth, policy, seal, http), dispatched through the action table. switchboard skill — the newest seat, forming the Sealed Core of the Trust pattern.",
+      "related": "Trust (sibling) — a Sealed Core is built of slotted skills. Realizes Practice #8; enforced by #1 Bare Metal + #2 Roll Your Own.",
+      "antipatterns": "Plugin runtime / dynamic loader (dlopen, DLL scanning). Framework registry / reflection autodiscovery (magic that hides the wire). Scattered wiring (registering one capability across three files)."
+    },
+    {
+      "id": "vouch",
+      "name": "Vouch",
+      "status": "proposed (name pending operator bless)",
+      "intent": "Onboard a person via an operator-issued single-use capability link — possession becomes identity, no secret reaches the client, and a passphrase-wrapped 'way back in' survives a lost device.",
+      "aka": "Onboarding; Invite → Bind → Recover; Capability Invite; the Welcome ceremony",
+      "problem": "You must onboard real humans to a product that holds their data, but every off-the-shelf front door is wrong: open signup lets anyone in, vendor email-verification makes a third party the arbiter of identity, password reset emails a bearer secret. Each weakens the trust boundary or puts a secret somewhere you don't control. You need the operator to decide who joins, possession to be the credential, and a recovery path that never hands the server the keys.",
+      "forces": [
+        "Reach pulls toward self-service (open signup, email magic links) — and hands identity to whoever controls the inbox.",
+        "Trust pulls toward vouching — a product writing to real client systems must let the operator decide membership.",
+        "No secret on the client fights usable recovery — a real 'I lost my device' path normally means the server holds a key it can hand back.",
+        "A link in a URL leaks — query strings land in logs and Referer; a capability carried there is a capability spilled."
+      ],
+      "solution": "An operator issues a signed, single-use, short-TTL capability link; the holder binds (possession = identity); a passphrase-wrapped key is the way back in — and the server only ever touches ciphertext. Three named parts: Vouch (the operator-signed invite, signature carried in the URL fragment, single-use, short TTL, per-tenant key), Bind (possession becomes identity — a device keypair or a federated OIDC identity — yielding an opaque server session), and Way Back (recovery: a user-chosen passphrase wraps the master key; the server stores only the wrapped blob and unwraps nothing, client-side).",
+      "structure": "OPERATOR                                  HOLDER (browser)\n  │ issue Vouch (signed, single-use, #frag) ─URL─▶ validate Vouch (sig, TTL, unused)\n  │                                          BIND (device keypair OR OIDC identity)\n  ▼                                          server mints OPAQUE SESSION cookie\n /op issue console                           WAY BACK: passphrase-wrapped key stored\n     ▲ lost device ──issue recovery Vouch──┘  (server holds ciphertext only)",
+      "consequences": "Gain: operator-controlled membership (no open signup), possession-is-identity, and a real recovery path — without the server ever holding a usable secret at rest. Pay: an operator must be in the loop to issue invites, and the holder must keep a recovery passphrase. Blast radius: a leaked invite is single-use + TTL'd; a fully-compromised server yields ciphertext only — no plaintext keys, no impersonation.",
+      "knownUses": "the-family-trust — live prod: operator invite console (Copy + WhatsApp share of the capability link), invite → bind → recover endpoints, 7-screen browser flow, test-proven. argus — in design: the OIDC-federation variant of Bind (member factor = Slack/Google instead of device-bind).",
+      "related": "Trust (composes) — Vouch runs through a Trust boundary: the Hollow Edge relays the calls, the Sealed Core signs/verifies, the operator FQDN is the Anchor. Slot (composes) — the pure-C auth skill seats in the Sealed Core. Practices: One secret offline, Seal everything, Trust is membership, Auth+security are substrate.",
+      "antipatterns": "Open signup / vendor-email identity. Password-reset recovery (emails a bearer secret, server hands back a key). Signature in the query string (spilled into logs + Referer). Server-held plaintext recovery key. Fat-edge auth (issuing/verifying the invite in the product/C# tier — violates the auth-is-substrate practice)."
+    }
+  ]
+}
