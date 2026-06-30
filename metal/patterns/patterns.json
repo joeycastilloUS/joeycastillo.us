@@ -56,9 +56,9 @@
       "antipatterns": "Plugin runtime / dynamic loader (dlopen, DLL scanning). Framework registry / reflection autodiscovery (magic that hides the wire). Scattered wiring (registering one capability across three files)."
     },
     {
-      "id": "vouch",
-      "name": "Vouch",
-      "status": "proposed (name pending operator bless)",
+      "id": "invite",
+      "name": "Invite",
+      "status": "active",
       "intent": "Onboard a person via an operator-issued single-use capability link — possession becomes identity, no secret reaches the client, and a passphrase-wrapped 'way back in' survives a lost device.",
       "aka": "Onboarding; Invite → Bind → Recover; Capability Invite; the Welcome ceremony",
       "problem": "You must onboard real humans to a product that holds their data, but every off-the-shelf front door is wrong: open signup lets anyone in, vendor email-verification makes a third party the arbiter of identity, password reset emails a bearer secret. Each weakens the trust boundary or puts a secret somewhere you don't control. You need the operator to decide who joins, possession to be the credential, and a recovery path that never hands the server the keys.",
@@ -68,11 +68,11 @@
         "No secret on the client fights usable recovery — a real 'I lost my device' path normally means the server holds a key it can hand back.",
         "A link in a URL leaks — query strings land in logs and Referer; a capability carried there is a capability spilled."
       ],
-      "solution": "An operator issues a signed, single-use, short-TTL capability link; the holder binds (possession = identity); a passphrase-wrapped key is the way back in — and the server only ever touches ciphertext. Three named parts: Vouch (the operator-signed invite, signature carried in the URL fragment, single-use, short TTL, per-tenant key), Bind (possession becomes identity — a device keypair or a federated OIDC identity — yielding an opaque server session), and Way Back (recovery: a user-chosen passphrase wraps the master key; the server stores only the wrapped blob and unwraps nothing, client-side).",
-      "structure": "OPERATOR                                  HOLDER (browser)\n  │ issue Vouch (signed, single-use, #frag) ─URL─▶ validate Vouch (sig, TTL, unused)\n  │                                          BIND (device keypair OR OIDC identity)\n  ▼                                          server mints OPAQUE SESSION cookie\n /op issue console                           WAY BACK: passphrase-wrapped key stored\n     ▲ lost device ──issue recovery Vouch──┘  (server holds ciphertext only)",
+      "solution": "An operator issues a signed, single-use, short-TTL capability link; the holder binds (possession = identity); a passphrase-wrapped key is the way back in — and the server only ever touches ciphertext. Three named parts: Invite (the operator-signed invite, signature carried in the URL fragment, single-use, short TTL, per-tenant key), Bind (possession becomes identity — a device keypair or a federated OIDC identity — yielding an opaque server session), and Way Back (recovery: a user-chosen passphrase wraps the master key; the server stores only the wrapped blob and unwraps nothing, client-side).",
+      "structure": "OPERATOR                                  HOLDER (browser)\n  │ issue Invite (signed, single-use, #frag) ─URL─▶ validate Invite (sig, TTL, unused)\n  │                                          BIND (device keypair OR OIDC identity)\n  ▼                                          server mints OPAQUE SESSION cookie\n /op issue console                           WAY BACK: passphrase-wrapped key stored\n     ▲ lost device ──issue recovery Invite──┘  (server holds ciphertext only)",
       "consequences": "Gain: operator-controlled membership (no open signup), possession-is-identity, and a real recovery path — without the server ever holding a usable secret at rest. Pay: an operator must be in the loop to issue invites, and the holder must keep a recovery passphrase. Blast radius: a leaked invite is single-use + TTL'd; a fully-compromised server yields ciphertext only — no plaintext keys, no impersonation.",
       "knownUses": "the-family-trust — live prod: operator invite console (Copy + WhatsApp share of the capability link), invite → bind → recover endpoints, 7-screen browser flow, test-proven. argus — in design: the OIDC-federation variant of Bind (member factor = Slack/Google instead of device-bind).",
-      "related": "Trust (composes) — Vouch runs through a Trust boundary: the Hollow Edge relays the calls, the Sealed Core signs/verifies, the operator FQDN is the Anchor. Slot (composes) — the pure-C auth skill seats in the Sealed Core. Practices: One secret offline, Seal everything, Trust is membership, Auth+security are substrate.",
+      "related": "Trust (composes) — Invite runs through a Trust boundary: the Hollow Edge relays the calls, the Sealed Core signs/verifies, the operator FQDN is the Anchor. Slot (composes) — the pure-C auth skill seats in the Sealed Core. Practices: One secret offline, Seal everything, Trust is membership, Auth+security are substrate.",
       "antipatterns": "Open signup / vendor-email identity. Password-reset recovery (emails a bearer secret, server hands back a key). Signature in the query string (spilled into logs + Referer). Server-held plaintext recovery key. Fat-edge auth (issuing/verifying the invite in the product/C# tier — violates the auth-is-substrate practice)."
     }
   ]
