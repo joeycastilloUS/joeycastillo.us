@@ -122,6 +122,9 @@ rem ancient clone predates it. Real local work is stashed, never lost.
 if exist "C:\metal\.git" (
     echo [4/6] Reconciling metal to latest ^(self-heal, no prompt^)...
     pushd C:\metal
+    rem Repoint a legacy clone off the ARCHIVED joeycastilloUS/metal[-console]
+    rem (frozen -- fetching it returns nothing, so the box never updates).
+    git remote get-url origin 2>nul | findstr /I "joeycastilloUS/metal" >nul && git remote set-url origin https://github.com/kastil-systems/metal-console.git
     git fetch -q origin main 2>nul
     if not exist "be\tools\autoheal-pull.ps1" git checkout origin/main -- be/tools/autoheal-pull.ps1 2>nul
     if exist "be\tools\autoheal-pull.ps1" (

@@ -117,6 +117,11 @@ if [[ -d "$METAL_DIR/.git" ]]; then
     # clone to origin/main via be/tools/autoheal-pull.sh -- fetched from origin
     # first if an ancient clone predates it. Real local work is stashed, never lost.
     echo "[4/6] Reconciling metal to latest (self-heal, no prompt)..."
+    # Repoint a legacy clone off the ARCHIVED joeycastilloUS/metal[-console]
+    # (frozen -- fetching it returns nothing, so the box never updates).
+    case "$(git -C "$METAL_DIR" remote get-url origin 2>/dev/null)" in
+        *joeycastilloUS/metal*) git -C "$METAL_DIR" remote set-url origin https://github.com/kastil-systems/metal-console.git 2>/dev/null || true ;;
+    esac
     git -C "$METAL_DIR" fetch -q origin main 2>/dev/null || true
     if [ ! -f "$METAL_DIR/be/tools/autoheal-pull.sh" ]; then
         git -C "$METAL_DIR" checkout origin/main -- be/tools/autoheal-pull.sh 2>/dev/null || true
