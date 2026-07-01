@@ -7,6 +7,11 @@ rem Idempotent - safe to run again.
 
 setlocal enabledelayedexpansion
 
+rem Mode: full (default) | iron | tools. The iron.bat / tools.bat web wrappers
+rem pass it as %1. iron and tools reuse this bootstrap but stop after Fe (no launch).
+set "MODE=%~1"
+if not defined MODE set "MODE=full"
+
 echo.
 echo   metal
 echo   v3.5 - 2026-05-02
@@ -23,11 +28,16 @@ echo     5. Run Fe (dev tools + identity + auth)
 echo     6. Launch Be (Claude Code + tilde commands)
 echo.
 
-set /p "CHOICE=  Install? [Y] yes / [S] skip: "
-if /i "!CHOICE!"=="S" (
+if /i "!MODE!"=="full" (
+    set /p "CHOICE=  Install? [Y] yes / [S] skip: "
+    if /i "!CHOICE!"=="S" (
+        echo.
+        echo   Skipped.
+        goto :end
+    )
+) else (
+    echo   Mode: !MODE! ^(standalone -- prerequisites + clone/self-heal, no launch^)
     echo.
-    echo   Skipped.
-    goto :end
 )
 
 rem === Step 0: Ensure winget is available ===
@@ -132,12 +142,28 @@ if not exist "C:\metal\go.bat" (
     goto :error
 )
 
-rem === Step 5: Run Fe (tools + identity + auth) ===
+rem === Step 5: Run Fe (Iron) ===
 echo [5/6] Running Fe...
-if exist "C:\metal\Go.Fe.bat" (
-    call "C:\metal\Go.Fe.bat"
+if /i "!MODE!"=="tools" (
+    powershell -ExecutionPolicy Bypass -File "C:\metal\Go.Fe.ps1" -ToolsOnly
 ) else (
-    echo   Go.Fe.bat not found - skipping tools setup.
+    if exist "C:\metal\Go.Fe.bat" (
+        call "C:\metal\Go.Fe.bat"
+    ) else (
+        echo   Go.Fe.bat not found - skipping tools setup.
+    )
+)
+
+rem Standalone modes stop here -- Iron did identity via its own Go.Sign step;
+rem tools did just the toolchain. No smoke re-run, no launch. Full falls through.
+if /i not "!MODE!"=="full" (
+    echo.
+    echo   ============================================
+    echo   metal.!MODE! complete ^(standalone^).
+    echo   Launch anytime: cd \metal ^&^& go
+    echo   ============================================
+    echo.
+    goto :end
 )
 
 rem === Step 5b: Run Go.Sign (identity + GPG + smoke test) ===
