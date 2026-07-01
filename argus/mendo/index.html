@@ -494,7 +494,7 @@ let TAB_ANIM = false; // one-shot: animate the active pane on tab switch
 let APP = localStorage.getItem("argus_app") || "meraki";
 const APPS = {
   meraki:  { label:"Meraki",  tabs:["operations","network","audit"] },
-  zendesk: { label:"Zendesk", tabs:["apibrowser"], source:"zendesk" }
+  zendesk: { label:"Zendesk", tabs:["comments","apibrowser"], source:"zendesk" }
 };
 if(!APPS[APP]) APP="meraki";
 if(APPS[APP].tabs.indexOf(TAB)<0) TAB=APPS[APP].tabs[0];
@@ -1691,6 +1691,84 @@ function abInner(){
 }
 function renderAB(){ const w=document.getElementById("ab-wrap"); if(w) w.innerHTML=abInner(); }
 
+// ===== Comments — readable Zendesk ticket + comment surface (read-only, gap-ordered) =====
+let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap" };
+function zdFetch(path){ const sep=path.indexOf("?")>=0?"&":"?"; return fetch(ZBRIDGE+path+sep+"_="+Date.now(), { cache:"no-store", headers: PW?{ "Authorization":"Bearer "+PW }:{} }); }
+function cmTags(t){ const tags=t.tags||[]; let intent="",conf="",sent=""; tags.forEach(x=>{ if(x.indexOf("intent__")===0) intent=x.slice(8).replace(/__/g," › ").replace(/_/g," "); else if(x==="intent_confidence__low")conf="low"; else if(x==="sentiment__negative")sent="negative"; }); return {intent,conf,sent,idk:tags.indexOf("i_don_t_know")>=0}; }
+function cmGapRank(t){ const g=cmTags(t); if(g.idk) return 0; if(g.conf==="low") return 1; if(!g.intent) return 2; return 3; }
+function cmName(aid){ return CM.users[aid] || ("user "+aid); }
+function cmAge(iso){ if(!iso) return ""; const days=Math.floor((Date.now()-new Date(iso).getTime())/86400000); return isNaN(days)?"":(days<=0?"today":days+"d"); }
+async function cmLoad(){
+  CM.list=null; CM.err=""; CM.busy=true; renderCM();
+  try{
+    const r=await zdFetch("/read?entry=tickets");
+    if(!r.ok){ CM.err = r.status===401 ? "Unlock the Argus gate (top-right) to load tickets." : ("HTTP "+r.status); CM.busy=false; renderCM(); return; }
+    const d=await r.json(); CM.list=(d.data&&d.data.tickets)||[];
+    try{ const ru=await zdFetch("/read?entry=users"); if(ru.ok){ const du=await ru.json(); ((du.data&&du.data.users)||[]).forEach(u=>{ if(u&&u.id) CM.users[u.id]=u.name; }); } }catch(_){}
+  }catch(e){ CM.err="Couldn’t reach the bridge."; }
+  CM.busy=false; renderCM();
+}
+async function cmOpen(id){
+  CM.sel=id; CM.thread=null; CM.terr=""; CM.tbusy=true; renderCM();
+  try{
+    const r=await zdFetch("/read?entry=ticket-comments&id="+encodeURIComponent(id));
+    if(!r.ok){ CM.terr="HTTP "+r.status; } else { const d=await r.json(); CM.thread=(d.data&&d.data.comments)||[]; }
+  }catch(e){ CM.terr="Network error."; }
+  CM.tbusy=false; renderCM();
+}
+function commentsPane(){
+  return "<style>"
+    +"#pane-comments .cmwrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}"
+    +"#pane-comments .cmlist{flex:0 0 300px;max-height:70vh;overflow:auto;border:1px solid #222;border-radius:8px;}"
+    +"#pane-comments .cmrow{padding:10px 12px;border-bottom:1px solid #1c1c1c;cursor:pointer;}"
+    +"#pane-comments .cmrow:hover{background:#161d21;}#pane-comments .cmrow.on{background:#1d2a31;}"
+    +"#pane-comments .cmsub{color:#e0e0e0;font-size:13px;font-weight:600;margin-bottom:4px;}"
+    +"#pane-comments .cmmeta{font-size:11px;color:#8a93a0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}"
+    +"#pane-comments .chip{border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;}"
+    +"#pane-comments .c-idk{background:#3a1414;color:#ff9b9b;}#pane-comments .c-low{background:#2a2206;color:#ffd479;}#pane-comments .c-int{background:#101c22;color:#6FC3DF;}#pane-comments .c-neg{background:#2a1414;color:#ff9b9b;}"
+    +"#pane-comments .cmthread{flex:1;min-width:280px;}"
+    +"#pane-comments .cmc{border:1px solid #222;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#141414;}"
+    +"#pane-comments .cmc.internal{background:#0f1410;border-color:#243024;}"
+    +"#pane-comments .cmc h4{font-size:12px;margin:0 0 6px;font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}"
+    +"#pane-comments .cmc .who{color:#6FC3DF;}#pane-comments .cmc .badge{font-size:10px;border-radius:4px;padding:1px 6px;}"
+    +"#pane-comments .b-pub{background:#06251a;color:#7CFFB2;}#pane-comments .b-int{background:#251d06;color:#ffd479;}"
+    +"#pane-comments .cmc .body{color:#dfe4e9;font-size:13.5px;white-space:pre-wrap;word-break:break-word;}"
+    +"#pane-comments .cmord{margin-bottom:10px;font-size:12px;color:#8a93a0;}#pane-comments .cmord button{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;margin:0 6px;}#pane-comments .cmord button.on{background:#6FC3DF;color:#06222c;font-weight:700;}"
+    +"</style><div id='cm-wrap'>"+cmInner()+"</div>";
+}
+function cmInner(){
+  let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'><h2 style='margin:0'>Comments</h2><span class='abro'>READ-ONLY</span></div>"
+    +"<div class='muted' style='margin-bottom:12px'>Read the conversation, and see where the automation is unsure. Gaps first — <b>i-don’t-know</b> and <b>low-confidence</b> intents rise to the top.</div>";
+  if(CM.busy && !CM.list){ return h+"<div class='muted'><span class='spin'></span> loading tickets&hellip;</div></div>"; }
+  if(CM.err){ return h+"<div class='aberr'>"+abEsc(CM.err)+"</div></div>"; }
+  const list=(CM.list||[]).slice();
+  if(CM.order==="gap") list.sort((a,b)=> cmGapRank(a)-cmGapRank(b) || (new Date(b.created_at||0)-new Date(a.created_at||0)));
+  else list.sort((a,b)=> new Date(b.created_at||0)-new Date(a.created_at||0));
+  h+="<div class='cmord'>Order:<button data-cmord='gap' class='"+(CM.order==="gap"?"on":"")+"'>Automation gaps first</button><button data-cmord='new' class='"+(CM.order==="new"?"on":"")+"'>Newest</button></div>";
+  h+="<div class='cmwrap'><div class='cmlist'>";
+  list.forEach(t=>{ const g=cmTags(t); h+="<div class='cmrow"+(t.id===CM.sel?" on":"")+"' data-cmt='"+t.id+"'>"
+    +"<div class='cmsub'>"+abEsc(t.subject||("#"+t.id))+"</div><div class='cmmeta'>"
+    +(g.idk?"<span class='chip c-idk'>I DON’T KNOW</span>":"")
+    +(g.conf==="low"?"<span class='chip c-low'>low-confidence</span>":"")
+    +(g.intent?"<span class='chip c-int'>"+abEsc(g.intent)+"</span>":"")
+    +(g.sent==="negative"?"<span class='chip c-neg'>negative</span>":"")
+    +"<span>#"+t.id+"</span><span>"+abEsc(t.status||"")+"</span><span>"+cmAge(t.created_at)+"</span></div></div>"; });
+  if(!list.length) h+="<div class='muted' style='padding:12px'>No tickets.</div>";
+  h+="</div><div class='cmthread'>";
+  if(CM.tbusy){ h+="<div class='muted'><span class='spin'></span> loading thread&hellip;</div>"; }
+  else if(CM.terr){ h+="<div class='aberr'>"+abEsc(CM.terr)+"</div>"; }
+  else if(CM.sel && CM.thread){
+    h+="<div class='muted' style='margin-bottom:8px'>Ticket #"+CM.sel+" &middot; "+CM.thread.length+" comment"+(CM.thread.length===1?"":"s")+"</div>";
+    CM.thread.forEach(c=>{ const pub=c.public!==false; const body=((c.plain_body||c.body||"")+"").trim();
+      h+="<div class='cmc"+(pub?"":" internal")+"'><h4><span class='who'>"+abEsc(cmName(c.author_id))+"</span>"
+       +"<span class='badge "+(pub?"b-pub":"b-int")+"'>"+(pub?"public":"internal")+"</span>"
+       +"<span style='color:#666;font-weight:400'>"+abEsc(((c.created_at||"")+"").replace("T"," ").replace("Z"," UTC"))+"</span></h4>"
+       +"<div class='body'>"+abEsc(body)+"</div></div>"; });
+  } else { h+="<div class='muted' style='padding:20px 4px'>Select a ticket to read its conversation.</div>"; }
+  return h+"</div></div></div>";
+}
+function renderCM(){ const w=document.getElementById("cm-wrap"); if(w) w.innerHTML=cmInner(); }
+
 function render(){
   let h="";
   const wifiN=NETV.wifi, ssidGroups=(wifiN&&wifiN.ssids)||[];
@@ -1702,11 +1780,13 @@ function render(){
   // The chosen application drives the source for the API Browser + which tabs appear.
   if(APPS[APP].source) AB.source=APPS[APP].source;
   if(TAB==="apibrowser" && AB.cat===null && !AB.busy && !AB.err) abLoadCatalog();
+  if(TAB==="comments" && CM.list===null && !CM.busy && !CM.err) cmLoad();
   const nsb=document.querySelector(".navsub"); if(nsb) nsb.innerHTML="<b>"+APPS[APP].label+"</b> &mdash; "+(APP==="zendesk"?"Support · read-only":"Operationally Driven, Network Operations Center");
   const tabHtml={
     operations:"<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>",
     network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
+    comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Comments</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>"
   };
   const tn=document.getElementById("tabnav");
@@ -1732,14 +1812,15 @@ function render(){
   // Security Audit -- own target picker (always present, run/re-run any time)
   h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+auditPane()+"</div>";
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
+  h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+commentsPane()+"</div>";
   h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+apiBrowserPane()+"</div>";
 
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML; TAB_ANIM=false;
 }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; return "View"; }
-function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Comments"; return "View"; }
+function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
   if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
@@ -1857,7 +1938,7 @@ function dataObjs(d){ return d.rows.map(r=>{ const o={}; d.headers.forEach((h,i)
 function scopeTables(scope){
   let root;
   if(scope.indexOf("sect:")===0){ root=document.getElementById("secbody-"+scope.slice(5)); }
-  else { const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":"pane-audit"; root=document.getElementById(id); }
+  else { const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":"pane-audit"; root=document.getElementById(id); }
   return root ? [...root.querySelectorAll("table")].filter(t=>!t.classList.contains("histtbl")&&!t.classList.contains("nosort")) : [];
 }
 async function exportRun(fmt, scope){
@@ -2115,7 +2196,13 @@ document.getElementById("report").addEventListener("click", e=>{
 // API Browser (read-only) — lazy-load the catalog on first entry, and its own delegated controls.
 document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-tab='apibrowser']") && AB.cat===null && !AB.busy){ abLoadCatalog(); } });
 // Application selector (Meraki / Zendesk) — switch the active app, its tabs, and the API Browser source.
-document.getElementById("tabnav").addEventListener("click", e=>{ const a=e.target.closest("[data-app]"); if(!a) return; const x=a.getAttribute("data-app"); if(!APPS[x]||x===APP) return; APP=x; localStorage.setItem("argus_app",x); TAB=APPS[x].tabs[0]; TAB_ANIM=true; if(APPS[x].source) AB.source=APPS[x].source; if(TAB==="apibrowser" && AB.cat===null && !AB.busy) abLoadCatalog(); render(); });
+document.getElementById("tabnav").addEventListener("click", e=>{ const a=e.target.closest("[data-app]"); if(!a) return; const x=a.getAttribute("data-app"); if(!APPS[x]||x===APP) return; APP=x; localStorage.setItem("argus_app",x); TAB=APPS[x].tabs[0]; TAB_ANIM=true; if(APPS[x].source) AB.source=APPS[x].source; if(TAB==="apibrowser" && AB.cat===null && !AB.busy) abLoadCatalog(); if(TAB==="comments" && CM.list===null && !CM.busy) cmLoad(); render(); });
+// Comments (read-only): lazy-load on entry + ticket-open + order toggle.
+document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-tab='comments']") && CM.list===null && !CM.busy){ cmLoad(); } });
+document.getElementById("report").addEventListener("click", e=>{
+  const row=e.target.closest("[data-cmt]"); if(row){ const id=row.getAttribute("data-cmt"); cmOpen(isNaN(+id)?id:+id); return; }
+  const ob=e.target.closest("[data-cmord]"); if(ob){ CM.order=ob.getAttribute("data-cmord"); renderCM(); return; }
+});
 document.getElementById("report").addEventListener("change", e=>{
   const s=e.target.closest("[data-ab]"); if(!s) return; const k=s.getAttribute("data-ab");
   if(k==="source"){ AB.source=s.value; abLoadCatalog(); }
@@ -2215,7 +2302,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r257 · 537c622 · 2026-07-01</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r266 · e508a67 · 2026-07-01</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
