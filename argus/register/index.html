@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registration — Purcius operator onboard</title>
+<style>
+  :root { --accent:#6FC3DF; --ok:#7CFFB2; --bad:#ff8b8b; --warn:#ffce85; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0a0a0a; color:#e0e0e0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.55; }
+  .wrap { max-width:640px; margin:0 auto; padding:36px 22px 90px; }
+  h1 { color:var(--accent); font-size:24px; letter-spacing:1px; }
+  .sub { color:#8a8a8a; margin:4px 0 22px; font-size:14px; }
+  .steps { display:flex; gap:6px; margin-bottom:22px; flex-wrap:wrap; }
+  .dot { width:26px; height:26px; border-radius:50%; border:1px solid #333; color:#888; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+  .dot.on { border-color:var(--accent); color:var(--accent); }
+  .dot.done { border-color:var(--ok); color:#000; background:var(--ok); }
+  .card { background:#141414; border:1px solid #1e1e1e; border-radius:10px; padding:22px; }
+  .card h2 { color:#fff; font-size:18px; margin-bottom:6px; }
+  .card p { color:#bbb; font-size:14px; margin:8px 0; }
+  .fqdn { color:var(--accent); font-family:Consolas,monospace; }
+  button { background:var(--accent); color:#062028; border:none; border-radius:8px; padding:10px 20px; font-size:14px; font-weight:700; cursor:pointer; margin-top:14px; }
+  button.ghost { background:none; border:1px solid #333; color:#aaa; }
+  button:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; gap:10px; align-items:center; margin-top:12px; }
+  code { background:#0a0a0a; border:1px solid #262626; border-radius:5px; padding:2px 7px; font-family:Consolas,monospace; font-size:12px; color:#bfe9f7; word-break:break-all; }
+  .chk { font-size:13px; margin:6px 0; } .chk .m { color:var(--ok); font-weight:700; } .chk .x { color:var(--warn); } .chk .f { color:var(--bad); }
+  .receipts { margin-top:8px; } .receipts div { font-size:13px; margin:5px 0; color:#ccc; }
+  .receipts .y::before { content:"✓ "; color:var(--ok); font-weight:700; }
+  .receipts .n::before { content:"○ "; color:#666; }
+  .note { color:var(--warn); font-size:12px; margin-top:10px; }
+  .foot { color:#555; font-size:12px; margin-top:26px; }
+  pre { background:#000; border:1px solid #222; border-radius:8px; padding:10px; font-family:Consolas,monospace; font-size:11.5px; color:#bfe9f7; overflow:auto; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Registration</h1>
+  <div class="sub">Purcius operator onboard · you log in <b>as your domain</b>, not with an IdP. Each step verifies itself — no "did it ship?"</div>
+  <div class="steps" id="steps"></div>
+  <div class="card" id="card"></div>
+  <div class="foot">Purcius · Registration ceremony · device-bind + domain-proof run entirely in your browser (no key ever leaves it).</div>
+</div>
+
+<script>
+// ---- config ----
+const FQDN = new URLSearchParams(location.search).get('fqdn') || 'joeycastillo.us';
+const DB = 'purcius-reg', STORE = 'keys';
+const state = { step:0, deviceBound:false, devicePub:null, domainOk:false, wayback:null, totp:null };
+const STEPS = ['Welcome','Prove domain','Bind device','TOTP','Way back in','Sovereign'];
+
+// ---- IndexedDB (store the non-extractable device CryptoKey) ----
+function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB,1);
+  r.onupgradeneeded=()=>r.result.createObjectStore(STORE); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function idbPut(k,v){ const d=await idb(); return new Promise((res,rej)=>{ const t=d.transaction(STORE,'readwrite'); t.objectStore(STORE).put(v,k); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); }); }
+async function idbGet(k){ const d=await idb(); return new Promise((res,rej)=>{ const t=d.transaction(STORE,'readonly'); const q=t.objectStore(STORE).get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+
+const hex = b => Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+
+// ---- step renderers ----
+function renderSteps(){ document.getElementById('steps').innerHTML = STEPS.map((s,i)=>
+  `<div class="dot ${i<state.step?'done':i===state.step?'on':''}" title="${s}">${i<state.step?'✓':i+1}</div>`).join(''); }
+
+function go(n){ state.step=n; render(); }
+
+async function render(){
+  renderSteps();
+  const c = document.getElementById('card');
+  const S = state.step;
+
+  if(S===0){
+    c.innerHTML = `<h2>You are <span class="fqdn">${FQDN}</span></h2>
+      <p>Members are <i>invited</i>. You, the operator, <b>self-originate</b> — you prove your own domain and adopt your own root key. No third party in your trust path.</p>
+      <button onclick="go(1)">Begin registration →</button>`;
+  }
+
+  else if(S===1){
+    c.innerHTML = `<h2>Prove your domain</h2>
+      <p>Your domain <i>is</i> your key. We check that <code>_purcius.${FQDN}</code> is planted — the publicly-auditable proof you're a registered Purcius operator. This query runs from your browser over DNS-over-HTTPS.</p>
+      <div id="dp" class="chk"><span class="x">checking _purcius.${FQDN} …</span></div>
+      <div class="row"><button id="dpNext" disabled onclick="go(2)">Next →</button>
+      <button class="ghost" onclick="checkDomain()">Re-check</button></div>`;
+    checkDomain();
+  }
+
+  else if(S===2){
+    const bound = state.deviceBound;
+    c.innerHTML = `<h2>Bind this device</h2>
+      <p>Your browser generates a <b>non-extractable</b> Ed25519 key — it can sign, but the private half can never leave this device (stored in IndexedDB). Possession of this device becomes part of your identity.</p>
+      <div id="db" class="chk">${bound?`<span class="m">bound · pubkey ${state.devicePub.slice(0,24)}…</span>`:'<span class="x">not bound yet</span>'}</div>
+      <div class="row">
+        ${bound?'':'<button id="bindBtn" onclick="bindDevice()">Bind this device</button>'}
+        <button id="dbNext" ${bound?'':'disabled'} onclick="go(3)">Next →</button>
+      </div>`;
+  }
+
+  else if(S===3){
+    if(!state.totp) state.totp = genTotpSecret();
+    const uri = `otpauth://totp/Purcius:${FQDN}?secret=${state.totp}&issuer=Purcius`;
+    c.innerHTML = `<h2>Rotating factor · TOTP</h2>
+      <p>A time-based one-time code (RFC 6238) is your rotating factor. Add this to your authenticator; the server freezes it on first use.</p>
+      <p>Secret: <code>${state.totp}</code></p>
+      <pre>${uri}</pre>
+      <p class="note">The secret is generated in-browser for enrolment; the pure-C auth service (on your prime) issues + freezes the canonical one.</p>
+      <button onclick="go(4)">I've added it →</button>`;
+  }
+
+  else if(S===4){
+    if(!state.wayback) state.wayback = genRecovery();
+    c.innerHTML = `<h2>Your way back in</h2>
+      <p>If you ever lose everything else, your domain re-establishes you (FQDN re-proof) — and this recovery code unwraps your key. Write it somewhere safe.</p>
+      <pre>${state.wayback}</pre>
+      <p class="note">Best-of-best recovery = FQDN re-proof (floor) + Shamir N-of-M split of the root key + NOUSEAL escrow. This code is the portable last resort.</p>
+      <div class="row"><input type="checkbox" id="ack"><label for="ack" style="font-size:13px;color:#bbb">I've written it down</label></div>
+      <button id="wbNext" disabled onclick="go(5)">Next →</button>`;
+    document.getElementById('ack').onchange = e => document.getElementById('wbNext').disabled = !e.target.checked;
+  }
+
+  else if(S===5){
+    c.innerHTML = `<h2>Sovereign</h2>
+      <div class="receipts">
+        <div class="${state.domainOk?'y':'n'}">Domain proven — <code>_purcius.${FQDN}</code> resolves</div>
+        <div class="${state.deviceBound?'y':'n'}">Device bound — non-extractable key in this browser</div>
+        <div class="${state.totp?'y':'n'}">TOTP enrolled</div>
+        <div class="${state.wayback?'y':'n'}">Way-back recorded</div>
+        <div class="n">Root key adopted + pinned — runs on your prime (operator-key.sh adopt)</div>
+        <div class="n">Sovereign session issued — by the pure-C auth service on the prime</div>
+      </div>
+      <p style="margin-top:14px">Everything your browser can prove is proven. The two remaining ✓ (adopt your root key <code>a61bdace…</code>, mint the session) run on your prime machine where the key lives.</p>
+      <button onclick="location.href='/argus/mendo/'">Enter Argus →</button>`;
+  }
+}
+
+// ---- real, prime-independent operations ----
+async function checkDomain(){
+  const el = document.getElementById('dp'); if(!el) return;
+  el.innerHTML = `<span class="x">checking _purcius.${FQDN} …</span>`;
+  try{
+    const r = await fetch(`https://cloudflare-dns.com/dns-query?name=_purcius.${FQDN}&type=TXT`, {headers:{accept:'application/dns-json'}});
+    const j = await r.json();
+    const txt = (j.Answer||[]).map(a=>(a.data||'').replace(/"/g,'')).find(d=>d.startsWith('purcius-id:'));
+    if(txt){ state.domainOk=true; el.innerHTML=`<span class="m">✓ ${txt}</span>`; document.getElementById('dpNext').disabled=false; }
+    else { el.innerHTML=`<span class="f">not planted yet — plant _purcius.${FQDN} via the cloudflare-bridge</span>`; }
+  }catch(e){ el.innerHTML=`<span class="f">DoH check failed: ${e.message}</span>`; }
+}
+
+async function bindDevice(){
+  const btn = document.getElementById('bindBtn'); if(btn){ btn.disabled=true; btn.textContent='binding…'; }
+  try{
+    // non-extractable Ed25519 keypair — the private half never leaves this device
+    const kp = await crypto.subtle.generateKey({name:'Ed25519'}, false, ['sign','verify']);
+    await idbPut('device', kp);                                  // store the CryptoKey object (opaque, non-extractable)
+    const pub = await crypto.subtle.exportKey('raw', kp.publicKey);
+    state.devicePub = hex(pub); state.deviceBound = true;
+    // prove it works: sign a nonce, verify
+    const nonce = crypto.getRandomValues(new Uint8Array(32));
+    const sig = await crypto.subtle.sign({name:'Ed25519'}, kp.privateKey, nonce);
+    const ok = await crypto.subtle.verify({name:'Ed25519'}, kp.publicKey, sig, nonce);
+    if(!ok) throw new Error('self-verify failed');
+    render();
+  }catch(e){
+    const el = document.getElementById('db'); if(el) el.innerHTML=`<span class="f">bind failed: ${e.message} (Ed25519 Web Crypto required)</span>`;
+    if(btn){ btn.disabled=false; btn.textContent='Bind this device'; }
+  }
+}
+
+// TOTP base32 secret (20 random bytes → base32, RFC 4648)
+function genTotpSecret(){
+  const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; const b=crypto.getRandomValues(new Uint8Array(20));
+  let bits='',out=''; for(const x of b) bits+=x.toString(2).padStart(8,'0');
+  for(let i=0;i+5<=bits.length;i+=5) out+=A[parseInt(bits.slice(i,i+5),2)];
+  return out;
+}
+// Portable recovery code (128-bit, grouped) — BIP-39 wordlist substituted in production
+function genRecovery(){
+  const b=crypto.getRandomValues(new Uint8Array(16));
+  return hex(b).match(/.{4}/g).join(' ');
+}
+
+render();
+</script>
+</body>
+</html>
