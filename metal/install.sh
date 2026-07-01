@@ -7,6 +7,11 @@
 
 set -e
 
+# Mode: full (default) | iron | tools. The iron.sh / tools.sh web wrappers pass
+# it as $1; the METAL_MODE env var also works. iron and tools reuse this same
+# bootstrap (git/gh/auth/clone/self-heal) but stop after Fe -- no Be launch.
+MODE="${1:-${METAL_MODE:-full}}"
+
 echo ""
 echo "  metal"
 echo "  v3.0 — 2026-03-25"
@@ -23,15 +28,19 @@ echo "    5. Run Fe (dev tools + identity + auth)"
 echo "    6. Launch Be (Claude Code + tilde commands)"
 echo ""
 
-printf "  Install? [Y] yes / [S] skip: "
-read -r CHOICE < /dev/tty
-
-case "$CHOICE" in
-    s|S)
-        echo "  Skipped."
-        exit 0
-        ;;
-esac
+if [ "$MODE" = "full" ]; then
+    printf "  Install? [Y] yes / [S] skip: "
+    read -r CHOICE < /dev/tty
+    case "$CHOICE" in
+        s|S)
+            echo "  Skipped."
+            exit 0
+            ;;
+    esac
+else
+    echo "  Mode: $MODE (standalone -- prerequisites + clone/self-heal, no launch)"
+    echo ""
+fi
 
 # === Step 1: Install Git ===
 if command -v git &>/dev/null; then
@@ -131,12 +140,29 @@ if [ ! -f "$METAL_DIR/go.sh" ]; then
     exit 1
 fi
 
-# === Step 5: Run Fe (tools + identity + auth) ===
+# === Step 5: Run Fe (Iron) ===
 echo "[5/6] Running Fe..."
 if [ -f "$METAL_DIR/Go.Fe.sh" ]; then
-    bash "$METAL_DIR/Go.Fe.sh" < /dev/tty
+    if [ "$MODE" = "tools" ]; then
+        bash "$METAL_DIR/Go.Fe.sh" --tools-only < /dev/tty
+    else
+        bash "$METAL_DIR/Go.Fe.sh" < /dev/tty
+    fi
 else
     echo "  Go.Fe.sh not found - skipping tools setup."
+fi
+
+# Standalone modes stop here -- Iron already did identity via its own Go.Sign
+# step; tools mode did just the toolchain. No smoke re-run, no launch. Full mode
+# falls through to 5b/5c/6.
+if [ "$MODE" != "full" ]; then
+    echo ""
+    echo "  ============================================"
+    echo "  metal.$MODE complete (standalone)."
+    echo "  Launch anytime: cd \"$METAL_DIR\" && ./go.sh"
+    echo "  ============================================"
+    echo ""
+    exit 0
 fi
 
 # === Step 5b: Run Go.Sign (identity + GPG + smoke test) ===
