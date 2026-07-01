@@ -1695,14 +1695,14 @@ function abInner(){
 function renderAB(){ const w=document.getElementById("ab-wrap"); if(w) w.innerHTML=abInner(); }
 
 // ===== Comments — readable Zendesk ticket + comment surface (read-only, gap-ordered) =====
-let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap" };
+let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap", filter:null, page:0, q:"", pageSize:25 };
 function zdFetch(path){ const sep=path.indexOf("?")>=0?"&":"?"; return fetch(ZBRIDGE+path+sep+"_="+Date.now(), { cache:"no-store", headers: PW?{ "Authorization":"Bearer "+PW }:{} }); }
 function cmTags(t){ const tags=t.tags||[]; let intent="",conf="",sent=""; tags.forEach(x=>{ if(x.indexOf("intent__")===0) intent=x.slice(8).replace(/__/g," › ").replace(/_/g," "); else if(x==="intent_confidence__low")conf="low"; else if(x==="sentiment__negative")sent="negative"; }); return {intent,conf,sent,idk:tags.indexOf("i_don_t_know")>=0}; }
 function cmGapRank(t){ const g=cmTags(t); if(g.idk) return 0; if(g.conf==="low") return 1; if(!g.intent) return 2; return 3; }
 function cmName(aid){ return CM.users[aid] || ("user "+aid); }
 function cmAge(iso){ if(!iso) return ""; const days=Math.floor((Date.now()-new Date(iso).getTime())/86400000); return isNaN(days)?"":(days<=0?"today":days+"d"); }
 async function cmLoad(){
-  CM.list=null; CM.err=""; CM.busy=true; renderCM();
+  CM.list=null; CM.err=""; CM.busy=true; CM.page=0; renderCM();
   try{
     const r=await zdFetch("/read?entry=tickets");
     if(!r.ok){ CM.err = r.status===401 ? "Unlock the Argus gate (top-right) to load tickets." : ("HTTP "+r.status); CM.busy=false; renderCM(); return; }
@@ -1719,6 +1719,15 @@ async function cmOpen(id){
   }catch(e){ CM.terr="Network error."; }
   CM.tbusy=false; renderCM();
 }
+// --- summary (what am I looking at?) + focus filter + typeahead search ---
+function cmStats(){ const L=CM.list||[]; const s={total:L.length,idk:0,low:0,neg:0,intents:{}}; L.forEach(t=>{ const g=cmTags(t); if(g.idk)s.idk++; if(g.conf==="low")s.low++; if(g.sent==="negative")s.neg++; if(g.intent){ const top=g.intent.split(" › ")[0]; s.intents[top]=(s.intents[top]||0)+1; } }); s.topIntents=Object.keys(s.intents).map(k=>[k,s.intents[k]]).sort((a,b)=>b[1]-a[1]).slice(0,5); return s; }
+function cmMatch(t){ const f=CM.filter; if(!f) return true; const g=cmTags(t); if(f==="idk") return g.idk; if(f==="low") return g.conf==="low"; if(f==="neg") return g.sent==="negative"; if(f.indexOf("intent:")===0) return (g.intent||"").split(" › ")[0]===f.slice(7); return true; }
+function cmFilterLabel(){ const f=CM.filter; if(!f) return ""; if(f==="idk")return "I don’t know"; if(f==="low")return "low-confidence"; if(f==="neg")return "negative sentiment"; if(f.indexOf("intent:")===0)return "intent: "+f.slice(7); return f; }
+function cmView(){ const L=(CM.list||[]).filter(cmMatch); if(CM.order==="gap") L.sort((a,b)=>cmGapRank(a)-cmGapRank(b)||(new Date(b.created_at||0)-new Date(a.created_at||0))); else L.sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)); return L; }
+function cmSearchList(q){ q=(q||"").toLowerCase().trim(); if(!q) return []; return (CM.list||[]).filter(t=>{ const g=cmTags(t); return (""+(t.subject||"")).toLowerCase().indexOf(q)>=0 || (""+t.id).indexOf(q)>=0 || (g.intent||"").toLowerCase().indexOf(q)>=0 || (""+(t.status||"")).toLowerCase().indexOf(q)>=0; }).slice(0,8); }
+function cmSearchDropdown(){ const q=CM.q; if(!(q&&q.trim())) return ""; const m=cmSearchList(q); if(!m.length) return "<div class='cmsd-empty'>no match in the loaded tickets</div>"; return m.map(t=>{ const g=cmTags(t); return "<div class='cmsd-row' data-cmg='"+t.id+"'><span class='cmsd-sub'>"+abEsc(t.subject||("#"+t.id))+"</span><span class='cmsd-meta'>#"+t.id+(g.intent?" · "+abEsc(g.intent.split(" › ")[0]):"")+(g.idk?" · idk":g.conf==="low"?" · low":"")+"</span></div>"; }).join(""); }
+function cmStat(label,count,key,cls){ const on = key==="__all__" ? CM.filter===null : CM.filter===key; return "<button class='cmstat"+(on?" on":"")+(cls?(" "+cls):"")+"' data-cmfilter='"+key+"'>"+abEsc(label)+" <b>"+count+"</b></button>"; }
+function renderCMSearch(){ const w=document.getElementById("cm-sd"); if(w) w.innerHTML=cmSearchDropdown(); }
 function commentsPane(){
   return "<style>"
     +"#pane-comments .cmwrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}"
@@ -1736,7 +1745,19 @@ function commentsPane(){
     +"#pane-comments .cmc .who{color:#6FC3DF;}#pane-comments .cmc .badge{font-size:10px;border-radius:4px;padding:1px 6px;}"
     +"#pane-comments .b-pub{background:#06251a;color:#7CFFB2;}#pane-comments .b-int{background:#251d06;color:#ffd479;}"
     +"#pane-comments .cmc .body{color:#dfe4e9;font-size:13.5px;white-space:pre-wrap;word-break:break-word;}"
-    +"#pane-comments .cmord{margin-bottom:10px;font-size:12px;color:#8a93a0;}#pane-comments .cmord button{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;margin:0 6px;}#pane-comments .cmord button.on{background:#6FC3DF;color:#06222c;font-weight:700;}"
+    +"#pane-comments .cmord{font-size:12px;color:#8a93a0;}#pane-comments .cmord button{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;margin:0 6px 0 0;}#pane-comments .cmord button.on{background:#6FC3DF;color:#06222c;font-weight:700;}"
+    +"#pane-comments .cmsumh{font-size:11px;color:#8a93a0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}"
+    +"#pane-comments .cmsum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}"
+    +"#pane-comments .cmstat{background:#141c20;color:#cdd6da;border:1px solid #2a3a42;border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;transition:.12s;}#pane-comments .cmstat:hover{border-color:#6FC3DF;}#pane-comments .cmstat b{color:#6FC3DF;margin-left:3px;}#pane-comments .cmstat.on{background:#6FC3DF;color:#06222c;border-color:#6FC3DF;}#pane-comments .cmstat.on b{color:#06222c;}"
+    +"#pane-comments .cmstat.st-idk b{color:#ff9b9b;}#pane-comments .cmstat.st-low b{color:#ffd479;}#pane-comments .cmstat.st-neg b{color:#ff9b9b;}#pane-comments .cmstat.on b{color:#06222c;}"
+    +"#pane-comments .cmsearch{position:relative;margin-bottom:12px;max-width:520px;}"
+    +"#pane-comments .cmq{width:100%;background:#0f0f0f;color:#e0e0e0;border:1px solid #333;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;}#pane-comments .cmq:focus{outline:0;border-color:#6FC3DF;}"
+    +"#pane-comments .cmsd{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#0d1418;border:1px solid #2a3a42;border-radius:8px;overflow:hidden;z-index:30;max-height:320px;overflow-y:auto;}#pane-comments .cmsd:empty{display:none;}"
+    +"#pane-comments .cmsd-row{padding:8px 12px;cursor:pointer;border-bottom:1px solid #182228;display:flex;justify-content:space-between;gap:10px;align-items:baseline;}#pane-comments .cmsd-row:hover{background:#16242b;}#pane-comments .cmsd-sub{color:#e0e0e0;font-size:13px;}#pane-comments .cmsd-meta{color:#6FC3DF;font-size:11px;white-space:nowrap;}#pane-comments .cmsd-empty{padding:8px 12px;color:#777;font-size:12px;}"
+    +"#pane-comments .cmbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}"
+    +"#pane-comments .cmfoc{font-size:12px;color:#9aa3ad;}#pane-comments .cmfoc b{color:#6FC3DF;}#pane-comments .cmx{background:#2a1414;color:#ff9b9b;border:0;border-radius:5px;padding:1px 7px;cursor:pointer;font-size:13px;}"
+    +"#pane-comments .cmcol{flex:0 0 320px;}#pane-comments .cmcol .cmlist{flex:none;}"
+    +"#pane-comments .cmpager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:#8a93a0;}#pane-comments .cmpager button{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;}#pane-comments .cmpager button:disabled{opacity:.4;cursor:default;}"
     +"</style><div id='cm-wrap'>"+cmInner()+"</div>";
 }
 function cmInner(){
@@ -1744,20 +1765,28 @@ function cmInner(){
     +"<div class='muted' style='margin-bottom:12px'>Read the conversation, and see where the automation is unsure. Gaps first — <b>i-don’t-know</b> and <b>low-confidence</b> intents rise to the top.</div>";
   if(CM.busy && !CM.list){ return h+"<div class='muted'><span class='spin'></span> loading tickets&hellip;</div></div>"; }
   if(CM.err){ return h+"<div class='aberr'>"+abEsc(CM.err)+"</div></div>"; }
-  const list=(CM.list||[]).slice();
-  if(CM.order==="gap") list.sort((a,b)=> cmGapRank(a)-cmGapRank(b) || (new Date(b.created_at||0)-new Date(a.created_at||0)));
-  else list.sort((a,b)=> new Date(b.created_at||0)-new Date(a.created_at||0));
-  h+="<div class='cmord'>Order:<button data-cmord='gap' class='"+(CM.order==="gap"?"on":"")+"'>Automation gaps first</button><button data-cmord='new' class='"+(CM.order==="new"?"on":"")+"'>Newest</button></div>";
-  h+="<div class='cmwrap'><div class='cmlist'>";
-  list.forEach(t=>{ const g=cmTags(t); h+="<div class='cmrow"+(t.id===CM.sel?" on":"")+"' data-cmt='"+t.id+"'>"
+  const s=cmStats();
+  h+="<div class='cmsumh'>What you’re looking at &mdash; "+s.total+" tickets loaded · click a number to focus</div><div class='cmsum'>"
+    +cmStat("All",s.total,"__all__")
+    +cmStat("I don’t know",s.idk,"idk","st-idk")
+    +cmStat("Low-confidence",s.low,"low","st-low")
+    +cmStat("Negative",s.neg,"neg","st-neg")
+    +s.topIntents.map(x=>cmStat(x[0],x[1],"intent:"+x[0],"st-int")).join("")
+    +"</div>";
+  h+="<div class='cmsearch'><input class='cmq' data-cmq placeholder='Search tickets as you type — subject, intent, #id…' value='"+abEsc(CM.q)+"' autocomplete='off'><div id='cm-sd' class='cmsd'>"+cmSearchDropdown()+"</div></div>";
+  h+="<div class='cmbar'><span class='cmord'>Order:<button data-cmord='gap' class='"+(CM.order==="gap"?"on":"")+"'>Gaps first</button><button data-cmord='new' class='"+(CM.order==="new"?"on":"")+"'>Newest</button></span>"
+    +(CM.filter?"<span class='cmfoc'>Focus: <b>"+abEsc(cmFilterLabel())+"</b> <button data-cmfilter='__all__' class='cmx'>&times;</button></span>":"")+"</div>";
+  const view=cmView(); const ps=CM.pageSize; const pages=Math.max(1,Math.ceil(view.length/ps)); if(CM.page>=pages)CM.page=pages-1; if(CM.page<0)CM.page=0; const slice=view.slice(CM.page*ps,CM.page*ps+ps);
+  h+="<div class='cmwrap'><div class='cmcol'><div class='cmlist'>";
+  slice.forEach(t=>{ const g=cmTags(t); h+="<div class='cmrow"+(t.id===CM.sel?" on":"")+"' data-cmt='"+t.id+"'>"
     +"<div class='cmsub'>"+abEsc(t.subject||("#"+t.id))+"</div><div class='cmmeta'>"
     +(g.idk?"<span class='chip c-idk'>I DON’T KNOW</span>":"")
     +(g.conf==="low"?"<span class='chip c-low'>low-confidence</span>":"")
     +(g.intent?"<span class='chip c-int'>"+abEsc(g.intent)+"</span>":"")
     +(g.sent==="negative"?"<span class='chip c-neg'>negative</span>":"")
     +"<span>#"+t.id+"</span><span>"+abEsc(t.status||"")+"</span><span>"+cmAge(t.created_at)+"</span></div></div>"; });
-  if(!list.length) h+="<div class='muted' style='padding:12px'>No tickets.</div>";
-  h+="</div><div class='cmthread'>";
+  if(!view.length) h+="<div class='muted' style='padding:12px'>No tickets"+(CM.filter?" for this focus":"")+".</div>";
+  h+="</div><div class='cmpager'><button data-cmpg='prev' "+(CM.page<=0?"disabled":"")+">&larr; Prev</button><span>"+(view.length?(CM.page*ps+1)+"&ndash;"+Math.min(view.length,CM.page*ps+ps):0)+" of "+view.length+"</span><button data-cmpg='next' "+(CM.page>=pages-1?"disabled":"")+">Next &rarr;</button></div></div><div class='cmthread'>";
   if(CM.tbusy){ h+="<div class='muted'><span class='spin'></span> loading thread&hellip;</div>"; }
   else if(CM.terr){ h+="<div class='aberr'>"+abEsc(CM.terr)+"</div>"; }
   else if(CM.sel && CM.thread){
@@ -2203,9 +2232,13 @@ document.getElementById("tabnav").addEventListener("click", e=>{ const a=e.targe
 // Comments (read-only): lazy-load on entry + ticket-open + order toggle.
 document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-tab='comments']") && CM.list===null && !CM.busy){ cmLoad(); } });
 document.getElementById("report").addEventListener("click", e=>{
+  const gd=e.target.closest("[data-cmg]"); if(gd){ const id=gd.getAttribute("data-cmg"); CM.q=""; cmOpen(isNaN(+id)?id:+id); return; }
   const row=e.target.closest("[data-cmt]"); if(row){ const id=row.getAttribute("data-cmt"); cmOpen(isNaN(+id)?id:+id); return; }
-  const ob=e.target.closest("[data-cmord]"); if(ob){ CM.order=ob.getAttribute("data-cmord"); renderCM(); return; }
+  const ob=e.target.closest("[data-cmord]"); if(ob){ CM.order=ob.getAttribute("data-cmord"); CM.page=0; renderCM(); return; }
+  const fl=e.target.closest("[data-cmfilter]"); if(fl){ const v=fl.getAttribute("data-cmfilter"); CM.filter=(v==="__all__"||CM.filter===v)?null:v; CM.page=0; renderCM(); return; }
+  const pg=e.target.closest("[data-cmpg]"); if(pg){ CM.page += (pg.getAttribute("data-cmpg")==="next"?1:-1); if(CM.page<0)CM.page=0; renderCM(); return; }
 });
+document.getElementById("report").addEventListener("input", e=>{ const q=e.target.closest("[data-cmq]"); if(q){ CM.q=q.value; renderCMSearch(); } });
 document.getElementById("report").addEventListener("change", e=>{
   const s=e.target.closest("[data-ab]"); if(!s) return; const k=s.getAttribute("data-ab");
   if(k==="source"){ AB.source=s.value; abLoadCatalog(); }
@@ -2305,7 +2338,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r268 · 10285db · 2026-07-01</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r271 · 01cc163 · 2026-07-01</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
