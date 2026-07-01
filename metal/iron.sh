@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# metal -- Iron (standalone). Dev tools + identity + MCP + auth on a bare box.
+# metal -- Iron (standalone). Dev tools + identity + auth on a bare box.
 #   curl -fsSL https://joeycastillo.us/metal/iron.sh | bash
 #
 # Reuses the full installer's bootstrap (git/gh/auth/clone/self-heal) but stops
