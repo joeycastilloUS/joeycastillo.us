@@ -1632,7 +1632,7 @@ async function abLoadCatalog(){
   AB.cat=null; AB.entry=""; AB.params={}; AB.result=null; AB.err=""; AB.busy=true; renderAB();
   try{
     const r=await abFetch("/catalog");
-    if(!r.ok){ AB.err = r.status===401 ? "Locked — unlock the Argus gate (top-right) and this tool opens automatically." : (r.status===404?"This source has no catalog deployed yet.":("HTTP "+r.status)); }
+    if(!r.ok){ AB.err = r.status===401 ? "Locked — unlock the Argus gate (top-right), then click Load." : (r.status===404?"This source has no catalog deployed yet.":("HTTP "+r.status)); }
     else { const d=await r.json(); AB.cat=(d&&d.entries)||[]; if(AB.cat.length) AB.entry=AB.cat[0].id; }
   }catch(e){ AB.err="Couldn’t reach the bridge."; }
   AB.busy=false; renderAB();
@@ -1688,6 +1688,9 @@ function abInner(){
     h+="<label class='abl'>Endpoint<select data-ab='entry'>"+cat.map(e=>"<option value='"+abEsc(e.id)+"'"+(e.id===AB.entry?" selected":"")+">"+abEsc(e.label)+"</option>").join("")+"</select></label>";
     if(cur) cur.params.forEach(p=>{ h+="<label class='abl'>"+abEsc(p)+"<input class='abin' data-abp='"+abEsc(p)+"' value='"+abEsc(AB.params[p]||"")+"' placeholder='"+abEsc(p)+"' autocomplete='off'></label>"; });
     h+="<button class='abgo' data-ab='exec'"+(AB.busy?" disabled":"")+">"+(AB.busy?"Running…":"Execute")+"</button>";
+    h+="<button class='abgo' data-load='ab' style='background:#16242b;color:#9aa3ad'"+(AB.busy?" disabled":"")+" title='Reload the endpoint catalog'>&#8635; Reload</button>";
+  } else {
+    h+="<button class='abgo' data-load='ab'"+(AB.busy?" disabled":"")+">"+(AB.busy?"Loading…":"Load endpoints")+"</button>";
   }
   h+="</div>";
   // source token (only sources that carry their own gate)
@@ -1697,7 +1700,7 @@ function abInner(){
   // states
   if(AB.busy && !AB.result){ h+="<div class='muted'><span class='spin'></span> contacting "+abEsc(s?s.label:"")+"…</div>"; }
   else if(AB.err){ h+="<div class='aberr'>"+abEsc(AB.err)+"</div>"; }
-  else if(!cat.length){ h+="<div class='muted'>No endpoints loaded.</div>"; }
+  else if(!cat.length && !AB.err){ h+="<div class='muted'>Click <b>Load endpoints</b> above to fetch this tool’s API catalog &mdash; nothing is fetched until you do.</div>"; }
   if(AB.result){
     h+="<div class='abmeta'>"+abEsc(SOURCES[AB.source].label)+" &middot; "+abEsc(AB.result.entry||"")+" &middot; "+abEsc(AB.result.path||"")
       +" &nbsp;<a href='javascript:void 0' data-ab='copy' style='color:#6FC3DF'>copy JSON</a></div>";
@@ -1777,6 +1780,9 @@ function commentsPane(){
 function cmInner(){
   let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'><h2 style='margin:0'>Comments</h2><span class='abro'>READ-ONLY</span></div>"
     +"<div class='muted' style='margin-bottom:12px'>Read the conversation, and see where the automation is unsure. Gaps first — <b>i-don’t-know</b> and <b>low-confidence</b> intents rise to the top.</div>";
+  if(CM.list===null && !CM.busy && !CM.err){ return h
+    +"<div style='padding:10px 0 4px'><button data-load='cm' style='background:#6FC3DF;color:#06222c;border:0;border-radius:7px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit'>Load comments</button></div>"
+    +"<div class='muted' style='margin-top:8px'>Nothing is fetched until you click.</div></div>"; }
   if(CM.busy && !CM.list){ return h+"<div class='muted'><span class='spin'></span> loading tickets&hellip;</div></div>"; }
   if(CM.err){ return h+"<div class='aberr'>"+abEsc(CM.err)+"</div></div>"; }
   const s=cmStats();
@@ -1789,7 +1795,8 @@ function cmInner(){
     +"</div>";
   h+="<div class='cmsearch'><input class='cmq' data-cmq placeholder='Search tickets as you type — subject, intent, #id…' value='"+abEsc(CM.q)+"' autocomplete='off'><div id='cm-sd' class='cmsd'>"+cmSearchDropdown()+"</div></div>";
   h+="<div class='cmbar'><span class='cmord'>Order:<button data-cmord='gap' class='"+(CM.order==="gap"?"on":"")+"'>Gaps first</button><button data-cmord='new' class='"+(CM.order==="new"?"on":"")+"'>Newest</button></span>"
-    +(CM.filter?"<span class='cmfoc'>Focus: <b>"+abEsc(cmFilterLabel())+"</b> <button data-cmfilter='__all__' class='cmx'>&times;</button></span>":"")+"</div>";
+    +(CM.filter?"<span class='cmfoc'>Focus: <b>"+abEsc(cmFilterLabel())+"</b> <button data-cmfilter='__all__' class='cmx'>&times;</button></span>":"")
+    +"<button data-load='cm'"+(CM.busy?" disabled":"")+" title='Refresh from Zendesk' style='background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit'>&#8635; "+(CM.busy?"Refreshing…":"Refresh")+"</button></div>";
   const view=cmView(); const ps=CM.pageSize; const pages=Math.max(1,Math.ceil(view.length/ps)); if(CM.page>=pages)CM.page=pages-1; if(CM.page<0)CM.page=0; const slice=view.slice(CM.page*ps,CM.page*ps+ps);
   h+="<div class='cmwrap'><div class='cmcol'><div class='cmlist'>";
   slice.forEach(t=>{ const g=cmTags(t); h+="<div class='cmrow"+(t.id===CM.sel?" on":"")+"' data-cmt='"+t.id+"'>"
@@ -1825,9 +1832,7 @@ function render(){
   // Section tabs live in the fixed LEFT sidebar (#tabnav), not in the scrolling content.
   // The chosen application drives the source for the API Browser + which tabs appear.
   if(APPS[APP].source) AB.source=APPS[APP].source;
-  if(TAB==="apibrowser" && AB.cat===null && !AB.busy && !AB.err) abLoadCatalog();
-  if(TAB==="comments" && CM.list===null && !CM.busy && !CM.err) cmLoad();
-  if(TAB==="cost" && GC.projects===null && !GC.busy && !GC.err) gcLoad();
+  // No auto-fetch on render/switch. Every data tool loads only when the operator clicks Load/Refresh.
   const nsb=document.querySelector(".navsub"); if(nsb) nsb.innerHTML="<b>"+APPS[APP].label+"</b> &mdash; "+(APP==="zendesk"?"Support · read-only":APP==="cloudflare"?"Edge · read-only":APP==="gcp"?"Cloud cost &middot; read-only":"Operationally Driven, Network Operations Center");
   const tabHtml={
     operations:"<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>",
@@ -1945,8 +1950,11 @@ function costPane(){
     +"</style><div id='gc-inner'>"+gcInner()+"</div>";
 }
 function gcInner(){
+  if(GC.projects===null && !GC.busy && !GC.err) return "<div class='gchead'><h2>&#128176; Cloud Cost</h2><span class='gcsub'>Cost per project you own, drillable to service &rarr; SKU.</span></div>"
+    +"<div style='padding:14px 0'><button data-load='gc' style='background:#6FC3DF;color:#06222c;border:0;border-radius:7px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit'>Load cost &amp; projects</button></div>"
+    +"<div class='gcnote'>Nothing is fetched until you click. Read-only.</div>";
   if(GC.busy && GC.projects===null) return "<div class='gcload'><span class='spin'></span> loading GCP cost &amp; projects&hellip;</div>";
-  if(GC.err && GC.projects!==null && GC.projects.length===0 && !GC.cost) return "<div class='gcerr'>"+esc(GC.err)+"</div>";
+  if(GC.err && GC.projects!==null && GC.projects.length===0 && !GC.cost) return "<div class='gcerr'>"+esc(GC.err)+" <button data-load='gc' style='margin-left:8px;background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit'>&#8635; Retry</button></div>";
   const projects=GC.projects||[];
   const active=projects.filter(p=>p.billingEnabled);
   const acct=(projects[0]&&projects[0].billingAccountName||"").replace("billingAccounts/","")||"—";
@@ -1954,7 +1962,8 @@ function gcInner(){
   const configured=!!(c&&c.configured&&c.ok);
   const grand=rows.reduce((s,r)=>s+(+r.cost||0),0);
 
-  let h="<div class='gchead'><h2>&#128176; Cloud Cost</h2><span class='gcsub'>Projects you own on billing account <b style='color:#cdd6da'>"+esc(acct)+"</b></span></div>";
+  let h="<div class='gchead'><h2>&#128176; Cloud Cost</h2><span class='gcsub'>Projects you own on billing account <b style='color:#cdd6da'>"+esc(acct)+"</b></span>"
+    +"<button data-load='gc'"+(GC.busy?" disabled":"")+" title='Refresh' style='margin-left:auto;background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit'>&#8635; "+(GC.busy?"Refreshing…":"Refresh")+"</button></div>";
 
   // Summary stats.
   h+="<div class='gcsum'>"
@@ -2386,10 +2395,14 @@ document.getElementById("report").addEventListener("click", e=>{
   const rv2=e.target.closest("[data-runview]"); if(rv2){ const i=+rv2.getAttribute("data-runview"); const r=AUD.runs[i]; if(r&&r.loading) return; AUD.view=i; if(r) AUDITMODE=r.scope; render(); return; }
   const sh=e.target.closest("[data-sect]"); if(sh){ const k=sh.getAttribute("data-sect"), open=SECTSTATE[k]!==false; SECTSTATE[k]=!open; const b=document.getElementById("secbody-"+k); if(b) b.style.display=open?"none":""; sh.classList.toggle("collapsed",open); }
 });
-// API Browser (read-only) — lazy-load the catalog on first entry, and its own delegated controls.
-document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-tab='apibrowser']") && AB.cat===null && !AB.busy){ abLoadCatalog(); } });
-// Application selector (Meraki / Zendesk) — switch the active app, its tabs, and the API Browser source.
-document.getElementById("tabnav").addEventListener("click", e=>{ const a=e.target.closest("[data-app]"); if(!a) return; const x=a.getAttribute("data-app"); APPSW_OPEN=false; if(!APPS[x]||x===APP){ render(); return; } APP=x; localStorage.setItem("argus_app",x); TAB=APPS[x].tabs[0]; TAB_ANIM=true; if(APPS[x].source) AB.source=APPS[x].source; if(TAB==="apibrowser" && AB.cat===null && !AB.busy) abLoadCatalog(); if(TAB==="comments" && CM.list===null && !CM.busy) cmLoad(); if(TAB==="cost" && GC.projects===null && !GC.busy) gcLoad(); render(); });
+// Explicit Load/Refresh — NOTHING fetches on app/tab switch; every data tool loads only on click.
+document.getElementById("report").addEventListener("click", e=>{
+  const b=e.target.closest("[data-load]"); if(!b || b.disabled) return;
+  const which=b.getAttribute("data-load");
+  if(which==="ab") abLoadCatalog(); else if(which==="cm") cmLoad(); else if(which==="gc") gcLoad();
+});
+// Application selector — switch the active app, its tabs, and the API Browser source (no fetch on switch).
+document.getElementById("tabnav").addEventListener("click", e=>{ const a=e.target.closest("[data-app]"); if(!a) return; const x=a.getAttribute("data-app"); APPSW_OPEN=false; if(!APPS[x]||x===APP){ render(); return; } APP=x; localStorage.setItem("argus_app",x); TAB=APPS[x].tabs[0]; TAB_ANIM=true; if(APPS[x].source) AB.source=APPS[x].source; render(); });
 // App switcher: toggle the dropdown; close it on any outside click.
 document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-appsw='toggle']")){ APPSW_OPEN=!APPSW_OPEN; render(); } });
 document.addEventListener("click", e=>{ if(APPSW_OPEN && !e.target.closest(".appsw")){ APPSW_OPEN=false; render(); } });
@@ -2401,7 +2414,6 @@ document.getElementById("report").addEventListener("click", e=>{
   const bc=e.target.closest("[data-gcbc]"); if(bc){ const lv=bc.getAttribute("data-gcbc"); if(lv==="all") GC.drill={project:null,service:null}; else if(lv==="project") GC.drill.service=null; renderGC(); return; }
 });
 // Comments (read-only): lazy-load on entry + ticket-open + order toggle.
-document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-tab='comments']") && CM.list===null && !CM.busy){ cmLoad(); } });
 document.getElementById("report").addEventListener("click", e=>{
   const gd=e.target.closest("[data-cmg]"); if(gd){ const id=gd.getAttribute("data-cmg"); CM.q=""; cmOpen(isNaN(+id)?id:+id); return; }
   const row=e.target.closest("[data-cmt]"); if(row){ const id=row.getAttribute("data-cmt"); cmOpen(isNaN(+id)?id:+id); return; }
@@ -2509,7 +2521,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r274 · 2fbf64e · 2026-07-01</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r278 · 6e1def6 · 2026-07-01</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
