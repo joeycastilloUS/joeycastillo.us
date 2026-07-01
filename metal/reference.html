@@ -122,7 +122,7 @@
         </tbody></table>
         <script>
         (function(){
-          var exempt = ['~h','~li','~l','~cr','~jc','~m','~tag','~config','~monitor','~dev-refresh','~chase','~tlt'];
+          var exempt = ['~h','~li','~l','~cr','~jc','~m','~config','~tag'];
           var chainFinal = ['~s','~r'];
           fetch('/metal/tildes.json').then(function(r){return r.json();}).then(function(d){
             var html = '<tr><th>Command</th><th>Aliases</th><th>What</th><th>DoD</th></tr>';
@@ -298,7 +298,7 @@
         <h2>Telemetry</h2>
 
         <div class="section">
-            <p>Every command (except <code>~h</code>) logs to <code>be/telemetry.json</code>:</p>
+            <p>Every command (except <code>~h</code>) logs a small per-tilde ledger entry to <code>be/telemetry.json</code> (still tracked in the project repo):</p>
             <ul>
                 <li><strong>triple</strong>: <code>{description, verb, project}</code></li>
                 <li><strong>command</strong>: the tilde command</li>
@@ -307,10 +307,17 @@
             </ul>
             <p>Rolling 100 entries max. Viewer at <code>be/telemetry.html</code>.</p>
             <p>Verb mapping: ~a &rarr; "added to", ~b &rarr; "built in", ~u &rarr; "updated in", ~d &rarr; "designed for", ~f &rarr; "fixed in", ~s &rarr; "shipped from", ~p &rarr; "planned for", ~e &rarr; "estimated for", ~i &rarr; "inspected in", ~t &rarr; "tested in", ~r &rarr; "retro'd in", ~tag &rarr; "tagged in".</p>
+
+            <h3>Runtime telemetry &mdash; otel.jsonl + prompts.jsonl (hub-sharded)</h3>
+            <p>The high-volume telemetry trail lives in two runtime-only files: <code>be/otel.jsonl</code> (OpenTelemetry spans) and <code>be/prompts.jsonl</code> (the prompt trail). These are <strong>gitignored and never committed to metal</strong> &mdash; they are runtime artifacts, not source.</p>
+            <ul>
+                <li><strong>Per-host sharding</strong> &mdash; each machine writes to its own path in the hub repo <code>acmedevUS/metal-telemetry</code> under <code>hosts/&lt;hostname&gt;/...</code>, so two machines never touch the same file (no merge conflicts, ever).</li>
+                <li><strong>Synced on the session lifecycle</strong> &mdash; <code>push-telemetry</code> runs on launch (SessionStart / SessionEnd), and Mercury fires on <code>~s</code> / <code>~r</code>, pushing each host's shards up and pulling the merged union down.</li>
+            </ul>
         </div>
 
         <div class="footer">
-            v0 &middot; r1711 &middot; 2026-06-30 &middot; command table renders live from /metal/tildes.json &middot; joeycastillo.us/metal/reference.html
+            v0 &middot; r1734 &middot; 2026-07-01 &middot; command table renders live from /metal/tildes.json &middot; joeycastillo.us/metal/reference.html
         </div>
     </div>
 

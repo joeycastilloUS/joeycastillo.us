@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPG Setup — metal</title>
+    <title>Commit Signing — metal</title>
     <link rel="icon" type="image/svg+xml" href="/metal/favicon-m.svg">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -201,44 +201,50 @@
 
     <div class="container">
 
-        <h1>GPG Setup</h1>
-        <div class="tagline">Signed commits. Verified on GitHub. Now automated.</div>
+        <h1>Commit Signing</h1>
+        <div class="tagline">SSH signing by default. Verified on GitHub. Zero manual steps.</div>
         <div class="version-line">
+            v0 &middot; r1734 &middot; 2026-07-01 &middot;
             <a href="/metal">&larr; metal</a>
         </div>
 
-        <!-- ═══ AUTOMATED NOTICE ═══ -->
+        <!-- ═══ FLEET DEFAULT: SSH SIGNING ═══ -->
+        <div class="section-title">SSH Signing &mdash; the fleet default</div>
+
         <div class="step-card" style="border-color: #2a4a3a; background: #0d1f1a;">
-            <div class="step-number" style="color: #4ec9b0;">automated since r813</div>
-            <div class="step-title" style="color: #4ec9b0;">install.bat does this for you.</div>
+            <div class="step-number" style="color: #4ec9b0;">automated &mdash; install Step 5b</div>
+            <div class="step-title" style="color: #4ec9b0;">Go.Sign wires SSH signing for you.</div>
             <div class="step-desc" style="margin-bottom: 0;">
-                Board 97 baked the entire flow into <code>install.bat</code> Step 5b
-                (calls <code>Go.Sign.bat</code>). If you curl-installed metal, signing
-                is already wired. The manual recipe below is preserved for repair
-                scenarios &mdash; running <code>C:\metal\Go.Sign.bat</code> standalone
-                fixes a borked laptop without re-running the whole install.
+                The metal fleet signs commits with the ed25519 key already in your
+                <code>~/.ssh</code> &mdash; no GPG, no RSA keygen, no OAuth scope.
+                <code>Go.Sign</code> runs automatically during install
+                (<code>install.bat</code> Step 5b), verifies the key, enables
+                <code>commit.gpgsign</code>, smoke-tests a signed commit, and exits.
+                If you curl-installed metal, signing is already done. Zero manual steps.
             </div>
         </div>
-
-        <!-- ═══ HOW IT WORKS ═══ -->
-        <div class="step-card" style="border-color: #1a3a2a;">
-            <div class="step-desc" style="margin-bottom: 0;">
-                <code>Go.Sign.ps1</code> handles key discovery / generation, git config,
-                and GitHub registration automatically. The only thing it can't do is
-                the one-time OAuth browser approval &mdash; that's your one step,
-                and it happens inline during install.
-            </div>
-        </div>
-
-        <!-- ═══ MANUAL REPAIR ═══ -->
-        <div class="section-title">If You Need To Run It Manually</div>
 
         <div class="step-card">
-            <div class="step-number">One command</div>
-            <div class="step-title">Run Go.Sign on the laptop that's broken</div>
+            <div class="step-number">What Go.Sign does on the SSH path</div>
+            <div class="step-title">Verify, enable, smoke-test, done</div>
+            <div style="color: #999; font-size: 0.85rem; line-height: 2;">
+                <span class="auto-badge">auto</span> Detect <code>gpg.format = ssh</code> and resolve your <code>~/.ssh</code> ed25519 signing key<br>
+                <span class="auto-badge">auto</span> Enable <code>commit.gpgsign</code> so every commit is signed<br>
+                <span class="auto-badge">auto</span> Smoke-test an empty signed commit in a scratch repo<br>
+                <span class="auto-badge">auto</span> Exit clean &mdash; no GPG keyring ever touched
+            </div>
+            <div class="note" style="margin-top: 1rem;">
+                On this path Go.Sign never installs gpg, never mints a 4096-bit RSA
+                key, and never needs the <code>write:gpg_key</code> scope. It just
+                confirms the SSH key works and gets out of the way.
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-number">Run it manually (optional)</div>
+            <div class="step-title">Re-run any time &mdash; it's idempotent</div>
             <div class="step-desc">
-                Go.Sign is idempotent &mdash; safe on healthy laptops (no-op),
-                self-heals broken ones.
+                Safe on healthy laptops (no-op), self-heals broken git config.
             </div>
             <div class="command-box" onclick="copy('s0-cmd','s0-btn')">
                 <code id="s0-cmd">C:\metal\Go.Sign.bat</code>
@@ -249,15 +255,46 @@
             </div>
         </div>
 
-        <!-- ═══ STEP 1 ═══ -->
-        <div class="section-title">What Go.Sign Does &mdash; Step By Step</div>
+        <!-- ═══ THE ONE MISSING PIECE: SIGNING KEY REGISTRATION ═══ -->
+        <div class="step-card" style="border-color: #2a3a4a;">
+            <div class="step-number" style="color: #6fc3df;">one thing to know</div>
+            <div class="step-title">Register the SSH key as a <em>signing</em> key for the green badge</div>
+            <div class="step-desc">
+                GitHub only shows the green "Verified" badge if your SSH public key
+                is registered as a <strong>signing</strong> key (not just an auth key).
+                It's a distinct key type on your account. Register it once:
+            </div>
+            <div class="command-box" onclick="copy('sk-cmd','sk-btn')">
+                <code id="sk-cmd">gh ssh-key add --type signing ~/.ssh/id_ed25519_signing.pub --title "metal signing"</code>
+                <button class="copy-btn" id="sk-btn">copy</button>
+            </div>
+            <div class="note">
+                Go.Sign is being updated to do this automatically. Until that ships,
+                run it yourself &mdash; commits sign fine without it, but the badge
+                stays grey until GitHub knows the key is for signing.
+            </div>
+        </div>
+
+        <!-- ═══ GPG FALLBACK ═══ -->
+        <div class="section-title">GPG Fallback (boxes not on SSH signing)</div>
 
         <div class="step-card">
-            <div class="step-number">Step 1 &mdash; the only manual moment</div>
+            <div class="step-desc" style="margin-bottom: 0;">
+                If a box has <code>gpg.format</code> set to something other than
+                <code>ssh</code>, Go.Sign falls back to the GPG path: it finds or
+                generates a GPG key, wires git config, registers the key with GitHub,
+                and smoke-tests. This path needs gpg installed and the
+                <code>write:gpg_key</code> OAuth scope. Preserved below for those boxes
+                &mdash; most operators never hit it.
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-number">Step 1 &mdash; the only manual moment (GPG path)</div>
             <div class="step-title">Grant GitHub CLI the GPG scope</div>
             <div class="step-desc">
-                Run automatically by Go.Sign when needed. Opens a browser &mdash;
-                you approve it, control returns. Equivalent command:
+                Run automatically by Go.Sign when it generates a new GPG key. Opens a
+                browser &mdash; you approve it, control returns. Equivalent command:
             </div>
             <div class="command-box" onclick="copy('s1-cmd','s1-btn')">
                 <code id="s1-cmd">gh auth refresh -h github.com -s write:gpg_key</code>
@@ -268,9 +305,8 @@
             </div>
         </div>
 
-        <!-- ═══ STEP 2 ═══ -->
         <div class="step-card">
-            <div class="step-number">Step 2</div>
+            <div class="step-number">Step 2 (GPG path)</div>
             <div class="step-title">Go.Sign continues automatically</div>
             <div class="step-desc">
                 After the browser approval, Go.Sign continues without further input:
@@ -278,7 +314,7 @@
             <div style="color: #999; font-size: 0.85rem; line-height: 2;">
                 <span class="auto-badge">auto</span> Find an existing local key matching your GitHub email, OR generate a fresh 4096-bit RSA key<br>
                 <span class="auto-badge">auto</span> Configure git to sign all commits with the chosen key<br>
-                <span class="auto-badge">auto</span> Upload the public key to your GitHub account (when generated)<br>
+                <span class="auto-badge">auto</span> Upload the public key to your GitHub account via <code>gh gpg-key add</code> (when generated)<br>
                 <span class="auto-badge">auto</span> Smoke-test with an empty signed commit in a scratch repo
             </div>
             <div class="note" style="margin-top: 1rem;">
@@ -286,8 +322,7 @@
             </div>
         </div>
 
-        <!-- ═══ TROUBLESHOOTING ═══ -->
-        <div class="section-title">If Something Breaks</div>
+        <div class="section-title">GPG Path &mdash; If Something Breaks</div>
 
         <div class="step-card">
             <div class="step-title" style="font-size: 0.95rem;"><code>gpg failed to sign the data</code></div>
@@ -311,8 +346,8 @@
             <div class="step-title" style="font-size: 0.95rem;">New machine?</div>
             <div class="step-desc" style="margin-bottom: 0;">
                 Just curl-install metal. <code>install.bat</code> runs
-                <code>Go.Sign.bat</code> at Step 5b automatically. Fresh key per
-                laptop; GitHub aggregates them all under your account.
+                <code>Go.Sign.bat</code> at Step 5b automatically &mdash; SSH signing
+                on the default fleet, GPG fallback only where configured.
             </div>
         </div>
 

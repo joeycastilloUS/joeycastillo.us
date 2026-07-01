@@ -317,17 +317,17 @@ case "$LAUNCH" in
     echo "  See you next time."
     ;;
 *)
-    METAL_BE="$HOME/metal.Be"
-    [ ! -d "$METAL_BE" ] && [ -d "/metal.Be" ] && METAL_BE="/metal.Be"
+    METAL_BE="$HOME/metal"
+    [ ! -d "$METAL_BE" ] && [ -d "/metal" ] && METAL_BE="/metal"
 
     if [ ! -d "$METAL_BE" ]; then
-        echo "  Cloning metal.Be..."
+        echo "  Cloning metal-console..."
         if command -v gh &>/dev/null; then
-            gh repo clone joeycastilloUS/metal.Be "$HOME/metal.Be"
+            gh repo clone kastil-systems/metal-console "$HOME/metal"
         else
-            git clone https://github.com/joeycastilloUS/metal.Be.git "$HOME/metal.Be"
+            git clone https://github.com/kastil-systems/metal-console.git "$HOME/metal"
         fi
-        METAL_BE="$HOME/metal.Be"
+        METAL_BE="$HOME/metal"
     fi
 
     if [ -f "$METAL_BE/Go.Be.sh" ]; then
