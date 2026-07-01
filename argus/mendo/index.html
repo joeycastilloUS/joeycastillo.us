@@ -1712,7 +1712,7 @@ function abInner(){
 function renderAB(){ const w=document.getElementById("ab-wrap"); if(w) w.innerHTML=abInner(); }
 
 // ===== Comments — readable Zendesk ticket + comment surface (read-only, gap-ordered) =====
-let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap", filter:null, page:0, q:"", pageSize:25 };
+let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap", filter:null, page:0, q:"", pageSize:25, analysis:{}, abusy:false, aerr:"" };
 function zdFetch(path){ const sep=path.indexOf("?")>=0?"&":"?"; return fetch(ZBRIDGE+path+sep+"_="+Date.now(), { cache:"no-store", headers: PW?{ "Authorization":"Bearer "+PW }:{} }); }
 function cmTags(t){ const tags=t.tags||[]; let intent="",conf="",sent=""; tags.forEach(x=>{ if(x.indexOf("intent__")===0) intent=x.slice(8).replace(/__/g," › ").replace(/_/g," "); else if(x==="intent_confidence__low")conf="low"; else if(x==="sentiment__negative")sent="negative"; }); return {intent,conf,sent,idk:tags.indexOf("i_don_t_know")>=0}; }
 function cmGapRank(t){ const g=cmTags(t); if(g.idk) return 0; if(g.conf==="low") return 1; if(!g.intent) return 2; return 3; }
@@ -1729,12 +1729,28 @@ async function cmLoad(){
   CM.busy=false; renderCM();
 }
 async function cmOpen(id){
-  CM.sel=id; CM.thread=null; CM.terr=""; CM.tbusy=true; renderCM();
+  CM.sel=id; CM.thread=null; CM.terr=""; CM.tbusy=true; CM.aerr=""; renderCM();
   try{
     const r=await zdFetch("/read?entry=ticket-comments&id="+encodeURIComponent(id));
     if(!r.ok){ CM.terr="HTTP "+r.status; } else { const d=await r.json(); CM.thread=(d.data&&d.data.comments)||[]; }
   }catch(e){ CM.terr="Network error."; }
   CM.tbusy=false; renderCM();
+}
+// Argus perception layer: send the opened ticket + its thread to gcp-bridge /vertex/analyze (Gemini
+// 2.5 Flash, in-project). OUR classification + sentiment/tone + thread-stitch — Zendesk's tags ignored.
+async function cmAnalyze(id){
+  const t=(CM.list||[]).find(x=>x.id===id); if(!t||!CM.thread) return;
+  CM.abusy=true; CM.aerr=""; renderCM();
+  try{
+    const thread=(CM.thread||[]).map(c=>({ author:cmName(c.author_id), public:c.public!==false, date:(c.created_at||""), body:((c.plain_body||c.body||"")+"").slice(0,4000) }));
+    const r=await fetch(GBRIDGE+"/vertex/analyze", { method:"POST", cache:"no-store",
+      headers:Object.assign({ "Content-Type":"application/json" }, PW?{ "Authorization":"Bearer "+PW }:{}),
+      body:JSON.stringify({ subject:t.subject||("#"+id), thread }) });
+    let d={}; try{ d=await r.json(); }catch(_){}
+    if(!r.ok || !d.analysis){ CM.aerr = r.status===401 ? "Unlock the Argus gate to run analysis." : (d.detail||d.error||("HTTP "+r.status)); }
+    else CM.analysis[id]=d;
+  }catch(e){ CM.aerr="Couldn’t reach gcp-bridge."; }
+  CM.abusy=false; renderCM();
 }
 // --- summary (what am I looking at?) + focus filter + typeahead search ---
 function cmStats(){ const L=CM.list||[]; const s={total:L.length,idk:0,low:0,neg:0,intents:{}}; L.forEach(t=>{ const g=cmTags(t); if(g.idk)s.idk++; if(g.conf==="low")s.low++; if(g.sent==="negative")s.neg++; if(g.intent){ const top=g.intent.split(" › ")[0]; s.intents[top]=(s.intents[top]||0)+1; } }); s.topIntents=Object.keys(s.intents).map(k=>[k,s.intents[k]]).sort((a,b)=>b[1]-a[1]).slice(0,5); return s; }
@@ -1775,6 +1791,16 @@ function commentsPane(){
     +"#pane-comments .cmfoc{font-size:12px;color:#9aa3ad;}#pane-comments .cmfoc b{color:#6FC3DF;}#pane-comments .cmx{background:#2a1414;color:#ff9b9b;border:0;border-radius:5px;padding:1px 7px;cursor:pointer;font-size:13px;}"
     +"#pane-comments .cmcol{flex:0 0 320px;}#pane-comments .cmcol .cmlist{flex:none;}"
     +"#pane-comments .cmpager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:#8a93a0;}#pane-comments .cmpager button{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;}#pane-comments .cmpager button:disabled{opacity:.4;cursor:default;}"
+    +"#pane-comments .cmprov{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#0c1418;border:1px solid #1f3a44;border-radius:8px;padding:9px 13px;margin-bottom:12px;font-size:12px;color:#9aa3ad;line-height:1.5;}#pane-comments .cmprov b{color:#6FC3DF;}#pane-comments .cmprov a{color:#6FC3DF;text-decoration:none;border-bottom:1px dotted #3a6b78;}#pane-comments .cmprov a:hover{color:#9fe;}#pane-comments .cmprov .dot{color:#3a4650;}"
+    +"#pane-comments .cma{background:#101820;border:1px solid #243b43;border-radius:10px;padding:14px 16px;margin-bottom:14px;}"
+    +"#pane-comments .cma-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;}#pane-comments .cma-hd .gem{font-weight:800;color:#6FC3DF;font-size:13px;letter-spacing:.03em;}#pane-comments .cma-verdict{font-size:15px;font-weight:700;color:#e6edf2;}"
+    +"#pane-comments .cbadge{font-size:10px;font-weight:800;border-radius:5px;padding:2px 7px;letter-spacing:.03em;}#pane-comments .cb-high{background:#06251a;color:#7CFFB2;}#pane-comments .cb-med{background:#2a2206;color:#ffd479;}#pane-comments .cb-low{background:#3a1414;color:#ff9b9b;}"
+    +"#pane-comments .cma-contrast{font-size:11.5px;color:#8a93a0;margin-bottom:10px;}#pane-comments .cma-contrast s{color:#6b7683;}"
+    +"#pane-comments .cma-grid{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;}#pane-comments .cma-chip{background:#0c1418;border:1px solid #243b43;border-radius:14px;padding:3px 10px;font-size:11.5px;color:#cdd6da;}#pane-comments .cma-chip b{color:#6FC3DF;font-weight:700;}"
+    +"#pane-comments .cma-row{font-size:13px;color:#dfe4e9;margin:6px 0;}#pane-comments .cma-row .k{color:#8a93a0;font-size:10px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:1px;}"
+    +"#pane-comments .cma-verify{background:#141c20;border-left:3px solid #ffd479;border-radius:0 6px 6px 0;padding:8px 12px;margin:8px 0;font-size:13px;color:#f0e6cf;}#pane-comments .cma-verify .k{color:#ffd479;font-size:10px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:2px;}"
+    +"#pane-comments .cma-prov{font-size:11px;color:#5a6069;margin-top:10px;border-top:1px solid #1c2830;padding-top:8px;}#pane-comments .cma-prov b{color:#8a93a0;}"
+    +"#pane-comments .cma-btn{background:#6FC3DF;color:#06222c;border:0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}#pane-comments .cma-re{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;}"
     +"</style><div id='cm-wrap'>"+cmInner()+"</div>";
 }
 function cmInner(){
@@ -1785,6 +1811,7 @@ function cmInner(){
     +"<div class='muted' style='margin-top:8px'>Nothing is fetched until you click.</div></div>"; }
   if(CM.busy && !CM.list){ return h+"<div class='muted'><span class='spin'></span> loading tickets&hellip;</div></div>"; }
   if(CM.err){ return h+"<div class='aberr'>"+abEsc(CM.err)+"</div></div>"; }
+  h+=cmProvenance();
   const s=cmStats();
   h+="<div class='cmsumh'>What you’re looking at &mdash; "+s.total+" tickets loaded · click a number to focus</div><div class='cmsum'>"
     +cmStat("All",s.total,"__all__")
@@ -1811,6 +1838,7 @@ function cmInner(){
   if(CM.tbusy){ h+="<div class='muted'><span class='spin'></span> loading thread&hellip;</div>"; }
   else if(CM.terr){ h+="<div class='aberr'>"+abEsc(CM.terr)+"</div>"; }
   else if(CM.sel && CM.thread){
+    h+=cmAnalysisHtml(CM.sel);
     h+="<div class='muted' style='margin-bottom:8px'>Ticket #"+CM.sel+" &middot; "+CM.thread.length+" comment"+(CM.thread.length===1?"":"s")+"</div>";
     CM.thread.forEach(c=>{ const pub=c.public!==false; const body=((c.plain_body||c.body||"")+"").trim();
       h+="<div class='cmc"+(pub?"":" internal")+"'><h4><span class='who'>"+abEsc(cmName(c.author_id))+"</span>"
@@ -1821,6 +1849,46 @@ function cmInner(){
   return h+"</div></div></div>";
 }
 function renderCM(){ const w=document.getElementById("cm-wrap"); if(w) w.innerHTML=cmInner(); }
+// Model-provenance note — clear about WHAT runs the analysis and WHERE (Joey's ask).
+function cmProvenance(){
+  return "<div class='cmprov'>&#129522; AI analysis runs on <b>Google Gemini 2.5 Flash</b> via "
+    +"<a href='https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash' target='_blank' rel='noopener'>Vertex AI</a>, "
+    +"inside your <b>acmedev-platform-hq</b> GCP project <span class='dot'>&middot;</span> your data stays in-project (ADC, no API key) "
+    +"<span class='dot'>&middot;</span> <a href='https://console.cloud.google.com/vertex-ai?project=acmedev-platform-hq' target='_blank' rel='noopener'>open Vertex in the console &#8599;</a></div>";
+}
+// The Argus AI verdict on the open ticket — OUR classification + sentiment/tone + thread-stitch.
+function cmAnalysisHtml(id){
+  const t=(CM.list||[]).find(x=>x.id===id); const g=t?cmTags(t):{};
+  if(CM.abusy) return "<div class='cma'><div class='muted'><span class='spin'></span> Gemini 2.5 is reading the thread&hellip;</div></div>";
+  const a=CM.analysis[id];
+  if(!a){
+    let h="<div class='cma'><div class='cma-hd'><span class='gem'>&#129522; Argus AI</span><span class='muted' style='font-size:12px'>our own read &mdash; classify &middot; sentiment &middot; thread</span></div>";
+    if(CM.aerr) h+="<div class='aberr' style='margin-bottom:8px'>"+abEsc(CM.aerr)+"</div>";
+    h+="<button class='cma-btn' data-cmanalyze='"+id+"'>Analyze with Gemini 2.5</button>";
+    if(g.intent||g.conf) h+="<div class='cma-contrast' style='margin-top:10px'>Zendesk said <s>"+abEsc(g.intent||"&mdash;")+(g.conf==="low"?" (low confidence)":"")+"</s> &mdash; we re-judge it ourselves.</div>";
+    return h+"</div>";
+  }
+  const an=a.analysis||{}, cl=an.classification||{}, se=an.sentiment||{}, th=an.thread||{}, en=an.entities||{}, pv=a.provenance||{};
+  const cb=(v)=>"cb-"+(v==="HIGH"?"high":v==="MEDIUM"?"med":"low");
+  let h="<div class='cma'><div class='cma-hd'><span class='gem'>&#129522; Argus AI</span>"
+    +"<span class='cma-verdict'>"+abEsc(cl.domain||"")+" / "+abEsc(cl.intent||"")+"</span>"
+    +"<span class='cbadge "+cb(cl.confidence)+"'>"+abEsc(cl.confidence||"")+"</span></div>";
+  if(g.intent||g.conf) h+="<div class='cma-contrast'>Zendesk: <s>"+abEsc(g.intent||"&mdash;")+(g.conf==="low"?" &middot; low":"")+"</s> &rarr; Argus re-judged above.</div>";
+  h+="<div class='cma-grid'>"
+    +(en.store?"<span class='cma-chip'><b>store</b> "+abEsc(en.store)+"</span>":"")
+    +(en.vendor_or_system?"<span class='cma-chip'><b>vendor</b> "+abEsc(en.vendor_or_system)+"</span>":"")
+    +"<span class='cma-chip'><b>route</b> "+abEsc(an.routing||"")+"</span>"
+    +"<span class='cma-chip'><b>tone</b> "+abEsc(se.tone||"")+"</span>"
+    +"<span class='cma-chip'><b>mood</b> "+abEsc(se.polarity||"")+"</span>"
+    +"<span class='cma-chip'><b>escalation</b> "+abEsc(se.escalation_risk||"")+"</span></div>";
+  if(cl.reasoning) h+="<div class='cma-row'><span class='k'>why</span>"+abEsc(cl.reasoning)+"</div>";
+  if(th.summary) h+="<div class='cma-row'><span class='k'>thread</span>"+abEsc(th.summary)+"</div>";
+  if(th.open_question) h+="<div class='cma-row'><span class='k'>open question</span>"+abEsc(th.open_question)+"</div>";
+  if(an.operator_verify) h+="<div class='cma-verify'><span class='k'>verify before acting</span>"+abEsc(an.operator_verify)+"</div>";
+  h+="<div class='cma-prov'>via <b>"+abEsc(pv.model||"gemini-2.5-flash")+"</b> &middot; Vertex AI &middot; project <b>"+abEsc(pv.project||"acmedev-platform-hq")+"</b> &middot; in-project, no key"
+    +" <button class='cma-re' data-cmanalyze='"+id+"' style='margin-left:8px'>&#8635; re-analyze</button></div>";
+  return h+"</div>";
+}
 
 function render(){
   let h="";
@@ -2419,6 +2487,7 @@ document.getElementById("report").addEventListener("click", e=>{
 document.getElementById("report").addEventListener("click", e=>{
   const gd=e.target.closest("[data-cmg]"); if(gd){ const id=gd.getAttribute("data-cmg"); CM.q=""; cmOpen(isNaN(+id)?id:+id); return; }
   const row=e.target.closest("[data-cmt]"); if(row){ const id=row.getAttribute("data-cmt"); cmOpen(isNaN(+id)?id:+id); return; }
+  const az=e.target.closest("[data-cmanalyze]"); if(az){ const id=az.getAttribute("data-cmanalyze"); cmAnalyze(isNaN(+id)?id:+id); return; }
   const ob=e.target.closest("[data-cmord]"); if(ob){ CM.order=ob.getAttribute("data-cmord"); CM.page=0; renderCM(); return; }
   const fl=e.target.closest("[data-cmfilter]"); if(fl){ const v=fl.getAttribute("data-cmfilter"); CM.filter=(v==="__all__"||CM.filter===v)?null:v; CM.page=0; renderCM(); return; }
   const pg=e.target.closest("[data-cmpg]"); if(pg){ CM.page += (pg.getAttribute("data-cmpg")==="next"?1:-1); if(CM.page<0)CM.page=0; renderCM(); return; }
@@ -2523,7 +2592,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r291 . e30dec4 . 2026-07-01</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r295 . efb1fde . 2026-07-01</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
