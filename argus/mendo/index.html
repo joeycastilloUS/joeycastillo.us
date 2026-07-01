@@ -17,10 +17,21 @@
   .tabv .ti{display:inline-flex;width:18px;justify-content:center;font-size:1.02rem;} .tabv .tl{flex:1;}
   .tabv:hover{color:var(--text);background:#161616;}
   .tabv.on{background:#1d2a31;color:var(--accent);border-color:rgba(111,195,223,.35);}
-  .appsel{display:flex;gap:4px;margin-bottom:8px;background:#0c1418;border:1px solid var(--line);border-radius:10px;padding:4px;}
-  .appbtn{flex:1;background:transparent;color:var(--dim);border:0;border-radius:7px;padding:8px 6px;font-size:.82rem;font-weight:800;letter-spacing:.03em;cursor:pointer;font-family:inherit;transition:.12s;}
-  .appbtn:hover{color:var(--accent);} .appbtn.on{background:var(--accent);color:#06222c;}
-  .appsel-lbl{color:var(--dim);font-size:.55rem;letter-spacing:2px;text-transform:uppercase;margin:2px 4px 8px;font-weight:700;}
+  /* App switcher — a full-width current-app button + a dropdown menu (scales past a button row). */
+  .appsw{position:relative;margin-bottom:12px;}
+  .appsw-btn{display:flex;align-items:center;gap:9px;width:100%;background:#0c1418;border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .12s;}
+  .appsw-btn:hover{border-color:rgba(111,195,223,.4);} .appsw-btn.open{border-color:var(--accent);}
+  .appsw-ic,.appmi-ic{font-size:1.12rem;width:22px;text-align:center;flex:0 0 auto;line-height:1;}
+  .appsw-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  .appsw-nm{color:var(--text);font-weight:800;font-size:.9rem;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .appsw-tg{color:var(--dim);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .appsw-cv{color:var(--dim);font-size:.65rem;flex:0 0 auto;transition:transform .15s;} .appsw-btn.open .appsw-cv{transform:rotate(180deg);}
+  .appsw-menu{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#0f171b;border:1px solid rgba(111,195,223,.35);border-radius:10px;padding:4px;z-index:80;box-shadow:0 12px 30px rgba(0,0,0,.6);}
+  .appsw-menu.hidden{display:none;}
+  .appsw-hd{color:var(--dim);font-size:.52rem;letter-spacing:2px;text-transform:uppercase;font-weight:700;padding:5px 8px 6px;}
+  .appmi{display:flex;align-items:center;gap:9px;width:100%;background:transparent;border:0;border-radius:7px;padding:8px 9px;cursor:pointer;font-family:inherit;text-align:left;}
+  .appmi:hover{background:#16242b;} .appmi.on{background:#1d2a31;}
+  .appmi.on .appsw-nm{color:var(--accent);}
   @media(max-width:640px){ #tabnav{width:132px;padding:44px 6px 10px;} .tabv{padding:10px 9px;font-size:.84rem;gap:7px;} .wrap,#brand-strip{margin-left:132px!important;} }
   .nav .be{color:var(--accent);font-weight:800;font-size:1.15rem;letter-spacing:3px;} .nav .r{color:var(--dim);font-size:.78rem;}
   .navbrand{display:flex;flex-direction:row;align-items:baseline;gap:9px;min-width:0;line-height:1.05;}
@@ -490,12 +501,15 @@ let PW = sessionStorage.getItem(PW_KEY) || "";
 let LAST = "";
 let TAB = "operations";
 let TAB_ANIM = false; // one-shot: animate the active pane on tab switch
-// Argus applications — Meraki and Zendesk are separate apps; the app selector picks which one (= the tool).
+// Argus applications — each is a separate tool. The app switcher (a dropdown, not a button row, so it
+// scales past a handful of apps) picks the active one; its tabs + API-Browser source follow.
 let APP = localStorage.getItem("argus_app") || "meraki";
+let APPSW_OPEN = false; // app-switcher dropdown open state
 const APPS = {
-  meraki:  { label:"Meraki",  tabs:["operations","network","audit"] },
-  zendesk: { label:"Zendesk", tabs:["comments","apibrowser"], source:"zendesk" },
-  cloudflare: { label:"Cloudflare", tabs:["apibrowser"], source:"cloudflare" }
+  meraki:  { label:"Meraki",  icon:"&#128225;", tag:"Network operations", tabs:["operations","network","audit"] },
+  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["comments","apibrowser"], source:"zendesk" },
+  cloudflare: { label:"Cloudflare", icon:"&#9729;&#65039;", tag:"Edge · read-only", tabs:["apibrowser"], source:"cloudflare" },
+  gcp: { label:"GCP", icon:"&#128176;", tag:"Cloud cost", tabs:["cost"] }
 };
 if(!APPS[APP]) APP="meraki";
 if(APPS[APP].tabs.indexOf(TAB)<0) TAB=APPS[APP].tabs[0];
@@ -1813,18 +1827,29 @@ function render(){
   if(APPS[APP].source) AB.source=APPS[APP].source;
   if(TAB==="apibrowser" && AB.cat===null && !AB.busy && !AB.err) abLoadCatalog();
   if(TAB==="comments" && CM.list===null && !CM.busy && !CM.err) cmLoad();
-  const nsb=document.querySelector(".navsub"); if(nsb) nsb.innerHTML="<b>"+APPS[APP].label+"</b> &mdash; "+(APP==="zendesk"?"Support · read-only":"Operationally Driven, Network Operations Center");
+  if(TAB==="cost" && GC.projects===null && !GC.busy && !GC.err) gcLoad();
+  const nsb=document.querySelector(".navsub"); if(nsb) nsb.innerHTML="<b>"+APPS[APP].label+"</b> &mdash; "+(APP==="zendesk"?"Support · read-only":APP==="cloudflare"?"Edge · read-only":APP==="gcp"?"Cloud cost &middot; read-only":"Operationally Driven, Network Operations Center");
   const tabHtml={
     operations:"<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>",
     network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Comments</span></button>",
-    apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>"
+    apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
+    cost:"<button class='tabv"+(TAB==="cost"?" on":"")+"' data-tab='cost'><span class='ti'>&#128202;</span><span class='tl'>Cost</span></button>"
   };
+  const cur=APPS[APP];
+  const swBtn="<button class='appsw-btn"+(APPSW_OPEN?" open":"")+"' data-appsw='toggle'>"
+     +"<span class='appsw-ic'>"+cur.icon+"</span>"
+     +"<span class='appsw-tx'><span class='appsw-nm'>"+cur.label+"</span><span class='appsw-tg'>"+cur.tag+"</span></span>"
+     +"<span class='appsw-cv'>&#9662;</span></button>";
+  const swMenu="<div class='appsw-menu"+(APPSW_OPEN?"":" hidden")+"'><div class='appsw-hd'>Applications</div>"
+     +Object.keys(APPS).map(a=>"<button class='appmi"+(a===APP?" on":"")+"' data-app='"+a+"'>"
+       +"<span class='appmi-ic'>"+APPS[a].icon+"</span>"
+       +"<span class='appsw-tx'><span class='appsw-nm'>"+APPS[a].label+"</span><span class='appsw-tg'>"+APPS[a].tag+"</span></span></button>").join("")
+     +"</div>";
   const tn=document.getElementById("tabnav");
   if(tn) tn.innerHTML="<div class='tabnav-inner'>"
-     +"<div class='appsel'>"+Object.keys(APPS).map(a=>"<button class='appbtn"+(a===APP?" on":"")+"' data-app='"+a+"'>"+APPS[a].label+"</button>").join("")+"</div>"
-     +"<div class='appsel-lbl'>"+APPS[APP].label+" application</div>"
+     +"<div class='appsw'>"+swBtn+swMenu+"</div>"
      +APPS[APP].tabs.map(t=>tabHtml[t]).join("")
      +"</div>";
 
@@ -1846,13 +1871,149 @@ function render(){
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
   h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+commentsPane()+"</div>";
   h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+apiBrowserPane()+"</div>";
+  // GCP Cost -- cost per project you own, drillable to service -> SKU (gcp-bridge, ADC, read-only)
+  h+="<div id='pane-cost' class='"+paneCls("cost")+"'>"+costPane()+"</div>";
 
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML; TAB_ANIM=false;
 }
 
+// ================= GCP app — Cloud Cost =================
+// "My cost per project I own, at lower levels." Projects come from Cloud Billing; cost per
+// project -> service -> SKU comes from the BigQuery billing export. Both via gcp-bridge (ADC, no
+// key, read-only), gated by the console token (PW). Until the Standard-usage-cost export is turned
+// on, the bridge returns configured:false + the one enable step, and we still show the project
+// inventory (real now) so the tab is useful immediately.
+const GBRIDGE = "https://gcp-bridge-692654781984.us-west1.run.app";
+let GC = { projects:null, cost:null, err:"", busy:false, months:1, drill:{project:null,service:null} };
+function gcFetch(path){ const sep=path.indexOf("?")>=0?"&":"?"; return fetch(GBRIDGE+path+sep+"_="+Date.now(), { cache:"no-store", headers: PW?{ "Authorization":"Bearer "+PW }:{} }); }
+async function gcLoad(){
+  GC.busy=true; GC.err=""; GC.drill={project:null,service:null}; renderGC();
+  try{
+    if(!PW) throw new Error("Unlock the console first — the GCP bridge needs the gate token.");
+    const pr=await gcFetch("/gcp/projects");
+    if(!pr.ok) throw new Error("projects HTTP "+pr.status+(pr.status===401?" — gate token rejected":""));
+    const pj=await pr.json(); GC.projects=(pj&&pj.projectBillingInfo)||[];
+    const cr=await gcFetch("/gcp/cost?months="+GC.months); GC.cost=await cr.json();
+  }catch(e){ GC.projects=GC.projects||[]; GC.err=(e&&e.message)||"load failed"; }
+  GC.busy=false; if(TAB==="cost") renderGC();
+}
+async function gcReloadCost(){
+  GC.busy=true; renderGC();
+  try{ const cr=await gcFetch("/gcp/cost?months="+GC.months); GC.cost=await cr.json(); GC.drill={project:null,service:null}; }
+  catch(e){ GC.err=(e&&e.message)||"load failed"; }
+  GC.busy=false; if(TAB==="cost") renderGC();
+}
+function gcAgg(rows, keyFn){ const m={}; rows.forEach(r=>{ const k=keyFn(r)||"(other)"; if(!m[k]) m[k]={key:k,cost:0,n:0}; m[k].cost+=(+r.cost||0); m[k].n++; }); return Object.values(m).sort((a,b)=>b.cost-a.cost); }
+function gcMoney(n,cur){ cur=cur||"USD"; const v=+n||0; const s=v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); return cur==="USD"?"$"+s:s+" "+cur; }
+function gcMonthsLabel(m){ return m===1?"This month":m+" months"; }
+function costPane(){
+  return "<style>"
+    +"#pane-cost .gchead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px;}"
+    +"#pane-cost h2{font-size:20px;color:#e0e0e0;margin:0;font-weight:800;}"
+    +"#pane-cost .gcsub{color:#8a93a0;font-size:13px;}"
+    +"#pane-cost .gcsum{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 6px;}"
+    +"#pane-cost .gcstat{background:#141414;border:1px solid #222;border-radius:8px;padding:10px 14px;min-width:120px;}"
+    +"#pane-cost .gcstat .k{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#8a93a0;}"
+    +"#pane-cost .gcstat .v{font-size:19px;font-weight:800;color:#6FC3DF;margin-top:2px;}"
+    +"#pane-cost .gcstat .v.small{font-size:13px;font-family:Consolas,monospace;color:#cdd6da;font-weight:600;}"
+    +"#pane-cost .gcmo{display:flex;gap:6px;margin:6px 0 12px;flex-wrap:wrap;}"
+    +"#pane-cost .gcmo button{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;}"
+    +"#pane-cost .gcmo button.on{background:#6FC3DF;color:#06222c;font-weight:700;}"
+    +"#pane-cost .gccrumb{font-size:13px;color:#8a93a0;margin:8px 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}"
+    +"#pane-cost .gccrumb button{background:none;border:0;color:#6FC3DF;cursor:pointer;font-size:13px;font-family:inherit;padding:0;}"
+    +"#pane-cost .gccrumb .cur{color:#e0e0e0;font-weight:700;}"
+    +"#pane-cost .gclist{border:1px solid #222;border-radius:10px;overflow:hidden;}"
+    +"#pane-cost .gcrow{display:flex;align-items:center;gap:12px;width:100%;background:transparent;border:0;border-bottom:1px solid #1c1c1c;padding:11px 14px;text-align:left;font-family:inherit;color:#e0e0e0;}"
+    +"#pane-cost .gcrow:last-child{border-bottom:0;}"
+    +"#pane-cost .gcrow.clk{cursor:pointer;}#pane-cost .gcrow.clk:hover{background:#161d21;}"
+    +"#pane-cost .gcname{flex:0 0 190px;font-size:13px;font-weight:600;word-break:break-word;}"
+    +"#pane-cost .gcbarwrap{flex:1;height:8px;background:#0f0f0f;border-radius:5px;overflow:hidden;min-width:60px;}"
+    +"#pane-cost .gcbar{display:block;height:100%;background:linear-gradient(90deg,#2f6f85,#6FC3DF);border-radius:5px;}"
+    +"#pane-cost .gcamt{flex:0 0 auto;font-family:Consolas,monospace;font-size:13px;color:#cdd6da;min-width:88px;text-align:right;}"
+    +"#pane-cost .gcchev{flex:0 0 14px;color:#5a6b74;font-size:16px;text-align:center;}"
+    +"#pane-cost .gcpills{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}"
+    +"#pane-cost .gcpill{background:#141414;border:1px solid #243b43;border-radius:20px;padding:5px 12px;font-size:12px;color:#cdd6da;}"
+    +"#pane-cost .gcpill.off{border-color:#3a2a12;color:#e0b56f;}"
+    +"#pane-cost .gccard{background:#12191d;border:1px solid #243b43;border-radius:10px;padding:16px 18px;margin:14px 0;}"
+    +"#pane-cost .gccard h3{margin:0 0 8px;font-size:15px;color:#6FC3DF;}"
+    +"#pane-cost .gccard ol{margin:8px 0 12px 18px;padding:0;color:#cdd6da;font-size:13px;line-height:1.7;}"
+    +"#pane-cost .gccard code{background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:1px 6px;font-size:12px;color:#6FC3DF;}"
+    +"#pane-cost .gcbtn{display:inline-block;background:#6FC3DF;color:#06222c;border-radius:7px;padding:8px 16px;font-weight:700;font-size:13px;text-decoration:none;}"
+    +"#pane-cost .gcerr{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:12px 14px;font-size:13px;}"
+    +"#pane-cost .gcnote{color:#777;font-size:12px;margin-top:8px;}"
+    +"#pane-cost .gcload{color:#8a93a0;font-size:13px;padding:20px 4px;}"
+    +"</style><div id='gc-inner'>"+gcInner()+"</div>";
+}
+function gcInner(){
+  if(GC.busy && GC.projects===null) return "<div class='gcload'><span class='spin'></span> loading GCP cost &amp; projects&hellip;</div>";
+  if(GC.err && GC.projects!==null && GC.projects.length===0 && !GC.cost) return "<div class='gcerr'>"+esc(GC.err)+"</div>";
+  const projects=GC.projects||[];
+  const active=projects.filter(p=>p.billingEnabled);
+  const acct=(projects[0]&&projects[0].billingAccountName||"").replace("billingAccounts/","")||"—";
+  const c=GC.cost, rows=(c&&c.rows)||[], cur=(c&&c.currency)||"USD";
+  const configured=!!(c&&c.configured&&c.ok);
+  const grand=rows.reduce((s,r)=>s+(+r.cost||0),0);
+
+  let h="<div class='gchead'><h2>&#128176; Cloud Cost</h2><span class='gcsub'>Projects you own on billing account <b style='color:#cdd6da'>"+esc(acct)+"</b></span></div>";
+
+  // Summary stats.
+  h+="<div class='gcsum'>"
+    +"<div class='gcstat'><div class='k'>Projects (billing on)</div><div class='v'>"+active.length+"</div></div>"
+    +(configured
+       ? "<div class='gcstat'><div class='k'>Spend &middot; "+esc(gcMonthsLabel(c.months||GC.months))+"</div><div class='v'>"+gcMoney(grand,cur)+"</div></div>"
+       : "<div class='gcstat'><div class='k'>Cost breakdown</div><div class='v small'>not enabled yet</div></div>")
+    +"<div class='gcstat'><div class='k'>Source</div><div class='v small'>gcp-bridge &middot; ADC</div></div>"
+    +"</div>";
+
+  if(GC.err){ h+="<div class='gcerr'>"+esc(GC.err)+"</div>"; }
+
+  if(configured && rows.length){
+    // Months selector.
+    h+="<div class='gcmo'>"+[1,3,6,12].map(m=>"<button data-gcmonths='"+m+"' class='"+(GC.months===m?"on":"")+"'>"+(m===1?"This month":m+"mo")+"</button>").join("")+"</div>";
+    // Drill: project -> service -> SKU.
+    const d=GC.drill;
+    let level, items, filtered;
+    if(!d.project){ level="project"; filtered=rows; items=gcAgg(rows, r=>r.project||"(unattributed)"); }
+    else if(!d.service){ level="service"; filtered=rows.filter(r=>(r.project||"(unattributed)")===d.project); items=gcAgg(filtered, r=>r.service); }
+    else { level="sku"; filtered=rows.filter(r=>(r.project||"(unattributed)")===d.project && (r.service||"(other)")===d.service); items=gcAgg(filtered, r=>r.sku); }
+    const max=items.length?items[0].cost:0;
+    // Breadcrumb.
+    h+="<div class='gccrumb'><button data-gcbc='all' class='"+(!d.project?"cur":"")+"'>All projects</button>";
+    if(d.project) h+=" <span>&rsaquo;</span> <button data-gcbc='project' class='"+(!d.service?"cur":"")+"'>"+esc(d.project)+"</button>";
+    if(d.service) h+=" <span>&rsaquo;</span> <span class='cur'>"+esc(d.service)+"</span>";
+    h+="</div>";
+    // Rows.
+    h+="<div class='gclist'>";
+    h+=items.map(it=>{
+      const w=max>0?Math.max(2,Math.round(it.cost/max*100)):0;
+      const clickable=level!=="sku";
+      const attr=level==="project"?"data-gcproj=\""+esc(it.key)+"\"":level==="service"?"data-gcsvc=\""+esc(it.key)+"\"":"";
+      return "<button class='gcrow"+(clickable?" clk":"")+"' "+attr+">"
+        +"<span class='gcname'>"+esc(it.key)+"</span>"
+        +"<span class='gcbarwrap'><span class='gcbar' style='width:"+w+"%'></span></span>"
+        +"<span class='gcamt'>"+gcMoney(it.cost,cur)+"</span>"
+        +"<span class='gcchev'>"+(clickable?"&#8250;":"")+"</span></button>";
+    }).join("");
+    h+="</div>";
+    h+="<div class='gcnote'>"+esc(level==="project"?"Click a project to drill into its services, then SKUs.":level==="service"?"Click a service to drill into its SKUs.":"SKU-level detail — the lowest level.")+" &middot; from "+esc(c.table||"billing export")+"</div>";
+  } else {
+    // Cost export not on yet — show the project inventory (real now) + the one enable step.
+    h+="<div class='gcpills'>"+active.map(p=>"<span class='gcpill'>"+esc(p.projectId)+"</span>").join("")+"</div>";
+    const steps=(c&&c.steps)||["Cloud Console → Billing → Billing export → BigQuery export → Edit settings","Enable 'Standard usage cost', dataset = acmedev-platform-hq.billing_export","Save. Cost populates within ~24h (not retroactive)."];
+    h+="<div class='gccard'><h3>Turn on the cost breakdown</h3>"
+      +"<div style='color:#cdd6da;font-size:13px;'>Projects and billing status are live above. To unlock per-project → per-service → per-SKU cost, enable the BigQuery <b>Standard usage cost</b> export once (the dataset is already created and the bridge is wired to it):</div>"
+      +"<ol>"+steps.map(s=>"<li>"+esc(s)+"</li>").join("")+"</ol>"
+      +"<a class='gcbtn' href='https://console.cloud.google.com/billing/"+esc(acct==="—"?"":acct)+"/export/bigquery?project=acmedev-platform-hq' target='_blank' rel='noopener'>Open Billing export &rarr;</a>"
+      +"<div class='gcnote'>"+esc((c&&c.reason)?("bridge: "+c.reason):"Cost drill-down appears here automatically once the export starts writing rows.")+"</div>"
+      +"</div>";
+  }
+  return h;
+}
+function renderGC(){ const el=document.getElementById("gc-inner"); if(el) el.innerHTML=gcInner(); }
+
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Comments"; return "View"; }
-function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Comments"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
   if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
@@ -2228,7 +2389,17 @@ document.getElementById("report").addEventListener("click", e=>{
 // API Browser (read-only) — lazy-load the catalog on first entry, and its own delegated controls.
 document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-tab='apibrowser']") && AB.cat===null && !AB.busy){ abLoadCatalog(); } });
 // Application selector (Meraki / Zendesk) — switch the active app, its tabs, and the API Browser source.
-document.getElementById("tabnav").addEventListener("click", e=>{ const a=e.target.closest("[data-app]"); if(!a) return; const x=a.getAttribute("data-app"); if(!APPS[x]||x===APP) return; APP=x; localStorage.setItem("argus_app",x); TAB=APPS[x].tabs[0]; TAB_ANIM=true; if(APPS[x].source) AB.source=APPS[x].source; if(TAB==="apibrowser" && AB.cat===null && !AB.busy) abLoadCatalog(); if(TAB==="comments" && CM.list===null && !CM.busy) cmLoad(); render(); });
+document.getElementById("tabnav").addEventListener("click", e=>{ const a=e.target.closest("[data-app]"); if(!a) return; const x=a.getAttribute("data-app"); APPSW_OPEN=false; if(!APPS[x]||x===APP){ render(); return; } APP=x; localStorage.setItem("argus_app",x); TAB=APPS[x].tabs[0]; TAB_ANIM=true; if(APPS[x].source) AB.source=APPS[x].source; if(TAB==="apibrowser" && AB.cat===null && !AB.busy) abLoadCatalog(); if(TAB==="comments" && CM.list===null && !CM.busy) cmLoad(); if(TAB==="cost" && GC.projects===null && !GC.busy) gcLoad(); render(); });
+// App switcher: toggle the dropdown; close it on any outside click.
+document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-appsw='toggle']")){ APPSW_OPEN=!APPSW_OPEN; render(); } });
+document.addEventListener("click", e=>{ if(APPSW_OPEN && !e.target.closest(".appsw")){ APPSW_OPEN=false; render(); } });
+// GCP Cost (read-only): month range + drill project -> service -> SKU + breadcrumb.
+document.getElementById("report").addEventListener("click", e=>{
+  const mo=e.target.closest("[data-gcmonths]"); if(mo){ GC.months=+mo.getAttribute("data-gcmonths"); gcReloadCost(); return; }
+  const pj=e.target.closest("[data-gcproj]"); if(pj){ GC.drill={project:pj.getAttribute("data-gcproj"),service:null}; renderGC(); return; }
+  const sv=e.target.closest("[data-gcsvc]"); if(sv){ GC.drill.service=sv.getAttribute("data-gcsvc"); renderGC(); return; }
+  const bc=e.target.closest("[data-gcbc]"); if(bc){ const lv=bc.getAttribute("data-gcbc"); if(lv==="all") GC.drill={project:null,service:null}; else if(lv==="project") GC.drill.service=null; renderGC(); return; }
+});
 // Comments (read-only): lazy-load on entry + ticket-open + order toggle.
 document.getElementById("tabnav").addEventListener("click", e=>{ if(e.target.closest("[data-tab='comments']") && CM.list===null && !CM.busy){ cmLoad(); } });
 document.getElementById("report").addEventListener("click", e=>{
@@ -2338,7 +2509,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r271 · 01cc163 · 2026-07-01</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r274 · 2fbf64e · 2026-07-01</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
