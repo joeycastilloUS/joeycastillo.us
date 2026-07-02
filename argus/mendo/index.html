@@ -1712,7 +1712,7 @@ function abInner(){
 function renderAB(){ const w=document.getElementById("ab-wrap"); if(w) w.innerHTML=abInner(); }
 
 // ===== Comments — readable Zendesk ticket + comment surface (read-only, gap-ordered) =====
-let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap", filter:null, page:0, q:"", pageSize:25, analysis:{}, abusy:false, aerr:"", ledger:null };
+let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap", filter:null, page:0, q:"", pageSize:25, analysis:{}, abusy:false, aerr:"", ledger:null, correcting:null, cbusy:false };
 function zdFetch(path){ const sep=path.indexOf("?")>=0?"&":"?"; return fetch(ZBRIDGE+path+sep+"_="+Date.now(), { cache:"no-store", headers: PW?{ "Authorization":"Bearer "+PW }:{} }); }
 function cmTags(t){ const tags=t.tags||[]; let intent="",conf="",sent=""; tags.forEach(x=>{ if(x.indexOf("intent__")===0) intent=x.slice(8).replace(/__/g," › ").replace(/_/g," "); else if(x==="intent_confidence__low")conf="low"; else if(x==="sentiment__negative")sent="negative"; }); return {intent,conf,sent,idk:tags.indexOf("i_don_t_know")>=0}; }
 function cmGapRank(t){ const g=cmTags(t); if(g.idk) return 0; if(g.conf==="low") return 1; if(!g.intent) return 2; return 3; }
@@ -1751,6 +1751,28 @@ async function cmAnalyze(id){
     else CM.analysis[id]=d;
   }catch(e){ CM.aerr="Couldn’t reach gcp-bridge."; }
   CM.abusy=false; renderCM(); cmLedger();
+}
+// Curate → shape: operator corrects the verdict; each changed field is written to `corrections`
+// in the argus Firestore, which the bridge injects as few-shot into future analyses. Teach it once.
+async function cmCorrect(id){
+  const t=(CM.list||[]).find(x=>x.id===id); const a=CM.analysis[id]; if(!a||!a.analysis) return;
+  const cl=a.analysis.classification||{};
+  const nd=document.getElementById("gc-corr-domain"), ni=document.getElementById("gc-corr-intent"), nr=document.getElementById("gc-corr-routing");
+  const changes=[];
+  if(nd && nd.value.trim() && nd.value.trim()!==cl.domain) changes.push(["domain",cl.domain||"",nd.value.trim()]);
+  if(ni && ni.value.trim() && ni.value.trim()!==cl.intent) changes.push(["intent",cl.intent||"",ni.value.trim()]);
+  if(nr && nr.value.trim() && nr.value.trim()!==a.analysis.routing) changes.push(["routing",a.analysis.routing||"",nr.value.trim()]);
+  if(!changes.length){ CM.correcting=null; renderCM(); return; }
+  CM.cbusy=true; renderCM();
+  try{
+    for(const c of changes){
+      await fetch(GBRIDGE+"/vertex/correction", { method:"POST",
+        headers:Object.assign({ "Content-Type":"application/json" }, PW?{ "Authorization":"Bearer "+PW }:{}),
+        body:JSON.stringify({ ticketId:id, subject:t.subject||("#"+id), field:c[0], before:c[1], after:c[2], operator:"operator" }) });
+    }
+    try{ toast("Taught — the AI will learn this"); }catch(_){}
+  }catch(e){ try{ toast("Correction failed"); }catch(_){} }
+  CM.cbusy=false; CM.correcting=null; renderCM(); cmLedger();
 }
 // The running ledger from the argus Firestore — tickets analyzed + total spend (eyes everywhere).
 async function cmLedger(){
@@ -1807,7 +1829,10 @@ function commentsPane(){
     +"#pane-comments .cma-row{font-size:13px;color:#dfe4e9;margin:6px 0;}#pane-comments .cma-row .k{color:#8a93a0;font-size:10px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:1px;}"
     +"#pane-comments .cma-verify{background:#141c20;border-left:3px solid #ffd479;border-radius:0 6px 6px 0;padding:8px 12px;margin:8px 0;font-size:13px;color:#f0e6cf;}#pane-comments .cma-verify .k{color:#ffd479;font-size:10px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:2px;}"
     +"#pane-comments .cma-next{background:#0c1c22;border-left:3px solid #6FC3DF;border-radius:0 6px 6px 0;padding:8px 12px;margin:8px 0;font-size:13.5px;color:#e6f4fa;font-weight:600;}#pane-comments .cma-next .k{color:#6FC3DF;font-size:10px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:2px;font-weight:700;}"
-    +"#pane-comments .cma-meta{font-family:Consolas,monospace;font-size:11px;color:#7d8894;}#pane-comments .cma-meta b{color:#9aa3ad;}#pane-comments .cma-esc{color:#ffd479;font-weight:700;}"
+    +"#pane-comments .cma-meta{font-family:Consolas,monospace;font-size:11px;color:#7d8894;}#pane-comments .cma-meta b{color:#9aa3ad;}#pane-comments .cma-esc{color:#ffd479;font-weight:700;}#pane-comments .cma-learn{color:#7CFFB2;}"
+    +"#pane-comments .cma-corr{background:#0c1418;border:1px solid #2a3a42;border-radius:8px;padding:12px;margin:8px 0;}#pane-comments .cma-corr .cl{display:block;font-size:10px;color:#8a93a0;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 2px;}"
+    +"#pane-comments .cma-corr input{width:100%;background:#0f0f0f;color:#e0e0e0;border:1px solid #333;border-radius:6px;padding:6px 9px;font-size:13px;font-family:inherit;}#pane-comments .cma-corr input:focus{outline:0;border-color:#6FC3DF;}"
+    +"#pane-comments .cma-corr .row{display:flex;gap:8px;margin-top:10px;}#pane-comments .cma-save{background:#6FC3DF;color:#06222c;border:0;border-radius:6px;padding:7px 14px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;}#pane-comments .cma-cancel{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:inherit;}#pane-comments .cma-correct{background:#141c20;color:#ffd479;border:1px solid #3a2f12;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;margin-left:8px;}"
     +"#pane-comments .cma-prov{font-size:11px;color:#5a6069;margin-top:10px;border-top:1px solid #1c2830;padding-top:8px;}#pane-comments .cma-prov b{color:#8a93a0;}"
     +"#pane-comments .cma-btn{background:#6FC3DF;color:#06222c;border:0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}#pane-comments .cma-re{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;}"
     +"</style><div id='cm-wrap'>"+cmInner()+"</div>";
@@ -1897,11 +1922,21 @@ function cmAnalysisHtml(id){
   if(th.open_question) h+="<div class='cma-row'><span class='k'>open question</span>"+abEsc(th.open_question)+"</div>";
   if(an.next_step) h+="<div class='cma-next'><span class='k'>&rarr; next step</span>"+abEsc(an.next_step)+"</div>";
   if(an.operator_verify) h+="<div class='cma-verify'><span class='k'>verify before acting</span>"+abEsc(an.operator_verify)+"</div>";
+  if(CM.correcting===id){
+    h+="<div class='cma-corr'>"
+      +"<span class='cl'>domain</span><input id='gc-corr-domain' value='"+abEsc(cl.domain||"")+"' spellcheck='false' autocomplete='off'>"
+      +"<span class='cl'>intent</span><input id='gc-corr-intent' value='"+abEsc(cl.intent||"")+"' spellcheck='false' autocomplete='off'>"
+      +"<span class='cl'>routing</span><input id='gc-corr-routing' value='"+abEsc(an.routing||"")+"' spellcheck='false' autocomplete='off'>"
+      +"<div class='row'><button class='cma-save' data-cmcsave='"+id+"'"+(CM.cbusy?" disabled":"")+">"+(CM.cbusy?"Saving&hellip;":"Save &mdash; teach it")+"</button>"
+      +"<button class='cma-cancel' data-cmccancel='1'>Cancel</button></div></div>";
+  }
   const m=a.meta||{}, tok=(m.tokens&&m.tokens.total)||0;
+  const learn=(m.lessonsApplied>0)?" &middot; <span class='cma-learn'>learned from "+m.lessonsApplied+"</span>":"";
   const metaLine = m.model ? "<div class='cma-meta'><b>"+abEsc(m.model)+"</b>"+(m.escalated?" <span class='cma-esc'>&#9650; escalated</span>":"")
-      +" &middot; "+(m.latencyMs||0)+"ms &middot; "+tok+" tok &middot; $"+(m.costUsd!=null?(+m.costUsd).toFixed(6):"?")+"</div>" : "";
+      +" &middot; "+(m.latencyMs||0)+"ms &middot; "+tok+" tok &middot; $"+(m.costUsd!=null?(+m.costUsd).toFixed(6):"?")+learn+"</div>" : "";
   h+="<div class='cma-prov'>"+metaLine+"via Vertex AI &middot; project <b>"+abEsc((pv.project)||"acmedev-platform-hq")+"</b> &middot; in-project, no key"
-    +" <button class='cma-re' data-cmanalyze='"+id+"' style='margin-left:8px'>&#8635; re-analyze</button></div>";
+    +" <button class='cma-re' data-cmanalyze='"+id+"' style='margin-left:8px'>&#8635; re-analyze</button>"
+    +(CM.correcting===id?"":"<button class='cma-correct' data-cmcorrect='"+id+"'>&#9998; correct</button>")+"</div>";
   return h+"</div>";
 }
 
@@ -2503,6 +2538,9 @@ document.getElementById("report").addEventListener("click", e=>{
   const gd=e.target.closest("[data-cmg]"); if(gd){ const id=gd.getAttribute("data-cmg"); CM.q=""; cmOpen(isNaN(+id)?id:+id); return; }
   const row=e.target.closest("[data-cmt]"); if(row){ const id=row.getAttribute("data-cmt"); cmOpen(isNaN(+id)?id:+id); return; }
   const az=e.target.closest("[data-cmanalyze]"); if(az){ const id=az.getAttribute("data-cmanalyze"); cmAnalyze(isNaN(+id)?id:+id); return; }
+  const cc=e.target.closest("[data-cmcorrect]"); if(cc){ const id=cc.getAttribute("data-cmcorrect"); CM.correcting=isNaN(+id)?id:+id; renderCM(); return; }
+  const cs=e.target.closest("[data-cmcsave]"); if(cs){ const id=cs.getAttribute("data-cmcsave"); cmCorrect(isNaN(+id)?id:+id); return; }
+  if(e.target.closest("[data-cmccancel]")){ CM.correcting=null; renderCM(); return; }
   const ob=e.target.closest("[data-cmord]"); if(ob){ CM.order=ob.getAttribute("data-cmord"); CM.page=0; renderCM(); return; }
   const fl=e.target.closest("[data-cmfilter]"); if(fl){ const v=fl.getAttribute("data-cmfilter"); CM.filter=(v==="__all__"||CM.filter===v)?null:v; CM.page=0; renderCM(); return; }
   const pg=e.target.closest("[data-cmpg]"); if(pg){ CM.page += (pg.getAttribute("data-cmpg")==="next"?1:-1); if(CM.page<0)CM.page=0; renderCM(); return; }
@@ -2607,7 +2645,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r298 . 7844023 . 2026-07-01</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r299 . 5c76a1b . 2026-07-02</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
