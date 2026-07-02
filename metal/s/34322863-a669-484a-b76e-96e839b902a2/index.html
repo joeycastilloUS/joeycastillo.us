@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build &mdash; Concurrent Sessions via Worktree (First Move)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 820px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 25px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 18px; margin: 14px 0; }
+  ul { margin: 8px 0 8px 20px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; color: #6FC3DF; }
+  pre { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; font-size: 12.5px; }
+  pre code { background: none; padding: 0; color: #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid #333; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 14px; margin: 10px 0; color: #bbb; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 40px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~b &mdash; Concurrent Sessions (worktree)</span>
+  <span class="pub">Published 2026-07-02 14:57 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/34322863-a669-484a-b76e-96e839b902a2/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Build &mdash; Concurrent Sessions via Worktree (First Move)</h1>
+<p style="color:#999;">Teach the launcher <code>go &lt;n&gt;</code> to run session n in its own git worktree. Proven: two sessions land on main, zero index-lock contention.</p>
+
+<h2>What Was Built</h2>
+<div class="section">
+  <p>The First Move of the concurrent-sessions design (<code>be/designs/2026-07-02-0849-design-concurrent-sessions.html</code>): the launcher now accepts a session number.</p>
+  <ul>
+    <li><strong><code>go</code></strong> (bare) &mdash; primary session, <code>C:\metal</code>, OTel 4318. Byte-identical behavior to before &mdash; zero regression.</li>
+    <li><strong><code>go &lt;n&gt;</code></strong> (n &ge; 2) &mdash; the launcher creates (or reuses) a git <strong>worktree</strong> at <code>C:\metal.&lt;n&gt;</code> on branch <code>session-&lt;n&gt;</code>, sets <code>$root</code> to it, starts the OTel collector on port <code>4318+n</code>, and launches claude there.</li>
+  </ul>
+  <p>Each worktree shares the <code>.git</code> object store + hooks (installed once into the main <code>.git/hooks</code>) but has its <strong>own working tree and its own git index</strong> &mdash; which is what makes the <code>index.lock</code> race impossible by construction. Each session's <code>be/</code> (board-status, telemetry) is naturally isolated; the per-session OTel port removes the collision.</p>
+</div>
+
+<h2>Proof (isolated harness)</h2>
+<div class="section">
+  <blockquote>Run <code>go</code> and <code>go 2</code> side by side; commit in each at once; both land on <code>origin/main</code>, neither hits <code>index.lock</code>.</blockquote>
+  <table>
+    <tr><th>Check</th><th>Result</th></tr>
+    <tr><td>Worktree created on <code>session-2</code> off main</td><td><span class="pass">yes</span> (2 worktrees listed)</td></tr>
+    <tr><td>Separate indexes (main <code>.git/index</code> vs <code>.git/worktrees/&lt;wt&gt;/index</code>)</td><td><span class="pass">yes</span> &mdash; no shared index.lock</td></tr>
+    <tr><td>Concurrent commits (session1 on main, session2 on session-2)</td><td><span class="pass">both committed</span></td></tr>
+    <tr><td>Both push to origin/main via rebase-retry (<code>HEAD:main</code>)</td><td><span class="pass">pushed try 1 each</span></td></tr>
+    <tr><td>origin/main carries BOTH sessions' commits</td><td><span class="pass">session1 + session2 both present</span></td></tr>
+    <tr><td>index.lock contention observed</td><td><span class="pass">0</span></td></tr>
+    <tr><td><code>otel_collector.py --port</code> supported / <code>go.ps1</code> + <code>go.sh</code> syntax</td><td><span class="pass">yes / clean</span></td></tr>
+  </table>
+</div>
+
+<h2>Decisions Made</h2>
+<div class="section">
+  <ul>
+    <li><strong><code>$root</code> indirection.</strong> The launcher computes one operational root (main or worktree) and everything &mdash; hook, autoheal, board, telemetry, collector, settings, prompt &mdash; hangs off it. Session 1 is unchanged; a numbered session just re-points <code>$root</code>.</li>
+    <li><strong>Hooks are shared, installed once</strong> into the main <code>.git/hooks</code> (worktrees share the common git dir) &mdash; so the ASCII guard applies to every session.</li>
+    <li><strong>Land on main via rebase-retry</strong> (<code>git push origin HEAD:main</code>) &mdash; the same loop that already lands concurrent writers. Per-session branch keeps a named line to reason about.</li>
+    <li><strong>Per-session OTel port <code>4318+n</code></strong> &mdash; clean cost attribution, no collision.</li>
+  </ul>
+</div>
+
+<h2>Files Changed</h2>
+<div class="section">
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>go.ps1</code></td><td><code>param([int]$Session)</code>; worktree create/reuse; <code>$root</code> + per-session OTel port; all refs follow <code>$root</code></td></tr>
+    <tr><td><code>go.sh</code></td><td>parity: <code>$1</code> session arg; worktree create/reuse; <code>SCRIPT_DIR</code> re-points to the worktree; hooks from main</td></tr>
+    <tr><td>(<code>go.bat</code>)</td><td>unchanged &mdash; already forwards <code>%*</code> to <code>go.ps1</code></td></tr>
+  </table>
+</div>
+
+<h2>What's Next</h2>
+<div class="section">
+  <ul>
+    <li><strong>Session-branch push discipline.</strong> A tilde in a <code>session-&lt;n&gt;</code> worktree pushes <code>HEAD:main</code> (proven here); fold that into the chain's push step so every tilde does it automatically in a numbered session.</li>
+    <li><strong>Lifecycle:</strong> <code>go &lt;n&gt; --end</code> to <code>git worktree remove</code> + delete the branch; prune orphan worktrees from crashed sessions on launch.</li>
+    <li><strong>board.md concurrency</strong> &mdash; the one shared mutable file; rebase-retry handles it; escalate to a board write-lock only if same-item conflicts get noisy.</li>
+  </ul>
+</div>
+
+<h2>Definition of Done</h2>
+<div class="section">
+  <ul>
+    <li><span class="pass">&#10003;</span> Code committed + pushed, SSH-signed; report saved + index updated</li>
+    <li><span class="pass">&#10003;</span> First Move proven in an isolated harness (both land on main, 0 index.lock)</li>
+    <li><span class="pass">&#10003;</span> Session 1 unchanged (no regression); go.ps1 + go.sh syntax clean</li>
+    <li><span class="pass">&#10003;</span> Born a Latchkey (this report is published at its cap-URL with a comment thread)</li>
+  </ul>
+</div>
+
+</div>
+
+<!-- LATCHKEY THREAD -- doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<div style="max-width:840px;margin:0 auto;padding:0 16px 24px;">
+<h2 style="color:#6FC3DF;font-size:20px;margin:32px 0 12px;border-bottom:1px solid #333;padding-bottom:8px;">Comments &amp; Follow-up <span style="font-size:12px;color:#555;font-weight:400;">Latchkey thread &middot; <code>~fu</code> attends</span></h2>
+<div style="background:#1A1A1A;border-radius:8px;padding:18px;">
+  <div id="lk-seen" style="font-size:12px;color:#22c55e;margin-bottom:8px;display:none;">&#10003; seen by metal</div>
+  <div id="lk-comments" style="color:#888;">Loading&hellip;</div>
+  <div style="margin-top:14px;border-top:1px solid #333;padding-top:12px;">
+    <input id="lk-name" placeholder="Your name" style="background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:6px 8px;border-radius:4px;margin:0 6px 6px 0;font-size:13px;">
+    <input id="lk-obj" placeholder="section, e.g. Shape (optional)" style="background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:6px 8px;border-radius:4px;margin:0 6px 6px 0;font-size:13px;width:230px;">
+    <br>
+    <textarea id="lk-text" rows="2" placeholder="Comment... start with ~ to issue a tilde command scoped to this artifact" style="width:100%;background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:8px;border-radius:4px;font-size:13px;font-family:inherit;margin:4px 0;box-sizing:border-box;"></textarea>
+    <button id="lk-post" onclick="lkPost()" style="background:#6FC3DF;color:#000;border:none;padding:7px 16px;border-radius:4px;font-weight:600;cursor:pointer;">Comment</button>
+  </div>
+</div>
+</div>
+<script>
+(function(){
+  var BRIDGE='https://gcp-bridge-692654781984.us-west1.run.app';
+  var TOKEN='34322863-a669-484a-b76e-96e839b902a2';
+  function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;}
+  function load(){
+    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN)).then(function(r){return r.json();}).then(function(d){
+      if(d.seenByMetal){document.getElementById('lk-seen').style.display='block';}
+      var box=document.getElementById('lk-comments');
+      if(!d.comments||!d.comments.length){box.innerHTML='<span style="color:#666;">No comments yet. Leave one &mdash; then run ~fu.</span>';return;}
+      box.innerHTML=d.comments.map(function(c){
+        var who=esc(c.author||'anon');
+        var obj=(c.obj&&c.obj!=='page'&&c.obj!=='general')?' <span style="color:#6FC3DF;">['+esc(c.obj)+']</span>':'';
+        var isCmd=(c.text&&c.text.charAt(0)==='~')?' <span style="color:#f59e0b;">&#9655; command</span>':'';
+        return '<div style="border-bottom:1px solid #222;padding:8px 0;"><div style="font-size:12px;color:#999;"><strong style="color:'+(who==='metal'?'#6FC3DF':'#e0e0e0')+';">'+who+'</strong>'+obj+isCmd+' <span style="color:#555;">'+esc(c.ts||'')+'</span></div><div style="margin-top:3px;white-space:pre-wrap;">'+esc(c.text)+'</div></div>';
+      }).join('');
+    }).catch(function(){document.getElementById('lk-comments').innerHTML='<span style="color:#f59e0b;">comments unavailable</span>';});
+  }
+  window.lkPost=function(){
+    var name=(document.getElementById('lk-name').value||'').trim();
+    var text=(document.getElementById('lk-text').value||'').trim();
+    var obj=(document.getElementById('lk-obj').value||'').trim()||'page';
+    if(!name||!text){return;}
+    var b=document.getElementById('lk-post');b.textContent='...';b.disabled=true;
+    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN)+'&obj='+encodeURIComponent(obj),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({author:name,text:text})})
+    .then(function(){document.getElementById('lk-text').value='';b.textContent='Comment';b.disabled=false;load();})
+    .catch(function(){b.textContent='Comment';b.disabled=false;alert('post failed');});
+  };
+  load();
+})();
+</script>
+
+<footer>v0 &middot; r1751 &middot; 2026-07-02 &middot; Be &middot; metal console</footer>
+</body>
+</html>
