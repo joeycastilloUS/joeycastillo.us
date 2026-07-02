@@ -1712,7 +1712,7 @@ function abInner(){
 function renderAB(){ const w=document.getElementById("ab-wrap"); if(w) w.innerHTML=abInner(); }
 
 // ===== Comments — readable Zendesk ticket + comment surface (read-only, gap-ordered) =====
-let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap", filter:null, page:0, q:"", pageSize:25, analysis:{}, abusy:false, aerr:"" };
+let CM = { list:null, sel:null, thread:null, err:"", busy:false, tbusy:false, terr:"", users:{}, order:"gap", filter:null, page:0, q:"", pageSize:25, analysis:{}, abusy:false, aerr:"", ledger:null };
 function zdFetch(path){ const sep=path.indexOf("?")>=0?"&":"?"; return fetch(ZBRIDGE+path+sep+"_="+Date.now(), { cache:"no-store", headers: PW?{ "Authorization":"Bearer "+PW }:{} }); }
 function cmTags(t){ const tags=t.tags||[]; let intent="",conf="",sent=""; tags.forEach(x=>{ if(x.indexOf("intent__")===0) intent=x.slice(8).replace(/__/g," › ").replace(/_/g," "); else if(x==="intent_confidence__low")conf="low"; else if(x==="sentiment__negative")sent="negative"; }); return {intent,conf,sent,idk:tags.indexOf("i_don_t_know")>=0}; }
 function cmGapRank(t){ const g=cmTags(t); if(g.idk) return 0; if(g.conf==="low") return 1; if(!g.intent) return 2; return 3; }
@@ -1726,7 +1726,7 @@ async function cmLoad(){
     const d=await r.json(); CM.list=(d.data&&d.data.tickets)||[];
     try{ const ru=await zdFetch("/read?entry=users"); if(ru.ok){ const du=await ru.json(); ((du.data&&du.data.users)||[]).forEach(u=>{ if(u&&u.id) CM.users[u.id]=u.name; }); } }catch(_){}
   }catch(e){ CM.err="Couldn’t reach the bridge."; }
-  CM.busy=false; renderCM();
+  CM.busy=false; renderCM(); cmLedger();
 }
 async function cmOpen(id){
   CM.sel=id; CM.thread=null; CM.terr=""; CM.tbusy=true; CM.aerr=""; renderCM();
@@ -1745,12 +1745,19 @@ async function cmAnalyze(id){
     const thread=(CM.thread||[]).map(c=>({ author:cmName(c.author_id), public:c.public!==false, date:(c.created_at||""), body:((c.plain_body||c.body||"")+"").slice(0,4000) }));
     const r=await fetch(GBRIDGE+"/vertex/analyze", { method:"POST", cache:"no-store",
       headers:Object.assign({ "Content-Type":"application/json" }, PW?{ "Authorization":"Bearer "+PW }:{}),
-      body:JSON.stringify({ subject:t.subject||("#"+id), thread }) });
+      body:JSON.stringify({ ticketId:id, subject:t.subject||("#"+id), thread }) });
     let d={}; try{ d=await r.json(); }catch(_){}
     if(!r.ok || !d.analysis){ CM.aerr = r.status===401 ? "Unlock the Argus gate to run analysis." : (d.detail||d.error||("HTTP "+r.status)); }
     else CM.analysis[id]=d;
   }catch(e){ CM.aerr="Couldn’t reach gcp-bridge."; }
-  CM.abusy=false; renderCM();
+  CM.abusy=false; renderCM(); cmLedger();
+}
+// The running ledger from the argus Firestore — tickets analyzed + total spend (eyes everywhere).
+async function cmLedger(){
+  try{
+    const r=await fetch(GBRIDGE+"/vertex/ledger?_="+Date.now(), { cache:"no-store", headers: PW?{ "Authorization":"Bearer "+PW }:{} });
+    if(r.ok){ const d=await r.json(); if(d&&d.ok){ CM.ledger={count:d.count,cost:d.totalCostUsd}; renderCM(); } }
+  }catch(_){}
 }
 // --- summary (what am I looking at?) + focus filter + typeahead search ---
 function cmStats(){ const L=CM.list||[]; const s={total:L.length,idk:0,low:0,neg:0,intents:{}}; L.forEach(t=>{ const g=cmTags(t); if(g.idk)s.idk++; if(g.conf==="low")s.low++; if(g.sent==="negative")s.neg++; if(g.intent){ const top=g.intent.split(" › ")[0]; s.intents[top]=(s.intents[top]||0)+1; } }); s.topIntents=Object.keys(s.intents).map(k=>[k,s.intents[k]]).sort((a,b)=>b[1]-a[1]).slice(0,5); return s; }
@@ -1856,7 +1863,9 @@ function cmProvenance(){
   return "<div class='cmprov'>&#129522; AI analysis runs on <b>Google Gemini 2.5 Flash</b> via "
     +"<a href='https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash' target='_blank' rel='noopener'>Vertex AI</a>, "
     +"inside your <b>acmedev-platform-hq</b> GCP project <span class='dot'>&middot;</span> your data stays in-project (ADC, no API key) "
-    +"<span class='dot'>&middot;</span> <a href='https://console.cloud.google.com/vertex-ai?project=acmedev-platform-hq' target='_blank' rel='noopener'>open Vertex in the console &#8599;</a></div>";
+    +"<span class='dot'>&middot;</span> <a href='https://console.cloud.google.com/vertex-ai?project=acmedev-platform-hq' target='_blank' rel='noopener'>open Vertex in the console &#8599;</a>"
+    +(CM.ledger?"<span class='dot'>&middot;</span> <b>ledger:</b> "+CM.ledger.count+" analyzed &middot; $"+(+CM.ledger.cost).toFixed(4)+" spent <span style='color:#5a6069'>(argus Firestore)</span>":"")
+    +"</div>";
 }
 // The Argus AI verdict on the open ticket — OUR classification + sentiment/tone + thread-stitch.
 function cmAnalysisHtml(id){
@@ -2598,7 +2607,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r297 . 4ac913f . 2026-07-01</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r298 . 7844023 . 2026-07-01</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
