@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# metal — install. Tools + engine in one shot.
-# v3.0 — 2026-03-25
+# metal ï¿½ install. Tools + engine in one shot.
+# v3.0 ï¿½ 2026-03-25
 # curl -fsSL https://joeycastillo.us/metal/install.sh | bash
 # Installs git, gh, clones metal, runs Fe (tools), launches Be.
-# Idempotent — safe to run again.
+# Idempotent ï¿½ safe to run again.
 
 set -e
 
@@ -14,7 +14,7 @@ MODE="${1:-${METAL_MODE:-full}}"
 
 echo ""
 echo "  metal"
-echo "  v3.0 — 2026-03-25"
+echo "  v3.0 ï¿½ 2026-03-25"
 echo ""
 echo "  Dedicated to Our Lady of the Miraculous Medal"
 echo ""
@@ -144,6 +144,14 @@ if [ ! -f "$METAL_DIR/go.sh" ]; then
     echo "    gh repo clone kastil-systems/metal-console ~/metal"
     exit 1
 fi
+
+# Belt-and-suspenders: FORCE the install-critical scripts to origin/main before
+# running them, so a stale or partially-reconciled clone can never run an old
+# Go.Fe (which ADDED MCP) or an old Go.Sign (email FAIL). Decoupled from whether
+# the clone's own autoheal fully updated. Local edits to these files are not a
+# thing operators do; overwriting is correct.
+git -C "$METAL_DIR" fetch -q origin main 2>/dev/null || true
+git -C "$METAL_DIR" checkout origin/main -- Go.Fe.sh Go.Fe.bat Go.Sign.sh Go.Sign.bat go.sh go.bat 2>/dev/null || true
 
 # === Step 5: Run Fe (Iron) ===
 echo "[5/6] Running Fe..."

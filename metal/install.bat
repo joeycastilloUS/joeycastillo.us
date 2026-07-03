@@ -145,6 +145,12 @@ if not exist "C:\metal\go.bat" (
     goto :error
 )
 
+rem Belt-and-suspenders: FORCE the install-critical scripts to origin/main before
+rem running them, so a stale/partial clone can never run an old Go.Fe (which ADDED
+rem MCP) or an old Go.Sign (email FAIL), regardless of whether autoheal updated.
+git -C C:\metal fetch -q origin main 2>nul
+git -C C:\metal checkout origin/main -- Go.Fe.ps1 Go.Fe.bat Go.Sign.ps1 Go.Sign.bat go.ps1 go.bat 2>nul
+
 rem === Step 5: Run Fe (Iron) ===
 echo [5/6] Running Fe...
 if /i "!MODE!"=="tools" (
