@@ -233,7 +233,7 @@ if !errorlevel! neq 0 (
         goto :error
     )
     rem use 'call' so npm.cmd returns control to this batch reliably.
-    call npm install -g @anthropic-ai/claude-code
+    call npm install -g @anthropic-ai/claude-code@latest
     call :refresh_path
     if exist "%APPDATA%\npm\claude.cmd" set "PATH=!PATH!;%APPDATA%\npm"
     where claude >nul 2>&1
