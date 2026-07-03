@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# metal â€” install. Tools + engine in one shot.
-# v3.0 â€” 2026-03-25
+# metal — install. Tools + engine in one shot.
+# v3.0 — 2026-03-25
 # curl -fsSL https://joeycastillo.us/metal/install.sh | bash
 # Installs git, gh, clones metal, runs Fe (tools), launches Be.
-# Idempotent â€” safe to run again.
+# Idempotent — safe to run again.
 
 set -e
 
@@ -14,7 +14,7 @@ MODE="${1:-${METAL_MODE:-full}}"
 
 echo ""
 echo "  metal"
-echo "  v3.0 â€” 2026-03-25"
+echo "  v3.0 — 2026-03-25"
 echo ""
 echo "  Dedicated to Our Lady of the Miraculous Medal"
 echo ""
@@ -155,6 +155,14 @@ if [ -f "$METAL_DIR/Go.Fe.sh" ]; then
     fi
 else
     echo "  Go.Fe.sh not found - skipping tools setup."
+fi
+
+# === Step 5a: Ensure latest Claude Code (the runtime Be drives) ===
+if command -v npm >/dev/null 2>&1; then
+    echo "[5a] Installing/updating Claude Code to latest..."
+    npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || echo "  (claude-code update skipped -- npm error)"
+else
+    echo "  npm not found -- install Node.js, then: npm install -g @anthropic-ai/claude-code@latest"
 fi
 
 # Standalone modes stop here -- Iron already did identity via its own Go.Sign
