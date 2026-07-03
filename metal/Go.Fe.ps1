@@ -360,24 +360,33 @@ Copy-Item "$PSScriptRoot\claude\settings.local.json" "$env:USERPROFILE\.claude\s
 Write-Host "  Claude settings installed"
 
 # -- Step 3: MCP -- metal does NOT install or support MCP servers.
-# MCP is deliberately not used. NUCLEAR (Joey direct): remove EVERY MCP server
-# configured on the box, not just the ones metal added. Re-running Iron leaves
-# zero MCP. Non-fatal; removing a non-existent server is a harmless no-op.
+# NUCLEAR by default, but RESPECTFUL: any server named in ~/.metal-mcp-ignore is
+# KEPT (one name per line, # for comments), and ~/.claude.json is backed up first
+# so a removal is always recoverable. metal ADDS zero MCP; it only clears them.
 if (Get-Command claude -ErrorAction SilentlyContinue) {
-    Write-Host "[Fe 3/4] MCP disabled -- removing ALL MCP servers..."
-    $removed = 0
+    Write-Host "[Fe 3/4] MCP -- removing servers (keeping any listed in ~/.metal-mcp-ignore)..."
+    $claudeJson = Join-Path $HOME ".claude.json"
+    if (Test-Path $claudeJson) { Copy-Item $claudeJson (Join-Path $HOME ".claude.json.metal-mcp-backup") -Force -ErrorAction SilentlyContinue }
+    $keep = @()
+    $ignoreFile = Join-Path $HOME ".metal-mcp-ignore"
+    if (Test-Path $ignoreFile) {
+        $keep = Get-Content $ignoreFile | ForEach-Object { ($_ -replace '#.*$', '').Trim() } | Where-Object { $_ }
+    }
+    $removed = 0; $kept = 0
     foreach ($line in (& claude mcp list 2>$null)) {
         $tok = ($line -split '\s+' | Where-Object { $_ })[0]
         if (-not $tok) { continue }
         $name = $tok.TrimEnd(':')
         if ($name -match '^(https?.*|Checking|No|MCP|Name)$') { continue }
+        if ($keep -contains $name) { Write-Host "  Kept MCP (in ~/.metal-mcp-ignore): $name"; $kept++; continue }
         & claude mcp remove $name 2>$null
         & claude mcp remove --scope user $name 2>$null
         Write-Host "  Removed MCP: $name"
         $removed++
     }
-    if ($removed -eq 0) { Write-Host "  No MCP servers found." }
-    Write-Host "  metal uses no MCP servers."
+    if ($removed -eq 0 -and $kept -eq 0) { Write-Host "  No MCP servers found." }
+    if ($removed -gt 0) { Write-Host "  (backup: ~/.claude.json.metal-mcp-backup)" }
+    Write-Host "  metal uses no MCP servers (kept: $kept)."
 } else {
     Write-Host "[Fe 3/4] Claude Code not found -- nothing to do (metal uses no MCP)."
 }

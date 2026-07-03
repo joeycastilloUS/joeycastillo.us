@@ -290,24 +290,35 @@ cp "$SCRIPT_DIR/claude/settings.local.json" "$HOME/.claude/settings.local.json" 
 echo "  Claude settings installed"
 
 # -- Step 3: MCP -- metal does NOT install or support MCP servers.
-# MCP is deliberately not used. NUCLEAR (Joey direct): remove EVERY MCP server
-# configured on the box, not just the ones metal added. Re-running Iron leaves
-# zero MCP. Non-fatal; removing a non-existent server is a harmless no-op.
+# NUCLEAR by default, but RESPECTFUL: any server named in ~/.metal-mcp-ignore is
+# KEPT (one name per line, # for comments), and ~/.claude.json is backed up first
+# so a removal is always recoverable. metal ADDS zero MCP; it only clears them.
 if command -v claude &>/dev/null; then
-    echo "[Fe 3/4] MCP disabled -- removing ALL MCP servers..."
-    removed=0
+    echo "[Fe 3/4] MCP -- removing servers (keeping any listed in ~/.metal-mcp-ignore)..."
+    # Back up the live config so nothing is ever lost unrecoverably.
+    [ -f "$HOME/.claude.json" ] && cp "$HOME/.claude.json" "$HOME/.claude.json.metal-mcp-backup" 2>/dev/null
+    # Load the keep-list (names metal must NOT remove).
+    keep=""
+    if [ -f "$HOME/.metal-mcp-ignore" ]; then
+        keep=$(grep -vE '^[[:space:]]*#' "$HOME/.metal-mcp-ignore" 2>/dev/null | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    fi
+    removed=0; kept=0
     while IFS= read -r line; do
         tok="${line%%[[:space:]]*}"
         name="${tok%:}"
         [ -n "$name" ] || continue
         case "$name" in http*|https*|Checking|No|MCP|Name) continue ;; esac
+        if printf '%s\n' "$keep" | grep -qxF "$name"; then
+            echo "  Kept MCP (in ~/.metal-mcp-ignore): $name"; kept=$((kept + 1)); continue
+        fi
         claude mcp remove "$name" >/dev/null 2>&1
         claude mcp remove --scope user "$name" >/dev/null 2>&1
         echo "  Removed MCP: $name"
         removed=$((removed + 1))
     done < <(claude mcp list 2>/dev/null)
-    [ "$removed" = "0" ] && echo "  No MCP servers found."
-    echo "  metal uses no MCP servers."
+    [ "$removed" = "0" ] && [ "$kept" = "0" ] && echo "  No MCP servers found."
+    [ "$removed" != "0" ] && echo "  (backup: ~/.claude.json.metal-mcp-backup)"
+    echo "  metal uses no MCP servers (kept: $kept)."
 else
     echo "[Fe 3/4] Claude Code not found -- nothing to do (metal uses no MCP)."
 fi
