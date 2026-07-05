@@ -1838,7 +1838,7 @@ function commentsPane(){
     +"</style><div id='cm-wrap'>"+cmInner()+"</div>";
 }
 function cmInner(){
-  let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'><h2 style='margin:0'>Comments</h2><span class='abro'>READ-ONLY</span></div>"
+  let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'><h2 style='margin:0'>Tickets</h2><span class='abro'>READ-ONLY</span></div>"
     +"<div class='muted' style='margin-bottom:12px'>Read the conversation, and see where the automation is unsure. Gaps first — <b>i-don’t-know</b> and <b>low-confidence</b> intents rise to the top.</div>";
   if(CM.list===null && !CM.busy && !CM.err){ return h
     +"<div style='padding:10px 0 4px'><button data-tload='cm' style='background:#6FC3DF;color:#06222c;border:0;border-radius:7px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit'>Load comments</button></div>"
@@ -1956,7 +1956,7 @@ function render(){
     operations:"<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>",
     network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
-    comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Comments</span></button>",
+    comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Tickets</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
     zdaudit:"<button class='tabv"+(TAB==="zdaudit"?" on":"")+"' data-tab='zdaudit'><span class='ti'>&#128203;</span><span class='tl'>Audit"+((ZAUD.run&&ZAUD.run.findings.length)?" &middot; <b class='bad'>"+ZAUD.run.findings.length+"</b>":"")+"</span></button>",
     cost:"<button class='tabv"+(TAB==="cost"?" on":"")+"' data-tab='cost'><span class='ti'>&#128202;</span><span class='tl'>Cost</span></button>"
@@ -2249,9 +2249,88 @@ function zdImpactLine(f){ const n=(f.offenders&&f.offenders.length)||0; const me
 var ZD_AI_AREAS = { "Intelligent Triage":1, "Knowledge / HC":1, "AI Answers":1 };
 // Ordered read stages (must match the ZAUD.prog labels set in zdRunAudit) — drives the streaming checklist.
 var ZD_RUN_STAGES = ["triggers","automations","macros","schedules","addresses","groups","fields","group memberships","help center","AI settings","SLA policies","views","ticket forms","agent seats","HC sections"];
-// Expandable offender list — "show me the N" without cluttering the card until asked.
+
+// ===== Board R2 — the four links (Why · How · Open-in-Zendesk · [Apply, R3]) =====
+// Deep-link families, split by where the object actually lives: the Admin Center vs Guide (help center).
+// This is the "exact place in Zendesk config" link Joey asked for — per object where an id exists, else
+// the section page. TENANT-scoped; today Mendo. (Verified URL patterns; uncertain ones fall back to a
+// section page rather than a guessed exact path — honest, never a fabricated deep link.)
+var ZD_ADMIN = "https://mendocinofarms.zendesk.com";
+var ZD_DEEP = {   // per-id builders (Admin Center unless noted)
+  trigger:    i=>ZD_ADMIN+"/admin/objects-rules/rules/triggers/"+i,
+  automation: i=>ZD_ADMIN+"/admin/objects-rules/rules/automations/"+i,
+  macro:      i=>ZD_ADMIN+"/admin/workspaces/agent-workspace/macros/"+i,
+  view:       i=>ZD_ADMIN+"/admin/workspaces/agent-workspace/views/"+i,
+  form:       i=>ZD_ADMIN+"/admin/objects-rules/tickets/ticket-forms/edit/"+i,
+  user:       i=>ZD_ADMIN+"/admin/people/team/members/"+i,
+  article:    i=>ZD_ADMIN+"/knowledge/articles/"+i    // Guide family, not Admin Center
+};
+var ZD_AREA = {   // section pages (no id / compound cases)
+  triggers:ZD_ADMIN+"/admin/objects-rules/rules/triggers", automations:ZD_ADMIN+"/admin/objects-rules/rules/automations",
+  macros:ZD_ADMIN+"/admin/workspaces/agent-workspace/macros", views:ZD_ADMIN+"/admin/workspaces/agent-workspace/views",
+  forms:ZD_ADMIN+"/admin/objects-rules/tickets/ticket-forms", fields:ZD_ADMIN+"/admin/objects-rules/tickets/fields",
+  slas:ZD_ADMIN+"/admin/objects-rules/business-rules/slas", schedules:ZD_ADMIN+"/admin/objects-rules/business-rules/schedules",
+  groups:ZD_ADMIN+"/admin/people/team/groups", members:ZD_ADMIN+"/admin/people/team/members",
+  security:ZD_ADMIN+"/admin/account/security/advanced", email:ZD_ADMIN+"/admin/channels/talk-and-email/email",
+  guide:ZD_ADMIN+"/knowledge"
+};
+function zdSrch(q){ return "https://support.zendesk.com/hc/en-us/search?query="+encodeURIComponent(q); }
+var _DOC = {
+  triggers:"https://developer.zendesk.com/api-reference/ticketing/business-rules/triggers/",
+  automations:"https://developer.zendesk.com/api-reference/ticketing/business-rules/automations/",
+  macros:"https://developer.zendesk.com/api-reference/ticketing/business-rules/macros/",
+  views:"https://developer.zendesk.com/api-reference/ticketing/business-rules/views/",
+  forms:"https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_forms/",
+  slas:"https://developer.zendesk.com/api-reference/ticketing/business-rules/sla_policies/",
+  users:"https://developer.zendesk.com/api-reference/ticketing/users/users/",
+  articles:"https://developer.zendesk.com/api-reference/help_center/help-center-api/articles/",
+  triage:"https://support.zendesk.com/hc/en-us/articles/4550640560538",
+  twofa:"https://support.zendesk.com/hc/en-us/articles/4408846853274-Managing-security-settings-in-Admin-Center"
+};
+// Per-check: why (best practice), how (how-to/API), fam (per-id deep-link family), area (fallback page),
+// action (the remediation action id the write lane knows — drives the R3 Apply button; null = no one-click).
+var ZD_LINKS = {
+  "trg-dead":     {why:zdSrch("unused triggers best practices"), how:_DOC.triggers, fam:"trigger", area:ZD_AREA.triggers, action:"deactivate-trigger"},
+  "trg-sprawl":   {why:zdSrch("too many triggers consolidate"),  how:_DOC.triggers, area:ZD_AREA.triggers},
+  "trg-inactive": {why:zdSrch("inactive triggers cleanup"),      how:_DOC.triggers, area:ZD_AREA.triggers},
+  "rule-clash":   {why:zdSrch("duplicate conflicting triggers"), how:_DOC.triggers, fam:"trigger", area:ZD_AREA.triggers, action:"deactivate-trigger"},
+  "aut-dead":     {why:zdSrch("automations best practices"),     how:_DOC.automations, fam:"automation", area:ZD_AREA.automations, action:"deactivate-automation"},
+  "aut-refire":   {why:zdSrch("automation nullify condition"),   how:_DOC.automations, fam:"automation", area:ZD_AREA.automations},
+  "mac-dead":     {why:zdSrch("unused macros cleanup"),          how:_DOC.macros, fam:"macro", area:ZD_AREA.macros, action:"deactivate-macro"},
+  "view-sprawl":  {why:zdSrch("too many views consolidate"),     how:_DOC.views, area:ZD_AREA.views},
+  "hrs-sched":    {why:zdSrch("business hours schedule SLA"),    how:zdSrch("set up business hours schedule"), area:ZD_AREA.schedules},
+  "addr-verified":{why:zdSrch("support address SPF verification"), how:zdSrch("verify support address forwarding"), area:ZD_AREA.email},
+  "grp-empty":    {why:zdSrch("empty groups routing"),           how:zdSrch("delete or edit a group"), area:ZD_AREA.groups},
+  "fld-inactive": {why:zdSrch("ticket fields cleanup"),          how:zdSrch("deactivate ticket field"), area:ZD_AREA.fields},
+  "form-inactive":{why:zdSrch("ticket forms cleanup"),          how:_DOC.forms, fam:"form", area:ZD_AREA.forms, action:"deactivate-form"},
+  "sla-bizhours": {why:zdSrch("SLA business hours vs calendar"), how:_DOC.slas, area:ZD_AREA.slas},
+  "seat-idle":    {why:zdSrch("agent seats light agent downgrade"), how:_DOC.users, fam:"user", area:ZD_AREA.members},
+  "agent-2fa":    {why:_DOC.twofa, how:_DOC.twofa, area:ZD_AREA.security},
+  "tri-adoption": {why:_DOC.triage, how:_DOC.triage, area:ZD_AREA.triggers},
+  "kb-stale":     {why:zdSrch("help center article freshness"),  how:_DOC.articles, fam:"article", area:ZD_AREA.guide},
+  "kb-drafts":    {why:zdSrch("publish help center draft"),      how:_DOC.articles, fam:"article", area:ZD_AREA.guide},
+  "kb-unhelpful": {why:zdSrch("improve article feedback votes"), how:_DOC.articles, fam:"article", area:ZD_AREA.guide},
+  "kb-empty-sections":{why:zdSrch("help center structure sections"), how:_DOC.articles, area:ZD_AREA.guide},
+  "ai-answers-grounded":{why:zdSrch("automatic answers article recommendations"), how:zdSrch("set up automatic answers"), area:ZD_AREA.guide}
+};
+// The deep-link for a whole finding: the first offender's object page if the check is per-object, else the section.
+function zdFindingDeep(f){ const L=ZD_LINKS[f.id]; if(!L) return null;
+  const o=(f.offenders||[])[0];
+  if(L.fam && o && o.id!=null && ZD_DEEP[L.fam]) return ZD_DEEP[L.fam](o.id);
+  return L.area||null; }
+// The four-links row rendered on every finding (Apply, the fourth, lands in R3 off L.action).
+function zdFindingLinks(f){ const L=ZD_LINKS[f.id]; if(!L) return "";
+  const deep=zdFindingDeep(f); let h="<div class='zlinks'>";
+  if(L.why) h+="<a href='"+L.why+"' target='_blank' rel='noopener'>&#9432; Why</a>";
+  if(L.how) h+="<a href='"+L.how+"' target='_blank' rel='noopener'>&#128214; How-to</a>";
+  if(deep)  h+="<a href='"+deep+"' target='_blank' rel='noopener'>&#8599; Open in Zendesk</a>";
+  h+="</div>"; return h; }
+// Expandable offender list — "show me the N", each name deep-linked to its object where one exists.
 function zdOffenders(f){ const o=f.offenders||[]; if(o.length<2) return "";
-  return "<details class='zoff'><summary>show all "+o.length+" affected</summary><div class='zoffl'>"+o.map(x=>esc(zdLabel(x))).join(" &middot; ")+"</div></details>"; }
+  const L=ZD_LINKS[f.id], fam=L&&L.fam;
+  const items=o.map(function(x){ const nm=esc(zdLabel(x));
+    return (fam&&x&&x.id!=null&&ZD_DEEP[fam]) ? "<a href='"+ZD_DEEP[fam](x.id)+"' target='_blank' rel='noopener'>"+nm+"</a>" : nm; });
+  return "<details class='zoff'><summary>show all "+o.length+" affected</summary><div class='zoffl'>"+items.join(" &middot; ")+"</div></details>"; }
 function zdStageList(){ const cur=ZD_RUN_STAGES.indexOf(ZAUD.prog); return "<div class='zstages'>"+ZD_RUN_STAGES.map(function(s,i){
   var cls = (cur<0||i<cur)?"done":(i===cur?"cur":"todo"); var mark = cls==="done"?"&#10003;":(cls==="cur"?"<span class='spin'></span>":"&middot;");
   return "<span class='zstg "+cls+"'>"+mark+" "+esc(s)+"</span>"; }).join("")+"</div>"; }
@@ -2281,7 +2360,7 @@ function zdAuditInner(){
     if(!run.findings.length) h+="<div class='muted'>No issues on the audited checks. &#9989;</div>";
     else h+=run.findings.map(f=>"<div class='zfind'><div class='zfh'>"+zdGradeChip(f.status)+"<span class='zft'>"+esc(f.title)+"</span>"+zdTagChip(f.tag)+(f.gr?"<span class='zgr'>GR</span>":"")+"<span class='zar'>"+esc(f.area)+"</span></div>"
       +"<div class='zfd'>"+esc(f.detail)+"</div>"+zdImpactLine(f)
-      +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div>"+zdOffenders(f)+"</div>").join("");
+      +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div>"+zdFindingLinks(f)+zdOffenders(f)+"</div>").join("");
     h+="</div>";
     // honest not-audited
     h+="<div class='box'><div class='feat-h'>Not audited yet</div><div class='muted' style='margin-bottom:8px'>Excluded from the score — never a silent pass. Grades flip on as the bridge reads land.</div>"
@@ -2308,7 +2387,8 @@ function zdAuditPane(){
     +"#pane-zdaudit .zgrp{color:#8fb7c4;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:16px 0 8px}"
     +"#pane-zdaudit .zarea{border-left:3px solid #2a343b}.zarea.gf{border-left-color:#ff9b9b}.zarea.gw{border-left-color:#ffd479}.zarea.gp{border-left-color:#7CFFB2}"
     +"#pane-zdaudit .zstages{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.zstg{font-size:10.5px;border-radius:4px;padding:2px 7px;background:#0f1519;color:#5c6670}.zstg.done{color:#7CFFB2}.zstg.cur{color:#6FC3DF;background:#0c1c22}"
-    +"#pane-zdaudit .zoff{margin-top:8px}.zoff summary{cursor:pointer;color:#6FC3DF;font-size:11.5px;font-weight:700}.zoffl{color:#9aa7b0;font-size:11.5px;margin-top:6px;line-height:1.7}"
+    +"#pane-zdaudit .zoff{margin-top:8px}.zoff summary{cursor:pointer;color:#6FC3DF;font-size:11.5px;font-weight:700}.zoffl{color:#9aa7b0;font-size:11.5px;margin-top:6px;line-height:1.7}.zoffl a{color:#9fd4e4;text-decoration:none;border-bottom:1px dotted #345}.zoffl a:hover{color:#6FC3DF}"
+    +"#pane-zdaudit .zlinks{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px}.zlinks a{color:#8fb7c4;font-size:11.5px;font-weight:700;text-decoration:none;border-bottom:1px solid #223} .zlinks a:hover{color:#6FC3DF;border-bottom-color:#6FC3DF}"
     +"#pane-zdaudit .zna{display:flex;flex-wrap:wrap;gap:8px}.znac{background:#111417;border:1px dashed #2a343b;border-radius:7px;padding:8px 12px;min-width:180px}.znat{display:block;color:#8a93a0;font-weight:700;font-size:12px}.znam{display:block;color:#5c6670;font-size:11px}"
     +"</style><div id='zd-wrap'>"+zdAuditInner()+"</div>";
 }
@@ -2454,7 +2534,7 @@ function gcInner(){
 function renderGC(){ const el=document.getElementById("gc-inner"); if(el) el.innerHTML=gcInner(); }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Comments"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
@@ -2960,7 +3040,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r374 . 66bbb96 . 2026-07-04</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r392 . 5157ddd . 2026-07-05</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
