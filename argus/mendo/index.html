@@ -2357,18 +2357,56 @@ function zdWriteMode(){
   ZREM.tok = t.trim(); ZREM.on = true; renderZAUD();
 }
 async function zdApply(action, id){
-  const k=zdRemKey(action,id); ZREM.steps[k]={status:"applying"}; renderZAUD();
-  try{ const d=await zdPost("apply",{ action, id:String(id) }); ZREM.steps[k]={status:"applied", before:d.before, after:d.after}; }
-  catch(e){ ZREM.steps[k]={status:"failed", err:String(e.message||e)}; }
+  const k=zdRemKey(action,id), body={ action, id:String(id) }, t0=Date.now();
+  ZREM.steps[k]={status:"applying", label:zdRemLabel(action,id)}; renderZAUD();
+  try{ const d=await zdPost("apply",body);
+    ZREM.steps[k]={status:"applied", before:d.before, after:d.after, label:zdRemLabel(action,id),
+      debug:{ op:"apply", req:body, resp:d, ms:Date.now()-t0, at:new Date().toLocaleTimeString() }}; }
+  catch(e){ ZREM.steps[k]={status:"failed", err:String(e.message||e), label:zdRemLabel(action,id),
+      debug:{ op:"apply", req:body, resp:String(e.message||e), ms:Date.now()-t0, at:new Date().toLocaleTimeString() }}; }
   renderZAUD();
 }
 async function zdRollback(action, id){
   const k=zdRemKey(action,id); const st=ZREM.steps[k];
   if(!st || st.before==null){ return; }                       // no anchor -> nothing to restore
-  const prev=st; ZREM.steps[k]=Object.assign({}, st, {status:"applying"}); renderZAUD();
-  try{ await zdPost("rollback",{ action, id:String(id), before:st.before }); ZREM.steps[k]={status:"rolledback", before:prev.before}; }
-  catch(e){ ZREM.steps[k]=Object.assign({}, prev, {status:"failed", err:String(e.message||e)}); }
+  const prev=st, body={ action, id:String(id), before:st.before }, t0=Date.now();
+  ZREM.steps[k]=Object.assign({}, st, {status:"applying"}); renderZAUD();
+  try{ const d=await zdPost("rollback",body);
+    ZREM.steps[k]={status:"rolledback", before:prev.before, label:prev.label,
+      debug:{ op:"rollback", req:body, resp:d, ms:Date.now()-t0, at:new Date().toLocaleTimeString() }}; }
+  catch(e){ ZREM.steps[k]=Object.assign({}, prev, {status:"failed", err:String(e.message||e),
+      debug:{ op:"rollback", req:body, resp:String(e.message||e), ms:Date.now()-t0, at:new Date().toLocaleTimeString() }}); }
   renderZAUD();
+}
+// Roll back everything applied this session, newest first — the session-wide undo.
+async function zdUndoAll(){
+  const applied=Object.keys(ZREM.steps).filter(k=>ZREM.steps[k].status==="applied");
+  if(!applied.length) return;
+  if(!confirm("Undo all "+applied.length+" change(s) applied this session? Each is restored to its captured prior value.")) return;
+  for(const k of applied.reverse()){ const a=k.split("|"); await zdRollback(a[0], a.slice(1).join("|")); }
+}
+function zdRemLabel(action,id){
+  const run=ZAUD.run; if(!run) return action+" "+id;
+  for(const f of run.findings){ const L=ZD_LINKS[f.id]; if(!L||L.action!==action) continue;
+    const o=(f.offenders||[]).find(x=>String(x.id)===String(id)); if(o) return zdLabel(o); }
+  return action.replace("deactivate-","")+" #"+id;
+}
+// The session ledger — every applied/rolled-back change, with an Undo-everything and a debug drawer.
+function zdLedger(){
+  const keys=Object.keys(ZREM.steps).filter(k=>["applied","rolledback","failed"].indexOf(ZREM.steps[k].status)>=0);
+  if(!keys.length) return "";
+  const nApplied=keys.filter(k=>ZREM.steps[k].status==="applied").length;
+  let h="<div class='box'><div class='feat-h' style='display:flex;align-items:center;gap:10px'>Change ledger &middot; this session"
+    +(nApplied?" <button class='zundoall' data-zundoall>&#8635; Undo everything ("+nApplied+")</button>":"")+"</div>";
+  h+=keys.map(function(k){ const s=ZREM.steps[k];
+    const badge = s.status==="applied"?"<span class='zok'>&#10003; applied</span>"
+      : s.status==="rolledback"?"<span class='zrbk'>&#8635; rolled back</span>"
+      : "<span class='zfail'>&#10007; failed</span>";
+    const dbg = s.debug ? ("<details class='zdbg'><summary>debug</summary><pre>"+esc(JSON.stringify(s.debug,null,1))+"</pre></details>") : "";
+    return "<div class='zledrow'><span class='zapn'>"+esc(s.label||k)+"</span><span class='zapc'>"+badge
+      + (s.debug?(" <span class='muted' style='font-size:10.5px'>"+s.debug.op+" &middot; "+s.debug.ms+"ms &middot; "+esc(s.debug.at||"")+"</span>"):"")
+      +"</span></div>"+dbg; }).join("");
+  return h+"</div>";
 }
 async function zdApplyAll(fid){
   const f=(ZAUD.run&&ZAUD.run.findings||[]).find(x=>x.id===fid); if(!f) return;
@@ -2394,7 +2432,8 @@ function zdApplyBlock(f){
     else if(st.status==="rolledback") ctl="<span class='zrbk'>&#8635; rolled back</span> <button class='zap' data-zap='"+L.action+"|"+o.id+"'>Re-apply</button>";
     else if(st.status==="failed") ctl="<span class='zfail'>&#10007; "+esc(st.err||"failed")+"</span> <button class='zap' data-zap='"+L.action+"|"+o.id+"'>Retry</button>";
     else ctl="<button class='zap' data-zap='"+L.action+"|"+o.id+"'>&#9654; Apply</button>";
-    return "<div class='zaprow'><span class='zapn'>"+esc(zdLabel(o))+"</span><span class='zapc'>"+ctl+"</span></div>";
+    const dbg = st.debug ? ("<details class='zdbg'><summary>debug</summary><pre>"+esc(JSON.stringify(st.debug,null,1))+"</pre></details>") : "";
+    return "<div class='zaprow'><span class='zapn'>"+esc(zdLabel(o))+"</span><span class='zapc'>"+ctl+"</span></div>"+dbg;
   }).join("");
   return h+"</div>";
 }
@@ -2431,6 +2470,7 @@ function zdAuditInner(){
       +"<div class='zfd'>"+esc(f.detail)+"</div>"+zdImpactLine(f)
       +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div>"+zdFindingLinks(f)+zdApplyBlock(f)+zdOffenders(f)+"</div>").join("");
     h+="</div>";
+    h+=zdLedger();   // session change ledger (applied/rolled-back) + Undo-everything + debug drawer
     // honest not-audited
     h+="<div class='box'><div class='feat-h'>Not audited yet</div><div class='muted' style='margin-bottom:8px'>Excluded from the score — never a silent pass. Grades flip on as the bridge reads land.</div>"
       +"<div class='zna'>"+ZD_NOTAUDITED.map(x=>"<div class='znac'><span class='znat'>"+esc(x[0])+"</span><span class='znam'>"+esc(x[1])+"</span></div>").join("")+"</div></div>";
@@ -2466,6 +2506,9 @@ function zdAuditPane(){
     +"#pane-zdaudit .zaprow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid #14202700}.zapn{color:#c7d0d8;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.zapc{flex:0 0 auto;font-size:11.5px}"
     +"#pane-zdaudit .zap,.zrb{background:#12303a;color:#9fe0f2;border:1px solid #235;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer}.zap:hover,.zrb:hover{background:#173b47}"
     +"#pane-zdaudit .zok{color:#7CFFB2;font-weight:700}.zrbk{color:#ffd479;font-weight:700}.zfail{color:#ff9b9b;font-weight:700}"
+    +"#pane-zdaudit .zundoall{background:#332608;color:#ffd479;border:1px solid #5a4410;border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:auto}"
+    +"#pane-zdaudit .zledrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #161c22}.zledrow .zapn{color:#c7d0d8;font-size:12px}"
+    +"#pane-zdaudit .zdbg{margin:2px 0 8px}.zdbg summary{cursor:pointer;color:#6b7a82;font-size:10.5px;font-weight:700}.zdbg pre{background:#080e11;border:1px solid #162028;border-radius:6px;padding:8px 10px;font-size:10.5px;color:#9fb4bf;margin-top:4px;max-height:220px}"
     +"#pane-zdaudit .zna{display:flex;flex-wrap:wrap;gap:8px}.znac{background:#111417;border:1px dashed #2a343b;border-radius:7px;padding:8px 12px;min-width:180px}.znat{display:block;color:#8a93a0;font-weight:700;font-size:12px}.znam{display:block;color:#5c6670;font-size:11px}"
     +"</style><div id='zd-wrap'>"+zdAuditInner()+"</div>";
 }
@@ -2473,6 +2516,7 @@ function renderZAUD(){ const w=document.getElementById("zd-wrap"); if(w) w.inner
 document.addEventListener("click", function(e){
   if(e.target.closest("[data-zdrun]")){ zdRunAudit(); return; }
   if(e.target.closest("[data-zwm]")){ zdWriteMode(); return; }
+  if(e.target.closest("[data-zundoall]")){ zdUndoAll(); return; }
   const ap=e.target.closest("[data-zap]"); if(ap){ const a=ap.getAttribute("data-zap").split("|"); zdApply(a[0], a.slice(1).join("|")); return; }
   const rb=e.target.closest("[data-zrb]"); if(rb){ const a=rb.getAttribute("data-zrb").split("|"); zdRollback(a[0], a.slice(1).join("|")); return; }
   const aa=e.target.closest("[data-zaall]"); if(aa){
@@ -3128,7 +3172,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r397 . a321137 . 2026-07-05</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r404 . 4472e07 . 2026-07-05</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
