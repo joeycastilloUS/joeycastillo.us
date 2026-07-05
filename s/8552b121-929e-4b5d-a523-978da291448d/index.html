@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex, nofollow">
+<title>Tickets service — Trust + Slot applied (Fable 5, corrected)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0d0d; color:#e0e0e0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; z-index:20; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; }
+  .brand { color:#6FC3DF; font-weight:700; font-size:18px; }
+  .pub { color:#8a93a0; font-size:12px; }
+  .wrap { max-width:920px; margin:0 auto; padding:24px 18px; }
+  h1 { color:#6FC3DF; font-size:22px; margin-bottom:4px; }
+  .sub{color:#8a93a0;font-size:13px;margin-bottom:14px;}
+  h2 { color:#6FC3DF; font-size:17px; margin:20px 0 8px; }
+  .card{background:#141a1f;border:1px solid #222c33;border-radius:10px;padding:16px 18px;margin:10px 0;}
+  .flag{background:#0f1a12;border:1px solid #2c5a3a;border-radius:8px;padding:12px 15px;margin:10px 0;color:#bfe8cc;font-size:12.5px;}
+  p{margin:8px 0;} b,strong{color:#e6edf2;} em{color:#7CFFB2;font-style:normal;}
+  code{background:#0a1013;padding:2px 6px;border-radius:4px;font-size:12px;color:#6FC3DF;}
+  pre{background:#0a0f12;border:1px solid #1a2830;border-radius:8px;padding:12px 14px;overflow:auto;font-size:11.5px;color:#cdd6da;line-height:1.5;margin:8px 0;white-space:pre;}
+  ul,ol{margin:6px 0 6px 20px;} li{margin:5px 0;}
+  table{width:100%;border-collapse:collapse;margin:8px 0;} th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #22303a;font-size:12px;vertical-align:top;} th{color:#6FC3DF;font-size:10px;text-transform:uppercase;}
+  .reuse{color:#7CFFB2;font-weight:700;} .new{color:#ffd479;font-weight:700;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:40px;padding:24px;border-top:1px solid #222;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be · argus · <span style="color:#8a93a0;font-weight:400;font-size:13px">Tickets service · Trust+Slot · Fable 5</span></span><span class="pub">Published 2026-07-04 22:10 PT</span></nav>
+<div class="wrap">
+<h1>Tickets substrate service — Trust + Slot applied</h1>
+<div class="sub">"Look in our design patterns." Fable 5 read trust.md + slot.md + the real switchboard/relay code — and it corrected the architecture, not just the estimate: the earlier design had the edge speaking wire, which Trust names as the anti-pattern.</div>
+
+<div class="flag">
+<b>The correction:</b> the C# edge must NOT speak wire. trust.md's anti-pattern list: <em>"Master key on the edge — giving the hollow edge the mesh PSK so it can talk to the core. Now the edge is the core's equal; defeats the pattern."</em> The wire hop belongs to the <b>relay</b>, and that C is already written + live (<code>relay_wire_to_prime()</code>, riding two skills today). Corrected path:
+<pre>browser --HTTP+bearer--> Hollow Edge (C#, clone switchboard) --HTTP scoped-bearer-->
+   relay (C, existing /ingest seam) --wire--> prime (C, ticket Slot skill, IDS in RAM)</pre>
+</div>
+
+<h2>Patterns applied — this is a Trust + Slot build, not new invention</h2>
+<div class="card" data-cm="patterns">
+<p>The jacket is the <b>Trust</b> pattern (<code>kastil-systems/a-d-d/patterns/trust.md</code>) — Hollow Edge / Sealed Core / Anchor Seal — whose first known use is exactly our shape: <em>switchboard (C# edge ▸ wire ▸ prime skill)</em>. The reusable C# artifact is the switchboard Hollow Edge at <code>C:\switchboard\edge\Program.cs</code> (155 lines, live, externally verified): CORS allowlist, <code>Forward()</code> with a scoped bearer, 429 retry, health, plus the Cloud Run scaffold. It's a <b>hollow HTTP edge, not a wire client</b> — by design.</p>
+<p>The wire hop is already-written C: <code>C:\nous\comms\skill\relay\relay_server.c</code> has the edge-sink seam (<code>POST /ingest</code>, ~line 1995) — it takes <code>{action, op, body}</code> JSON from a C# Hollow Edge, strips it to wire triples, and delegates to the prime via <code>relay_wire_to_prime()</code>. Two production seams already ride it: <code>airbyte-atlas/edge</code> and <code>yosemite-camp/conditions-edge</code>.</p>
+<p>The ticket→payload op is a <b>Slot</b> skill (<code>slot.md</code>): a self-contained seat at <code>C:\nous\comms\skill\ticket\</code> (<code>.c</code>/<code>.h</code>/<code>skill.json</code>) + one Pin line in <code>g_action_table</code> (<code>prime_server.c:6445</code>). Verified from code: <code>{"ingest",wire_h_ingest}</code> + <code>{"conditions",wire_h_conditions}</code> pinned at 6460–6461. The ticket skill is the <b>fourth rider on a proven bus</b> — addition, not surgery, on the 6,995-line server.</p>
+</div>
+
+<h2>What's reused vs. genuinely new</h2>
+<div class="card" data-cm="reuse">
+<table>
+<tr><th>piece</th><th>status</th><th>source / what must be written</th></tr>
+<tr><td>C# Hollow Edge (CORS, Forward, scoped bearer, retry, health)</td><td class="reuse">REUSED</td><td>clone <code>switchboard/edge/Program.cs</code> — third clone of a shipped shape</td></tr>
+<tr><td>Cloud Run deploy scaffold</td><td class="reuse">REUSED</td><td><code>switchboard/edge/Dockerfile</code> + <code>cloudbuild.yaml</code> (meraki-bridge lineage)</td></tr>
+<tr><td>Wire client — handshake / PSK / framing</td><td class="reuse">REUSED (relay's job)</td><td><code>relay_wire_to_prime()</code>; the edge NEVER speaks wire (Trust anti-pattern)</td></tr>
+<tr><td>Edge-sink seam ({action,op,body}→wire→skill→back)</td><td class="reuse">REUSED</td><td><code>handle_ingest()</code> in relay_server.c; add <code>"ticket"</code> to its action whitelist</td></tr>
+<tr><td>Slot / Pin / Bus skill-seating</td><td class="reuse">REUSED</td><td><code>g_action_table</code> dispatch + <code>comms/skill/&lt;name&gt;/</code> convention</td></tr>
+<tr><td>Prime wire server + GCE always-on</td><td class="reuse">REUSED</td><td><code>prime_server.c</code> as-is; the precedented nous deploy</td></tr>
+<tr><td>Ticket→payload skill logic</td><td class="new">NEW</td><td>compose understand/retrieve/ticket_json over the loaded IDS → program + precedents + provenance. The real work of Board 1.</td></tr>
+<tr><td>Jacket ticket surface</td><td class="new">NEW (small)</td><td><code>GET /ticket/&lt;id&gt;</code> → the seam's POST shape; CORS origin = argus.com.ai; bearer gate</td></tr>
+<tr><td>GCS snapshot + manifest hot-swap</td><td class="new">NEW</td><td>Board 2, unchanged — no precedent for the atomic store swap</td></tr>
+<tr><td>Tickets-tab wiring</td><td class="new">NEW</td><td>vanilla JS fetch + render</td></tr>
+</table>
+<p>Both "invent it" line items (C# wire client; op surgery on the prime) become applications of shipped shapes. What must genuinely be written: the ticket skill's brains, a small jacket adaptation, the hot-swap loop, the tab.</p>
+</div>
+
+<h2>Revised ~e — First Move re-sized for reuse</h2>
+<div class="card" data-cm="estimate">
+<p><b>Board 1 — First Move · 21 → 19 pts</b></p>
+<table>
+<tr><th>item</th><th>pts·cmd</th></tr>
+<tr><td>{ticket→payload skill + pin + relay action whitelist, seat via Slot in, nous (comms/skill/ticket → g_action_table → edge-sink seam)}</td><td>5·~a~t</td></tr>
+<tr><td>{relay + prime + frozen IDS/WordNet snapshot via private GCS, deploy to, GCE always-on (systemd)}</td><td>5·~b~t</td></tr>
+<tr><td>{ingress posture — relay HTTPS admits jacket egress only; prime wire port internal to the box, add to, GCE firewall}</td><td>3·~a~t</td></tr>
+<tr><td>{tickets jacket — switchboard Hollow Edge clone (Forward + CORS + bearer + scaffold), adapt + deploy to, Cloud Run}</td><td>3·~b~t</td></tr>
+<tr><td>{ticket click → jacket fetch → program/precedents/provenance render, wire into, Tickets tab}</td><td>3·~u~t</td></tr>
+</table>
+<p>The jacket drops <b>5 → 3</b> (the wire-client half deleted — relay's job; what remains is a route + origin + scaffold clone). Boards 2 (19) + 3 (17) stand — genuinely-new work, no reuse to claim. <b>Grand total: 57 → 55 pts.</b></p>
+<p><b>Honest read:</b> points barely move because the skill's brains were always the real work — reuse doesn't zero effort. What moves hard is <b>risk</b>: the plan's highest-variance item ("MH-4/PSK in .NET, stop + decompose if it busts a day") is <b>deleted outright</b>, replaced by a 3-pt clone of a shape that's shipped three times. No Board-1 item now carries invent-from-scratch risk.</p>
+</div>
+
+<h2>Updated unknowns (Rule 6)</h2>
+<div class="card" data-cm="unknowns">
+<ul>
+<li><b>RETIRED — C# wire-client effort.</b> Not "proven elsewhere" — it must NOT exist. No <code>.cs</code> on this machine implements the handshake (swept C:\), because Trust forbids the edge holding the PSK. The wire hop is <code>relay_wire_to_prime()</code>, existing C, exercised by two live seams. The unknown dissolves.</li>
+<li><b>NEW — skill access to the loaded stores.</b> Seated skills to date are pure/self-contained; the ticket skill is the first that must read the in-RAM IDS/WordNet. Either its logic lives in the <code>wire_h_ticket</code> handler (which sees <code>g_store</code>) with the slot holding pure helpers, or the dispatch signature grows a store handle. Small, but the one place the Slot convention hasn't stretched yet — surface it in the first hour, not the last. If it forces a dispatch-signature change, flow it up to slot.md first (Rule 11) — a pattern amendment, not a local hack.</li>
+<li><b>Liftability — low risk, verified.</b> Program.cs is 155 self-contained lines; the only impedance is mapping <code>GET /ticket/&lt;id&gt;</code> onto the seam's <code>POST {action,op,body}</code> — the jacket composes the envelope.</li>
+<li><b>Relay placement</b> — co-locate on the tickets box (default, keeps the Mendo path on-box) vs. route through the live relay. Deploy-time; affects the firewall item shape, not points.</li>
+<li><b>Retained:</b> e2-small memory (measure Board 3) · Zendesk cursor semantics · VPC egress flavor · token posture interim until FQDN auth.</li>
+</ul>
+</div>
+
+<h2>General</h2>
+<div class="card" data-cm="general"><div class="sub" style="margin:0">Comment + <code>~fu</code>. The C# wire-client "unknown" is gone — it's the Trust pattern (Hollow Edge → relay → wire → prime), the edge never speaks wire. 55 pts / 3 boards, no invent-from-scratch risk on Board 1. <code>~b</code> TSS1.</div></div>
+
+</div>
+<footer>v0 · 2026-07-04 · Be · argus · Tickets service Trust+Slot · Fable 5 · 55 pts</footer>
+<script>window.ARTIFACT={doc:"8552b121-929e-4b5d-a523-978da291448d"};</script>
+<script>
+/* Be — artifact comment + collapse + new-indicator widget (the "kung ~fu" template).
+   Drop into any Be artifact:
+     <script>window.ARTIFACT={doc:"my-artifact-key"};</script>
+     <script src="../tools/artifact-comments.js"></script>
+   Mark any element commentable + collapsible with data-cm="<object-id>". The heading immediately
+   before it becomes a collapse toggle. Comments are open (no lock), per-object, backed by the
+   gcp-bridge /comments API. "N new" = comments you haven't opened yet (per-object, localStorage).
+   metal reads via /comments/recent and stamps seen. Self-contained: injects its own CSS. */
+(function(){
+  var CFG = window.ARTIFACT || {};
+  var GB  = CFG.bridge || "https://gcp-bridge-692654781984.us-west1.run.app";
+  var DOC = CFG.doc; if(!DOC){ return; }
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+  function el(id){ return document.getElementById(id); }
+  function lsGet(k){ try{ return localStorage.getItem(k)||""; }catch(_){ return ""; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(_){} }
+  function nowIso(){ return new Date().toISOString().replace(/\.\d+Z$/,"Z"); }
+  function readKey(o){ return "acr_"+DOC+"_"+o; }
+
+  // ---- inject CSS (template ships its own look) ----
+  var css=
+  ".ac-h{cursor:pointer;user-select:none;} .ac-chev{display:inline-block;color:#6FC3DF;font-size:.8em;transition:transform .15s;transform:rotate(-90deg);} .ac-h.ac-open .ac-chev{transform:none;}"
+  +".ac-hnew{background:#241d06;color:#ffd479;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:800;margin-left:8px;vertical-align:middle;}"
+  +"[data-cm].ac-collapsed{display:none;}"
+  +".ac-bar{margin-top:12px;padding-top:9px;border-top:1px solid #22303a;}"
+  +".ac-toggle{background:none;border:0;color:#6FC3DF;font-size:11px;cursor:pointer;font-family:inherit;padding:0;letter-spacing:.02em;text-transform:uppercase;font-weight:700;} .ac-toggle:hover{color:#9fe;} .ac-count{color:#7d8894;}"
+  +".ac-newbadge{background:#0c1c22;color:#7CFFB2;border:1px solid #1f5f47;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:800;margin-left:6px;}"
+  +".ac-panel{margin-top:12px;display:none;} .ac-panel.open{display:block;}"
+  +".ac-item{background:#10171c;border:1px solid #222c33;border-radius:12px;padding:11px 14px;margin:9px 0;}"
+  +".ac-item.me{border-color:#243b43;background:#0e161b;box-shadow:inset 3px 0 0 #6FC3DF;padding-left:16px;} .ac-item.isnew{box-shadow:inset 3px 0 0 #7CFFB2;}"
+  +".ac-ih{font-size:11px;margin-bottom:5px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;} .ac-ih b{font-weight:800;} .ac-item.me .ac-ih b{color:#6FC3DF;} .ac-item.op .ac-ih b{color:#e0b56f;} .ac-t{color:#59626b;font-size:10.5px;}"
+  +".ac-tx{font-size:13.5px;color:#e2e8ee;line-height:1.66;white-space:pre-wrap;word-break:break-word;} .ac-item.cmd .ac-tx{font-family:Consolas,monospace;font-size:12.5px;color:#e6f4fa;background:#0a1013;border:1px solid #1a2830;border-radius:7px;padding:9px 11px;}"
+  +".ac-tilde{background:#241d06;color:#ffd479;border-radius:5px;padding:1px 7px;font-size:9.5px;font-weight:800;} .ac-seen{color:#7CFFB2;font-size:10px;font-weight:800;} .ac-newtag{background:#0c1c22;color:#7CFFB2;border-radius:4px;padding:1px 6px;font-size:9.5px;font-weight:800;} .ac-empty{color:#5a636c;font-size:12.5px;font-style:italic;}"
+  +".ac-post{margin-top:12px;display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:start;}"
+  +".ac-post input,.ac-post textarea{background:#0d0d0d;color:#e6e6e6;border:1px solid #2a2f34;border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;} .ac-post input:focus,.ac-post textarea:focus{outline:0;border-color:#6FC3DF;} .ac-post textarea{resize:vertical;min-height:38px;}"
+  +".ac-post button{background:#6FC3DF;color:#06222c;border:0;border-radius:8px;padding:9px 18px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;}"
+  +"@media(max-width:560px){ .ac-post{grid-template-columns:1fr;} }"
+  +".ac-navbox{display:inline-flex;align-items:center;gap:12px;font-size:11px;color:#7d8894;}"
+  +".ac-live{display:inline-flex;align-items:center;gap:7px;} .ac-dot{width:7px;height:7px;border-radius:50%;background:#7CFFB2;animation:acpulse 2s infinite;}"
+  +".ac-navbtn{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;} .ac-navbtn:hover{border-color:#6FC3DF;color:#6FC3DF;}"
+  +"@keyframes acpulse{0%{box-shadow:0 0 0 0 rgba(124,255,178,.55);}70%{box-shadow:0 0 0 6px rgba(124,255,178,0);}100%{box-shadow:0 0 0 0 rgba(124,255,178,0);}}";
+  var st=document.createElement("style"); st.textContent=css; document.head.appendChild(st);
+
+  var objs=[].slice.call(document.querySelectorAll("[data-cm]"));
+
+  // ---- collapse: wire the heading before each card ----
+  objs.forEach(function(node){
+    var h=node.previousElementSibling;
+    while(h && !/^H[1-6]$/.test(h.tagName)) h=h.previousElementSibling;
+    if(h){ h.classList.add("ac-h","ac-open"); h.setAttribute("data-accol", node.getAttribute("data-cm"));
+      h.insertAdjacentHTML("afterbegin","<span class='ac-chev'>&#9662;</span> ");
+      h.insertAdjacentHTML("beforeend","<span class='ac-hnew' id='ach-"+node.getAttribute("data-cm")+"' style='display:none'></span>"); }
+  });
+
+  // ---- comment bar per object ----
+  objs.forEach(function(node){
+    var obj=node.getAttribute("data-cm");
+    var bar=document.createElement("div"); bar.className="ac-bar";
+    bar.innerHTML="<button class='ac-toggle' data-accm='"+obj+"'><span class='ac-count' id='acc-"+obj+"'>comment</span><span id='acn-"+obj+"'></span></button>"
+      +"<div class='ac-panel' id='acp-"+obj+"'><div id='acl-"+obj+"'></div>"
+      +"<div class='ac-post'><input id='aca-"+obj+"' placeholder='name' autocomplete='off'>"
+      +"<textarea id='acx-"+obj+"' rows='1' placeholder='comment &mdash; or a tilde like ~go'></textarea>"
+      +"<button data-acpost='"+obj+"'>Post</button></div></div>";
+    node.appendChild(bar);
+  });
+
+  // ---- nav controls ----
+  var nav=document.querySelector("nav");
+  if(nav){ var box=document.createElement("span"); box.className="ac-navbox";
+    box.innerHTML="<span id='ac-live' class='ac-live'></span><button id='ac-collapse' class='ac-navbtn'>collapse all</button>";
+    nav.appendChild(box); }
+
+  var seenTs="", lastPoll=0, allComments=[], totalNew=0;
+  function render(all){
+    allComments=all;
+    var g={}; all.forEach(function(c){ (g[c.obj]=g[c.obj]||[]).push(c); });
+    totalNew=0;
+    objs.forEach(function(node){
+      var obj=node.getAttribute("data-cm"), cs=g[obj]||[], lastRead=lsGet(readKey(obj));
+      var newN=cs.filter(function(c){return c.author!=="metal" && c.ts>lastRead;}).length; totalNew+=newN;
+      var cc=el("acc-"+obj); if(cc) cc.textContent = cs.length ? (cs.length+" comment"+(cs.length>1?"s":"")) : "comment";
+      var nb=el("acn-"+obj); if(nb) nb.innerHTML = newN? " <span class='ac-newbadge'>"+newN+" new</span>":"";
+      var hn=el("ach-"+obj); if(hn){ hn.textContent = newN? (newN+" new"):""; hn.style.display = newN? "":"none"; }
+      var cl=el("acl-"+obj); if(cl) cl.innerHTML = cs.length ? cs.map(function(c){
+        var mine=c.author==="metal", isnew=(c.author!=="metal" && c.ts>lastRead), seen=(!mine && seenTs && c.ts<=seenTs);
+        return "<div class='ac-item "+(mine?"me":"op")+(c.isCommand?" cmd":"")+(isnew?" isnew":"")+"'><div class='ac-ih'><b>"+esc(c.author)+"</b> <span class='ac-t'>"+esc((c.ts||'').replace('T',' ').replace('Z',' UTC'))+"</span>"+(c.isCommand?"<span class='ac-tilde'>TILDE &mdash; metal acts</span>":"")+(seen?"<span class='ac-seen'>&#10003; seen by metal</span>":"")+(isnew?"<span class='ac-newtag'>NEW</span>":"")+"</div><div class='ac-tx'>"+esc(c.text)+"</div></div>";
+      }).join(""):"<div class='ac-empty'>No comments yet.</div>";
+    });
+    tick();
+  }
+  function relt(ms){ var s=Math.round((Date.now()-ms)/1000); if(s<2)return "just now"; if(s<60)return s+"s ago"; return Math.round(s/60)+"m ago"; }
+  function tick(){ var e=el("ac-live"); if(e&&lastPoll) e.innerHTML="<span class='ac-dot'></span> live &middot; "+relt(lastPoll)+(totalNew?" &middot; <b style='color:#7CFFB2'>"+totalNew+" new</b>":""); }
+  function load(){ fetch(GB+"/comments?doc="+DOC+"&_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){ seenTs=(d&&d.seenByMetal)||seenTs; lastPoll=Date.now(); render((d&&d.comments)||[]); }).catch(function(){}); }
+  function markRead(o){ lsSet(readKey(o), nowIso()); render(allComments); }
+  function post(o){
+    var a=((el("aca-"+o)||{}).value||"").trim()||"operator", t=((el("acx-"+o)||{}).value||"").trim();
+    if(!t) return; lsSet("cm_author",a);
+    fetch(GB+"/comments?doc="+DOC,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({obj:o,author:a,text:t})}).then(function(r){return r.json();}).then(function(){ el("acx-"+o).value=""; markRead(o); load(); }).catch(function(){});
+  }
+  function setCollapsed(node,on){ node.classList.toggle("ac-collapsed",on); var h=el("acp-"+node.getAttribute("data-cm")); var head=document.querySelector("[data-accol='"+node.getAttribute("data-cm")+"']"); if(head) head.classList.toggle("ac-open",!on); }
+  function toggleAll(){ var anyOpen=objs.some(function(n){return !n.classList.contains("ac-collapsed");}); objs.forEach(function(n){ setCollapsed(n, anyOpen); }); var b=el("ac-collapse"); if(b) b.textContent = anyOpen? "expand all":"collapse all"; }
+
+  document.addEventListener("click", function(e){
+    if(!e.target||!e.target.closest) return;
+    if(e.target.id==="ac-collapse"){ toggleAll(); return; }
+    var col=e.target.closest("[data-accol]"); if(col && !e.target.closest("[data-accm]") && !e.target.closest(".ac-bar")){ var o=col.getAttribute("data-accol"); var card=document.querySelector("[data-cm='"+o+"']"); if(card) setCollapsed(card, !card.classList.contains("ac-collapsed")); return; }
+    var tg=e.target.closest("[data-accm]"); if(tg){ var o=tg.getAttribute("data-accm"); var p=el("acp-"+o); if(p){ p.classList.toggle("open"); if(p.classList.contains("open")) markRead(o); } return; }
+    var pb=e.target.closest("[data-acpost]"); if(pb){ post(pb.getAttribute("data-acpost")); return; }
+  });
+
+  try{ var la=lsGet("cm_author"); if(la) objs.forEach(function(n){ var ai=el("aca-"+n.getAttribute("data-cm")); if(ai) ai.value=la; }); }catch(_){}
+  load(); setInterval(load, 15000); setInterval(tick, 1000);
+})();
+
+</script>
+</body>
+</html>

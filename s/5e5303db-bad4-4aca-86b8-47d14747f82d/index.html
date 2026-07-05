@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex, nofollow">
+<title>~i — nous.api: the model gateway, and where Tickets/determinism fit (Fable 5)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0d0d; color:#e0e0e0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; z-index:20; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; }
+  .brand { color:#6FC3DF; font-weight:700; font-size:18px; }
+  .pub { color:#8a93a0; font-size:12px; }
+  .wrap { max-width:920px; margin:0 auto; padding:24px 18px; }
+  h1 { color:#6FC3DF; font-size:22px; margin-bottom:4px; }
+  .sub{color:#8a93a0;font-size:13px;margin-bottom:14px;}
+  h2 { color:#6FC3DF; font-size:17px; margin:20px 0 8px; }
+  h3 { color:#cfe9f2; font-size:14px; margin:12px 0 4px; }
+  .card{background:#141a1f;border:1px solid #222c33;border-radius:10px;padding:16px 18px;margin:10px 0;}
+  .a{background:#0f1a12;border:1px solid #2c5a3a;border-radius:8px;padding:12px 15px;margin:10px 0;color:#bfe8cc;font-size:12.5px;}
+  p{margin:8px 0;} b,strong{color:#e6edf2;} em{color:#7CFFB2;font-style:normal;}
+  code{background:#0a1013;padding:2px 6px;border-radius:4px;font-size:12px;color:#6FC3DF;}
+  pre{background:#0a0f12;border:1px solid #1a2830;border-radius:8px;padding:12px 14px;overflow:auto;font-size:11.5px;color:#cdd6da;line-height:1.5;margin:8px 0;white-space:pre;}
+  ul,ol{margin:6px 0 6px 20px;} li{margin:5px 0;}
+  .q{color:#6FC3DF;font-weight:700;} .ans{color:#7CFFB2;font-weight:700;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:40px;padding:24px;border-top:1px solid #222;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be · nous · <span style="color:#8a93a0;font-weight:400;font-size:13px">~i · nous.api architecture</span></span><span class="pub">Published 2026-07-05 01:10 PT</span></nav>
+<div class="wrap">
+<h1>nous.api — the model gateway, and where Tickets + determinism fit</h1>
+<div class="sub">"Should we use nous.api? Is this where AI Pantheon + Model Garden go behind it? Does nous.api need the determinism/infra dance?" Recon says: yes to the gateway, no to determinism — and it clarifies the whole stack.</div>
+
+<div class="a">
+<b>The answer in one line:</b> nous.api is your <b>probabilistic model gateway</b> (live, pure C, the 38-model Pantheon behind it). Determinism stays in the <b>prime</b> (IDS + recall + safeguard, over the wire). The <b>edge composes</b> both. Fold GCP Model Garden in as provider rows and nous.api becomes the single BYO-BIG3 gateway — exactly what you asked.
+</div>
+
+<h2>What nous.api IS (found + externally verified live)</h2>
+<div class="card" data-cm="what">
+<p>Not a separate repo — it lives in the nous substrate as a skill + a server:</p>
+<ul>
+<li><b>The skill</b> <code>intelligence/skill/api/</code> — "deliberately thin — it routes, it does not reason." Public surface = <b>four verbs</b> (<code>ask · judge · summarize · reconsider</code>) via <code>api_dispatch()</code>; anything else = <code>API_ERR_VERB</code>. Composes fanout/judge/summarize/reconsider.</li>
+<li><b>The server</b> <code>intelligence/tool/nousapi-server/nousapi_server.c</code> (~112KB, pure C, static-musl FROM scratch, own TLS 1.3 — no OpenSSL, no SDKs). Routes: open <code>GET /</code> (freemium console) + <code>GET /v1/models</code>, bearer-gated <code>POST /v1/{ask,judge,summarize,reconsider}</code> + composed <code>/v1/factcheck</code> + <code>/v1/research</code> + <code>/v1/quota</code>.</li>
+<li><b>Live:</b> Cloud Run <code>nous-api</code> in <code>acmedev-platform-hq</code>/us-west4, rev 00013 (2026-06-18), min-instances 1. Probed: <code>/v1/models</code> → 200 JSON, <code>/v1/ask</code> no-token → 401. Health check via <code>/v1/models</code> (the GFE intercepts <code>/healthz</code>).</li>
+<li><b>Auth:</b> app-level <code>Authorization: Bearer</code> + <b>BYO keys</b> per-request (<code>keys:{"ANTHROPIC_API_KEY":"..."}</code>), RAM-only, resolution request-key → sealed vault → store triple → env.</li>
+</ul>
+<p><b>What it fronts:</b> models only — the AI Pantheon, literally. <code>memory/skill/providers/providers.c</code> is a <b>38-row catalogue</b> of direct vendor APIs (Anthropic, OpenAI, Gemini, xAI, DeepSeek, Mistral, Perplexity, Cohere, Reka, Groq/Llama…). It does <b>NOT</b> front the substrate — no understand/learn/recall, no IDS, no wire to the prime. Its wire/relay integration is spec-ahead-of-code (aspirational).</p>
+</div>
+
+<h2>Your three questions, answered</h2>
+<div class="card" data-cm="answers">
+<p><span class="q">A. Route Tickets through nous.api instead of a bespoke edge?</span> <span class="ans">No — keep the edge; the edge calls nous.api for the verdict.</span> nous.api has no <code>recall</code> verb, no wire client, no path to the sealed IDS — and its contract forbids adding one (<code>API_ERR_VERB</code>). The Hollow Edge isn't a deviation — it's the pattern nous.api's own header names: <em>"the C# edge is the blind REST front; it never sees keys or plaintext."</em> The edge composes two calls: <b>(1) recall</b> over relay→wire→prime (deterministic), <b>(2) verdict</b> via <code>nous-api /v1/ask|/v1/judge</code> (probabilistic).</p>
+<p><span class="q">B. Put the Pantheon + Model Garden behind nous.api?</span> <span class="ans">Yes — the Pantheon already is; fold Vertex in as provider rows.</span> Model Garden is the gap: <code>gcp-bridge</code> (C# jacket) fronts Vertex via ADC/service-account — a different auth model than the vendor keys in <code>providers.c</code>. <b>Don't teach pure-C nous.api Google OAuth</b> (that's the jacket's job — language law). Add provider rows <code>vertex-claude</code>/<code>vertex-gemini</code> whose <code>endpoint</code> = the gcp-bridge URL and <code>key_env</code> = <code>BRIDGE_TOKEN</code>. Result: <b>nous.api = the single model gateway</b>, gcp-bridge demotes to a jacket behind it, and Tickets' <code>/vertex/analyze</code> call migrates to <code>nous-api /v1/ask</code> with <code>providers:["vertex-gemini"]</code>.</p>
+<p><span class="q">C. Does nous.api do the determinism/infra dance?</span> <span class="ans">No.</span> The split is already in the code: nous.api is stateless per request, holds no store, self-describes as routing-only. Determinism — sealed IDS, <code>recall</code>, the atom-diff safeguard — is the <b>GCE prime</b>'s job over wire/TLS. Putting recall in nous.api would expose the substrate over REST (kernel violation), drag the sealed store into an autoscaling container, and break the trust story: <em>a sealed deterministic answer must come from the thing that holds the seal.</em></p>
+</div>
+
+<h2>The clean end-state</h2>
+<div class="card" data-cm="endstate">
+<pre>browser (Tickets tab)
+   |  HTTPS JSON, one origin
+   v
+Hollow Edge — C#, Cloud Run, blind REST front (the designed edge role)
+   |-- recall  (DETERMINISTIC):  NTRP triples -> relay -> wire/TLS -> GCE prime -> sealed IDS
+   +-- verdict (PROBABILISTIC):  HTTPS bearer -> nous-api /v1/ask | /v1/judge
+                                   |-- fanout -> 38-provider AI Pantheon (direct vendor APIs, BYO keys)
+                                   +-- vertex-* rows -> gcp-bridge (C# jacket) -> Vertex Model Garden</pre>
+<p><b>Three roles, cleanly split:</b> <b>prime = deterministic</b> (IDS, recall, understand/learn, wire only) · <b>nous.api = probabilistic</b> (model fanout, judge, BYO keys, quota) · <b>edge = blind translation + composition</b> (no logic, no keys, no plaintext).</p>
+</div>
+
+<h2>Three moves (in order)</h2>
+<div class="card" data-cm="moves">
+<ol>
+<li><b>Tickets keeps the Hollow Edge</b> — swap its direct gcp-bridge verdict call for a <code>nous-api /v1/{ask,judge}</code> call. The recall half is unchanged (relay→wire→prime).</li>
+<li><b>Add the vertex-* provider rows to <code>providers.c</code></b> (endpoint = gcp-bridge, key_env = BRIDGE_TOKEN) so Model Garden joins the Pantheon behind the one gateway. gcp-bridge demotes to a jacket.</li>
+<li><b>Leave nous.api's wire/relay integration as its later phase</b> — the path by which nous.api itself becomes wire-addressable. Nothing in Tickets waits on it.</li>
+</ol>
+<p><b>Honesty:</b> nous.api is real + live as a REST model gateway (shipped 2026-06-18); the relay→edge→wire→<code>api_dispatch</code> topology in its docs is not built yet. The above leans only on what exists + was verified today.</p>
+</div>
+
+<h2>General</h2>
+<div class="card" data-cm="general"><div class="sub" style="margin:0">Comment + <code>~fu</code>. nous.api = the model gateway (Pantheon behind it, Model Garden folds in via provider rows). Prime = determinism (recall). Edge composes both. <code>~b</code> = add the vertex-* rows (Model Garden behind nous.api) or seat <code>recall</code> on the prime.</div></div>
+
+</div>
+<footer>v0 · 2026-07-05 · Be · nous · nous.api architecture · Fable 5</footer>
+<script>window.ARTIFACT={doc:"5e5303db-bad4-4aca-86b8-47d14747f82d"};</script>
+<script>
+/* Be — artifact comment + collapse + new-indicator widget (the "kung ~fu" template).
+   Drop into any Be artifact:
+     <script>window.ARTIFACT={doc:"my-artifact-key"};</script>
+     <script src="../tools/artifact-comments.js"></script>
+   Mark any element commentable + collapsible with data-cm="<object-id>". The heading immediately
+   before it becomes a collapse toggle. Comments are open (no lock), per-object, backed by the
+   gcp-bridge /comments API. "N new" = comments you haven't opened yet (per-object, localStorage).
+   metal reads via /comments/recent and stamps seen. Self-contained: injects its own CSS. */
+(function(){
+  var CFG = window.ARTIFACT || {};
+  var GB  = CFG.bridge || "https://gcp-bridge-692654781984.us-west1.run.app";
+  var DOC = CFG.doc; if(!DOC){ return; }
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+  function el(id){ return document.getElementById(id); }
+  function lsGet(k){ try{ return localStorage.getItem(k)||""; }catch(_){ return ""; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(_){} }
+  function nowIso(){ return new Date().toISOString().replace(/\.\d+Z$/,"Z"); }
+  function readKey(o){ return "acr_"+DOC+"_"+o; }
+
+  // ---- inject CSS (template ships its own look) ----
+  var css=
+  ".ac-h{cursor:pointer;user-select:none;} .ac-chev{display:inline-block;color:#6FC3DF;font-size:.8em;transition:transform .15s;transform:rotate(-90deg);} .ac-h.ac-open .ac-chev{transform:none;}"
+  +".ac-hnew{background:#241d06;color:#ffd479;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:800;margin-left:8px;vertical-align:middle;}"
+  +"[data-cm].ac-collapsed{display:none;}"
+  +".ac-bar{margin-top:12px;padding-top:9px;border-top:1px solid #22303a;}"
+  +".ac-toggle{background:none;border:0;color:#6FC3DF;font-size:11px;cursor:pointer;font-family:inherit;padding:0;letter-spacing:.02em;text-transform:uppercase;font-weight:700;} .ac-toggle:hover{color:#9fe;} .ac-count{color:#7d8894;}"
+  +".ac-newbadge{background:#0c1c22;color:#7CFFB2;border:1px solid #1f5f47;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:800;margin-left:6px;}"
+  +".ac-panel{margin-top:12px;display:none;} .ac-panel.open{display:block;}"
+  +".ac-item{background:#10171c;border:1px solid #222c33;border-radius:12px;padding:11px 14px;margin:9px 0;}"
+  +".ac-item.me{border-color:#243b43;background:#0e161b;box-shadow:inset 3px 0 0 #6FC3DF;padding-left:16px;} .ac-item.isnew{box-shadow:inset 3px 0 0 #7CFFB2;}"
+  +".ac-ih{font-size:11px;margin-bottom:5px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;} .ac-ih b{font-weight:800;} .ac-item.me .ac-ih b{color:#6FC3DF;} .ac-item.op .ac-ih b{color:#e0b56f;} .ac-t{color:#59626b;font-size:10.5px;}"
+  +".ac-tx{font-size:13.5px;color:#e2e8ee;line-height:1.66;white-space:pre-wrap;word-break:break-word;} .ac-item.cmd .ac-tx{font-family:Consolas,monospace;font-size:12.5px;color:#e6f4fa;background:#0a1013;border:1px solid #1a2830;border-radius:7px;padding:9px 11px;}"
+  +".ac-tilde{background:#241d06;color:#ffd479;border-radius:5px;padding:1px 7px;font-size:9.5px;font-weight:800;} .ac-seen{color:#7CFFB2;font-size:10px;font-weight:800;} .ac-newtag{background:#0c1c22;color:#7CFFB2;border-radius:4px;padding:1px 6px;font-size:9.5px;font-weight:800;} .ac-empty{color:#5a636c;font-size:12.5px;font-style:italic;}"
+  +".ac-post{margin-top:12px;display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:start;}"
+  +".ac-post input,.ac-post textarea{background:#0d0d0d;color:#e6e6e6;border:1px solid #2a2f34;border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;} .ac-post input:focus,.ac-post textarea:focus{outline:0;border-color:#6FC3DF;} .ac-post textarea{resize:vertical;min-height:38px;}"
+  +".ac-post button{background:#6FC3DF;color:#06222c;border:0;border-radius:8px;padding:9px 18px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;}"
+  +"@media(max-width:560px){ .ac-post{grid-template-columns:1fr;} }"
+  +".ac-navbox{display:inline-flex;align-items:center;gap:12px;font-size:11px;color:#7d8894;}"
+  +".ac-live{display:inline-flex;align-items:center;gap:7px;} .ac-dot{width:7px;height:7px;border-radius:50%;background:#7CFFB2;animation:acpulse 2s infinite;}"
+  +".ac-navbtn{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;} .ac-navbtn:hover{border-color:#6FC3DF;color:#6FC3DF;}"
+  +"@keyframes acpulse{0%{box-shadow:0 0 0 0 rgba(124,255,178,.55);}70%{box-shadow:0 0 0 6px rgba(124,255,178,0);}100%{box-shadow:0 0 0 0 rgba(124,255,178,0);}}";
+  var st=document.createElement("style"); st.textContent=css; document.head.appendChild(st);
+
+  var objs=[].slice.call(document.querySelectorAll("[data-cm]"));
+
+  // ---- collapse: wire the heading before each card ----
+  objs.forEach(function(node){
+    var h=node.previousElementSibling;
+    while(h && !/^H[1-6]$/.test(h.tagName)) h=h.previousElementSibling;
+    if(h){ h.classList.add("ac-h","ac-open"); h.setAttribute("data-accol", node.getAttribute("data-cm"));
+      h.insertAdjacentHTML("afterbegin","<span class='ac-chev'>&#9662;</span> ");
+      h.insertAdjacentHTML("beforeend","<span class='ac-hnew' id='ach-"+node.getAttribute("data-cm")+"' style='display:none'></span>"); }
+  });
+
+  // ---- comment bar per object ----
+  objs.forEach(function(node){
+    var obj=node.getAttribute("data-cm");
+    var bar=document.createElement("div"); bar.className="ac-bar";
+    bar.innerHTML="<button class='ac-toggle' data-accm='"+obj+"'><span class='ac-count' id='acc-"+obj+"'>comment</span><span id='acn-"+obj+"'></span></button>"
+      +"<div class='ac-panel' id='acp-"+obj+"'><div id='acl-"+obj+"'></div>"
+      +"<div class='ac-post'><input id='aca-"+obj+"' placeholder='name' autocomplete='off'>"
+      +"<textarea id='acx-"+obj+"' rows='1' placeholder='comment &mdash; or a tilde like ~go'></textarea>"
+      +"<button data-acpost='"+obj+"'>Post</button></div></div>";
+    node.appendChild(bar);
+  });
+
+  // ---- nav controls ----
+  var nav=document.querySelector("nav");
+  if(nav){ var box=document.createElement("span"); box.className="ac-navbox";
+    box.innerHTML="<span id='ac-live' class='ac-live'></span><button id='ac-collapse' class='ac-navbtn'>collapse all</button>";
+    nav.appendChild(box); }
+
+  var seenTs="", lastPoll=0, allComments=[], totalNew=0;
+  function render(all){
+    allComments=all;
+    var g={}; all.forEach(function(c){ (g[c.obj]=g[c.obj]||[]).push(c); });
+    totalNew=0;
+    objs.forEach(function(node){
+      var obj=node.getAttribute("data-cm"), cs=g[obj]||[], lastRead=lsGet(readKey(obj));
+      var newN=cs.filter(function(c){return c.author!=="metal" && c.ts>lastRead;}).length; totalNew+=newN;
+      var cc=el("acc-"+obj); if(cc) cc.textContent = cs.length ? (cs.length+" comment"+(cs.length>1?"s":"")) : "comment";
+      var nb=el("acn-"+obj); if(nb) nb.innerHTML = newN? " <span class='ac-newbadge'>"+newN+" new</span>":"";
+      var hn=el("ach-"+obj); if(hn){ hn.textContent = newN? (newN+" new"):""; hn.style.display = newN? "":"none"; }
+      var cl=el("acl-"+obj); if(cl) cl.innerHTML = cs.length ? cs.map(function(c){
+        var mine=c.author==="metal", isnew=(c.author!=="metal" && c.ts>lastRead), seen=(!mine && seenTs && c.ts<=seenTs);
+        return "<div class='ac-item "+(mine?"me":"op")+(c.isCommand?" cmd":"")+(isnew?" isnew":"")+"'><div class='ac-ih'><b>"+esc(c.author)+"</b> <span class='ac-t'>"+esc((c.ts||'').replace('T',' ').replace('Z',' UTC'))+"</span>"+(c.isCommand?"<span class='ac-tilde'>TILDE &mdash; metal acts</span>":"")+(seen?"<span class='ac-seen'>&#10003; seen by metal</span>":"")+(isnew?"<span class='ac-newtag'>NEW</span>":"")+"</div><div class='ac-tx'>"+esc(c.text)+"</div></div>";
+      }).join(""):"<div class='ac-empty'>No comments yet.</div>";
+    });
+    tick();
+  }
+  function relt(ms){ var s=Math.round((Date.now()-ms)/1000); if(s<2)return "just now"; if(s<60)return s+"s ago"; return Math.round(s/60)+"m ago"; }
+  function tick(){ var e=el("ac-live"); if(e&&lastPoll) e.innerHTML="<span class='ac-dot'></span> live &middot; "+relt(lastPoll)+(totalNew?" &middot; <b style='color:#7CFFB2'>"+totalNew+" new</b>":""); }
+  function load(){ fetch(GB+"/comments?doc="+DOC+"&_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){ seenTs=(d&&d.seenByMetal)||seenTs; lastPoll=Date.now(); render((d&&d.comments)||[]); }).catch(function(){}); }
+  function markRead(o){ lsSet(readKey(o), nowIso()); render(allComments); }
+  function post(o){
+    var a=((el("aca-"+o)||{}).value||"").trim()||"operator", t=((el("acx-"+o)||{}).value||"").trim();
+    if(!t) return; lsSet("cm_author",a);
+    fetch(GB+"/comments?doc="+DOC,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({obj:o,author:a,text:t})}).then(function(r){return r.json();}).then(function(){ el("acx-"+o).value=""; markRead(o); load(); }).catch(function(){});
+  }
+  function setCollapsed(node,on){ node.classList.toggle("ac-collapsed",on); var h=el("acp-"+node.getAttribute("data-cm")); var head=document.querySelector("[data-accol='"+node.getAttribute("data-cm")+"']"); if(head) head.classList.toggle("ac-open",!on); }
+  function toggleAll(){ var anyOpen=objs.some(function(n){return !n.classList.contains("ac-collapsed");}); objs.forEach(function(n){ setCollapsed(n, anyOpen); }); var b=el("ac-collapse"); if(b) b.textContent = anyOpen? "expand all":"collapse all"; }
+
+  document.addEventListener("click", function(e){
+    if(!e.target||!e.target.closest) return;
+    if(e.target.id==="ac-collapse"){ toggleAll(); return; }
+    var col=e.target.closest("[data-accol]"); if(col && !e.target.closest("[data-accm]") && !e.target.closest(".ac-bar")){ var o=col.getAttribute("data-accol"); var card=document.querySelector("[data-cm='"+o+"']"); if(card) setCollapsed(card, !card.classList.contains("ac-collapsed")); return; }
+    var tg=e.target.closest("[data-accm]"); if(tg){ var o=tg.getAttribute("data-accm"); var p=el("acp-"+o); if(p){ p.classList.toggle("open"); if(p.classList.contains("open")) markRead(o); } return; }
+    var pb=e.target.closest("[data-acpost]"); if(pb){ post(pb.getAttribute("data-acpost")); return; }
+  });
+
+  try{ var la=lsGet("cm_author"); if(la) objs.forEach(function(n){ var ai=el("aca-"+n.getAttribute("data-cm")); if(ai) ai.value=la; }); }catch(_){}
+  load(); setInterval(load, 15000); setInterval(tick, 1000);
+})();
+
+</script>
+</body>
+</html>

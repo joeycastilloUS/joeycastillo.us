@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex, nofollow">
+<title>~i — Don't rebuild the wheel: how we deploy prime/relay/edge already (Fable 5)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0d0d; color:#e0e0e0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; z-index:20; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; }
+  .brand { color:#6FC3DF; font-weight:700; font-size:18px; }
+  .pub { color:#8a93a0; font-size:12px; }
+  .wrap { max-width:900px; margin:0 auto; padding:24px 18px; }
+  h1 { color:#6FC3DF; font-size:22px; margin-bottom:4px; }
+  .sub{color:#8a93a0;font-size:13px;margin-bottom:14px;}
+  h2 { color:#6FC3DF; font-size:17px; margin:20px 0 8px; }
+  .card{background:#141a1f;border:1px solid #222c33;border-radius:10px;padding:16px 18px;margin:10px 0;}
+  .win{background:#0f1a12;border:1px solid #2c5a3a;border-radius:8px;padding:12px 15px;margin:10px 0;color:#bfe8cc;font-size:12.5px;}
+  p{margin:8px 0;} b,strong{color:#e6edf2;} em{color:#7CFFB2;font-style:normal;}
+  code{background:#0a1013;padding:2px 6px;border-radius:4px;font-size:12px;color:#6FC3DF;}
+  pre{background:#0a0f12;border:1px solid #1a2830;border-radius:8px;padding:12px 14px;overflow:auto;font-size:11.5px;color:#cdd6da;line-height:1.5;margin:8px 0;white-space:pre;}
+  ol,ul{margin:6px 0 6px 20px;} li{margin:5px 0;}
+  table{width:100%;border-collapse:collapse;margin:8px 0;} th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #22303a;font-size:12px;vertical-align:top;} th{color:#6FC3DF;font-size:10px;text-transform:uppercase;}
+  .warn{color:#ffd479;font-weight:700;} .ok{color:#7CFFB2;font-weight:700;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:40px;padding:24px;border-top:1px solid #222;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be · argus · <span style="color:#8a93a0;font-weight:400;font-size:13px">~i · deploy reuse (don't rebuild)</span></span><span class="pub">Published 2026-07-04 23:20 PT</span></nav>
+<div class="wrap">
+<h1>~i — the deploy wheel already exists</h1>
+<div class="sub">"Look at my a-d-d and targets. I've done this many times. Do not re-build that wheel." Found it. The prime/relay are live, the machinery is written, and the ticket skill is the same move as ingest/conditions.</div>
+
+<div class="win">
+<b>The "Linux build wall" dissolves.</b> There is no fresh VM, no from-scratch cross-build. The <b>Las Vegas prime is live</b> and builds ON the node via <code>startup.sh --install</code>. The ticket skill is a Slot seated in that existing prime — exactly how <code>ingest</code> + <code>conditions</code> shipped (precedent: <code>a-d-d/nous/MESH_DEPLOY_AND_VERIFY.md</code>). The edge is an <code>airbyte-atlas/edge</code> clone to Cloud Run — already a live pattern.
+</div>
+
+<h2>What "targets" is</h2>
+<div class="card" data-cm="targets">
+<p><code>C:\a-d-d\tgt\</code> = deployment targets, one dir per place code runs (<code>cloud-run</code>, <code>console/win</code>, <code>phone</code>, <code>rt</code> = biRT bare-metal GCE). Each has a <code>CLAUDE.md</code> with the build pattern + constraints for that destination. <b>Tickets needs NO new target</b> — the edge uses the existing <code>cloud-run</code> target; the skill rides the existing GCE prime/relay tier. Key doc: <code>a-d-d/tgt/cloud-run/CLAUDE.md</code> (pure-C = cloudbuild + alpine gcc + Buildah FROM scratch; C# = Docker cloudbuild, its own pattern).</p>
+</div>
+
+<h2>Where the live nodes run (gcloud-verified, project kastil-systems)</h2>
+<div class="card" data-cm="nodes">
+<table>
+<tr><th>node</th><th>zone</th><th>status</th><th>ip</th></tr>
+<tr><td>relay …us-west2-a (Los Angeles)</td><td>us-west2-a</td><td class="ok">RUNNING</td><td>35.236.10.94 = relay.3-nous.net</td></tr>
+<tr><td>relay …asia-east2-b (Hong Kong)</td><td>asia-east2-b</td><td class="ok">RUNNING</td><td>34.92.148.71</td></tr>
+<tr><td><b>prime …us-west4-a (Las Vegas)</b></td><td>us-west4-a</td><td class="ok">RUNNING</td><td>34.125.36.235 &larr; ingest+conditions seated here</td></tr>
+<tr><td>prime …asia-east2-a (Hong Kong)</td><td>asia-east2-a</td><td class="ok">RUNNING</td><td>34.92.19.3</td></tr>
+</table>
+<p><b>The ticket skill goes on the Las Vegas prime.</b> The LA relay delegates there (<code>--prime &lt;internal-ip&gt;:8080</code>, VPC-internal). Relay ports: <code>:8080</code> HTTP (<code>/status /auth /register /ingest</code>), <code>:8443</code> wire/TLS. (Stale roster caveat: a-d-d docs predate the Ashburn/Singapore terminations — 4 nodes RUNNING is truth.)</p>
+</div>
+
+<h2>The machinery to REUSE</h2>
+<div class="card" data-cm="machinery">
+<table>
+<tr><th>need</th><th>reuse this</th></tr>
+<tr><td>Build+deploy prime (on-node)</td><td><code>nous/intelligence/tool/prime-server/startup.sh --install</code> (gcc on the node → /opt/nous/prime + prime.service; then <code>systemctl restart prime</code> — the start is a no-op on a running svc, documented). Deploy = tar the tree from <code>/c/nous</code>, scp to LV prime, extract, <code>--install</code>, restart, confirm MainPID changed. set -e gated — a bad build never touches the live binary.</td></tr>
+<tr><td>Build+deploy relay (off-node)</td><td><code>nous/comms/skill/relay/build_linux.sh</code> (fix its stale <code>cd /mnt/c/...</code>) → scp binary → <code>systemctl restart relay</code> → <code>journalctl -u relay -n</code> (relay has a documented hang-while-alive history — check it's SERVING).</td></tr>
+<tr><td>Build+deploy edge (Cloud Run)</td><td>clone <code>airbyte-atlas/edge/</code> (Program.cs, Config.cs, Dockerfile, cloudbuild.yaml — fully parameterized) → <code>gcloud builds submit edge/ --config edge/cloudbuild.yaml --project acmedev-platform-hq</code>. atlas-edge is LIVE at atlas-edge-…-uw.a.run.app.</td></tr>
+<tr><td>Identity/keys</td><td><b>Nothing new.</b> No new mesh node → no keygen/roster/cert. The edge is dumb by design (Trust). Honest: <code>handle_ingest()</code> doesn't enforce the edge token yet (accepts unauth /ingest) — matches atlas precedent; wiring the check is a Kaizen item, not a blocker.</td></tr>
+<tr><td>Ops bible</td><td><code>a-d-d/nous/MESH_DEPLOY_AND_VERIFY.md</code> — written after the ingest/conditions seating = the exact precedent to follow.</td></tr>
+</table>
+</div>
+
+<h2>The step-by-step for Tickets edge + ticket skill (existing machinery only)</h2>
+<div class="card" data-cm="steps">
+<ol>
+<li><b>Cut the slot</b> — <code>nous/comms/skill/ticket/{ticket.c,ticket.h,skill.json}</code>, clone the shape of <code>comms/skill/ingest/</code> (ship <code>ping</code>/<code>healthz</code> first to prove the seam, real ops after — exactly how ingest.c shipped).</li>
+<li><b>Pin it in the prime</b> — <code>prime_server.c</code>: add <code>wire_h_ticket()</code> (copy <code>wire_h_ingest</code>, ~6421) + one line in <code>g_action_table</code> (~6460) <code>{ "ticket", wire_h_ticket }</code>; add <code>ticket</code> to <code>startup.sh</code> IFLAGS + COM_SRCS.</li>
+<li><b>Whitelist it in the relay</b> — <code>relay_server.c</code>, TWO places: wire dispatch (~1860) + HTTP <code>handle_ingest</code> (~2028), add <code>"ticket"</code>.</li>
+<li><b>Deploy prime</b> — tar <code>/c/nous</code> → scp LV prime → <code>sudo ./startup.sh --install</code> → <code>systemctl restart prime</code> → confirm MainPID + boot log.</li>
+<li><b>Deploy relay</b> — rebuild + scp + restart + journalctl-verify.</li>
+<li><b>Deploy edge</b> — copy <code>airbyte-atlas/edge/</code> → tickets-edge, <code>gcloud builds submit</code>, set <code>RELAY_URL=http://relay.3-nous.net:8080</code> + <code>EDGE_RELAY_TOKEN</code> by name.</li>
+<li><b>Mendo IDS into the prime</b> — prime loads at boot from <code>--store-dir /var/nous/catalog</code> + <code>--data-dir /var/nous/data</code> (GCS-cacheable from a bucket). Our sealed snapshot (<code>gs://acmedev-mendo-tickets-ids</code>) drops into the prime's data dir; the ticket skill reads the mmap'd store. (Note: ingest's <code>load</code> op is ping-only today — the ticket skill's store-read is where that logic first lands; Rule-11 flag if it needs a dispatch-signature change.)</li>
+<li><b>Verify (Rule 13)</b> — <code>curl -X POST relay.3-nous.net:8080/ingest -d '{"action":"ticket","op":"ping"}'</code> → <code>{"skill":"ticket","status":"ok"}</code> echoed edge→relay→prime→back; then the edge's public <code>/healthz</code> + forward route; then wire the Tickets tab to the edge.</li>
+</ol>
+</div>
+
+<h2>What this changes</h2>
+<div class="card" data-cm="delta">
+<p>The 55-pt plan's biggest cost + risk — "stand up prime/relay on a new GCE VM, Linux build from scratch" — is <b>deleted</b>. The prime/relay are live; we add a skill the way we've added two already. Board 1 collapses to: <b>slot + pin + whitelist + prime redeploy (startup.sh) + edge clone + tab</b>. No new VM, no keygen, no wire-from-scratch. The GCS snapshot I already made is the IDS source-of-record the prime caches. <b>Ship the ping-first slot to prove the seam, then seat the ticket logic.</b></p>
+</div>
+
+<h2>General</h2>
+<div class="card" data-cm="general"><div class="sub" style="margin:0">Comment + <code>~fu</code>. Reuse: LV prime (live) + atlas-edge clone + startup.sh. Precedent: MESH_DEPLOY_AND_VERIFY.md (ingest/conditions). <code>~b</code> = cut the ticket slot (ping-first) and seat it on the live prime.</div></div>
+
+</div>
+<footer>v0 · 2026-07-04 · Be · argus · ~i deploy reuse · Fable 5</footer>
+<script>window.ARTIFACT={doc:"396616f9-cb60-4e02-af77-7e3b3159e81d"};</script>
+<script>
+/* Be — artifact comment + collapse + new-indicator widget (the "kung ~fu" template).
+   Drop into any Be artifact:
+     <script>window.ARTIFACT={doc:"my-artifact-key"};</script>
+     <script src="../tools/artifact-comments.js"></script>
+   Mark any element commentable + collapsible with data-cm="<object-id>". The heading immediately
+   before it becomes a collapse toggle. Comments are open (no lock), per-object, backed by the
+   gcp-bridge /comments API. "N new" = comments you haven't opened yet (per-object, localStorage).
+   metal reads via /comments/recent and stamps seen. Self-contained: injects its own CSS. */
+(function(){
+  var CFG = window.ARTIFACT || {};
+  var GB  = CFG.bridge || "https://gcp-bridge-692654781984.us-west1.run.app";
+  var DOC = CFG.doc; if(!DOC){ return; }
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+  function el(id){ return document.getElementById(id); }
+  function lsGet(k){ try{ return localStorage.getItem(k)||""; }catch(_){ return ""; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(_){} }
+  function nowIso(){ return new Date().toISOString().replace(/\.\d+Z$/,"Z"); }
+  function readKey(o){ return "acr_"+DOC+"_"+o; }
+
+  // ---- inject CSS (template ships its own look) ----
+  var css=
+  ".ac-h{cursor:pointer;user-select:none;} .ac-chev{display:inline-block;color:#6FC3DF;font-size:.8em;transition:transform .15s;transform:rotate(-90deg);} .ac-h.ac-open .ac-chev{transform:none;}"
+  +".ac-hnew{background:#241d06;color:#ffd479;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:800;margin-left:8px;vertical-align:middle;}"
+  +"[data-cm].ac-collapsed{display:none;}"
+  +".ac-bar{margin-top:12px;padding-top:9px;border-top:1px solid #22303a;}"
+  +".ac-toggle{background:none;border:0;color:#6FC3DF;font-size:11px;cursor:pointer;font-family:inherit;padding:0;letter-spacing:.02em;text-transform:uppercase;font-weight:700;} .ac-toggle:hover{color:#9fe;} .ac-count{color:#7d8894;}"
+  +".ac-newbadge{background:#0c1c22;color:#7CFFB2;border:1px solid #1f5f47;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:800;margin-left:6px;}"
+  +".ac-panel{margin-top:12px;display:none;} .ac-panel.open{display:block;}"
+  +".ac-item{background:#10171c;border:1px solid #222c33;border-radius:12px;padding:11px 14px;margin:9px 0;}"
+  +".ac-item.me{border-color:#243b43;background:#0e161b;box-shadow:inset 3px 0 0 #6FC3DF;padding-left:16px;} .ac-item.isnew{box-shadow:inset 3px 0 0 #7CFFB2;}"
+  +".ac-ih{font-size:11px;margin-bottom:5px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;} .ac-ih b{font-weight:800;} .ac-item.me .ac-ih b{color:#6FC3DF;} .ac-item.op .ac-ih b{color:#e0b56f;} .ac-t{color:#59626b;font-size:10.5px;}"
+  +".ac-tx{font-size:13.5px;color:#e2e8ee;line-height:1.66;white-space:pre-wrap;word-break:break-word;} .ac-item.cmd .ac-tx{font-family:Consolas,monospace;font-size:12.5px;color:#e6f4fa;background:#0a1013;border:1px solid #1a2830;border-radius:7px;padding:9px 11px;}"
+  +".ac-tilde{background:#241d06;color:#ffd479;border-radius:5px;padding:1px 7px;font-size:9.5px;font-weight:800;} .ac-seen{color:#7CFFB2;font-size:10px;font-weight:800;} .ac-newtag{background:#0c1c22;color:#7CFFB2;border-radius:4px;padding:1px 6px;font-size:9.5px;font-weight:800;} .ac-empty{color:#5a636c;font-size:12.5px;font-style:italic;}"
+  +".ac-post{margin-top:12px;display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:start;}"
+  +".ac-post input,.ac-post textarea{background:#0d0d0d;color:#e6e6e6;border:1px solid #2a2f34;border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;} .ac-post input:focus,.ac-post textarea:focus{outline:0;border-color:#6FC3DF;} .ac-post textarea{resize:vertical;min-height:38px;}"
+  +".ac-post button{background:#6FC3DF;color:#06222c;border:0;border-radius:8px;padding:9px 18px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;}"
+  +"@media(max-width:560px){ .ac-post{grid-template-columns:1fr;} }"
+  +".ac-navbox{display:inline-flex;align-items:center;gap:12px;font-size:11px;color:#7d8894;}"
+  +".ac-live{display:inline-flex;align-items:center;gap:7px;} .ac-dot{width:7px;height:7px;border-radius:50%;background:#7CFFB2;animation:acpulse 2s infinite;}"
+  +".ac-navbtn{background:#16242b;color:#9aa3ad;border:1px solid #2c4a55;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;} .ac-navbtn:hover{border-color:#6FC3DF;color:#6FC3DF;}"
+  +"@keyframes acpulse{0%{box-shadow:0 0 0 0 rgba(124,255,178,.55);}70%{box-shadow:0 0 0 6px rgba(124,255,178,0);}100%{box-shadow:0 0 0 0 rgba(124,255,178,0);}}";
+  var st=document.createElement("style"); st.textContent=css; document.head.appendChild(st);
+
+  var objs=[].slice.call(document.querySelectorAll("[data-cm]"));
+
+  // ---- collapse: wire the heading before each card ----
+  objs.forEach(function(node){
+    var h=node.previousElementSibling;
+    while(h && !/^H[1-6]$/.test(h.tagName)) h=h.previousElementSibling;
+    if(h){ h.classList.add("ac-h","ac-open"); h.setAttribute("data-accol", node.getAttribute("data-cm"));
+      h.insertAdjacentHTML("afterbegin","<span class='ac-chev'>&#9662;</span> ");
+      h.insertAdjacentHTML("beforeend","<span class='ac-hnew' id='ach-"+node.getAttribute("data-cm")+"' style='display:none'></span>"); }
+  });
+
+  // ---- comment bar per object ----
+  objs.forEach(function(node){
+    var obj=node.getAttribute("data-cm");
+    var bar=document.createElement("div"); bar.className="ac-bar";
+    bar.innerHTML="<button class='ac-toggle' data-accm='"+obj+"'><span class='ac-count' id='acc-"+obj+"'>comment</span><span id='acn-"+obj+"'></span></button>"
+      +"<div class='ac-panel' id='acp-"+obj+"'><div id='acl-"+obj+"'></div>"
+      +"<div class='ac-post'><input id='aca-"+obj+"' placeholder='name' autocomplete='off'>"
+      +"<textarea id='acx-"+obj+"' rows='1' placeholder='comment &mdash; or a tilde like ~go'></textarea>"
+      +"<button data-acpost='"+obj+"'>Post</button></div></div>";
+    node.appendChild(bar);
+  });
+
+  // ---- nav controls ----
+  var nav=document.querySelector("nav");
+  if(nav){ var box=document.createElement("span"); box.className="ac-navbox";
+    box.innerHTML="<span id='ac-live' class='ac-live'></span><button id='ac-collapse' class='ac-navbtn'>collapse all</button>";
+    nav.appendChild(box); }
+
+  var seenTs="", lastPoll=0, allComments=[], totalNew=0;
+  function render(all){
+    allComments=all;
+    var g={}; all.forEach(function(c){ (g[c.obj]=g[c.obj]||[]).push(c); });
+    totalNew=0;
+    objs.forEach(function(node){
+      var obj=node.getAttribute("data-cm"), cs=g[obj]||[], lastRead=lsGet(readKey(obj));
+      var newN=cs.filter(function(c){return c.author!=="metal" && c.ts>lastRead;}).length; totalNew+=newN;
+      var cc=el("acc-"+obj); if(cc) cc.textContent = cs.length ? (cs.length+" comment"+(cs.length>1?"s":"")) : "comment";
+      var nb=el("acn-"+obj); if(nb) nb.innerHTML = newN? " <span class='ac-newbadge'>"+newN+" new</span>":"";
+      var hn=el("ach-"+obj); if(hn){ hn.textContent = newN? (newN+" new"):""; hn.style.display = newN? "":"none"; }
+      var cl=el("acl-"+obj); if(cl) cl.innerHTML = cs.length ? cs.map(function(c){
+        var mine=c.author==="metal", isnew=(c.author!=="metal" && c.ts>lastRead), seen=(!mine && seenTs && c.ts<=seenTs);
+        return "<div class='ac-item "+(mine?"me":"op")+(c.isCommand?" cmd":"")+(isnew?" isnew":"")+"'><div class='ac-ih'><b>"+esc(c.author)+"</b> <span class='ac-t'>"+esc((c.ts||'').replace('T',' ').replace('Z',' UTC'))+"</span>"+(c.isCommand?"<span class='ac-tilde'>TILDE &mdash; metal acts</span>":"")+(seen?"<span class='ac-seen'>&#10003; seen by metal</span>":"")+(isnew?"<span class='ac-newtag'>NEW</span>":"")+"</div><div class='ac-tx'>"+esc(c.text)+"</div></div>";
+      }).join(""):"<div class='ac-empty'>No comments yet.</div>";
+    });
+    tick();
+  }
+  function relt(ms){ var s=Math.round((Date.now()-ms)/1000); if(s<2)return "just now"; if(s<60)return s+"s ago"; return Math.round(s/60)+"m ago"; }
+  function tick(){ var e=el("ac-live"); if(e&&lastPoll) e.innerHTML="<span class='ac-dot'></span> live &middot; "+relt(lastPoll)+(totalNew?" &middot; <b style='color:#7CFFB2'>"+totalNew+" new</b>":""); }
+  function load(){ fetch(GB+"/comments?doc="+DOC+"&_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){ seenTs=(d&&d.seenByMetal)||seenTs; lastPoll=Date.now(); render((d&&d.comments)||[]); }).catch(function(){}); }
+  function markRead(o){ lsSet(readKey(o), nowIso()); render(allComments); }
+  function post(o){
+    var a=((el("aca-"+o)||{}).value||"").trim()||"operator", t=((el("acx-"+o)||{}).value||"").trim();
+    if(!t) return; lsSet("cm_author",a);
+    fetch(GB+"/comments?doc="+DOC,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({obj:o,author:a,text:t})}).then(function(r){return r.json();}).then(function(){ el("acx-"+o).value=""; markRead(o); load(); }).catch(function(){});
+  }
+  function setCollapsed(node,on){ node.classList.toggle("ac-collapsed",on); var h=el("acp-"+node.getAttribute("data-cm")); var head=document.querySelector("[data-accol='"+node.getAttribute("data-cm")+"']"); if(head) head.classList.toggle("ac-open",!on); }
+  function toggleAll(){ var anyOpen=objs.some(function(n){return !n.classList.contains("ac-collapsed");}); objs.forEach(function(n){ setCollapsed(n, anyOpen); }); var b=el("ac-collapse"); if(b) b.textContent = anyOpen? "expand all":"collapse all"; }
+
+  document.addEventListener("click", function(e){
+    if(!e.target||!e.target.closest) return;
+    if(e.target.id==="ac-collapse"){ toggleAll(); return; }
+    var col=e.target.closest("[data-accol]"); if(col && !e.target.closest("[data-accm]") && !e.target.closest(".ac-bar")){ var o=col.getAttribute("data-accol"); var card=document.querySelector("[data-cm='"+o+"']"); if(card) setCollapsed(card, !card.classList.contains("ac-collapsed")); return; }
+    var tg=e.target.closest("[data-accm]"); if(tg){ var o=tg.getAttribute("data-accm"); var p=el("acp-"+o); if(p){ p.classList.toggle("open"); if(p.classList.contains("open")) markRead(o); } return; }
+    var pb=e.target.closest("[data-acpost]"); if(pb){ post(pb.getAttribute("data-acpost")); return; }
+  });
+
+  try{ var la=lsGet("cm_author"); if(la) objs.forEach(function(n){ var ai=el("aca-"+n.getAttribute("data-cm")); if(ai) ai.value=la; }); }catch(_){}
+  load(); setInterval(load, 15000); setInterval(tick, 1000);
+})();
+
+</script>
+</body>
+</html>
