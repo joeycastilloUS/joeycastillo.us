@@ -2414,16 +2414,20 @@ async function zdApplyAll(fid){
   const ids=(f.offenders||[]).filter(o=>o&&o.id!=null).map(o=>o.id);
   for(const id of ids){ if((ZREM.steps[zdRemKey(L.action,id)]||{}).status!=="applied") await zdApply(L.action, id); }
 }
+// Human label for a write action (the WriteCatalog labels, mirrored client-side for the Apply block).
+var ZD_ACTION_LABEL = { "deactivate-trigger":"Disable trigger", "deactivate-automation":"Disable automation",
+  "deactivate-macro":"Deactivate macro", "deactivate-view":"Deactivate view", "deactivate-form":"Deactivate ticket form" };
+function zdActionLabel(a){ return ZD_ACTION_LABEL[a] || a; }
 // The Apply block — rendered only for checks whose fix is "deactivate every offender" (trg-dead/aut-dead/mac-dead).
 function zdApplyBlock(f){
   const L=ZD_LINKS[f.id]; if(!L||!L.action) return "";
   const targets=(f.offenders||[]).filter(o=>o&&o.id!=null);
   if(!targets.length) return "";
-  const noun=L.action.replace("deactivate-","")+"s";
+  const label=zdActionLabel(L.action), noun=L.action.replace("deactivate-","")+"s";
   if(!ZREM.on)
-    return "<div class='zapply off'>Argus can apply this &mdash; "+L.label.toLowerCase()+" &times;"+targets.length
+    return "<div class='zapply off'>Argus can apply this &mdash; "+label.toLowerCase()+" &times;"+targets.length
       +" <button class='zwm' data-zwm>Enable write mode</button></div>";
-  let h="<div class='zapply'><div class='zaph'>Argus can fix this &mdash; "+esc(L.label)+" ("+targets.length+" "+noun+")"
+  let h="<div class='zapply'><div class='zaph'>Argus can fix this &mdash; "+esc(label)+" ("+targets.length+" "+noun+")"
     +" <button class='zaall' data-zaall='"+f.id+"'>Apply all "+targets.length+"</button></div>";
   h+=targets.map(function(o){
     const k=zdRemKey(L.action,o.id), st=ZREM.steps[k]||{status:"pending"}; let ctl;
@@ -3172,7 +3176,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r404 . 4472e07 . 2026-07-05</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r407 . 01d7b30 . 2026-07-05</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
