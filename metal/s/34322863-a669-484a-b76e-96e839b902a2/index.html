@@ -40,8 +40,8 @@
 <h1>Build &mdash; Concurrent Sessions via Worktree (First Move)</h1>
 <p style="color:#999;">Teach the launcher <code>go &lt;n&gt;</code> to run session n in its own git worktree. Proven: two sessions land on main, zero index-lock contention.</p>
 
-<h2>What Was Built</h2><div class="lk-sec" data-obj="what-was-built"></div>
-<div class="section">
+<h2>What Was Built</h2>
+<div data-cm="what-was-built" class="section">
   <p>The First Move of the concurrent-sessions design (<code>be/designs/2026-07-02-0849-design-concurrent-sessions.html</code>): the launcher now accepts a session number.</p>
   <ul>
     <li><strong><code>go</code></strong> (bare) &mdash; primary session, <code>C:\metal</code>, OTel 4318. Byte-identical behavior to before &mdash; zero regression.</li>
@@ -50,8 +50,8 @@
   <p>Each worktree shares the <code>.git</code> object store + hooks (installed once into the main <code>.git/hooks</code>) but has its <strong>own working tree and its own git index</strong> &mdash; which is what makes the <code>index.lock</code> race impossible by construction. Each session's <code>be/</code> (board-status, telemetry) is naturally isolated; the per-session OTel port removes the collision.</p>
 </div>
 
-<h2>Proof (isolated harness)</h2><div class="lk-sec" data-obj="proof-isolated-harness"></div>
-<div class="section">
+<h2>Proof (isolated harness)</h2>
+<div data-cm="proof-isolated-harness" class="section">
   <blockquote>Run <code>go</code> and <code>go 2</code> side by side; commit in each at once; both land on <code>origin/main</code>, neither hits <code>index.lock</code>.</blockquote>
   <table>
     <tr><th>Check</th><th>Result</th></tr>
@@ -65,8 +65,8 @@
   </table>
 </div>
 
-<h2>Decisions Made</h2><div class="lk-sec" data-obj="decisions-made"></div>
-<div class="section">
+<h2>Decisions Made</h2>
+<div data-cm="decisions-made" class="section">
   <ul>
     <li><strong><code>$root</code> indirection.</strong> The launcher computes one operational root (main or worktree) and everything &mdash; hook, autoheal, board, telemetry, collector, settings, prompt &mdash; hangs off it. Session 1 is unchanged; a numbered session just re-points <code>$root</code>.</li>
     <li><strong>Hooks are shared, installed once</strong> into the main <code>.git/hooks</code> (worktrees share the common git dir) &mdash; so the ASCII guard applies to every session.</li>
@@ -75,8 +75,8 @@
   </ul>
 </div>
 
-<h2>Files Changed</h2><div class="lk-sec" data-obj="files-changed"></div>
-<div class="section">
+<h2>Files Changed</h2>
+<div data-cm="files-changed" class="section">
   <table>
     <tr><th>File</th><th>Change</th></tr>
     <tr><td><code>go.ps1</code></td><td><code>param([int]$Session)</code>; worktree create/reuse; <code>$root</code> + per-session OTel port; all refs follow <code>$root</code></td></tr>
@@ -85,8 +85,8 @@
   </table>
 </div>
 
-<h2>What's Next</h2><div class="lk-sec" data-obj="what-s-next"></div>
-<div class="section">
+<h2>What's Next</h2>
+<div data-cm="what-s-next" class="section">
   <ul>
     <li><strong>Session-branch push discipline.</strong> A tilde in a <code>session-&lt;n&gt;</code> worktree pushes <code>HEAD:main</code> (proven here); fold that into the chain's push step so every tilde does it automatically in a numbered session.</li>
     <li><strong>Lifecycle:</strong> <code>go &lt;n&gt; --end</code> to <code>git worktree remove</code> + delete the branch; prune orphan worktrees from crashed sessions on launch.</li>
@@ -94,8 +94,8 @@
   </ul>
 </div>
 
-<h2>Definition of Done</h2><div class="lk-sec" data-obj="definition-of-done"></div>
-<div class="section">
+<h2>Definition of Done</h2>
+<div data-cm="definition-of-done" class="section">
   <ul>
     <li><span class="pass">&#10003;</span> Code committed + pushed, SSH-signed; report saved + index updated</li>
     <li><span class="pass">&#10003;</span> First Move proven in an isolated harness (both land on main, 0 index.lock)</li>
@@ -105,78 +105,10 @@
 </div>
 
 </div>
-<style id="lk-style">.lk-sec{margin:2px 0 18px}.lk-bar{display:inline-block;font-size:12px;color:#6FC3DF;background:#141414;border:1px solid #262626;border-radius:14px;padding:3px 12px;cursor:pointer;user-select:none}.lk-bar:hover{border-color:#6FC3DF}.lk-body{margin-top:10px}.lk-c{background:#141414;border:1px solid #1e1e1e;border-radius:8px;padding:10px 12px;margin:8px 0}.lk-c .m{font-size:12px;color:#999;margin-bottom:3px}.lk-c .t{font-size:13px;color:#ccc;white-space:pre-wrap}.lk-form{margin:8px 0}.lk-form input,.lk-form textarea{background:#0a0a0a;border:1px solid #333;color:#e0e0e0;border-radius:6px;font-size:13px;padding:8px 10px;font-family:inherit;box-sizing:border-box}.lk-form .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}.lk-form input{flex:1;min-width:140px;max-width:240px}.lk-form textarea{width:100%;resize:vertical}.lk-form button{background:#6FC3DF;color:#000;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;margin-top:6px}.lk-st{font-size:12px;margin-left:10px}</style><!-- LATCHKEY THREAD v3 (per-section) -- doc = this artifact's cap token; ~fu attends via the gcp-bridge --><div id="lk-thread" style="max-width:840px;margin:0 auto;padding:0 16px 32px;"><h2 style="color:#6FC3DF;font-size:20px;margin:32px 0 12px;border-bottom:1px solid #333;padding-bottom:8px;">Comments &amp; Follow-up <span id="lk-count" style="font-size:12px;color:#000;background:#6FC3DF;border-radius:10px;padding:1px 8px;font-weight:700;margin-left:6px;">&middot;</span> <span style="font-size:12px;color:#555;font-weight:400;margin-left:4px;">comment on any section above &middot; <code>~fu</code> attends</span></h2><div id="lk-seen" style="font-size:12px;color:#22c55e;margin-bottom:8px;display:none;">&#10003; seen by metal</div><div id="lk-page"></div></div>
-<script>
-(function(){
-  var BRIDGE='https://gcp-bridge-692654781984.us-west1.run.app', TOKEN='34322863-a669-484a-b76e-96e839b902a2';
-  var esc=function(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;};
-  var author=''; try{author=localStorage.getItem('lk-author')||'';}catch(e){}
-  var groups={};
-  function cHtml(c){
-    var who=esc(c.author||'anon'), isM=(c.author==='metal');
-    var cmd=(c.text&&c.text.charAt(0)==='~')?' <span style="color:#f59e0b;font-weight:600;">&#9655; command</span>':'';
-    return '<div class="lk-c"><div class="m"><strong style="color:'+(isM?'#6FC3DF':'#e0e0e0')+';">'+who+'</strong>'+cmd+
-      ' <span style="color:#555;">'+esc(c.ts||'')+'</span></div><div class="t">'+esc(c.text)+'</div></div>';
-  }
-  function formHtml(obj,ph){
-    return '<div class="lk-form" data-obj="'+esc(obj)+'"><div class="row">'+
-      '<input class="lk-n" placeholder="Your name" value="'+esc(author)+'"></div>'+
-      '<textarea class="lk-t" rows="2" placeholder="'+esc(ph)+' -- start with ~ for a tilde command"></textarea>'+
-      '<button class="lk-send">Comment</button><span class="lk-st"></span></div>';
-  }
-  function sectionHtml(obj){
-    var cs=groups[obj]||[]; var n=cs.length;
-    var bar=n?(n+' comment'+(n>1?'s':'')):'Comment on this section';
-    return '<span class="lk-bar" data-t="'+esc(obj)+'">'+bar+'</span>'+
-      '<div class="lk-body" id="lkb-'+esc(obj)+'" style="display:none">'+cs.map(cHtml).join('')+formHtml(obj,'Comment on this section')+'</div>';
-  }
-  function render(d){
-    if(d&&d.seenByMetal){document.getElementById('lk-seen').style.display='block';}
-    var list=(d&&d.comments)||[]; groups={};
-    list.forEach(function(c){var o=c.obj||'page';(groups[o]=groups[o]||[]).push(c);});
-    document.getElementById('lk-count').textContent=String(list.length);
-    var secs=document.querySelectorAll('.lk-sec');
-    for(var i=0;i<secs.length;i++){secs[i].innerHTML=sectionHtml(secs[i].getAttribute('data-obj'));}
-    var page=groups['page']||groups['general']||[];
-    var ph=document.getElementById('lk-page');
-    ph.innerHTML='<div style="font-size:12px;color:#777;margin-bottom:6px;">Whole-artifact comments</div>'+
-      (page.length?page.map(cHtml).join(''):'<div style="color:#666;font-size:13px;margin-bottom:8px;">No page-level comments yet.</div>')+
-      formHtml('page','Comment on the whole artifact');
-  }
-  function load(){
-    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN))
-      .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
-      .then(render)
-      .catch(function(){document.getElementById('lk-page').innerHTML='<span style="color:#f59e0b;">comments unavailable -- bridge did not answer.</span>';});
-  }
-  document.addEventListener('click',function(e){
-    var t=e.target;
-    if(t.classList&&t.classList.contains('lk-bar')){
-      var b=document.getElementById('lkb-'+t.getAttribute('data-t'));
-      if(b){b.style.display=(b.style.display==='none'?'block':'none');}
-      return;
-    }
-    if(t.classList&&t.classList.contains('lk-send')){
-      var form=t.closest('.lk-form'); if(!form)return;
-      var obj=form.getAttribute('data-obj');
-      var name=(form.querySelector('.lk-n').value||'').trim();
-      var text=(form.querySelector('.lk-t').value||'').trim();
-      var st=form.querySelector('.lk-st');
-      if(!name){st.textContent='Enter your name.';st.style.color='#f59e0b';return;}
-      if(!text){st.textContent='Write a comment.';st.style.color='#f59e0b';return;}
-      try{localStorage.setItem('lk-author',name);author=name;}catch(e){}
-      t.textContent='Posting...';t.disabled=true;st.textContent='';
-      fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN),{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({author:name,text:text,obj:obj})})
-        .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json().catch(function(){return{};});})
-        .then(function(){st.textContent='Posted. Run ~fu to have metal attend.';st.style.color='#22c55e';t.textContent='Comment';t.disabled=false;load();})
-        .catch(function(err){st.textContent='Post failed ('+((err&&err.message)||'network')+'). Text kept.';st.style.color='#f87171';t.textContent='Comment';t.disabled=false;});
-    }
-  });
-  load();
-})();
-</script>
-
 <footer>v0 &middot; r1751 &middot; 2026-07-02 &middot; Be &middot; metal console</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"34322863-a669-484a-b76e-96e839b902a2"};</script>
+<script src="/metal/artifact-comments.js"></script>
 </body>
 </html>
