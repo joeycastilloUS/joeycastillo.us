@@ -2296,7 +2296,7 @@ var ZD_LINKS = {
   "trg-dead":     {why:zdSrch("unused triggers best practices"), how:_DOC.triggers, fam:"trigger", area:ZD_AREA.triggers, action:"deactivate-trigger"},
   "trg-sprawl":   {why:zdSrch("too many triggers consolidate"),  how:_DOC.triggers, area:ZD_AREA.triggers},
   "trg-inactive": {why:zdSrch("inactive triggers cleanup"),      how:_DOC.triggers, area:ZD_AREA.triggers},
-  "rule-clash":   {why:zdSrch("duplicate conflicting triggers"), how:_DOC.triggers, fam:"trigger", area:ZD_AREA.triggers, action:"deactivate-trigger"},
+  "rule-clash":   {why:zdSrch("duplicate conflicting triggers"), how:_DOC.triggers, fam:"trigger", area:ZD_AREA.triggers},
   "aut-dead":     {why:zdSrch("automations best practices"),     how:_DOC.automations, fam:"automation", area:ZD_AREA.automations, action:"deactivate-automation"},
   "aut-refire":   {why:zdSrch("automation nullify condition"),   how:_DOC.automations, fam:"automation", area:ZD_AREA.automations},
   "mac-dead":     {why:zdSrch("unused macros cleanup"),          how:_DOC.macros, fam:"macro", area:ZD_AREA.macros, action:"deactivate-macro"},
@@ -2305,7 +2305,7 @@ var ZD_LINKS = {
   "addr-verified":{why:zdSrch("support address SPF verification"), how:zdSrch("verify support address forwarding"), area:ZD_AREA.email},
   "grp-empty":    {why:zdSrch("empty groups routing"),           how:zdSrch("delete or edit a group"), area:ZD_AREA.groups},
   "fld-inactive": {why:zdSrch("ticket fields cleanup"),          how:zdSrch("deactivate ticket field"), area:ZD_AREA.fields},
-  "form-inactive":{why:zdSrch("ticket forms cleanup"),          how:_DOC.forms, fam:"form", area:ZD_AREA.forms, action:"deactivate-form"},
+  "form-inactive":{why:zdSrch("ticket forms cleanup"),          how:_DOC.forms, fam:"form", area:ZD_AREA.forms},
   "sla-bizhours": {why:zdSrch("SLA business hours vs calendar"), how:_DOC.slas, area:ZD_AREA.slas},
   "seat-idle":    {why:zdSrch("agent seats light agent downgrade"), how:_DOC.users, fam:"user", area:ZD_AREA.members},
   "agent-2fa":    {why:_DOC.twofa, how:_DOC.twofa, area:ZD_AREA.security},
@@ -2334,6 +2334,70 @@ function zdOffenders(f){ const o=f.offenders||[]; if(o.length<2) return "";
   const items=o.map(function(x){ const nm=esc(zdLabel(x));
     return (fam&&x&&x.id!=null&&ZD_DEEP[fam]) ? "<a href='"+ZD_DEEP[fam](x.id)+"' target='_blank' rel='noopener'>"+nm+"</a>" : nm; });
   return "<details class='zoff'><summary>show all "+o.length+" affected</summary><div class='zoffl'>"+items.join(" &middot; ")+"</div></details>"; }
+
+// ===== Board R3 — Apply / Rollback (the 4th link, wired to the write lane) =====
+// Write mode is OFF by default. Turning it on prompts for the write-mode passphrase (X-Bridge-Write),
+// held in memory for the session only — never stored, never committed. Apply/rollback go through the
+// gated /zendesk/remediate lane; if the service is disarmed the caller sees a clean "writes are off".
+var ZREM = { on:false, tok:"", steps:{} };  // steps["action|id"] = {status, before, after, err}
+function zdRemKey(action,id){ return action+"|"+id; }
+async function zdPost(path, body){
+  const r = await fetch(ZBRIDGE+"/zendesk/remediate/"+path, { method:"POST",
+    headers: Object.assign({ "Content-Type":"application/json" },
+      PW?{ "Authorization":"Bearer "+PW }:{}, ZREM.tok?{ "X-Bridge-Write":ZREM.tok }:{}),
+    body: JSON.stringify(body) });
+  let d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok) throw new Error(d.detail||d.error||("HTTP "+r.status));
+  return d;
+}
+function zdWriteMode(){
+  if(ZREM.on){ ZREM.on=false; ZREM.tok=""; renderZAUD(); return; }
+  const t = prompt("Write mode lets Argus APPLY fixes to your LIVE Zendesk (each is reversible — every Apply gets a Roll back).\n\nEnter the write-mode passphrase to enable (blank = cancel):");
+  if(!t) return;
+  ZREM.tok = t.trim(); ZREM.on = true; renderZAUD();
+}
+async function zdApply(action, id){
+  const k=zdRemKey(action,id); ZREM.steps[k]={status:"applying"}; renderZAUD();
+  try{ const d=await zdPost("apply",{ action, id:String(id) }); ZREM.steps[k]={status:"applied", before:d.before, after:d.after}; }
+  catch(e){ ZREM.steps[k]={status:"failed", err:String(e.message||e)}; }
+  renderZAUD();
+}
+async function zdRollback(action, id){
+  const k=zdRemKey(action,id); const st=ZREM.steps[k];
+  if(!st || st.before==null){ return; }                       // no anchor -> nothing to restore
+  const prev=st; ZREM.steps[k]=Object.assign({}, st, {status:"applying"}); renderZAUD();
+  try{ await zdPost("rollback",{ action, id:String(id), before:st.before }); ZREM.steps[k]={status:"rolledback", before:prev.before}; }
+  catch(e){ ZREM.steps[k]=Object.assign({}, prev, {status:"failed", err:String(e.message||e)}); }
+  renderZAUD();
+}
+async function zdApplyAll(fid){
+  const f=(ZAUD.run&&ZAUD.run.findings||[]).find(x=>x.id===fid); if(!f) return;
+  const L=ZD_LINKS[fid]; if(!L||!L.action) return;
+  const ids=(f.offenders||[]).filter(o=>o&&o.id!=null).map(o=>o.id);
+  for(const id of ids){ if((ZREM.steps[zdRemKey(L.action,id)]||{}).status!=="applied") await zdApply(L.action, id); }
+}
+// The Apply block — rendered only for checks whose fix is "deactivate every offender" (trg-dead/aut-dead/mac-dead).
+function zdApplyBlock(f){
+  const L=ZD_LINKS[f.id]; if(!L||!L.action) return "";
+  const targets=(f.offenders||[]).filter(o=>o&&o.id!=null);
+  if(!targets.length) return "";
+  const noun=L.action.replace("deactivate-","")+"s";
+  if(!ZREM.on)
+    return "<div class='zapply off'>Argus can apply this &mdash; "+L.label.toLowerCase()+" &times;"+targets.length
+      +" <button class='zwm' data-zwm>Enable write mode</button></div>";
+  let h="<div class='zapply'><div class='zaph'>Argus can fix this &mdash; "+esc(L.label)+" ("+targets.length+" "+noun+")"
+    +" <button class='zaall' data-zaall='"+f.id+"'>Apply all "+targets.length+"</button></div>";
+  h+=targets.map(function(o){
+    const k=zdRemKey(L.action,o.id), st=ZREM.steps[k]||{status:"pending"}; let ctl;
+    if(st.status==="applying") ctl="<span class='spin'></span> working&hellip;";
+    else if(st.status==="applied") ctl="<span class='zok'>&#10003; applied</span> <button class='zrb' data-zrb='"+L.action+"|"+o.id+"'>&#8635; Roll back</button>";
+    else if(st.status==="rolledback") ctl="<span class='zrbk'>&#8635; rolled back</span> <button class='zap' data-zap='"+L.action+"|"+o.id+"'>Re-apply</button>";
+    else if(st.status==="failed") ctl="<span class='zfail'>&#10007; "+esc(st.err||"failed")+"</span> <button class='zap' data-zap='"+L.action+"|"+o.id+"'>Retry</button>";
+    else ctl="<button class='zap' data-zap='"+L.action+"|"+o.id+"'>&#9654; Apply</button>";
+    return "<div class='zaprow'><span class='zapn'>"+esc(zdLabel(o))+"</span><span class='zapc'>"+ctl+"</span></div>";
+  }).join("");
+  return h+"</div>";
+}
 function zdStageList(){ const cur=ZD_RUN_STAGES.indexOf(ZAUD.prog); return "<div class='zstages'>"+ZD_RUN_STAGES.map(function(s,i){
   var cls = (cur<0||i<cur)?"done":(i===cur?"cur":"todo"); var mark = cls==="done"?"&#10003;":(cls==="cur"?"<span class='spin'></span>":"&middot;");
   return "<span class='zstg "+cls+"'>"+mark+" "+esc(s)+"</span>"; }).join("")+"</div>"; }
@@ -2343,6 +2407,8 @@ function zdAuditInner(){
     +"<h2 style='margin:0'>Audit &mdash; Feature &amp; Config Usage</h2><span class='zro'>READ-ONLY</span></div>"
     +"<div class='muted' style='margin-bottom:12px'>Grade this Zendesk instance's live configuration &mdash; rules, routing, seats, knowledge, and the AI you pay for &mdash; against best practice. Deterministic; nothing is changed.</div>";
   h+="<button class='zgo' data-zdrun"+(ZAUD.busy?" disabled":"")+">"+(ZAUD.busy?("<span class='spin'></span> reading "+esc(ZAUD.prog||"")+"…"):(run?"&#8635; Re-run Audit":"&#9654; Run Audit"))+"</button>";
+  if(run) h+=" <button class='zwmtop"+(ZREM.on?" on":"")+"' data-zwm>"+(ZREM.on?"&#128275; Write mode ON":"&#128274; Write mode off")+"</button>";
+  if(ZREM.on) h+="<div class='zwmwarn'>&#9888; Write mode is ON &mdash; <b>Apply</b> changes your LIVE Zendesk (each is reversible via Roll back). <button class='zwm' data-zwm>Turn off</button></div>";
   if(ZAUD.busy) h+=zdStageList();
   if(ZAUD.err) h+="<div class='zerr'>"+esc(ZAUD.err)+"</div>";
   h+="</div>";
@@ -2363,7 +2429,7 @@ function zdAuditInner(){
     if(!run.findings.length) h+="<div class='muted'>No issues on the audited checks. &#9989;</div>";
     else h+=run.findings.map(f=>"<div class='zfind'><div class='zfh'>"+zdGradeChip(f.status)+"<span class='zft'>"+esc(f.title)+"</span>"+zdTagChip(f.tag)+(f.gr?"<span class='zgr'>GR</span>":"")+"<span class='zar'>"+esc(f.area)+"</span></div>"
       +"<div class='zfd'>"+esc(f.detail)+"</div>"+zdImpactLine(f)
-      +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div>"+zdFindingLinks(f)+zdOffenders(f)+"</div>").join("");
+      +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div>"+zdFindingLinks(f)+zdApplyBlock(f)+zdOffenders(f)+"</div>").join("");
     h+="</div>";
     // honest not-audited
     h+="<div class='box'><div class='feat-h'>Not audited yet</div><div class='muted' style='margin-bottom:8px'>Excluded from the score — never a silent pass. Grades flip on as the bridge reads land.</div>"
@@ -2392,11 +2458,30 @@ function zdAuditPane(){
     +"#pane-zdaudit .zstages{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.zstg{font-size:10.5px;border-radius:4px;padding:2px 7px;background:#0f1519;color:#5c6670}.zstg.done{color:#7CFFB2}.zstg.cur{color:#6FC3DF;background:#0c1c22}"
     +"#pane-zdaudit .zoff{margin-top:8px}.zoff summary{cursor:pointer;color:#6FC3DF;font-size:11.5px;font-weight:700}.zoffl{color:#9aa7b0;font-size:11.5px;margin-top:6px;line-height:1.7}.zoffl a{color:#9fd4e4;text-decoration:none;border-bottom:1px dotted #345}.zoffl a:hover{color:#6FC3DF}"
     +"#pane-zdaudit .zlinks{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px}.zlinks a{color:#8fb7c4;font-size:11.5px;font-weight:700;text-decoration:none;border-bottom:1px solid #223} .zlinks a:hover{color:#6FC3DF;border-bottom-color:#6FC3DF}"
+    +"#pane-zdaudit .zwmtop{background:#12181d;color:#8a93a0;border:1px solid #2a343b;border-radius:6px;padding:8px 12px;font-weight:700;font-size:12px;cursor:pointer;margin-left:8px}.zwmtop.on{background:#3a1212;color:#ffb4b4;border-color:#6b2b2b}"
+    +"#pane-zdaudit .zwmwarn{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:9px 12px;font-size:12px;margin-top:10px}.zwmwarn button{background:none;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;margin-left:6px}"
+    +"#pane-zdaudit .zapply{margin-top:10px;background:#0c1418;border:1px solid #1a2830;border-radius:8px;padding:10px 12px}.zapply.off{color:#8a93a0;font-size:12px}"
+    +"#pane-zdaudit .zapply.off .zwm{background:#6FC3DF;color:#06222c;border:0;border-radius:5px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer;margin-left:8px}"
+    +"#pane-zdaudit .zaph{font-size:12px;color:#cfe9f2;font-weight:700;margin-bottom:8px}.zaall{background:#6FC3DF;color:#06222c;border:0;border-radius:5px;padding:3px 10px;font-weight:700;font-size:11px;cursor:pointer;margin-left:8px}"
+    +"#pane-zdaudit .zaprow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid #14202700}.zapn{color:#c7d0d8;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.zapc{flex:0 0 auto;font-size:11.5px}"
+    +"#pane-zdaudit .zap,.zrb{background:#12303a;color:#9fe0f2;border:1px solid #235;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer}.zap:hover,.zrb:hover{background:#173b47}"
+    +"#pane-zdaudit .zok{color:#7CFFB2;font-weight:700}.zrbk{color:#ffd479;font-weight:700}.zfail{color:#ff9b9b;font-weight:700}"
     +"#pane-zdaudit .zna{display:flex;flex-wrap:wrap;gap:8px}.znac{background:#111417;border:1px dashed #2a343b;border-radius:7px;padding:8px 12px;min-width:180px}.znat{display:block;color:#8a93a0;font-weight:700;font-size:12px}.znam{display:block;color:#5c6670;font-size:11px}"
     +"</style><div id='zd-wrap'>"+zdAuditInner()+"</div>";
 }
 function renderZAUD(){ const w=document.getElementById("zd-wrap"); if(w) w.innerHTML=zdAuditInner(); }
-document.addEventListener("click", function(e){ if(e.target.closest("[data-zdrun]")) zdRunAudit(); });
+document.addEventListener("click", function(e){
+  if(e.target.closest("[data-zdrun]")){ zdRunAudit(); return; }
+  if(e.target.closest("[data-zwm]")){ zdWriteMode(); return; }
+  const ap=e.target.closest("[data-zap]"); if(ap){ const a=ap.getAttribute("data-zap").split("|"); zdApply(a[0], a.slice(1).join("|")); return; }
+  const rb=e.target.closest("[data-zrb]"); if(rb){ const a=rb.getAttribute("data-zrb").split("|"); zdRollback(a[0], a.slice(1).join("|")); return; }
+  const aa=e.target.closest("[data-zaall]"); if(aa){
+    const f=(ZAUD.run&&ZAUD.run.findings||[]).find(x=>x.id===aa.getAttribute("data-zaall"));
+    const n=f?(f.offenders||[]).filter(o=>o&&o.id!=null).length:0;
+    if(n && confirm("Apply to all "+n+" — this changes your live Zendesk. Each is reversible. Continue?")) zdApplyAll(aa.getAttribute("data-zaall"));
+    return;
+  }
+});
 
 // ================= GCP app — Cloud Cost =================
 // "My cost per project I own, at lower levels." Projects come from Cloud Billing; cost per
@@ -3043,7 +3128,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r396 . c0a53bf . 2026-07-05</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r397 . a321137 . 2026-07-05</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
