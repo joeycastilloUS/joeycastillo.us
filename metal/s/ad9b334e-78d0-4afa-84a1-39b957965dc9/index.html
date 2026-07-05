@@ -34,7 +34,7 @@
   .pill.dead{background:#1c0c0c;border-color:#5f1f1f;color:#EF9E9E;text-decoration:line-through}
   footer{max-width:820px;margin:0 auto;padding:20px;color:var(--mut);font-size:12px;border-top:1px solid #262626}
 </style>
-<nav><span class="brand">Be</span><span class="pub">Published 2026-07-05 13:20 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/ad9b334e-78d0-4afa-84a1-39b957965dc9/').then(function(){var t=b.textContent;b.textContent='✓ Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-05 14:15 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/ad9b334e-78d0-4afa-84a1-39b957965dc9/').then(function(){var t=b.textContent;b.textContent='✓ Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
 </nav>
 <main>
 
@@ -146,17 +146,177 @@ APP / MODULE ── Argus, … ── access = the whole app (for now) ── ga
 <p style="margin:0"><span class="good">On the tool:</span> you were right &mdash; I reinvented a comment engine you'd already built and loved. This artifact is now a real Latchkey on <em>your</em> <code>artifact-comments.js</code> + gcp-bridge, minted UUID, served from <code>/metal/s/</code>, robots-blocked. Your comments below are the trail; each of my <code>~fu</code> replies sits under yours, in-thread.</p>
 </div>
 
+<h2 id="lifecycle">The lifecycle — every state, end to end</h2>
+<div data-cm="lifecycle" class="card">
+<pre>onboard ──▶ invite ──▶ ACTIVE ──▶ pause ⇄ resume
+mint key    cap-link      │
++ Warrant   becomes       ├──▶ expire   date hits — automatic, edge-enforced
+            identity      ├──▶ cut off  Overlord — terminal
+                          ├──▶ recover  lost device — same key, new shares (resplit)
+                          └──▶ rotate   max age — new key, new anchor, re-Warrant</pre>
+<table>
+<tr><th>State</th><th>Triggered by</th><th>What proves it</th><th>Edge behavior</th></tr>
+<tr><td><strong>Onboarded</strong></td><td>Operator mints; Overlord Warrants</td><td><code>_key.&lt;fqdn&gt;</code> anchor + Warrant sig</td><td>May enroll devices; no session yet</td></tr>
+<tr><td><strong>Invited</strong> (user)</td><td>Overlord / granted Operator</td><td>Unused, unexpired cap-token</td><td>Redeems once, then burned</td></tr>
+<tr><td><strong>Active</strong></td><td>Warrant + <code>status:"active"</code></td><td>Challenge&ndash;response + live status check</td><td>Sessions honored</td></tr>
+<tr><td><strong>Paused</strong></td><td>Overlord sets <code>status:"paused"</code></td><td>Status doc</td><td>New logins refused; live sessions die within 60&thinsp;s. Reversible.</td></tr>
+<tr><td><strong>Cut off</strong></td><td>Overlord sets <code>status:"revoked"</code></td><td>Status doc + Warrant serial on revocation list</td><td>Everything refused. Terminal — re-onboard to return.</td></tr>
+<tr><td><strong>Expired</strong></td><td>Clock passes <code>expires</code></td><td>Date in the signed grant</td><td>Automatic refusal. No human in the loop.</td></tr>
+<tr><td><strong>Recovered</strong></td><td>Operator, any 3 of 5 shares</td><td><code>genesis_recover</code> &rarr; same pubkey</td><td>Anchor unchanged; old device Warrant revoked</td></tr>
+<tr><td><strong>Rotated</strong></td><td>Max key age (forced) or choice</td><td>New anchor published; old tombstoned</td><td>Old key refused after cutover</td></tr>
+</table>
+<p style="margin:0">One law under all eight: <strong>the edge decides from live signed state, never from a stale session.</strong> A session is a claim; the status doc is the truth; every request reconciles the two.</p>
+</div>
+
+<h2 id="onboard">Onboarding — operator and user</h2>
+<div data-cm="onboard" class="card">
+<p style="margin-top:0"><strong>Operator</strong> (key-holder) — four steps, all on existing code:</p>
+<ol>
+<li><strong>Mint</strong> — <code>genesis-cli mint 5 3 &lt;fqdn&gt; ./out</code> (or the Genesis app), air-gapped. Emits <code>operator.pub</code>, five 65-byte shares, and the <code>_key.&lt;fqdn&gt;</code> TXT line. Root wiped on return — already built, already KAT-tested.</li>
+<li><strong>Publish</strong> — the operator plants <code>_key.&lt;fqdn&gt;</code> in their DNS. Third-party-verifiable with <code>dig</code>.</li>
+<li><strong>Warrant</strong> — the Overlord verifies the anchor from an independent vantage, then signs <code>op_pub ‖ fqdn ‖ role ‖ expires</code> with the Purcius root (<code>genesis_sign</code>, exists today). The Warrant IS the seat.</li>
+<li><strong>Enroll a device</strong> — the console mints a non-extractable Ed25519 device key (Web Crypto), shows its pubkey as a QR; the Genesis app on the key-holding device scans and signs <code>device_pub ‖ "console" ‖ issued_at</code> with the operator key. Device speaks for operator; operator speaks for the anchor.</li>
+</ol>
+<p style="margin:0"><strong>User</strong> — no key, no ceremony: an invite (below) plus Slack / Discord / Google OIDC. The provider proves who; the invite decides what. Users never touch Genesis.</p>
+</div>
+
+<h2 id="invite">Invite — a single-use cap-link that becomes identity</h2>
+<div data-cm="invite" class="card">
+<p style="margin-top:0">Sibling of Latchkey: a Latchkey token grants <em>reading a document</em>; an Invite token grants <em>becoming a member</em>. Same shape — unguessable cap-URL, server-side ledger, fail-closed.</p>
+<pre>Joey ─▶ mint invite {org: mendo, apps: [argus], bind: michelle@…, expires: 7d}
+     ─▶ https://argus.com.ai/join/&lt;token&gt;      (DM'd over the org's Slack)
+Michelle clicks ─▶ OIDC login (Slack) ─▶ identity slack:U… bound to org
+     ─▶ email appended to argus_crew_v1 ─▶ token BURNED (used_by, used_at)</pre>
+<ul>
+<li><strong>Single-use.</strong> Redeemed = burned. A leaked used link is a dead link.</li>
+<li><strong>Bindable.</strong> An invite may pin an email (only Michelle can redeem) or be open-but-expiring for a batch.</li>
+<li><strong>Carries the grant.</strong> Org + apps ride in the server-side record, not the URL. Redeeming writes the allow-list entry — the same <code>argus_crew_v1</code> mechanism already live.</li>
+<li><strong>Org membership answer:</strong> the invite names the org. One email invited by two orgs = two memberships, deliberately — the workspace that DM'd the link is the org that vouched.</li>
+</ul>
+<p style="margin:0">This closes the open question above: Michelle, Elbert, Brendan come off their Slack workspace via one DM'd link each. No admin screen, no CSV, no shared password.</p>
+</div>
+
+<h2 id="recovery">Recovery — lost device &ne; lost identity</h2>
+<div data-cm="recovery" class="card">
+<p style="margin-top:0">Genesis already mints recovery: the root never persists whole — it exists as 5 Shamir shares, any 3 reconstruct, any 2 reveal <em>nothing</em> (information-theoretic, not just hard). Canonical share placement per operator:</p>
+<table>
+<tr><th>#</th><th>Where</th><th>Why</th></tr>
+<tr><td class="c">1</td><td>Genesis app on the operator's phone</td><td>The everyday share</td></tr>
+<tr><td class="c">2</td><td>Printed, home safe</td><td>Survives the phone</td></tr>
+<tr><td class="c">3</td><td>Bank deposit box</td><td>Survives the house</td></tr>
+<tr><td class="c">4</td><td>Trusted person (sealed)</td><td>Survives the operator's geography</td></tr>
+<tr><td class="c">5</td><td>Operator's private vault repo (<code>&lt;name&gt;US/vault</code>)</td><td>One share alone leaks zero bits — safe at rest in git</td></tr>
+</table>
+<p><strong>The recover flow</strong> — <code>genesis-cli recover</code> then <code>genesis_resplit</code>, both built and self-verifying:</p>
+<ol>
+<li>Gather any 3 shares. <code>genesis-cli recover root.key share-a share-b share-c</code> &mdash; same 64-byte root, same pubkey.</li>
+<li><code>genesis_resplit</code> &mdash; same key, <strong>five fresh shares</strong>; the old set (including whatever the lost device held) is dead. Redistribute per the table.</li>
+<li>Revoke the lost device's Warrant serial; enroll the new device (QR, as in onboarding).</li>
+</ol>
+<p style="margin:0"><span class="good">The identity survives untouched:</span> the pubkey never changed, so <code>_key.&lt;fqdn&gt;</code> stays as published and every Warrant remains valid. Only the device layer resets. If enough shares are lost that 3 can't be gathered — that is the one unrecoverable event, by design; the placement table exists to make it require three simultaneous disasters.</p>
+</div>
+
+<h2 id="control">Overlord control plane — pause, cut off, expire, monitor</h2>
+<div data-cm="control" class="card">
+<p style="margin-top:0">One status document per operator, Overlord-writable only — the same settings-doc pattern that already runs <code>argus_crew_v1</code>, one level up:</p>
+<pre>purcius_operators_v1: {
+  "&lt;op_pubkey_hex&gt;": {
+    fqdn: "scottyledell.us",
+    status: "active" | "paused" | "revoked",
+    expires: "2027-07-01",                  // absent = no date limit
+    warrant_serial: 7,                       // bump = every old Warrant dies
+    grants: { "mendo": ["argus"], "philz": ["argus"] },
+    last_seen: "...", logins_30d: n, requests_30d: n
+  }
+}</pre>
+<table>
+<tr><th>Overlord action</th><th>Write</th><th>Effect at the edge</th></tr>
+<tr><td>Pause</td><td><code>status:"paused"</code></td><td>New logins refused; sessions die on next check (&le;60&thinsp;s). Flip back to resume.</td></tr>
+<tr><td>Cut off</td><td><code>status:"revoked"</code> + serial bump</td><td>Key, Warrants, sessions, devices — all dead. Terminal.</td></tr>
+<tr><td>Expire on a date</td><td><code>expires</code></td><td>Edge compares clock per request. Contractor ends on the day, unattended.</td></tr>
+<tr><td>Narrow a grant</td><td>Edit <code>grants</code></td><td>Org/app access follows the doc, next request.</td></tr>
+<tr><td>Monitor</td><td>&mdash; (read)</td><td>Edge appends login/request events; console shows last-seen, counts, anomalies per operator.</td></tr>
+</table>
+<p style="margin:0"><strong>The enforcement point is the edge, not the app.</strong> Every request bearing a key-session re-checks the status doc (cached &le;60&thinsp;s) before honoring it. A session is never a bearer instrument that outlives the Overlord's word — pause a person at 2:14, they are out by 2:15, and Argus itself contains zero enforcement code to get wrong.</p>
+</div>
+
+<h2 id="rotation">Rotation — enforced, not requested</h2>
+<div data-cm="rotation" class="card">
+<p style="margin-top:0">Every credential in the chain has a max age, and the edge <strong>refuses</strong> what's stale. No reminder emails — refusal with a path back:</p>
+<table>
+<tr><th>Credential</th><th>Max age</th><th>Enforced how</th><th>Path back</th></tr>
+<tr><td>Session</td><td>12&thinsp;h idle / 7&thinsp;d absolute</td><td>Timestamps in the signed session; edge refuses past either</td><td>Log in again</td></tr>
+<tr><td>Device key</td><td>90&thinsp;d</td><td><code>issued_at</code> inside the signed device Warrant; edge refuses older</td><td>Re-enroll (one QR scan)</td></tr>
+<tr><td>Warrant</td><td>1&thinsp;y (or <code>expires</code>, whichever first)</td><td>Expiry inside the Warrant body — unforgeable, uneditable</td><td>Overlord re-Warrants</td></tr>
+<tr><td>Operator key</td><td>2&thinsp;y</td><td>Anchor <code>issued</code> date; edge refuses Warrants on an over-age key</td><td>Mint new, publish new anchor, re-Warrant</td></tr>
+<tr><td>Shamir shares</td><td>On every recovery</td><td><code>genesis_resplit</code> — old set dies whenever the root is reassembled</td><td>Automatic in the recover flow</td></tr>
+<tr><td>Revocation</td><td>&le;60&thinsp;s propagation</td><td>Status-doc cache TTL at the edge</td><td>&mdash;</td></tr>
+</table>
+<p style="margin:0">Ages ride <em>inside signed material</em>, so an operator can't quietly extend their own life — changing a date breaks the signature. Grace: the console banners the last 7 days before any refusal, then refuses. The banner is courtesy; the refusal is the policy.</p>
+</div>
+
+<h2 id="skill">Where it lives — the pure-C skill Argus consumes</h2>
+<div data-cm="skill" class="card">
+<p style="margin-top:0"><strong>Name: Operator Identity &amp; Key Lifecycle.</strong> A kastil-systems pure-C99 skill, slotted into the mesh, spoken over the wire protocol — per PRACTICES #12: <em>auth and security are substrate; products consume them, never reimplement them.</em> It links the same audited primitives Genesis already ships (<code>crypt.c</code> ed25519, <code>shamir_gf256.c</code>, DRBG).</p>
+<table>
+<tr><th>Wire op</th><th>Does</th></tr>
+<tr><td><code>CHALLENGE_NEW / CHALLENGE_VERIFY</code></td><td>Nonce out; device signature verified against Warrant, Warrant against the <code>_key.&lt;fqdn&gt;</code> anchor</td></tr>
+<tr><td><code>WARRANT_ISSUE / WARRANT_VERIFY</code></td><td>Sign / check <code>op_pub ‖ fqdn ‖ role ‖ expires</code> chains (root&rarr;operator&rarr;device)</td></tr>
+<tr><td><code>SESSION_MINT / SESSION_CHECK</code></td><td>Opaque session in; live status + TTL + serial verdict out — the single enforcement call</td></tr>
+<tr><td><code>STATUS_SET</code></td><td>Pause / revoke / expire / re-grant (Overlord-key-signed writes only)</td></tr>
+<tr><td><code>INVITE_MINT / INVITE_REDEEM</code></td><td>Cap-token lifecycle: mint, single-use burn, allow-list append</td></tr>
+<tr><td><code>ROTATE_BEGIN / ROTATE_COMMIT</code></td><td>New-anchor cutover with the old key tombstoned atomically</td></tr>
+</table>
+<p style="margin:0"><strong>What Argus keeps:</strong> the C# bridge stays exactly what the Language Boundary canon allows — a jacket on foreign OIDC manufacturers (Slack/Discord/Google token exchange). Its home-rolled HMAC session (<code>Auth.cs</code>) is the drift PRACTICES #12 already names; it is replaced by one wire call per request: <code>SESSION_CHECK</code>. The next product gets login by speaking the same six ops — zero auth code written in the product, ever again.</p>
+</div>
+
+<h2 id="plan">~p — the build plan</h2>
+<div data-cm="plan" class="card">
+<p style="margin-top:0"><strong>Intent.</strong> The Overlord logs into argus.com.ai with a key and no password; every lifecycle state above is enforced at the edge by the pure-C skill.</p>
+<p><strong>Scope.</strong> Key login, Warrants, invites, control plane, enforced rotation. Out: per-feature authz, non-<code>.us</code> FQDNs, multi-Overlord.</p>
+<p><strong>Approach.</strong> Build the skill on the Genesis substrate (crypto is done and KAT-tested — this is plumbing, not research). Argus consumes over wire; C# keeps the OIDC jacket only. Each phase lands live and externally verified before the next widens.</p>
+<table>
+<tr><th>Phase</th><th>Ships</th><th>Live means</th></tr>
+<tr><td><strong>1 — Overlord key-login</strong></td><td>Skill core: CHALLENGE_*, WARRANT_VERIFY, SESSION_MINT/CHECK; wire seam from the bridge; device enroll + anchor check. Overlord only, hard-seated.</td><td>Joey signs a nonce and is in — no password anywhere</td></tr>
+<tr><td><strong>2 — Control plane</strong></td><td><code>purcius_operators_v1</code> + STATUS_SET + per-request SESSION_CHECK; pause/cut-off/expire from the console</td><td>Pause at 2:14 = out by 2:15, verified from a second browser</td></tr>
+<tr><td><strong>3 — Invite</strong></td><td>INVITE_MINT/REDEEM, join page, crew append</td><td>Michelle/Elbert/Brendan in Argus off one DM'd link each</td></tr>
+<tr><td><strong>4 — Enforced rotation</strong></td><td>Max ages live at the edge; 7-day banner; refusal paths</td><td>A back-dated device Warrant is refused on purpose, on camera</td></tr>
+<tr><td><strong>5 — Second operator</strong></td><td>Genesis-app QR enrollment end to end; Scotty minted, Warranted, granted</td><td>Scotty key-logs-in with zero Joey keystrokes on his box</td></tr>
+</table>
+<p><strong>Constraints.</strong> Skill is C99 in kastil-systems (PRACTICES #12); wire only into the substrate; no vendor auth, no WebAuthn; no Cloud Run custom domains; secrets by env-var name only.</p>
+<p><strong>Unknowns — named.</strong> (1) Ed25519 in Web Crypto on older Safari/enterprise browsers — may force a P-256 device-key fallback under the same Warrant format. (2) How the C# jacket speaks wire — an in-process wire client vs. a small C sidecar; picked in phase 1, first contact. (3) Firestore status-read latency inside a 60&thinsp;s cache — budget unproven. (4) Phone-to-phone enrollment when the key device <em>is</em> the browser — carried open from above. (5) Wire reachability Cloud Run &rarr; mesh from the bridge's egress.</p>
+<p style="margin:0"><strong>When to revisit.</strong> v2 triggers: any Unknown resolves against the design; a customer needs per-feature grants; a second Overlord/tenant appears; revocation must beat 60&thinsp;s; phase 1's wire seam costs &gt;2&times; its estimate — that last one means the seam design was wrong, stop and re-plan, don't push through.</p>
+</div>
+
+<h2 id="estimate">~e — points, path, hump</h2>
+<div data-cm="estimate" class="card">
+<table>
+<tr><th>Phase</th><th>Pts</th><th>Why that size</th></tr>
+<tr><td>1 — Overlord key-login</td><td class="c"><strong>8</strong></td><td>New wire seam + Web Crypto enroll + challenge flow. Crypto pre-built; the seam is the work.</td></tr>
+<tr><td>2 — Control plane</td><td class="c"><strong>5</strong></td><td>One doc, one wire op, one console page; enforcement rides the phase-1 SESSION_CHECK</td></tr>
+<tr><td>3 — Invite</td><td class="c"><strong>5</strong></td><td>Latchkey-shaped: mint/burn ledger + join page + crew append (exists)</td></tr>
+<tr><td>4 — Enforced rotation</td><td class="c"><strong>3</strong></td><td>Timestamp comparisons on already-signed material + banner</td></tr>
+<tr><td>5 — Second operator</td><td class="c"><strong>5</strong></td><td>Genesis-app QR UX + a ceremony doc a non-Joey human can follow</td></tr>
+<tr><td><strong>Total</strong></td><td class="c"><strong>26</strong></td><td>&nbsp;</td></tr>
+</table>
+<p><strong>Critical path:</strong> 1 &rarr; 2 &rarr; 4 (the enforcement spine — every check phase 4 tightens rides phase 1's session and phase 2's status doc). 3 and 5 hang off it and can parallel.</p>
+<p style="margin:0"><strong>The immovable hump is phase 1's wire seam</strong> — the first time a product consumes a kastil-systems skill over the wire protocol instead of importing code. Everything after inherits it; nothing before needs it. Phase 1 clears it by keeping the skill's first surface to three ops (challenge, verify, session) and hard-seating a single operator — small enough to debug byte-by-byte on the wire, real enough that when Joey logs in, the seam is production-proven, not demo-proven. Once that call round-trips, phases 2&ndash;4 are additional ops on a proven pipe.</p>
+</div>
+
 <h2 id="dod">DoD</h2>
 <div class="card"><ul>
-<li>&#10003; A-D-D read &mdash; Purcius Genesis (minted root), Operator-Identity Auth canon, Latchkey pattern</li>
-<li>&#10003; Built on your system &mdash; <code>artifact-comments.js</code> + gcp-bridge Thread, not a reinvented engine</li>
-<li>&#10003; Latchkey minted (uuidv4), Door at <code>/metal/s/&lt;uuid&gt;/</code>, robots-disallowed, ledger recorded</li>
-<li>&#10003; Comment trail seeded; every <code>~fu</code> reply threaded under the operator comment it answers</li>
-<li>&#9633; Live &mdash; verified HTTP 200 at the joeycastillo.us Door after push</li>
+<li>&#10003; A-D-D read &mdash; Genesis core/CLI/tests (mint · recover · resplit · sign, KAT-tested), <code>Auth.cs</code> live bridge, Operator-Identity + Wire Protocol + Language Boundary canons, PRACTICES #12</li>
+<li>&#10003; Built on your system &mdash; <code>artifact-comments.js</code> + gcp-bridge Thread, same doc uuid, your comment trail intact</li>
+<li>&#10003; Model baked from your comments &mdash; roll-our-own key login, passphrase retired, Overlord = platform provider, whole-app grants</li>
+<li>&#10003; Lifecycle covered end to end &mdash; onboard · invite · active · pause · cut-off · expire · recover · rotate, each with its enforcement point</li>
+<li>&#10003; Auth placed per PRACTICES #12 &mdash; pure-C99 kastil-systems skill over wire; Argus consumes; C# stays a foreign-OIDC jacket only</li>
+<li>&#10003; Rotation enforced, not requested &mdash; max ages inside signed material; the edge refuses stale</li>
+<li>&#10003; ~p~e attached &mdash; phases to a live Overlord key-login first; Unknowns named; 26 honest points</li>
+<li>&#10003; Live &mdash; HTTP 200 at the joeycastillo.us Door, verified externally after push</li>
 </ul></div>
 
 </main>
-<footer>Be &middot; v0 &middot; ~d Purcius Identity &middot; 2026-07-05 &middot; Latchkey ad9b334e</footer>
+<footer>Be &middot; v0 &middot; ~i ~d ~p~e Purcius Identity — final &middot; 2026-07-05 &middot; Latchkey ad9b334e</footer>
 
 <!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
 <script>window.ARTIFACT={doc:"ad9b334e-78d0-4afa-84a1-39b957965dc9"};</script>
