@@ -42,7 +42,7 @@ footer { color:#666; font-size:12px; text-align:center; padding:24px; border-top
 <div class="wrap">
   <h1>Identity, Organizations &amp; Permissions</h1>
   <p class="sub">Who you are, who you answer to, and what you can touch — from the overlord's cold-born key down to a support-desk user invited off Slack.</p>
-  <p class="status">~d — DESIGN FOR COMMENT</p>
+  <p class="status">~d v2 · ~fu — your Jul 5 decisions folded in (no passphrase · key-login designed)</p>
   <p style="font-size:13px;color:#889;">This is a <b>latchkey</b>: anyone with the link can read and <b>comment inline</b> (tap 💬 on any section). Nothing here is built yet except where noted <span class="ok">✓ live</span> — it's the map we agree on before wiring it.</p>
 
   <h2>The map <button class="cbtn" onclick="toggleComments('map')">💬 <span id="count-map">0</span></button></h2>
@@ -111,13 +111,23 @@ footer { color:#666; font-size:12px; text-align:center; padding:24px; border-top
     <p class="verdict">Note the two people named Elbert/Elber: a person can be <b>both</b> — an operator (holds a key, runs an org) <i>and</i> a user (a seat inside someone else's org). Role is per-context, not per-person.</p>
   </section>
 
-  <h2>Login — two rails <button class="cbtn" onclick="toggleComments('login')">💬 <span id="count-login">0</span></button></h2>
+  <h2>Login — two rails, NO passphrase <button class="cbtn" onclick="toggleComments('login')">💬 <span id="count-login">0</span></button></h2>
   <section>
-    <h3>Sovereign key (overlord + operators)</h3>
-    <p>You prove possession of your Purcius key (Genesis-minted; published at <code>_key.&lt;fqdn&gt;</code>; the mesh pins the overlord root). This is a <b>substrate-level</b> login — it yields the highest authority and does not depend on Slack. Operators do the same with their own keys, warranted under you.</p>
-    <h3>Federated OIDC (users)</h3>
-    <p>Invited users log in with <b>Slack / Google</b> — the <a href="/argus">Argus federation Bind</a> that's already live. The operator issues a single-use <b>Invite</b> capability link (the Invite pattern); the user binds their Slack/Google identity; the bridge mints an <b>opaque session</b>. Login = identity only.</p>
-    <p class="verdict"><b>The bug you hit</b> is the seam between these: a Slack session unlocks the Meraki bridge but not the audit/GCP bridges (they still want the operator passphrase), so Settings + audit nag "unlock the gate." The fix is in the <i>authorization</i> layer below, not two logins.</p>
+    <p><span class="new">DECIDED (your comments, Jul 5):</span> the passphrase is <b>retired</b>. You are exactly one of two things: a <b>Purcius operator</b> (you hold a key) or a <b>user</b> (Slack · Discord · Google). Nothing else.</p>
+
+    <h3>Rail 1 — Sovereign key (overlord + operators): passwordless, key-rooted</h3>
+    <p>The hard part you asked to work out: your Purcius root is <b>cold + Shamir-split</b> (Genesis) — you can't type it into a browser. So the root never touches the console. Instead:</p>
+    <ol>
+      <li><b>Enrol a device once.</b> The browser/phone generates a <b>non-extractable Ed25519 device key</b> (Web Crypto — private half never leaves the device; same tech as the Registration ceremony). Using your Purcius key (via the Genesis app, or a one-time cold sign) you issue a <b>Warrant</b> for it: <code>sign(root, device_pub ‖ "console")</code>. The Warrant + device pubkey go into your device roster server-side. The root goes back to cold.</li>
+      <li><b>Log in every session (no secret typed).</b> Console asks the bridge for a <b>challenge</b> (random nonce, short TTL) → the device key <b>signs the nonce</b> in-browser → the bridge <b>verifies</b>: (a) the signature against the device pubkey, and (b) the device's Warrant <b>chains to your published <code>_key.&lt;fqdn&gt;</code></b> pubkey, pinned to the mesh's overlord root. Pass → an <b>opaque operator session</b> with full authority.</li>
+      <li><b>Strongest variant — the Genesis app as your authenticator.</b> Instead of a browser key, your phone (Genesis app, holding a device key Warranted by your root) signs the challenge via QR/push — a sovereign passkey. Best for a shared/console machine.</li>
+    </ol>
+    <p style="font-size:12.5px;" class="verdict">This is the "best security" path: Ed25519 challenge–response, device-bound, chained to your sovereign root, verified against the DNS-published + mesh-pinned pubkey. A passkey rooted in <b>your</b> key, not a vendor's. Operators do the identical thing with their own keys, warranted under you.</p>
+
+    <h3>Rail 2 — Federated OIDC (users): Slack · Discord · Google</h3>
+    <p>Invited users log in with <b>Slack, Discord, or Google</b> — the <a href="/argus">Argus federation Bind</a> (Slack + Google live ✓; Discord = one more <code>providers.json</code> row). An operator issues a single-use <b>Invite</b> link (the Invite pattern); the user binds their OIDC identity; the bridge mints an <b>opaque session</b>. Login = identity only.</p>
+
+    <p class="verdict"><b>The bug you hit</b> was the passphrase seam — a Slack session unlocked Meraki but the audit/GCP bridges still wanted the passphrase. Retiring the passphrase removes the seam: an <b>operator key session</b> (or an authorized user session) is the single credential every bridge honors.</p>
   </section>
 
   <h2>Authorization — one spine <button class="cbtn" onclick="toggleComments('authz')">💬 <span id="count-authz">0</span></button></h2>
@@ -173,15 +183,23 @@ footer { color:#666; font-size:12px; text-align:center; padding:24px; border-top
     <p class="verdict">Everything else — operators minting keys, org-scoped invites, the full matrix — layers on top once this spine exists.</p>
   </section>
 
-  <h2>Open questions for you <button class="cbtn" onclick="toggleComments('open')">💬 <span id="count-open">0</span></button></h2>
+  <h2>Decisions &amp; what's still open <button class="cbtn" onclick="toggleComments('open')">💬 <span id="count-open">0</span></button></h2>
   <section>
+    <h3>Decided (your comments, Jul 5)</h3>
     <ul>
-      <li>Do <b>operators</b> get their own console/subdomain, or share yours scoped by org?</li>
-      <li>Can a <b>user</b> belong to multiple orgs (Elbert at Acme Dev <i>and</i> a client)?</li>
-      <li>Is "can use an app" enough, or do we need <b>read vs write</b> per app per user (e.g. Brendan reads audits, can't change networks)?</li>
-      <li>Should the <b>overlord key login</b> be device-bound (a Writ) or a fresh key-challenge each session?</li>
+      <li class="ok">✓ <b>No passphrase.</b> Only Purcius-operator-key or user-OIDC (Slack/Discord/Google).</li>
+      <li class="ok">✓ <b>You (overlord) decide which operator accesses which orgs and apps.</b> Operator↔org/app assignment is an overlord control (in Global Settings).</li>
+      <li class="ok">✓ <b>App access = the whole app</b> (all features) for now — no read-vs-write split yet.</li>
+      <li class="ok">✓ <b>A user can also be an operator</b> — role is per-context.</li>
+      <li class="ok">✓ <b>Overlord/operator login is device-bound</b> (a Warranted device key + challenge–response), not a fresh cold-key sign each session — see Rail 1.</li>
     </ul>
-    <p style="font-size:13px;color:#889;">Drop answers as comments above — that's what this latchkey is for.</p>
+    <h3>Still open</h3>
+    <ul>
+      <li>Can a <b>user</b> belong to <b>multiple orgs</b> (Elbert at Acme Dev <i>and</i> a client)? — leaning yes; identity is one, seats are many.</li>
+      <li><b>Operator consoles:</b> you decide their org/app access — but do they get their <b>own subdomain</b> (scotty.argus…) or your console scoped to their orgs?</li>
+      <li><b>Discord</b> confirmed as a third OIDC provider — priority vs shipping the key-login first?</li>
+    </ul>
+    <p style="font-size:13px;color:#889;">Keep dropping answers as comments — this latchkey stays the build spec.</p>
   </section>
 
   <footer>Purcius · a kASTIL Systems platform · ~d identity model · overlord · operators · orgs · users · apps<br>CONFIDENTIAL — comment via the link; nothing here ships without your bless.</footer>
