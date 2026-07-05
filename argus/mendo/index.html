@@ -2025,6 +2025,20 @@ function zdAutoNullifies(a){ const acts=a.actions||[]; if(acts.some(x=>x.field==
   return acts.some(x=> cf.indexOf(x.field)>=0 || x.field==="remove_tags" || x.field==="set_tags" || x.field==="current_tags"); }
 // Intelligent-Triage system fields: Zendesk provisions them as 'tagger' fields titled Intent/Sentiment/Language.
 function zdTriageFields(fields){ return (fields||[]).filter(f=> f.type==="tagger" && f.active!==false && /intent|sentiment|language/i.test((f.title||"")+" "+(f.raw_title||"")) ); }
+// Contradictory/redundant rule detection — SAFE by construction (no fuzzy overlap; exact condition signatures only).
+// conflict = same conditions AND one action field set to DIFFERENT values (order-dependent, last-writer-wins bug).
+// redundant = same conditions AND identical action set (one rule is dead weight).
+function zdCondSig(t){ const norm=o=>(o||[]).map(c=>c.field+":"+c.operator+":"+JSON.stringify(c.value)).sort().join("|"); const c=t.conditions||{}; return "ALL["+norm(c.all)+"]ANY["+norm(c.any)+"]"; }
+function zdActSig(t){ return JSON.stringify((t.actions||[]).map(a=>a.field+"="+JSON.stringify(a.value)).sort()); }
+function zdRuleClashes(rules){ const groups={}; rules.forEach(t=>{ const s=zdCondSig(t); if(s==="ALL[]ANY[]") return; (groups[s]=groups[s]||[]).push(t); });
+  const conflicts=[], redundant=[];
+  Object.values(groups).filter(g=>g.length>1).forEach(g=>{
+    const byField={}; g.forEach(t=>(t.actions||[]).forEach(a=>{ (byField[a.field]=byField[a.field]||new Set()).add(JSON.stringify(a.value)); }));
+    if(Object.keys(byField).some(f=>byField[f].size>1)) conflicts.push(g);
+    const seen={}; g.forEach(t=>{ const k=zdActSig(t); (seen[k]=seen[k]||[]).push(t); }); Object.values(seen).filter(x=>x.length>1).forEach(x=>redundant.push(x));
+  });
+  return { conflicts, redundant };
+}
 function zdLabel(o){ return o.title||o.name||o.email||("#"+o.id); }
 function zdNames(arr,n){ n=n||12; return arr.slice(0,n).map(zdLabel).join(", ")+(arr.length>n?", +"+(arr.length-n)+" more":""); }
 // Sourced check library (research doc 2026-07-04-0110). Each: pure predicate over fetched JSON.
@@ -2145,14 +2159,34 @@ const ZD_CHECKS = [
       const pct=ag.length?no2fa.length/ag.length:0; const st=pct>0.20?"WARN":"PASS";
       return { status:st, impact: no2fa.length>30?"med":"low", gr:false, offenders:no2fa,
         detail: no2fa.length+" of "+ag.length+" active agents without two-factor auth",
-        fix: st==="WARN"? (no2fa.length+" active agents ("+Math.round(pct*100)+"%) have no two-factor auth — every one is a phishable path into customer PII. Enforce 2FA account-wide (Admin Center › Security), starting with admins.") : (no2fa.length+" of "+ag.length+" agents without 2FA — acceptable.") }; } }
+        fix: st==="WARN"? (no2fa.length+" active agents ("+Math.round(pct*100)+"%) have no two-factor auth — every one is a phishable path into customer PII. Enforce 2FA account-wide (Admin Center › Security), starting with admins.") : (no2fa.length+" of "+ag.length+" agents without 2FA — acceptable.") }; } },
+  { id:"rule-clash", area:"Triggers", title:"No contradictory or redundant rules", tag:"human-cost",
+    run:(c)=>{ const r=zdRuleClashes((c.triggers||[]).filter(t=>t.active));
+      const nc=r.conflicts.length, nr=r.redundant.length; const st=nc?"FAIL":nr?"WARN":"PASS";
+      const conflictNames=r.conflicts.map(g=>g.map(zdLabel).join(" vs ")); const redundNames=r.redundant.map(g=>g.map(zdLabel).join(" = "));
+      return { status:st, impact:nc?"high":"low", gr:false, offenders:r.conflicts.concat(r.redundant).flat(),
+        detail: nc+" contradictory rule group(s), "+nr+" redundant pair(s) among active triggers",
+        fix: nc? (nc+" groups of active triggers share identical conditions but set the SAME field to different values — the outcome depends on trigger order, a silent bug. Resolve: "+conflictNames.slice(0,4).join("; ")+".")
+             : nr? (nr+" active trigger(s) are exact duplicates (identical conditions AND actions) — dead weight evaluated on every ticket. Delete one of each: "+redundNames.slice(0,4).join("; ")+".")
+             : "No active triggers share identical conditions with clashing or duplicate actions." }; } },
+  { id:"kb-unhelpful", area:"Knowledge / HC", title:"Articles aren't rated unhelpful", tag:"human-cost",
+    run:(c)=>{ const pub=(c.articles||[]).filter(a=>!a.draft); const bad=pub.filter(a=>(a.vote_count||0)>=3 && (a.vote_sum||0)<0);
+      const st=bad.length?"WARN":"PASS";
+      return { status:st, impact: bad.length>5?"med":"low", gr:false, offenders:bad,
+        detail: bad.length+" published articles with 3+ votes and net-negative feedback",
+        fix: st==="WARN"? (bad.length+" articles have guests voting them net-unhelpful — they mislead self-service and poison AI-answer grounding. Rewrite or retire: "+zdNames(bad)+".") : "No published article carries net-negative feedback (with a meaningful vote count)." }; } },
+  { id:"kb-empty-sections", area:"Knowledge / HC", title:"Help Center has no empty shelves", tag:"dark-value",
+    run:(c)=>{ const pub=(c.articles||[]).filter(a=>!a.draft); const cnt={}; pub.forEach(a=>{ cnt[a.section_id]=(cnt[a.section_id]||0)+1; });
+      const secs=(c.sections||[]); const empty=secs.filter(s=>!(cnt[s.id]>0)); const st=empty.length>5?"WARN":"PASS";
+      return { status:st, impact:"low", gr:false, offenders:empty,
+        detail: empty.length+" of "+secs.length+" Help Center sections have no published article",
+        fix: st==="WARN"? (empty.length+" Help Center sections are empty shelves — guests land on nothing and AI answers have no content there. Fill or remove: "+zdNames(empty)+".") : (empty.length+" empty of "+secs.length+" sections — fine.") }; } }
 ];
 // NOT-AUDITED areas (honest gaps — bridge reads land on later boards; never a silent pass).
 const ZD_NOTAUDITED = [
-  ["Contradictory rule pairs","condition-overlap logic (Board 5) — needs careful pairwise diffing; deferred to avoid false positives on a live demo"],
-  ["Recommendation templates","richer $-quantified templates land next board (Board 5)"],
   ["AR spend / deflection counts","Automatic-Resolution usage counts are Admin-Center-only — not in the public API (probed: 404). Enablement is graded; consumption counts aren't reachable read-only."],
-  ["AI agent (advanced / ZRA)","enablement read from account/settings (currently off); per-bot config is Admin-Center-only"]
+  ["AI agent (advanced / ZRA)","enablement read from account/settings (currently off); per-bot config is Admin-Center-only"],
+  ["Per-intent KB mapping","intent taxonomy is Admin-Center-only — coverage is proxied via empty sections + unhelpful articles, not per-intent"]
 ];
 async function zdRunAudit(){
   ZAUD.busy=true; ZAUD.err=""; ZAUD.prog="triggers"; renderZAUD();
@@ -2184,7 +2218,9 @@ async function zdRunAudit(){
     const forms=await zdOne("ticket-forms","ticket_forms");
     ZAUD.prog="agent seats"; renderZAUD();
     const agents=await zdAll("agents","agents-page","users");
-    const ctx={triggers,automations,macros,schedules,addrs,groups,memberships,fields,articles,settings,slas,views,forms,agents};
+    ZAUD.prog="HC sections"; renderZAUD();
+    const sections=await zdOne("hc-sections","sections");
+    const ctx={triggers,automations,macros,schedules,addrs,groups,memberships,fields,articles,settings,slas,views,forms,agents,sections};
     // Hardened core: one throwing check can't blank the audit — it surfaces as an errored finding, never a silent pass.
     const results=ZD_CHECKS.map(chk=>{ try{ return Object.assign({id:chk.id,area:chk.area,title:chk.title,tag:chk.tag},chk.run(ctx)); }
       catch(e){ return {id:chk.id,area:chk.area,title:chk.title,tag:chk.tag,status:"WARN",impact:"low",gr:false,offenders:[],detail:"check could not run (data unavailable)",fix:"This check errored on the fetched data — treat as unaudited, not a pass."}; } });
@@ -2204,6 +2240,10 @@ async function zdRunAudit(){
 }
 function zdGradeChip(g){ const col=g==="FAIL"?"zf":g==="WARN"?"zw":"zp"; return "<span class='zchip "+col+"'>"+g+"</span>"; }
 function zdTagChip(t){ return "<span class='ztag zt-"+t+"'>"+t+"</span>"; }
+// Recommendation-template layer: a consistent $-direction line per finding, quantified by affected count.
+var ZD_TAG_MEANING = { wasting:"Money out now", "human-cost":"Converts to agent hours", "dark-value":"Paid-for, sitting unused" };
+function zdImpactLine(f){ const n=(f.offenders&&f.offenders.length)||0; const mean=ZD_TAG_MEANING[f.tag]||""; if(!mean) return "";
+  return "<div class='zimp zt-"+f.tag+"'>"+esc(mean)+(n?(" · "+n+" affected"):"")+(f.gr?" · touches Guest Relations":"")+"</div>"; }
 function zdAuditInner(){
   const run=ZAUD.run;
   let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'>"
@@ -2221,7 +2261,7 @@ function zdAuditInner(){
     h+="<div class='box'><div class='feat-h'>Findings &middot; "+run.findings.length+"</div>";
     if(!run.findings.length) h+="<div class='muted'>No issues on the audited checks. &#9989;</div>";
     else h+=run.findings.map(f=>"<div class='zfind'><div class='zfh'>"+zdGradeChip(f.status)+"<span class='zft'>"+esc(f.title)+"</span>"+zdTagChip(f.tag)+(f.gr?"<span class='zgr'>GR</span>":"")+"<span class='zar'>"+esc(f.area)+"</span></div>"
-      +"<div class='zfd'>"+esc(f.detail)+"</div>"
+      +"<div class='zfd'>"+esc(f.detail)+"</div>"+zdImpactLine(f)
       +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div></div>").join("");
     h+="</div>";
     // honest not-audited
@@ -2244,6 +2284,7 @@ function zdAuditPane(){
     +"#pane-zdaudit .ztag{font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 6px;text-transform:uppercase}.zt-wasting{background:#3a1212;color:#ff9b9b}.zt-human-cost{background:#332608;color:#ffd479}.zt-dark-value{background:#0c1c22;color:#7CFFB2}"
     +"#pane-zdaudit .zgr{background:#2a1840;color:#c9a9ff;font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 6px}"
     +"#pane-zdaudit .zfd{color:#c7d0d8;font-size:12.5px;margin:6px 0 6px}.zrec{background:#0a1013;border-left:3px solid #6FC3DF;border-radius:4px;padding:8px 12px;font-size:12.5px;color:#d6e6ec}.zrl{color:#6FC3DF;font-weight:800;font-size:10px;letter-spacing:.06em;margin-right:6px}"
+    +"#pane-zdaudit .zimp{display:inline-block;font-size:10.5px;font-weight:700;border-radius:4px;padding:2px 8px;margin:0 0 7px}.zimp.zt-wasting{background:#2a1010;color:#ff9b9b}.zimp.zt-human-cost{background:#2a2208;color:#ffd479}.zimp.zt-dark-value{background:#08191f;color:#7CFFB2}"
     +"#pane-zdaudit .zna{display:flex;flex-wrap:wrap;gap:8px}.znac{background:#111417;border:1px dashed #2a343b;border-radius:7px;padding:8px 12px;min-width:180px}.znat{display:block;color:#8a93a0;font-weight:700;font-size:12px}.znam{display:block;color:#5c6670;font-size:11px}"
     +"</style><div id='zd-wrap'>"+zdAuditInner()+"</div>";
 }
@@ -2895,7 +2936,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r368 . 529935c . 2026-07-04</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r371 . 81db7bd . 2026-07-04</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
