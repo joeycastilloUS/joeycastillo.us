@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~i — metal.CE Latchkey: Personal URL + Comments for ~fu</title>
+<style>
+  body { background:#111111; color:#e0e0e0; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; margin:0; line-height:1.55; }
+  nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 20px; display:flex; align-items:center; gap:14px; z-index:10; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; }
+  nav .title { color:#e0e0e0; font-size:14px; flex:1; }
+  nav .pub { color:#777; font-size:12px; font-weight:400; }
+  main { max-width:820px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { color:#6FC3DF; font-size:26px; margin:24px 0 6px; }
+  h2 { color:#6FC3DF; font-size:20px; margin:36px 0 12px; border-bottom:1px solid #333; padding-bottom:8px; }
+  .sub { color:#888; font-size:14px; margin:0 0 8px; }
+  .card { background:#1A1A1A; border-radius:8px; padding:16px 18px; margin:14px 0; }
+  table { width:100%; border-collapse:collapse; margin:14px 0; font-size:14px; }
+  th { text-align:left; color:#6FC3DF; border-bottom:1px solid #333; padding:8px 10px; }
+  td { border-bottom:1px solid #222; padding:8px 10px; vertical-align:top; }
+  code { background:#0a0a0a; color:#9fd8ea; padding:1px 5px; border-radius:3px; font-size:13px; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:14px; overflow-x:auto; font-size:13px; line-height:1.5; color:#c8c8c8; }
+  .solid { color:#22c55e; font-weight:700; }
+  .partial { color:#f59e0b; font-weight:700; }
+  .missing { color:#ef4444; font-weight:700; }
+  .pass { color:#22c55e; }
+  .fail { color:#ef4444; }
+  ul { padding-left:22px; }
+  li { margin:6px 0; }
+  .ev { color:#888; font-size:13px; }
+  footer { max-width:820px; margin:0 auto; padding:20px 16px 40px; color:#666; font-size:13px; border-top:1px solid #222; }
+  .hl { color:#6FC3DF; }
+  .irony { border-left:3px solid #f59e0b; padding-left:14px; color:#ccc; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~i inspect — metal.CE Latchkey: Personal URL + Comments for ~fu</span>
+  <span class="pub">Published 2026-07-04 18:51 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/25a09833-bd85-4f71-bfcc-0669c4aa3ee0/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>Does metal.CE have solid Latchkey support with a real personal URL + comments for ~fu?</h1>
+<p class="sub">Read-only inspection of the Latchkey publish chain: <code>be/tools/latchkey_publish.py</code>, <code>be/tools/cap_tokens.py</code>, the Latchkey Publish Protocol, the <code>~fu</code> spec, the a-d-d pattern, and the C99 skill spec. Three questions, three honest verdicts.</p>
+
+<h2>What It Is</h2>
+<div class="card">
+<p>The Latchkey capability today: every metal artifact is supposed to be <strong>born a Latchkey</strong> — at publish time, <code>latchkey_publish.py</code> mints (or idempotently reuses) an unguessable UUIDv4 token, records it in the private Ledger (<code>be/cap-tokens.json</code>), injects a Share button + a live comment Thread into the HTML, hardens it (no-referrer, gate stripped), stages the Door copy at <code>be/s/&lt;token&gt;/index.html</code>, and mirrors it to the public site at <code>/metal/s/&lt;token&gt;/</code>. The token is the whole credential — possession is admission. Comments post to a GCP bridge keyed on <code>doc=&lt;token&gt;</code>, and <code>~fu</code> is the Attendant: one sweep reads the operator's comments and acts on them.</p>
+<p>Five named parts per the pattern (<code>a-d-d/patterns/latchkey.md:19-25</code>): <span class="hl">Latchkey</span> (the token), <span class="hl">Ledger</span> (private registry), <span class="hl">Door</span> (the <code>/s/&lt;uuid&gt;/</code> serving convention), <span class="hl">Thread</span> (comments keyed on the token), <span class="hl">Attendant</span> (<code>~fu</code>).</p>
+</div>
+
+<h2>The Three Questions</h2>
+<table>
+<tr><th>Part</th><th>Verdict</th><th>Evidence</th></tr>
+<tr>
+  <td><strong>1. Latchkey support</strong><br><span class="ev">mint / ledger / stage / publish + protocol wiring</span></td>
+  <td class="solid">SOLID</td>
+  <td class="ev">Idempotent <code>get_or_mint</code>: cap_tokens.py:120-147. Ledger anchored to main clone across worktrees: cap_tokens.py:40-57. Atomic save: cap_tokens.py:100-108. UUIDv4 validation before use: latchkey_publish.py:136-137 + cap_tokens.py:64. Harden: cap_tokens.py:159-170. Idempotent double-inject guards: latchkey_publish.py:104-128. Ledger never published: latchkey_publish.py:150-151, cap_tokens.py:18-19. Door discipline live: <code>C:/joeycastillo.us/robots.txt</code> disallows <code>/metal/s/</code> (verified). Protocol: conventions.md:708-747. Live Ledger has 10 tokens, all since 2026-07-02 — "born a Latchkey" holds going forward; backfill is opt-in by design (conventions.md:747).</td>
+</tr>
+<tr>
+  <td><strong>2. Real PERSONAL URL</strong><br><span class="ev">cap-URL on the operator's own FQDN</span></td>
+  <td class="missing">MISSING</td>
+  <td class="ev"><code>PUBLIC_BASE = "https://joeycastillo.us"</code> hardcoded, no env override: latchkey_publish.py:31. <code>SITE_ROOT</code> defaults to <code>C:/joeycastillo.us</code> (env-overridable but Joey-defaulted): latchkey_publish.py:30. <code>PUBLIC_PREFIX = "/metal/s"</code> hardcoded: cap_tokens.py:62. Every operator's cap-URL is <code>joeycastillo.us/metal/s/&lt;token&gt;/</code> regardless of who runs it (latchkey_publish.py:138). The C99 skill spec explicitly forbids this: "PUBLIC_PREFIX, the Ledger path, and any bridge URL are parameters — never hardcoded" (skill/latchkey/CLAUDE.md:116-117). The FQDN↔org convention that would drive it exists (CLAUDE.md § FQDN ↔ GitHub Org Mapping) but is not wired in.</td>
+</tr>
+<tr>
+  <td><strong>3. Comments for ~fu</strong><br><span class="ev">Thread widget + Attendant sweep loop</span></td>
+  <td class="partial">PARTIAL</td>
+  <td class="ev">Thread widget is real and complete — load, post, seen-receipt, tilde-command detection: latchkey_publish.py:48-96. <code>doc=token</code> keying: latchkey_publish.py:71,89 — domain-independent, so <code>~fu</code> resolves via the Ledger no matter where the Door lives (title/rel_path recorded for attribution: cap_tokens.py:12-14,129-133). <code>~fu</code> sweep spec is concrete and working: commands.md:1854-1883 (<code>GET /comments/recent</code>, act, <code>POST /comments/seen</code>). BUT the backend is one shared hardcoded bridge — <code>gcp-bridge-692654781984.us-west1.run.app</code> (latchkey_publish.py:29; hardcoded again in commands.md:1865) — not per-operator, and the pattern itself flags it as a bridge-tier dependency that "must later retire to the Pantheon mesh" (latchkey.md:45).</td>
+</tr>
+</table>
+
+<h2>Structure — how a cap-URL is produced today, end to end</h2>
+<pre>
+tilde saves artifact          be/&lt;kind&gt;/YYYY-MM-DD-HHMM-&lt;slug&gt;.html
+        |
+latchkey_publish.py &lt;kind&gt; &lt;key&gt; &lt;html&gt; "&lt;title&gt;"      (conventions.md:716)
+        |
+  1. MINT      cap_tokens.get_or_mint(kind, key, title, rel_path)
+               -&gt; UUIDv4, recorded in be/cap-tokens.json (Ledger, private)
+               idempotent: re-publish reuses token, link + thread stay stable
+        |
+  2. INJECT    Share button -&gt; before &lt;/nav&gt;        (guard: lk-share-btn)
+               Thread widget -&gt; before last &lt;footer&gt; (guard: LATCHKEY THREAD)
+               widget speaks BRIDGE/comments?doc=&lt;token&gt;
+        |
+  3. HARDEN    strip gate.css/gate.js, force &lt;meta referrer no-referrer&gt;
+        |
+  4. STAGE     be/s/&lt;token&gt;/index.html              (rides the metal commit)
+        |
+  5. PUBLISH   copy -&gt; C:/joeycastillo.us/metal/s/&lt;token&gt;/index.html
+               cap-URL = https://joeycastillo.us/metal/s/&lt;token&gt;/   &lt;-- HARDCODED
+               deploys via the joeycastillo.us repo -&gt; Cloudflare Pages
+               robots.txt disallows /metal/s/  (verified live)
+</pre>
+<p class="ev">Boundary held correctly: the tool mints + injects + stages + publishes; it does not host the Thread and is not the Attendant (conventions.md:743-745, skill CLAUDE.md:119-131).</p>
+
+<h2>The Personal-URL Gap</h2>
+<div class="card">
+<p><strong>What's hardcoded.</strong> Three constants pin every operator to Joey's domain:</p>
+<ul>
+<li><code>PUBLIC_BASE = "https://joeycastillo.us"</code> — latchkey_publish.py:31. No env override at all (unlike SITE_ROOT).</li>
+<li><code>SITE_ROOT = os.environ.get("METAL_SITE_ROOT", "C:/joeycastillo.us")</code> — latchkey_publish.py:30. Overridable, but the cap-URL printed and injected would still say joeycastillo.us even if you redirect the file copy.</li>
+<li><code>PUBLIC_PREFIX = "/metal/s"</code> — cap_tokens.py:62.</li>
+</ul>
+<p><strong>What personal means here.</strong> The convention already defines it: every Pantheon operator owns their FQDN and the matching GitHub org (<code>scottyledell.us → scottyledellUS</code>). Scotty's inspection of Scotty's project should mint <code>https://scottyledell.us/&lt;project&gt;/s/&lt;token&gt;/</code>. Today it would mint <code>https://joeycastillo.us/metal/s/&lt;token&gt;/</code> — a URL on a site repo Scotty almost certainly cannot write to, so his publish step silently degrades to "staged only" (latchkey_publish.py:153-157 skips when the site root isn't found) and the injected Share button copies a dead link on someone else's domain.</p>
+<p><strong>What it would take:</strong></p>
+<ul>
+<li><strong>Parameterize.</strong> Derive <code>PUBLIC_BASE</code>, <code>SITE_ROOT</code>, and <code>PUBLIC_PREFIX</code> from the operator's identity — an <code>operator.fqdn</code> field in <code>be/config.json</code> (or the vault), with CLI/env override. The C99 skill spec already mandates exactly this (skill CLAUDE.md:116-117); the Python is behind its own spec.</li>
+<li><strong>Per-operator site repo.</strong> The operator's FQDN site (<code>&lt;name&gt;US/&lt;name&gt;.us</code>-style, Cloudflare Pages) with a <code>/s/</code> (or <code>/&lt;project&gt;/s/</code>) Door, robots.txt disallow, no index. Joey's side of this exists and is verified; it's the template.</li>
+<li><strong>DNS.</strong> Already solved by onboarding — the operator must own the FQDN before sovereign storage is provisioned (kernel CLAUDE.md, FQDN↔org convention). No new DNS work; the domain is the operator's by definition.</li>
+<li><strong>Nothing changes for the Thread.</strong> Because <code>doc=token</code> (a globally unique UUID), the comment keying survives any domain move — the same token works on any Door.</li>
+</ul>
+<p class="irony"><strong>The irony is not lost:</strong> this very inspection, when published per protocol, will get a cap-URL on <code>joeycastillo.us/metal/s/&lt;token&gt;/</code> — a live demonstration of the exact gap it documents. The report about the missing personal URL cannot be served from a personal URL.</p>
+</div>
+
+<h2>Comments + ~fu — is the loop real?</h2>
+<div class="card">
+<p><strong>Yes, the loop is real and closed — for one operator.</strong></p>
+<ul>
+<li><strong>Widget (write side):</strong> injected into every published artifact; posts <code>POST /comments?doc=&lt;token&gt;&amp;obj=&lt;section&gt;</code> with author + text; loads existing comments; renders a <code>seen by metal</code> receipt; flags <code>~</code>-prefixed comments as commands (latchkey_publish.py:48-96).</li>
+<li><strong>~fu (read side / Attendant):</strong> one sweep of <code>GET /comments/recent</code>, act on each unseen operator comment (execute tilde commands scoped to the artifact, answer questions, optionally reply in-thread as <code>author=metal</code>), stamp <code>POST /comments/seen?doc=</code> (commands.md:1862-1875). Deliberately pull-based — no poller, no idle cost (commands.md:1877-1879), which honors the pattern's anti-pattern warning about unwired attendance while dodging its cost.</li>
+<li><strong>doc=token resolution:</strong> the crucial design win. The Thread keys on the Latchkey, never the artifact name (pattern anti-pattern, latchkey.md:63), and <code>get_or_mint</code> records <code>title</code> + <code>rel_path</code> in the Ledger precisely so <code>~fu</code> can attribute a token back to a human-readable artifact from the Ledger alone (cap_tokens.py:12-14). This works <em>regardless of domain</em> — a personal-URL future needs zero Thread changes.</li>
+</ul>
+<p><strong>Why PARTIAL, not SOLID:</strong> the backend is a single shared bridge — <code>https://gcp-bridge-692654781984.us-west1.run.app</code> — hardcoded in both the publisher (latchkey_publish.py:29) and the <code>~fu</code> spec (commands.md:1865). Not per-operator: all operators' comments would land in one store Joey controls, and <code>~fu</code>'s <code>/comments/recent</code> sweep is global — a multi-operator world would leak everyone's threads into everyone's sweep. The pattern itself names this debt: "a GCP bridge-tier dependency that must later retire to the Pantheon mesh" (latchkey.md:45), and the skill boundary agrees the bridge URL must be a parameter (skill CLAUDE.md:116-117, 124-125). For the single-operator present, the loop works end to end; for the personal/per-operator future, the bridge is the second hardcoded Joey-ism.</p>
+</div>
+
+<h2>Bottom Line</h2>
+<div class="card">
+<p><strong>Partial — one of three, honestly.</strong> The Latchkey engine itself is genuinely solid: idempotent mint, a private Ledger correctly anchored across worktrees and never published, UUID validation, hardening, idempotent injection, a verified Door (robots.txt live), and a protocol that makes every new artifact born a Latchkey. The comments loop is real and closed — widget, bridge, <code>doc=token</code> keying, and a working <code>~fu</code> Attendant sweep — but it rides a single shared, hardcoded bridge rather than anything per-operator. And the crux — a <em>real personal URL</em> — is flatly missing: <code>PUBLIC_BASE</code> is hardcoded to <code>https://joeycastillo.us</code>, so every operator on the Pantheon publishes into Joey's domain (or fails to publish at all), in direct violation of the skill spec's own "parameters, never hardcoded" rule and the FQDN-is-identity convention the kernel is built on. The fix is well-scoped — derive base/root/prefix from the operator's FQDN, stand up the per-operator Door on their existing domain, parameterize the bridge — and the <code>doc=token</code> design means the Thread survives the move untouched. metal.CE has a solid Latchkey with working comments for <code>~fu</code>; it does not yet have a personal one.</p>
+</div>
+
+<h2>DoD Checklist</h2>
+<div class="card">
+<ul style="list-style:none; padding-left:4px;">
+<li><span class="pass">&#10003;</span> A-D-D read first (pattern <code>latchkey.md</code> + skill spec read in full before verdicts)</li>
+<li><span class="pass">&#10003;</span> All named sources read in full (latchkey_publish.py, cap_tokens.py, conventions.md &sect; Latchkey, commands.md &sect; ~fu, pattern, skill, kernel FQDN convention)</li>
+<li><span class="pass">&#10003;</span> Every verdict carries file:line evidence (no unevidenced claims)</li>
+<li><span class="pass">&#10003;</span> Ground truth verified, not assumed (Ledger: 10 tokens live; robots.txt disallow confirmed on disk; grep confirmed no other PUBLIC_BASE definition)</li>
+<li><span class="pass">&#10003;</span> Read-only inspection — no source files modified</li>
+<li><span class="pass">&#10003;</span> Be HTML style (bg #111, tron blue, 820px, sticky nav, published stamp)</li>
+<li><span class="pass">&#10003;</span> Honest negative finding surfaced (personal URL MISSING; the report's own cap-URL demonstrates the gap)</li>
+<li><span class="fail">&#10007;</span> Committed + pushed (main session runs the chain — not this agent's step)</li>
+<li><span class="fail">&#10007;</span> External production verification (pending Latchkey publish of this artifact by the main session)</li>
+</ul>
+</div>
+
+</main>
+
+<!-- LATCHKEY THREAD -- doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<div style="max-width:840px;margin:0 auto;padding:0 16px 24px;">
+<h2 style="color:#6FC3DF;font-size:20px;margin:32px 0 12px;border-bottom:1px solid #333;padding-bottom:8px;">Comments &amp; Follow-up <span style="font-size:12px;color:#555;font-weight:400;">Latchkey thread &middot; <code>~fu</code> attends</span></h2>
+<div style="background:#1A1A1A;border-radius:8px;padding:18px;">
+  <div id="lk-seen" style="font-size:12px;color:#22c55e;margin-bottom:8px;display:none;">&#10003; seen by metal</div>
+  <div id="lk-comments" style="color:#888;">Loading&hellip;</div>
+  <div style="margin-top:14px;border-top:1px solid #333;padding-top:12px;">
+    <input id="lk-name" placeholder="Your name" style="background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:6px 8px;border-radius:4px;margin:0 6px 6px 0;font-size:13px;">
+    <input id="lk-obj" placeholder="section, e.g. Shape (optional)" style="background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:6px 8px;border-radius:4px;margin:0 6px 6px 0;font-size:13px;width:230px;">
+    <br>
+    <textarea id="lk-text" rows="2" placeholder="Comment... start with ~ to issue a tilde command scoped to this artifact" style="width:100%;background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:8px;border-radius:4px;font-size:13px;font-family:inherit;margin:4px 0;box-sizing:border-box;"></textarea>
+    <button id="lk-post" onclick="lkPost()" style="background:#6FC3DF;color:#000;border:none;padding:7px 16px;border-radius:4px;font-weight:600;cursor:pointer;">Comment</button>
+  </div>
+</div>
+</div>
+<script>
+(function(){
+  var BRIDGE='https://gcp-bridge-692654781984.us-west1.run.app';
+  var TOKEN='25a09833-bd85-4f71-bfcc-0669c4aa3ee0';
+  function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;}
+  function load(){
+    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN)).then(function(r){return r.json();}).then(function(d){
+      if(d.seenByMetal){document.getElementById('lk-seen').style.display='block';}
+      var box=document.getElementById('lk-comments');
+      if(!d.comments||!d.comments.length){box.innerHTML='<span style="color:#666;">No comments yet. Leave one &mdash; then run ~fu.</span>';return;}
+      box.innerHTML=d.comments.map(function(c){
+        var who=esc(c.author||'anon');
+        var obj=(c.obj&&c.obj!=='page'&&c.obj!=='general')?' <span style="color:#6FC3DF;">['+esc(c.obj)+']</span>':'';
+        var isCmd=(c.text&&c.text.charAt(0)==='~')?' <span style="color:#f59e0b;">&#9655; command</span>':'';
+        return '<div style="border-bottom:1px solid #222;padding:8px 0;"><div style="font-size:12px;color:#999;"><strong style="color:'+(who==='metal'?'#6FC3DF':'#e0e0e0')+';">'+who+'</strong>'+obj+isCmd+' <span style="color:#555;">'+esc(c.ts||'')+'</span></div><div style="margin-top:3px;white-space:pre-wrap;">'+esc(c.text)+'</div></div>';
+      }).join('');
+    }).catch(function(){document.getElementById('lk-comments').innerHTML='<span style="color:#f59e0b;">comments unavailable</span>';});
+  }
+  window.lkPost=function(){
+    var name=(document.getElementById('lk-name').value||'').trim();
+    var text=(document.getElementById('lk-text').value||'').trim();
+    var obj=(document.getElementById('lk-obj').value||'').trim()||'page';
+    if(!name||!text){return;}
+    var b=document.getElementById('lk-post');b.textContent='...';b.disabled=true;
+    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN)+'&obj='+encodeURIComponent(obj),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({author:name,text:text})})
+    .then(function(){document.getElementById('lk-text').value='';b.textContent='Comment';b.disabled=false;load();})
+    .catch(function(){b.textContent='Comment';b.disabled=false;alert('post failed');});
+  };
+  load();
+})();
+</script>
+
+<footer>
+v0 &middot; r1772 &middot; 2026-07-04 &middot; Be &middot; metal console
+</footer>
+</body>
+</html>
