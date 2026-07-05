@@ -3,41 +3,607 @@
   "mirroredFrom": "metal kernel + be/docs/commands.md",
   "mirroredOn": "2026-07-01",
   "model": "Claude Code — Opus, high effort",
-  "groups": ["Create", "Plan", "Work", "Ship", "Ops", "Cloud"],
+  "groups": [
+    "Create",
+    "Plan",
+    "Work",
+    "Ship",
+    "Ops",
+    "Cloud"
+  ],
   "tildes": [
-    { "cmd": "~new", "cat": "Create", "aliases": ["~new","~N","~n"], "name": "New Project", "oneLiner": "Create a new project — repo, be/ scaffold, CLAUDE.md, proposal site, initial commit — and switch context to it.", "spec": "Creates a project from scratch: parses name/org/FQDN (a dotted arg is the FQDN, required), refuses to overwrite an existing folder, makes C:\\<name>, git-inits on main, scaffolds the full be/ tree, writes a minimal CLAUDE.md and a deploy.json stub, fills the proposal/ template, makes the initial commit, and creates the private GitHub repo via gh. It then cd's into the new folder so all later tildes operate there. Output is inline (no HTML report, like ~l), but the DoD gate applies to the committed scaffold. Recommends ~p next.", "aiDoes": "Sanitizes the name, checks the folder doesn't exist, runs git init and gh repo create, writes the be/ scaffold + CLAUDE.md + deploy.json + proposal/index.html with placeholders substituted, commits, pushes, switches the working directory into the project, and prints an inline Created summary.", "source": "be/docs/commands.md § ~new — New Project", "created": "2026-04-03", "updated": "2026-04-03", "datesApprox": true },
-    { "cmd": "~li", "cat": "Create", "aliases": ["~li","~LI","~list","~LIST"], "name": "List Projects", "oneLiner": "List all projects Be can see — local and remote, plus open transfers.", "spec": "Scans root-level directories for Be-managed projects (have be/) and plain local repos, gathering name, path, org, branch, status, last commit, and Last Run from be/telemetry.json. Collects known GitHub orgs dynamically and runs gh repo list per org, including only remote repos that have a be/ folder. Also scans be/transfers/ for open handoffs. DoD-exempt utility — inline output across four sections; no HTML artifact. Logs a telemetry entry with verb 'listed in'.", "aiDoes": "Walks C:\\* directories, runs git status/log per repo, reads telemetry tails for Last Run, calls gh repo list and gh api for be/ detection on remotes, scans be/transfers/, then prints the four-section table inline. No commit, no report.", "source": "be/docs/commands.md § ~li — List Projects", "created": "2026-04-04", "updated": "2026-04-04", "datesApprox": true },
-    { "cmd": "~l", "cat": "Create", "aliases": ["~l","~L","~load"], "name": "Load Repo", "oneLiner": "Load a repo into Be's working context — clone if needed, sync if clean, switch context.", "spec": "Resolves the input (URL, path, or short name) to a local repo, cloning if absent, then runs a health check (git status, diff, log, board check). Pulls only when the tree is clean — never over dirty work, never pushes — then cd's into the repo so every later tilde operates on that project's be/ folder and board. If be/board.md exists it resolves a recommended Next item using ~b's selection logic (without moving anything). DoD-exempt utility — inline output only. Per the Auto-board rule it pops the project's most-recent live board view.", "aiDoes": "Determines the local path, clones if missing, reads git state, conditionally pulls when clean, switches the working directory, computes a Next-item recommendation from board.md, prints the inline Loaded summary, and launches the live kanban board view in a browser.", "source": "be/docs/commands.md § ~l — Load Repo", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~i", "cat": "Create", "aliases": ["~i","~I","~inspect"], "name": "Inspect", "oneLiner": "Deep-read a repo, URL, or codebase and report what's there.", "spec": "Reads a target (repo, codebase, URL, or folder) and renders an inspect report to be/plans/ with sections What It Is, Structure, Stack, Patterns Found, Open Questions (architecture inspections use Intent → Purpose → What). Updates the Be index, commits, pushes, then opens the HTML. The DoD gate applies, though as a discovery tilde its production-verify item is typically N/A. Read-only with respect to source code — produces only its own plan artifact.", "aiDoes": "Fetches/reads the target, synthesizes a structured inspect report, writes the HTML to be/plans/, links it from be/index.html, commits + pushes, logs telemetry with verb 'inspected in', and pops the report for the user.", "source": "be/docs/commands.md § ~i — Inspect", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~ul", "cat": "Create", "aliases": ["~ul","~UL","~unload"], "name": "Unload", "oneLiner": "Close out a project — housekeep, surface anything unclean, status report, switch back.", "spec": "The inverse of ~l. Identifies the loaded project, runs a housekeeping audit (git status, diff, unpushed commits, In Progress items, deploy state), and presents any unclean state with resolution options — never auto-committing, pushing, or discarding without approval. Always renders a status report to be/builds/YYYY-MM-DD-unload-<project>.html, updates the index, commits + pushes, then cd's back to the calling directory. DoD gate applies; the report lands in the PROJECT's be/builds/.", "aiDoes": "Reads git + board + deploy state, offers interactive cleanup choices, renders the unload status HTML, updates the index, commits + pushes any approved housekeeping, switches the working directory back, and prints the inline Unloaded summary.", "source": "be/docs/commands.md § ~ul — Unload", "created": "2026-04-03", "updated": "2026-04-03", "datesApprox": true },
-    { "cmd": "~d", "cat": "Plan", "aliases": ["~d","~D","~design","~DESIGN"], "name": "Design", "oneLiner": "Start from the need, source the solution from what already exists, name things literally, and shape the smallest thing that proves it.", "spec": "A planning/discovery command with a six-section spine sized to the work: Need, Raw User Stories, Sourced Solution (mine kastil-systems/a-d-d + kastil-systems/nous C99 primitives + vendored src/sdk + apps we've built + outside prior art before inventing), literal Naming, Shape, and First Move — plus three optional tools (Choices + Consequences, Escape Routes, Pure Metal Test) included only when a load-bearing design earns them. Agile/YAGNI: replaces the old mandatory 8 sections. Renders to be/designs/YYYY-MM-DD-HHMM-design-<slug>.html from _template.html. DoD gate applies (production-verify N/A). Read-only except its own artifact — produces NO source edits, NO plan, NO board items, and NO code. NOT a delete command.", "aiDoes": "Names the real need, drafts raw user stories, sources the approach from a-d-d + kastil-systems/nous (C99 primitives) + existing apps + external prior art before inventing, proposes literal names (metaphor only when accurate; brand names exempt), shapes the minimum viable structure, and defines the smallest First Move that proves it — writing the dated HTML to be/designs/ from the leaner template, updating the index, committing + pushing, logging telemetry with verb 'designed for', and popping the design. Small designs skip the optional analytical tools. Writes no code.", "source": "be/docs/commands.md § ~d — Design", "created": "2026-03-29", "updated": "2026-07-01", "datesApprox": false },
-    { "cmd": "~laf", "cat": "Plan", "aliases": ["~laf","~LAF","~look-and-feel"], "name": "Look and Feel", "oneLiner": "Generate a UI design system from intent — emotion, structure, and interaction into a usable UI architecture.", "spec": "A planning command that converts 6 input axes (Emotion, Information Density, Reality Level, Hierarchy Strength, Interaction Rhythm, Expression Level) into a design system mapped onto 5 paradigms — no named external styles ever. A required constraint layer detects contradictions, prioritizes the top 2 traits, and resolves toward coherence. Renders a 4-section report (Intent, System Rules, Component Behavior, Interaction) to be/designs/ from _laf-template.html, with a CSS variables block. DoD gate applies. Produces a system, not CSS/code.", "aiDoes": "Collects or infers the 6 axes, runs the constraint layer to resolve conflicts, fills the 4 output sections plus a CSS :root block into the template, writes the dated HTML to be/designs/, updates the index, commits + pushes, and walks the user through the intent flagging any inferred axis.", "source": "be/docs/commands.md § ~laf — Look and Feel", "created": "2026-04-26", "updated": "2026-04-26", "datesApprox": true },
-    { "cmd": "~p", "cat": "Plan", "aliases": ["~p","~P","~plan"], "name": "Plan", "oneLiner": "Plan work and render the report — intent, scope, approach, unknowns, when-to-revisit.", "spec": "Does the planning work and renders a plan report to be/plans/YYYY-MM-DD-<slug>[-vN].html with required sections Intent, Scope, Approach, Phases, Constraints, plus Unknowns (named explicitly) and When To Revisit (the v2 trigger) per Rule 6. Plans are v1 hypotheses: revising copies v1 to a -v2- filename with a Supersedes section and marks v1 SUPERSEDED. Sets 'Plan — Awaiting Approval', updates the index, commits, pushes. DoD gate applies. Planning IS the review.", "aiDoes": "Writes the structured plan including the mandatory Unknowns and When-To-Revisit sections, versions the filename if superseding, renders the HTML to be/plans/, links it from the index, commits + pushes, logs telemetry with verb 'planned for', and pops the plan for approval.", "source": "be/docs/commands.md § ~p — Plan", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~e", "cat": "Plan", "aliases": ["~e","~E","~estimate"], "name": "Estimate", "oneLiner": "Size a plan into Fibonacci kanban boards (3–5 pt items, 13–21 pt boards).", "spec": "Takes a ~p output and produces sized kanban boards. Every work item is a {what, verb, context} triple estimated at 3 or 5 only, prioritized by greatest value. Items group into boards of 13–21 points, ordered by value then dependency removal, and an infra-awareness rule forces explicit firewall/port items when new hosts/ports/services appear. Renders a build-plan report to be/plans/, writes the kanban state into be/board.md, updates the index, commits, pushes. DoD gate applies.", "aiDoes": "Reads the plan, decomposes/recomposes into 3/5-pt triples, groups and orders boards, writes be/board.md, renders the estimate HTML to be/plans/, updates the index, commits + pushes (board.md alongside), logs telemetry with verb 'estimated for', and pops the report.", "source": "be/docs/commands.md § ~e — Estimate", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~pu", "cat": "Plan", "aliases": ["~pu","~PU","~plan-user"], "name": "Plan User Story", "oneLiner": "Plan the work framed as a user story — As a..., I want..., So that...", "spec": "Plans work as a user story and renders a plan report to be/plans/ with sections User Story, Acceptance Criteria, Scope, Approach. Includes an immediate review to validate the story, then updates the index, commits, pushes. DoD gate applies. A lightweight sibling of ~p focused on the story framing.", "aiDoes": "Drafts the As-a/I-want/So-that story plus acceptance criteria, renders the HTML to be/plans/, reviews the story, updates the index, commits + pushes, and pops the report.", "source": "be/docs/commands.md § ~pu — Preview User Story", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~pt", "cat": "Plan", "aliases": ["~pt","~PT","~plan-test"], "name": "Plan Test", "oneLiner": "Plan the test strategy for a feature or area.", "spec": "Plans the test strategy and renders a plan report to be/plans/ with sections What to Test, Test Cases, Edge Cases, Dependencies. Includes an immediate review to validate the strategy before tests are built, then updates the index, commits, pushes. DoD gate applies. Upstream of ~bt/~t — defines what to test, not the tests.", "aiDoes": "Writes the test-strategy plan covering cases, edge cases, and dependencies, renders the HTML to be/plans/, reviews the strategy, updates the index, commits + pushes, and pops the report.", "source": "be/docs/commands.md § ~pt — Plan Test", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~patterns", "cat": "Plan", "aliases": ["~patterns","~pp"], "name": "kASTIL Patterns & Practices", "oneLiner": "The architectural-pattern library — list, show, apply, or extract patterns.", "spec": "Routes to the canonical library at kastil-systems/a-d-d/patterns/ (PATTERNS.md catalog, PRACTICES.md; currently Trust + Slot). Four verbs: bare and '<name>' list/show inline (DoD-exempt); 'apply <name>' renders the pattern's Structure as a checklist against current work then implements; 'extract' lifts a reusable pattern from current work, proposes names for the operator to bless, writes the pattern doc + catalog row — DoD gate applies. 'make it a slot' / 'apply Trust here' resolve to apply. Patterns are human-owned, AI-stewarded (Rule 10).", "aiDoes": "Reads PATTERNS.md to list/resolve a pattern, renders its Structure as a checklist and implements to it on apply, or on extract interviews the current design, proposes names, writes kastil-systems/a-d-d/patterns/<name>.md plus a catalog row, then commits/pushes under the DoD gate.", "source": "be/docs/commands.md § ~patterns", "created": "2026-06-15", "updated": "2026-06-30", "datesApprox": true },
-    { "cmd": "~a", "cat": "Work", "aliases": ["~a","~A","~add"], "name": "Add", "oneLiner": "Add something new to the project.", "spec": "Adds a new feature/file/capability, runs an immediate review, then renders a build report to be/builds/ with sections What Was Added, Decisions Made, Files Changed, What's Next. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. An auth-gate rule auto-includes the auth gate for new web projects when deploy.json has auth.enabled. Per Rule 7 it ships paired with ~t (~a~t).", "aiDoes": "Edits/creates the source files, reviews the change, moves any matching board item Ready→In Progress→Done, renders the build report to be/builds/, updates the index, commits + pushes (board.md alongside), verifies the DoD gate, launches the demo, opens the report, and runs ~t to verify.", "source": "be/docs/commands.md § ~a — Add", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~u", "cat": "Work", "aliases": ["~u","~U","~update"], "name": "Update", "oneLiner": "Update existing code or a feature.", "spec": "Updates existing code/features, runs an immediate review, then renders a build report to be/builds/ with sections What Was Updated, Before/After, Files Changed, What's Next. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. Ships paired with ~t (~u~t) per the verify-loop rule.", "aiDoes": "Modifies the targeted source, reviews before/after, moves any matching board item through the lanes, renders the build report to be/builds/, updates the index, commits + pushes, verifies DoD, launches the demo, opens the report, and runs ~t to verify.", "source": "be/docs/commands.md § ~u — Update", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~f", "cat": "Work", "aliases": ["~f","~F","~fix"], "name": "Fix", "oneLiner": "Diagnose and fix a bug, then write a test as proof.", "spec": "Diagnoses and fixes the specified bug, then writes a test that reproduces it (fails before, passes after) or documents manual verification. Reviews the fix, then renders a build report to be/builds/ with sections What Was Broken, Root Cause, What Was Fixed, Test Added, Files Changed, What's Next. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. Every fix ships with proof — the test is the proof.", "aiDoes": "Locates the root cause, edits the source to fix it, adds a regression test (or documents manual steps), reviews that the test passes, renders the fix report to be/builds/, updates the index, commits + pushes, verifies DoD, launches the demo, and opens the report.", "source": "be/docs/commands.md § ~f — Fix", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~b", "cat": "Work", "aliases": ["~b","~B","~build"], "name": "Build", "oneLiner": "Build it — or pull the next item from the board and complete the whole board.", "spec": "With an argument, builds the specified thing. Without one, reads be/board.md, finds the first unblocked board, and completes EVERY Ready item in order — moving each Ready→In Progress, executing its mapped tilde (~a/~u/~f/~t), reviewing, moving to Done, and committing+pushing per item as a crash checkpoint. When the board finishes it unblocks the next, renders ONE build report to be/builds/, updates the index, and launches the demo and report ONCE at the end. DoD gate applies. Preflight, tarball-audit, and auth-gate-awareness rules govern remote/deploy/web builds.", "aiDoes": "Reads the board, iterates each Ready item committing+pushing atomically after each, edits source per the item's mapped verb, reviews each build, updates board.md state (re-rendering the live view), then renders the single end-of-board report, updates the index, verifies DoD, launches the demo once, and pops both the report and the live board view.", "source": "be/docs/commands.md § ~b — Build", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~bt", "cat": "Work", "aliases": ["~bt","~BT","~build-test"], "name": "Build Test", "oneLiner": "Build the tests for a feature or area.", "spec": "Builds the actual tests for the specified feature/area, reviews coverage and correctness, then renders a test report to be/tests/ with sections Tests Built, Coverage, Test Results, Remaining Gaps. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. A test-ordering rule sequences sections by impact: smoke → functional → integration/E2E → destructive.", "aiDoes": "Writes the test code for the target, runs it, reviews coverage, renders the test report to be/tests/, updates the index, commits + pushes, verifies DoD, launches the demo, and opens the report.", "source": "be/docs/commands.md § ~bt — Build Test", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~t", "cat": "Work", "aliases": ["~t","~T","~test"], "name": "Test", "oneLiner": "Test the current work (or a specified thing) and fix what's broken.", "spec": "Tests the current work or a specified target, fixes what's broken, then renders a test report to be/tests/ with sections What Was Tested, Results, Fixes Applied, Remaining Issues. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. Same smoke → functional → integration/E2E → destructive ordering as ~bt. It is the verify half of every work-tilde loop (~a~t, ~u~t, ~f~t, ~b~t) per Rule 7.", "aiDoes": "Runs the tests against the work, fixes failures inline (or files a ~f if scope grows) and re-tests until green, renders the test report to be/tests/, updates the index, commits + pushes, verifies DoD, launches the demo, and opens the report.", "source": "be/docs/commands.md § ~t — Test", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~chase", "cat": "Work", "aliases": ["~chase","~CHASE"], "name": "Chase JR", "oneLiner": "JR-driven autonomous loop — get the next item, execute, ship, repeat until JR returns 'hide'.", "spec": "An autonomous session that authenticates with the operator's mesh session token, GETs the-jack-rabbit.net/p/<project>/next.json, and loops: a winner {what,verb,context,cmd,pts} is placed Ready on board.md and its mapped tilde executes (producing its own artifact+commit+push+Signal), the upstream Signal lets JR re-decide, and the loop repeats until JR returns {status:hide}. Termination is JR-driven; winners are billed per iteration, hides are not. The DoD gate applies to the inner work tildes; ~chase itself emits an inline end-of-loop summary — no HTML artifact of its own.", "aiDoes": "Authenticates, polls JR's next.json, writes each served winner onto board.md, dispatches the mapped work tilde (each does its own report/commit/push/Signal), handles backoff/auth-refresh failure modes, and on 'hide' prints the inline chase summary with the ledger total and artifact links.", "source": "be/docs/commands.md § ~chase — Chase JR", "created": "2026-05-31", "updated": "2026-05-31", "datesApprox": true },
-    { "cmd": "~s", "cat": "Ship", "aliases": ["~s","~S","~ship"], "name": "Ship", "oneLiner": "Commit, push, deploy, and sync the site.", "spec": "A chain-final command: stages, commits (never with co-author lines), pushes, and bumps revision, then renders a ship report to be/ships/ (What Shipped, Version, Commits Included, Deploy Target). Updates the index, syncs the joeycastillo.us/metal site's pages if present, verifies ~h is in sync and revision footers are current, and fires Mercury to sync telemetry (non-fatal). DoD gate applies plus chain-final items (chain complete, site in sync, ~h in sync, revision current). When deploy.json exists, the deploy chain is followed.", "aiDoes": "Stages and commits all work, pushes, renders the ship report to be/ships/, updates the index, deploys per deploy.json and verifies the live target serves the new bytes, syncs the public metal site pages, re-checks ~h and revision footers, runs Mercury sync, and confirms the full chain has no telemetry gaps.", "source": "be/docs/commands.md § ~s — Ship", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~brief", "cat": "Ship", "aliases": ["~brief"], "name": "Avatar Briefing", "oneLiner": "Generate a 60–90s avatar video briefing from the most recent ship report.", "spec": "Reads the most recent be/ships/*.html, extracts what shipped, and drafts a 150–200 word briefing script saved to be/briefs/. Then calls the HeyGen API (key from HEYGEN_API_KEY) to generate a 1080p avatar video, polls until completed, and downloads the mp4. If the key isn't set it saves the script and prompts. Renders a brief report to be/builds/ with an embedded <video>. DoD gate applies — the script is the artifact; DoD passes on the script alone.", "aiDoes": "Reads the latest ship report, writes the spoken-word script to be/briefs/, optionally calls HeyGen to render and download the mp4, renders the brief HTML report to be/builds/, updates the index, commits + pushes, and offers to ship the briefing.", "source": "be/docs/commands.md § ~brief — Avatar Briefing", "created": "2026-04-21", "updated": "2026-04-21", "datesApprox": true },
-    { "cmd": "~monitor", "cat": "Ship", "aliases": ["~monitor"], "name": "Monitor", "oneLiner": "Check deploy health — verify the deploy is live and healthy.", "spec": "An ops command that verifies a deployment's health (the live target responds with the expected payload). It appears in the kernel grid and the ~h commands reference but has no dedicated detailed section in commands.md, so its contract is the grid entry plus the Rule 9 verify-from-the-right-vantage discipline (Done = production, third-party verifiable). Treated as a utility check; no HTML artifact specified.", "aiDoes": "Probes the deploy target from an appropriate vantage and protocol (per Rule 9 — not a single curl from the dev box), checks process/logs/DNS/proxy as relevant, and reports live/healthy or names the failure cause with evidence inline.", "source": "be/docs/help-blocks.md § commands grid (no dedicated commands.md section)", "created": "2026-03-29", "updated": "2026-06-09", "datesApprox": true },
-    { "cmd": "~demo", "cat": "Ship", "aliases": ["~demo"], "name": "Demo / Refactor", "oneLiner": "Demo, review, or refactor code — restructure, clean up, or improve it.", "spec": "Performs demo/refactor work on the specified code, reviews correctness, then renders a report to be/retros/ with sections What Was Changed, Before/After, Decisions Made, Impact, What Could Be Better. Every 'What Could Be Better' bullet becomes a Kaizen item on Board K with a source annotation (same convention as ~retro). Updates the index, commits (board.md alongside), pushes, launches the demo, opens the report. DoD gate applies.", "aiDoes": "Refactors/cleans the targeted code, reviews it, appends Kaizen items to Board K for each improvement bullet, renders the report to be/retros/, updates the index, commits + pushes, launches the demo, and opens the report.", "source": "be/docs/commands.md § ~demo — Demo / Refactor", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~r", "cat": "Ship", "aliases": ["~r","~R","~retro"], "name": "Retro", "oneLiner": "Retrospect on recent work — what went well, what didn't.", "spec": "A chain-final command that reviews all Be artifacts since the last retro and reads the most recent be/debug/ logs for tool failures, permission rejections, retries, and slow ops. Renders a retro report to be/retros/YYYY-MM-DD-retro.html (What Happened, What Went Well, What Could Be Better, Tool Failures, Permission Issues, Performance Notes, Commitments), and appends a Kaizen item to Board K for every improvement point. Updates the index, commits (board.md alongside), pushes, fires Mercury sync. DoD gate applies plus chain-final item. Only covers not-yet-retro'd artifacts.", "aiDoes": "Gathers since-last-retro artifacts and debug logs, writes the retro report to be/retros/, generates Kaizen board items with source annotations, updates the index, commits + pushes, runs Mercury telemetry sync, and presents the retro.", "source": "be/docs/commands.md § ~retro — Retro", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~dev-refresh", "cat": "Ship", "aliases": ["~dev-refresh"], "name": "Dev Refresh", "oneLiner": "Regenerate the rolling WIP demo site (<project>.dev).", "spec": "Regenerates the rolling work-in-progress demo surface (the <project>.dev developer zone) per Rule 5's three-surfaces convention — refreshed at every board completion rather than every commit. Appears in the kernel grid and ~h commands reference; the generator location, refresh trigger, and opt-in rules live in conventions.md § Rolling WIP Demo Convention.", "aiDoes": "Runs the rolling-WIP demo generator to rebuild the <project>.dev site from current board/build state, then publishes it so the developer surface reflects the latest completed board.", "source": "be/docs/conventions.md § Rolling WIP Demo Convention", "created": "2026-04-11", "updated": "2026-06-09", "datesApprox": true },
-    { "cmd": "~tag", "cat": "Ops", "aliases": ["~tag"], "name": "Tag", "oneLiner": "Universal tagging — tag anything as a searchable triple.", "spec": "A DoD-exempt utility that tags anything with a {subject, tagged as, tag} triple stored in be/tags.json (committed, searchable). Subcommands: attach, bare (view all grouped by subject), search <term>, rm <N>. Each operation auto-increments a never-reused ID, pulls author from git config, rebuilds be/tags.html (vanilla viewer), commits both files, pushes. Logs a telemetry entry with verb 'tagged in'.", "aiDoes": "Reads/creates be/tags.json, appends or removes the tag entry, regenerates be/tags.html, commits both files, pushes, and prints the inline confirmation or tag listing.", "source": "be/docs/commands.md § ~tag — Tag", "created": "2026-04-10", "updated": "2026-04-10", "datesApprox": true },
-    { "cmd": "~config", "cat": "Ops", "aliases": ["~config"], "name": "Configure", "oneLiner": "Read and write Be runtime settings (reports, chains, remote control).", "spec": "A DoD-exempt runtime utility that reads/writes settings in be/config.json (versioned, read by every artifact-producing tilde). Subcommands show all/namespace/one key, set a value, or reset. Known keys: reports.display (preview/print/silent), reports.chain_timing (each/final), remote_control.enabled. Missing file means defaults; every write commits and pushes be/config.json. No HTML artifact and no telemetry entry for ~config itself.", "aiDoes": "Reads be/config.json (or applies defaults), validates the key/value, writes the change, commits + pushes the config file, and prints the inline settings table or confirmation. Launchers read remote_control.enabled on the next go.", "source": "be/docs/commands.md § ~config — Configure", "created": "2026-04-17", "updated": "2026-04-17", "datesApprox": true },
-    { "cmd": "~cr", "cat": "Ops", "aliases": ["~cr","~CR","~crash"], "name": "Crash Recovery", "oneLiner": "Recover crashed work — read the prompt log first, git second, resume the chain.", "spec": "A DoD-exempt recovery utility that reconstructs the most recent unfinished session across folders. Step 0 reads the centralized prompt log (be/prompts.jsonl) filtered to this hostname to find the candidate session and cwd; Steps 1–3 read git + be/ to fingerprint which tilde ran and where the chain broke; Step 4 resumes from the break point without redoing completed steps; Step 5 renders a crash-recovery report to be/builds/. Never pulls, never discards; commits per-item atomically with a build report per recovered item.", "aiDoes": "Reads be/prompts.jsonl to identify the unfinished session/cwd, inspects git and be/ artifacts to locate the break point, resumes the interrupted tilde from exactly where it stopped, renders the recovery report, updates the index, commits + pushes, and launches the demo if applicable.", "source": "be/docs/commands.md § ~cr — Crash Recovery", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~WTF", "cat": "Ops", "aliases": ["~WTF","~wtf"], "name": "AI Trust Recovery", "oneLiner": "AI trust recovery — audit, clean house, kill the session, brief the next.", "spec": "Invoked when the AI's judgment is broken across a pattern of work. A 7-step protocol: HALT, compute BLAST RADIUS from the last known-good ~s/~r commit, AUDIT every change read-only and grade it (verified/suspect/broken), ROLLBACK with the user deciding each one, HOUSEKEEPING to make the repo clean and accurate, LOBOTOMY (write the WTF briefing report to be/builds/, commit+push, then end the session — the AI does NOT continue), and REFRESH where the next session's DoR picks up the WTF state. DoD gate applies. Optional 'guardrails' mode tightens the next session.", "aiDoes": "Stops work, lists the blast-radius commits and diffs, grades each change without fixing, presents rollbacks for the user to decide, cleans the repo and board, writes the WTF audit/briefing HTML with concrete anti-patterns, commits + pushes it, and tells the user to start a new session — then stops.", "source": "be/docs/commands.md § ~WTF — AI Trust Recovery", "created": "2026-04-13", "updated": "2026-04-13", "datesApprox": true },
-    { "cmd": "~transfer", "cat": "Ops", "aliases": ["~transfer"], "name": "Project Handoff", "oneLiner": "Project handoff — audit, clean, verify, manifest.", "spec": "Prepares the focused project for handoff. Subcommands: bare (scan+clean+manifest), 'to <name>', 'clean', 'manifest'. A pre-flight scan reads git/board/secrets/paths/artifacts/deploy state without changing anything; interactive cleanup offers clean/keep/skip per category (never auto-deleting secrets, NEVER deleting Be artifacts or board.md); then commits+pushes, generates a self-contained manifest HTML to be/transfers/ with 10 sections, commits+pushes again, opens it. DoD gate applies; idempotent.", "aiDoes": "Scans the repo for secrets/paths/artifacts and board state, presents interactive cleanup choices, commits cleanup, renders the 10-section transfer manifest HTML to be/transfers/, updates the index, commits + pushes the manifest, and opens it for review.", "source": "be/docs/commands.md § ~transfer — Project Handoff", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~h", "cat": "Ops", "aliases": ["~h","~H","~help"], "name": "Help", "oneLiner": "The help system — overview, command reference, and per-topic detail.", "spec": "The only tilde that produces no artifact and no commit — pure inline display. Bare ~h renders the Latest block (from be/h-cache.json), the single-screen command grid + chains, and one random unshown Joey quote. ~h <topic> routes to be/docs/help-blocks.md for commands/dod/dor/chain/board, and ~h <command> routes to be/docs/commands.md for a single command's detail, displaying the named fenced block byte-verbatim. DoD-exempt; no telemetry entry.", "aiDoes": "Reads be/h-cache.json for Latest, prints the kernel's bare grid, picks a random unshown quote; or for a subtopic reads help-blocks.md/commands.md, finds the section, and prints its fenced block exactly as written. No file writes, no commit.", "source": "CLAUDE.md § ~h — Help + be/docs/help-blocks.md", "created": "2026-03-29", "updated": "2026-06-09", "datesApprox": true },
-    { "cmd": "~jc", "cat": "Ops", "aliases": ["~jc"], "name": "Joey's Take", "oneLiner": "Channel Joey's 40+ years of architecture experience as direct, on-demand advice.", "spec": "A DoD-exempt conversation command with no report, no artifact, and no commit. Reads the current context and responds as Joey would — direct, opinionated, ship-first, framework-skeptical, economy of words (1–3 short paragraphs, no bullets/headers). A mandatory attribution rule forbids any sign-off: no -jc (reserved for real quotes), no -Be, no tag — just the advice.", "aiDoes": "Reads what's being worked on or decided, then speaks in Joey's voice with a decisive, experience-backed recommendation in a few sentences, with no sign-off and no file output.", "source": "be/docs/commands.md § ~jc — Joey's Take", "created": "2026-03-29", "updated": "2026-03-29", "datesApprox": false },
-    { "cmd": "~tlt", "cat": "Cloud", "aliases": ["~tlt","~TLT"], "name": "The Last Test (cloud)", "oneLiner": "the-last-test cloud — billed, sealed browser test execution (sibling to local ~t).", "spec": "A 'For Rent' Purcius service consumed by operators and billed per call, distinct from local ~t (own box, free). It dispatches an intent (and optional target) to the the-last-test cloud, which executes a browser test and returns a sealed RunResult while firing a usage meter. Dispatcher is be/tools/tlt-dispatch.sh; endpoints are api.the-last-test.com/serve/run and /serve/skill. Documented in the ~h commands FOR RENT block.", "aiDoes": "Invokes be/tools/tlt-dispatch.sh to send the test intent to the the-last-test cloud endpoint, receives the sealed RunResult, and surfaces the outcome while the metered charge is recorded.", "source": "be/docs/help-blocks.md § commands (FOR RENT block)", "created": null, "updated": null, "datesApprox": true }
+    {
+      "cmd": "~new",
+      "cat": "Create",
+      "aliases": [
+        "~new",
+        "~N",
+        "~n"
+      ],
+      "name": "New Project",
+      "oneLiner": "Create a new project — repo, be/ scaffold, CLAUDE.md, proposal site, initial commit — and switch context to it.",
+      "spec": "Creates a project from scratch: parses name/org/FQDN (a dotted arg is the FQDN, required), refuses to overwrite an existing folder, makes C:\\<name>, git-inits on main, scaffolds the full be/ tree, writes a minimal CLAUDE.md and a deploy.json stub, fills the proposal/ template, makes the initial commit, and creates the private GitHub repo via gh. It then cd's into the new folder so all later tildes operate there. Output is inline (no HTML report, like ~l), but the DoD gate applies to the committed scaffold. Recommends ~p next.",
+      "aiDoes": "Sanitizes the name, checks the folder doesn't exist, runs git init and gh repo create, writes the be/ scaffold + CLAUDE.md + deploy.json + proposal/index.html with placeholders substituted, commits, pushes, switches the working directory into the project, and prints an inline Created summary.",
+      "source": "be/docs/commands.md § ~new — New Project",
+      "created": "2026-04-03",
+      "updated": "2026-04-03",
+      "datesApprox": true,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~li",
+      "cat": "Create",
+      "aliases": [
+        "~li",
+        "~LI",
+        "~list",
+        "~LIST"
+      ],
+      "name": "List Projects",
+      "oneLiner": "List all projects Be can see — local and remote, plus open transfers.",
+      "spec": "Scans root-level directories for Be-managed projects (have be/) and plain local repos, gathering name, path, org, branch, status, last commit, and Last Run from be/telemetry.json. Collects known GitHub orgs dynamically and runs gh repo list per org, including only remote repos that have a be/ folder. Also scans be/transfers/ for open handoffs. DoD-exempt utility — inline output across four sections; no HTML artifact. Logs a telemetry entry with verb 'listed in'.",
+      "aiDoes": "Walks C:\\* directories, runs git status/log per repo, reads telemetry tails for Last Run, calls gh repo list and gh api for be/ detection on remotes, scans be/transfers/, then prints the four-section table inline. No commit, no report.",
+      "source": "be/docs/commands.md § ~li — List Projects",
+      "created": "2026-04-04",
+      "updated": "2026-04-04",
+      "datesApprox": true,
+      "model": "haiku"
+    },
+    {
+      "cmd": "~l",
+      "cat": "Create",
+      "aliases": [
+        "~l",
+        "~L",
+        "~load"
+      ],
+      "name": "Load Repo",
+      "oneLiner": "Load a repo into Be's working context — clone if needed, sync if clean, switch context.",
+      "spec": "Resolves the input (URL, path, or short name) to a local repo, cloning if absent, then runs a health check (git status, diff, log, board check). Pulls only when the tree is clean — never over dirty work, never pushes — then cd's into the repo so every later tilde operates on that project's be/ folder and board. If be/board.md exists it resolves a recommended Next item using ~b's selection logic (without moving anything). DoD-exempt utility — inline output only. Per the Auto-board rule it pops the project's most-recent live board view.",
+      "aiDoes": "Determines the local path, clones if missing, reads git state, conditionally pulls when clean, switches the working directory, computes a Next-item recommendation from board.md, prints the inline Loaded summary, and launches the live kanban board view in a browser.",
+      "source": "be/docs/commands.md § ~l — Load Repo",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "haiku"
+    },
+    {
+      "cmd": "~i",
+      "cat": "Create",
+      "aliases": [
+        "~i",
+        "~I",
+        "~inspect"
+      ],
+      "name": "Inspect",
+      "oneLiner": "Deep-read a repo, URL, or codebase and report what's there.",
+      "spec": "Reads a target (repo, codebase, URL, or folder) and renders an inspect report to be/plans/ with sections What It Is, Structure, Stack, Patterns Found, Open Questions (architecture inspections use Intent → Purpose → What). Updates the Be index, commits, pushes, then opens the HTML. The DoD gate applies, though as a discovery tilde its production-verify item is typically N/A. Read-only with respect to source code — produces only its own plan artifact.",
+      "aiDoes": "Fetches/reads the target, synthesizes a structured inspect report, writes the HTML to be/plans/, links it from be/index.html, commits + pushes, logs telemetry with verb 'inspected in', and pops the report for the user.",
+      "source": "be/docs/commands.md § ~i — Inspect",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "fable"
+    },
+    {
+      "cmd": "~ul",
+      "cat": "Create",
+      "aliases": [
+        "~ul",
+        "~UL",
+        "~unload"
+      ],
+      "name": "Unload",
+      "oneLiner": "Close out a project — housekeep, surface anything unclean, status report, switch back.",
+      "spec": "The inverse of ~l. Identifies the loaded project, runs a housekeeping audit (git status, diff, unpushed commits, In Progress items, deploy state), and presents any unclean state with resolution options — never auto-committing, pushing, or discarding without approval. Always renders a status report to be/builds/YYYY-MM-DD-unload-<project>.html, updates the index, commits + pushes, then cd's back to the calling directory. DoD gate applies; the report lands in the PROJECT's be/builds/.",
+      "aiDoes": "Reads git + board + deploy state, offers interactive cleanup choices, renders the unload status HTML, updates the index, commits + pushes any approved housekeeping, switches the working directory back, and prints the inline Unloaded summary.",
+      "source": "be/docs/commands.md § ~ul — Unload",
+      "created": "2026-04-03",
+      "updated": "2026-04-03",
+      "datesApprox": true,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~d",
+      "cat": "Plan",
+      "aliases": [
+        "~d",
+        "~D",
+        "~design",
+        "~DESIGN"
+      ],
+      "name": "Design",
+      "oneLiner": "Start from the need, source the solution from what already exists, name things literally, and shape the smallest thing that proves it.",
+      "spec": "A planning/discovery command with a six-section spine sized to the work: Need, Raw User Stories, Sourced Solution (mine kastil-systems/a-d-d + kastil-systems/nous C99 primitives + vendored src/sdk + apps we've built + outside prior art before inventing), literal Naming, Shape, and First Move — plus three optional tools (Choices + Consequences, Escape Routes, Pure Metal Test) included only when a load-bearing design earns them. Agile/YAGNI: replaces the old mandatory 8 sections. Renders to be/designs/YYYY-MM-DD-HHMM-design-<slug>.html from _template.html. DoD gate applies (production-verify N/A). Read-only except its own artifact — produces NO source edits, NO plan, NO board items, and NO code. NOT a delete command.",
+      "aiDoes": "Names the real need, drafts raw user stories, sources the approach from a-d-d + kastil-systems/nous (C99 primitives) + existing apps + external prior art before inventing, proposes literal names (metaphor only when accurate; brand names exempt), shapes the minimum viable structure, and defines the smallest First Move that proves it — writing the dated HTML to be/designs/ from the leaner template, updating the index, committing + pushing, logging telemetry with verb 'designed for', and popping the design. Small designs skip the optional analytical tools. Writes no code.",
+      "source": "be/docs/commands.md § ~d — Design",
+      "created": "2026-03-29",
+      "updated": "2026-07-01",
+      "datesApprox": false,
+      "model": "fable"
+    },
+    {
+      "cmd": "~laf",
+      "cat": "Plan",
+      "aliases": [
+        "~laf",
+        "~LAF",
+        "~look-and-feel"
+      ],
+      "name": "Look and Feel",
+      "oneLiner": "Generate a UI design system from intent — emotion, structure, and interaction into a usable UI architecture.",
+      "spec": "A planning command that converts 6 input axes (Emotion, Information Density, Reality Level, Hierarchy Strength, Interaction Rhythm, Expression Level) into a design system mapped onto 5 paradigms — no named external styles ever. A required constraint layer detects contradictions, prioritizes the top 2 traits, and resolves toward coherence. Renders a 4-section report (Intent, System Rules, Component Behavior, Interaction) to be/designs/ from _laf-template.html, with a CSS variables block. DoD gate applies. Produces a system, not CSS/code.",
+      "aiDoes": "Collects or infers the 6 axes, runs the constraint layer to resolve conflicts, fills the 4 output sections plus a CSS :root block into the template, writes the dated HTML to be/designs/, updates the index, commits + pushes, and walks the user through the intent flagging any inferred axis.",
+      "source": "be/docs/commands.md § ~laf — Look and Feel",
+      "created": "2026-04-26",
+      "updated": "2026-04-26",
+      "datesApprox": true,
+      "model": "fable"
+    },
+    {
+      "cmd": "~p",
+      "cat": "Plan",
+      "aliases": [
+        "~p",
+        "~P",
+        "~plan"
+      ],
+      "name": "Plan",
+      "oneLiner": "Plan work and render the report — intent, scope, approach, unknowns, when-to-revisit.",
+      "spec": "Does the planning work and renders a plan report to be/plans/YYYY-MM-DD-<slug>[-vN].html with required sections Intent, Scope, Approach, Phases, Constraints, plus Unknowns (named explicitly) and When To Revisit (the v2 trigger) per Rule 6. Plans are v1 hypotheses: revising copies v1 to a -v2- filename with a Supersedes section and marks v1 SUPERSEDED. Sets 'Plan — Awaiting Approval', updates the index, commits, pushes. DoD gate applies. Planning IS the review.",
+      "aiDoes": "Writes the structured plan including the mandatory Unknowns and When-To-Revisit sections, versions the filename if superseding, renders the HTML to be/plans/, links it from the index, commits + pushes, logs telemetry with verb 'planned for', and pops the plan for approval.",
+      "source": "be/docs/commands.md § ~p — Plan",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "fable"
+    },
+    {
+      "cmd": "~e",
+      "cat": "Plan",
+      "aliases": [
+        "~e",
+        "~E",
+        "~estimate"
+      ],
+      "name": "Estimate",
+      "oneLiner": "Size a plan into Fibonacci kanban boards (3–5 pt items, 13–21 pt boards).",
+      "spec": "Takes a ~p output and produces sized kanban boards. Every work item is a {what, verb, context} triple estimated at 3 or 5 only, prioritized by greatest value. Items group into boards of 13–21 points, ordered by value then dependency removal, and an infra-awareness rule forces explicit firewall/port items when new hosts/ports/services appear. Renders a build-plan report to be/plans/, writes the kanban state into be/board.md, updates the index, commits, pushes. DoD gate applies.",
+      "aiDoes": "Reads the plan, decomposes/recomposes into 3/5-pt triples, groups and orders boards, writes be/board.md, renders the estimate HTML to be/plans/, updates the index, commits + pushes (board.md alongside), logs telemetry with verb 'estimated for', and pops the report.",
+      "source": "be/docs/commands.md § ~e — Estimate",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~pu",
+      "cat": "Plan",
+      "aliases": [
+        "~pu",
+        "~PU",
+        "~plan-user"
+      ],
+      "name": "Plan User Story",
+      "oneLiner": "Plan the work framed as a user story — As a..., I want..., So that...",
+      "spec": "Plans work as a user story and renders a plan report to be/plans/ with sections User Story, Acceptance Criteria, Scope, Approach. Includes an immediate review to validate the story, then updates the index, commits, pushes. DoD gate applies. A lightweight sibling of ~p focused on the story framing.",
+      "aiDoes": "Drafts the As-a/I-want/So-that story plus acceptance criteria, renders the HTML to be/plans/, reviews the story, updates the index, commits + pushes, and pops the report.",
+      "source": "be/docs/commands.md § ~pu — Preview User Story",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~pt",
+      "cat": "Plan",
+      "aliases": [
+        "~pt",
+        "~PT",
+        "~plan-test"
+      ],
+      "name": "Plan Test",
+      "oneLiner": "Plan the test strategy for a feature or area.",
+      "spec": "Plans the test strategy and renders a plan report to be/plans/ with sections What to Test, Test Cases, Edge Cases, Dependencies. Includes an immediate review to validate the strategy before tests are built, then updates the index, commits, pushes. DoD gate applies. Upstream of ~bt/~t — defines what to test, not the tests.",
+      "aiDoes": "Writes the test-strategy plan covering cases, edge cases, and dependencies, renders the HTML to be/plans/, reviews the strategy, updates the index, commits + pushes, and pops the report.",
+      "source": "be/docs/commands.md § ~pt — Plan Test",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~patterns",
+      "cat": "Plan",
+      "aliases": [
+        "~patterns",
+        "~pp"
+      ],
+      "name": "kASTIL Patterns & Practices",
+      "oneLiner": "The architectural-pattern library — list, show, apply, or extract patterns.",
+      "spec": "Routes to the canonical library at kastil-systems/a-d-d/patterns/ (PATTERNS.md catalog, PRACTICES.md; currently Trust + Slot). Four verbs: bare and '<name>' list/show inline (DoD-exempt); 'apply <name>' renders the pattern's Structure as a checklist against current work then implements; 'extract' lifts a reusable pattern from current work, proposes names for the operator to bless, writes the pattern doc + catalog row — DoD gate applies. 'make it a slot' / 'apply Trust here' resolve to apply. Patterns are human-owned, AI-stewarded (Rule 10).",
+      "aiDoes": "Reads PATTERNS.md to list/resolve a pattern, renders its Structure as a checklist and implements to it on apply, or on extract interviews the current design, proposes names, writes kastil-systems/a-d-d/patterns/<name>.md plus a catalog row, then commits/pushes under the DoD gate.",
+      "source": "be/docs/commands.md § ~patterns",
+      "created": "2026-06-15",
+      "updated": "2026-06-30",
+      "datesApprox": true,
+      "model": "fable"
+    },
+    {
+      "cmd": "~a",
+      "cat": "Work",
+      "aliases": [
+        "~a",
+        "~A",
+        "~add"
+      ],
+      "name": "Add",
+      "oneLiner": "Add something new to the project.",
+      "spec": "Adds a new feature/file/capability, runs an immediate review, then renders a build report to be/builds/ with sections What Was Added, Decisions Made, Files Changed, What's Next. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. An auth-gate rule auto-includes the auth gate for new web projects when deploy.json has auth.enabled. Per Rule 7 it ships paired with ~t (~a~t).",
+      "aiDoes": "Edits/creates the source files, reviews the change, moves any matching board item Ready→In Progress→Done, renders the build report to be/builds/, updates the index, commits + pushes (board.md alongside), verifies the DoD gate, launches the demo, opens the report, and runs ~t to verify.",
+      "source": "be/docs/commands.md § ~a — Add",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "opus"
+    },
+    {
+      "cmd": "~u",
+      "cat": "Work",
+      "aliases": [
+        "~u",
+        "~U",
+        "~update"
+      ],
+      "name": "Update",
+      "oneLiner": "Update existing code or a feature.",
+      "spec": "Updates existing code/features, runs an immediate review, then renders a build report to be/builds/ with sections What Was Updated, Before/After, Files Changed, What's Next. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. Ships paired with ~t (~u~t) per the verify-loop rule.",
+      "aiDoes": "Modifies the targeted source, reviews before/after, moves any matching board item through the lanes, renders the build report to be/builds/, updates the index, commits + pushes, verifies DoD, launches the demo, opens the report, and runs ~t to verify.",
+      "source": "be/docs/commands.md § ~u — Update",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "opus"
+    },
+    {
+      "cmd": "~f",
+      "cat": "Work",
+      "aliases": [
+        "~f",
+        "~F",
+        "~fix"
+      ],
+      "name": "Fix",
+      "oneLiner": "Diagnose and fix a bug, then write a test as proof.",
+      "spec": "Diagnoses and fixes the specified bug, then writes a test that reproduces it (fails before, passes after) or documents manual verification. Reviews the fix, then renders a build report to be/builds/ with sections What Was Broken, Root Cause, What Was Fixed, Test Added, Files Changed, What's Next. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. Every fix ships with proof — the test is the proof.",
+      "aiDoes": "Locates the root cause, edits the source to fix it, adds a regression test (or documents manual steps), reviews that the test passes, renders the fix report to be/builds/, updates the index, commits + pushes, verifies DoD, launches the demo, and opens the report.",
+      "source": "be/docs/commands.md § ~f — Fix",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "opus"
+    },
+    {
+      "cmd": "~b",
+      "cat": "Work",
+      "aliases": [
+        "~b",
+        "~B",
+        "~build"
+      ],
+      "name": "Build",
+      "oneLiner": "Build it — or pull the next item from the board and complete the whole board.",
+      "spec": "With an argument, builds the specified thing. Without one, reads be/board.md, finds the first unblocked board, and completes EVERY Ready item in order — moving each Ready→In Progress, executing its mapped tilde (~a/~u/~f/~t), reviewing, moving to Done, and committing+pushing per item as a crash checkpoint. When the board finishes it unblocks the next, renders ONE build report to be/builds/, updates the index, and launches the demo and report ONCE at the end. DoD gate applies. Preflight, tarball-audit, and auth-gate-awareness rules govern remote/deploy/web builds.",
+      "aiDoes": "Reads the board, iterates each Ready item committing+pushing atomically after each, edits source per the item's mapped verb, reviews each build, updates board.md state (re-rendering the live view), then renders the single end-of-board report, updates the index, verifies DoD, launches the demo once, and pops both the report and the live board view.",
+      "source": "be/docs/commands.md § ~b — Build",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "opus"
+    },
+    {
+      "cmd": "~bt",
+      "cat": "Work",
+      "aliases": [
+        "~bt",
+        "~BT",
+        "~build-test"
+      ],
+      "name": "Build Test",
+      "oneLiner": "Build the tests for a feature or area.",
+      "spec": "Builds the actual tests for the specified feature/area, reviews coverage and correctness, then renders a test report to be/tests/ with sections Tests Built, Coverage, Test Results, Remaining Gaps. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. A test-ordering rule sequences sections by impact: smoke → functional → integration/E2E → destructive.",
+      "aiDoes": "Writes the test code for the target, runs it, reviews coverage, renders the test report to be/tests/, updates the index, commits + pushes, verifies DoD, launches the demo, and opens the report.",
+      "source": "be/docs/commands.md § ~bt — Build Test",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "opus"
+    },
+    {
+      "cmd": "~t",
+      "cat": "Work",
+      "aliases": [
+        "~t",
+        "~T",
+        "~test"
+      ],
+      "name": "Test",
+      "oneLiner": "Test the current work (or a specified thing) and fix what's broken.",
+      "spec": "Tests the current work or a specified target, fixes what's broken, then renders a test report to be/tests/ with sections What Was Tested, Results, Fixes Applied, Remaining Issues. Updates the index, commits, pushes, launches the demo, opens the report. DoD gate applies. Same smoke → functional → integration/E2E → destructive ordering as ~bt. It is the verify half of every work-tilde loop (~a~t, ~u~t, ~f~t, ~b~t) per Rule 7.",
+      "aiDoes": "Runs the tests against the work, fixes failures inline (or files a ~f if scope grows) and re-tests until green, renders the test report to be/tests/, updates the index, commits + pushes, verifies DoD, launches the demo, and opens the report.",
+      "source": "be/docs/commands.md § ~t — Test",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "opus"
+    },
+    {
+      "cmd": "~chase",
+      "cat": "Work",
+      "aliases": [
+        "~chase",
+        "~CHASE"
+      ],
+      "name": "Chase JR",
+      "oneLiner": "JR-driven autonomous loop — get the next item, execute, ship, repeat until JR returns 'hide'.",
+      "spec": "An autonomous session that authenticates with the operator's mesh session token, GETs the-jack-rabbit.net/p/<project>/next.json, and loops: a winner {what,verb,context,cmd,pts} is placed Ready on board.md and its mapped tilde executes (producing its own artifact+commit+push+Signal), the upstream Signal lets JR re-decide, and the loop repeats until JR returns {status:hide}. Termination is JR-driven; winners are billed per iteration, hides are not. The DoD gate applies to the inner work tildes; ~chase itself emits an inline end-of-loop summary — no HTML artifact of its own.",
+      "aiDoes": "Authenticates, polls JR's next.json, writes each served winner onto board.md, dispatches the mapped work tilde (each does its own report/commit/push/Signal), handles backoff/auth-refresh failure modes, and on 'hide' prints the inline chase summary with the ledger total and artifact links.",
+      "source": "be/docs/commands.md § ~chase — Chase JR",
+      "created": "2026-05-31",
+      "updated": "2026-05-31",
+      "datesApprox": true,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~s",
+      "cat": "Ship",
+      "aliases": [
+        "~s",
+        "~S",
+        "~ship"
+      ],
+      "name": "Ship",
+      "oneLiner": "Commit, push, deploy, and sync the site.",
+      "spec": "A chain-final command: stages, commits (never with co-author lines), pushes, and bumps revision, then renders a ship report to be/ships/ (What Shipped, Version, Commits Included, Deploy Target). Updates the index, syncs the joeycastillo.us/metal site's pages if present, verifies ~h is in sync and revision footers are current, and fires Mercury to sync telemetry (non-fatal). DoD gate applies plus chain-final items (chain complete, site in sync, ~h in sync, revision current). When deploy.json exists, the deploy chain is followed.",
+      "aiDoes": "Stages and commits all work, pushes, renders the ship report to be/ships/, updates the index, deploys per deploy.json and verifies the live target serves the new bytes, syncs the public metal site pages, re-checks ~h and revision footers, runs Mercury sync, and confirms the full chain has no telemetry gaps.",
+      "source": "be/docs/commands.md § ~s — Ship",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~brief",
+      "cat": "Ship",
+      "aliases": [
+        "~brief"
+      ],
+      "name": "Avatar Briefing",
+      "oneLiner": "Generate a 60–90s avatar video briefing from the most recent ship report.",
+      "spec": "Reads the most recent be/ships/*.html, extracts what shipped, and drafts a 150–200 word briefing script saved to be/briefs/. Then calls the HeyGen API (key from HEYGEN_API_KEY) to generate a 1080p avatar video, polls until completed, and downloads the mp4. If the key isn't set it saves the script and prompts. Renders a brief report to be/builds/ with an embedded <video>. DoD gate applies — the script is the artifact; DoD passes on the script alone.",
+      "aiDoes": "Reads the latest ship report, writes the spoken-word script to be/briefs/, optionally calls HeyGen to render and download the mp4, renders the brief HTML report to be/builds/, updates the index, commits + pushes, and offers to ship the briefing.",
+      "source": "be/docs/commands.md § ~brief — Avatar Briefing",
+      "created": "2026-04-21",
+      "updated": "2026-04-21",
+      "datesApprox": true,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~monitor",
+      "cat": "Ship",
+      "aliases": [
+        "~monitor"
+      ],
+      "name": "Monitor",
+      "oneLiner": "Check deploy health — verify the deploy is live and healthy.",
+      "spec": "An ops command that verifies a deployment's health (the live target responds with the expected payload). It appears in the kernel grid and the ~h commands reference but has no dedicated detailed section in commands.md, so its contract is the grid entry plus the Rule 9 verify-from-the-right-vantage discipline (Done = production, third-party verifiable). Treated as a utility check; no HTML artifact specified.",
+      "aiDoes": "Probes the deploy target from an appropriate vantage and protocol (per Rule 9 — not a single curl from the dev box), checks process/logs/DNS/proxy as relevant, and reports live/healthy or names the failure cause with evidence inline.",
+      "source": "be/docs/help-blocks.md § commands grid (no dedicated commands.md section)",
+      "created": "2026-03-29",
+      "updated": "2026-06-09",
+      "datesApprox": true,
+      "model": "fable"
+    },
+    {
+      "cmd": "~demo",
+      "cat": "Ship",
+      "aliases": [
+        "~demo"
+      ],
+      "name": "Demo / Refactor",
+      "oneLiner": "Demo, review, or refactor code — restructure, clean up, or improve it.",
+      "spec": "Performs demo/refactor work on the specified code, reviews correctness, then renders a report to be/retros/ with sections What Was Changed, Before/After, Decisions Made, Impact, What Could Be Better. Every 'What Could Be Better' bullet becomes a Kaizen item on Board K with a source annotation (same convention as ~retro). Updates the index, commits (board.md alongside), pushes, launches the demo, opens the report. DoD gate applies.",
+      "aiDoes": "Refactors/cleans the targeted code, reviews it, appends Kaizen items to Board K for each improvement bullet, renders the report to be/retros/, updates the index, commits + pushes, launches the demo, and opens the report.",
+      "source": "be/docs/commands.md § ~demo — Demo / Refactor",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "opus"
+    },
+    {
+      "cmd": "~r",
+      "cat": "Ship",
+      "aliases": [
+        "~r",
+        "~R",
+        "~retro"
+      ],
+      "name": "Retro",
+      "oneLiner": "Retrospect on recent work — what went well, what didn't.",
+      "spec": "A chain-final command that reviews all Be artifacts since the last retro and reads the most recent be/debug/ logs for tool failures, permission rejections, retries, and slow ops. Renders a retro report to be/retros/YYYY-MM-DD-retro.html (What Happened, What Went Well, What Could Be Better, Tool Failures, Permission Issues, Performance Notes, Commitments), and appends a Kaizen item to Board K for every improvement point. Updates the index, commits (board.md alongside), pushes, fires Mercury sync. DoD gate applies plus chain-final item. Only covers not-yet-retro'd artifacts.",
+      "aiDoes": "Gathers since-last-retro artifacts and debug logs, writes the retro report to be/retros/, generates Kaizen board items with source annotations, updates the index, commits + pushes, runs Mercury telemetry sync, and presents the retro.",
+      "source": "be/docs/commands.md § ~retro — Retro",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "fable"
+    },
+    {
+      "cmd": "~dev-refresh",
+      "cat": "Ship",
+      "aliases": [
+        "~dev-refresh"
+      ],
+      "name": "Dev Refresh",
+      "oneLiner": "Regenerate the rolling WIP demo site (<project>.dev).",
+      "spec": "Regenerates the rolling work-in-progress demo surface (the <project>.dev developer zone) per Rule 5's three-surfaces convention — refreshed at every board completion rather than every commit. Appears in the kernel grid and ~h commands reference; the generator location, refresh trigger, and opt-in rules live in conventions.md § Rolling WIP Demo Convention.",
+      "aiDoes": "Runs the rolling-WIP demo generator to rebuild the <project>.dev site from current board/build state, then publishes it so the developer surface reflects the latest completed board.",
+      "source": "be/docs/conventions.md § Rolling WIP Demo Convention",
+      "created": "2026-04-11",
+      "updated": "2026-06-09",
+      "datesApprox": true,
+      "model": "haiku"
+    },
+    {
+      "cmd": "~tag",
+      "cat": "Ops",
+      "aliases": [
+        "~tag"
+      ],
+      "name": "Tag",
+      "oneLiner": "Universal tagging — tag anything as a searchable triple.",
+      "spec": "A DoD-exempt utility that tags anything with a {subject, tagged as, tag} triple stored in be/tags.json (committed, searchable). Subcommands: attach, bare (view all grouped by subject), search <term>, rm <N>. Each operation auto-increments a never-reused ID, pulls author from git config, rebuilds be/tags.html (vanilla viewer), commits both files, pushes. Logs a telemetry entry with verb 'tagged in'.",
+      "aiDoes": "Reads/creates be/tags.json, appends or removes the tag entry, regenerates be/tags.html, commits both files, pushes, and prints the inline confirmation or tag listing.",
+      "source": "be/docs/commands.md § ~tag — Tag",
+      "created": "2026-04-10",
+      "updated": "2026-04-10",
+      "datesApprox": true,
+      "model": "haiku"
+    },
+    {
+      "cmd": "~config",
+      "cat": "Ops",
+      "aliases": [
+        "~config"
+      ],
+      "name": "Configure",
+      "oneLiner": "Read and write Be runtime settings (reports, chains, remote control).",
+      "spec": "A DoD-exempt runtime utility that reads/writes settings in be/config.json (versioned, read by every artifact-producing tilde). Subcommands show all/namespace/one key, set a value, or reset. Known keys: reports.display (preview/print/silent), reports.chain_timing (each/final), remote_control.enabled. Missing file means defaults; every write commits and pushes be/config.json. No HTML artifact and no telemetry entry for ~config itself.",
+      "aiDoes": "Reads be/config.json (or applies defaults), validates the key/value, writes the change, commits + pushes the config file, and prints the inline settings table or confirmation. Launchers read remote_control.enabled on the next go.",
+      "source": "be/docs/commands.md § ~config — Configure",
+      "created": "2026-04-17",
+      "updated": "2026-04-17",
+      "datesApprox": true,
+      "model": "haiku"
+    },
+    {
+      "cmd": "~cr",
+      "cat": "Ops",
+      "aliases": [
+        "~cr",
+        "~CR",
+        "~crash"
+      ],
+      "name": "Crash Recovery",
+      "oneLiner": "Recover crashed work — read the prompt log first, git second, resume the chain.",
+      "spec": "A DoD-exempt recovery utility that reconstructs the most recent unfinished session across folders. Step 0 reads the centralized prompt log (be/prompts.jsonl) filtered to this hostname to find the candidate session and cwd; Steps 1–3 read git + be/ to fingerprint which tilde ran and where the chain broke; Step 4 resumes from the break point without redoing completed steps; Step 5 renders a crash-recovery report to be/builds/. Never pulls, never discards; commits per-item atomically with a build report per recovered item.",
+      "aiDoes": "Reads be/prompts.jsonl to identify the unfinished session/cwd, inspects git and be/ artifacts to locate the break point, resumes the interrupted tilde from exactly where it stopped, renders the recovery report, updates the index, commits + pushes, and launches the demo if applicable.",
+      "source": "be/docs/commands.md § ~cr — Crash Recovery",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "opus"
+    },
+    {
+      "cmd": "~WTF",
+      "cat": "Ops",
+      "aliases": [
+        "~WTF",
+        "~wtf"
+      ],
+      "name": "AI Trust Recovery",
+      "oneLiner": "AI trust recovery — audit, clean house, kill the session, brief the next.",
+      "spec": "Invoked when the AI's judgment is broken across a pattern of work. A 7-step protocol: HALT, compute BLAST RADIUS from the last known-good ~s/~r commit, AUDIT every change read-only and grade it (verified/suspect/broken), ROLLBACK with the user deciding each one, HOUSEKEEPING to make the repo clean and accurate, LOBOTOMY (write the WTF briefing report to be/builds/, commit+push, then end the session — the AI does NOT continue), and REFRESH where the next session's DoR picks up the WTF state. DoD gate applies. Optional 'guardrails' mode tightens the next session.",
+      "aiDoes": "Stops work, lists the blast-radius commits and diffs, grades each change without fixing, presents rollbacks for the user to decide, cleans the repo and board, writes the WTF audit/briefing HTML with concrete anti-patterns, commits + pushes it, and tells the user to start a new session — then stops.",
+      "source": "be/docs/commands.md § ~WTF — AI Trust Recovery",
+      "created": "2026-04-13",
+      "updated": "2026-04-13",
+      "datesApprox": true,
+      "model": "fable"
+    },
+    {
+      "cmd": "~transfer",
+      "cat": "Ops",
+      "aliases": [
+        "~transfer"
+      ],
+      "name": "Project Handoff",
+      "oneLiner": "Project handoff — audit, clean, verify, manifest.",
+      "spec": "Prepares the focused project for handoff. Subcommands: bare (scan+clean+manifest), 'to <name>', 'clean', 'manifest'. A pre-flight scan reads git/board/secrets/paths/artifacts/deploy state without changing anything; interactive cleanup offers clean/keep/skip per category (never auto-deleting secrets, NEVER deleting Be artifacts or board.md); then commits+pushes, generates a self-contained manifest HTML to be/transfers/ with 10 sections, commits+pushes again, opens it. DoD gate applies; idempotent.",
+      "aiDoes": "Scans the repo for secrets/paths/artifacts and board state, presents interactive cleanup choices, commits cleanup, renders the 10-section transfer manifest HTML to be/transfers/, updates the index, commits + pushes the manifest, and opens it for review.",
+      "source": "be/docs/commands.md § ~transfer — Project Handoff",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "sonnet"
+    },
+    {
+      "cmd": "~h",
+      "cat": "Ops",
+      "aliases": [
+        "~h",
+        "~H",
+        "~help"
+      ],
+      "name": "Help",
+      "oneLiner": "The help system — overview, command reference, and per-topic detail.",
+      "spec": "The only tilde that produces no artifact and no commit — pure inline display. Bare ~h renders the Latest block (from be/h-cache.json), the single-screen command grid + chains, and one random unshown Joey quote. ~h <topic> routes to be/docs/help-blocks.md for commands/dod/dor/chain/board, and ~h <command> routes to be/docs/commands.md for a single command's detail, displaying the named fenced block byte-verbatim. DoD-exempt; no telemetry entry.",
+      "aiDoes": "Reads be/h-cache.json for Latest, prints the kernel's bare grid, picks a random unshown quote; or for a subtopic reads help-blocks.md/commands.md, finds the section, and prints its fenced block exactly as written. No file writes, no commit.",
+      "source": "CLAUDE.md § ~h — Help + be/docs/help-blocks.md",
+      "created": "2026-03-29",
+      "updated": "2026-06-09",
+      "datesApprox": true,
+      "model": "haiku"
+    },
+    {
+      "cmd": "~jc",
+      "cat": "Ops",
+      "aliases": [
+        "~jc"
+      ],
+      "name": "Joey's Take",
+      "oneLiner": "Channel Joey's 40+ years of architecture experience as direct, on-demand advice.",
+      "spec": "A DoD-exempt conversation command with no report, no artifact, and no commit. Reads the current context and responds as Joey would — direct, opinionated, ship-first, framework-skeptical, economy of words (1–3 short paragraphs, no bullets/headers). A mandatory attribution rule forbids any sign-off: no -jc (reserved for real quotes), no -Be, no tag — just the advice.",
+      "aiDoes": "Reads what's being worked on or decided, then speaks in Joey's voice with a decisive, experience-backed recommendation in a few sentences, with no sign-off and no file output.",
+      "source": "be/docs/commands.md § ~jc — Joey's Take",
+      "created": "2026-03-29",
+      "updated": "2026-03-29",
+      "datesApprox": false,
+      "model": "fable"
+    },
+    {
+      "cmd": "~tlt",
+      "cat": "Cloud",
+      "aliases": [
+        "~tlt",
+        "~TLT"
+      ],
+      "name": "The Last Test (cloud)",
+      "oneLiner": "the-last-test cloud — billed, sealed browser test execution (sibling to local ~t).",
+      "spec": "A 'For Rent' Purcius service consumed by operators and billed per call, distinct from local ~t (own box, free). It dispatches an intent (and optional target) to the the-last-test cloud, which executes a browser test and returns a sealed RunResult while firing a usage meter. Dispatcher is be/tools/tlt-dispatch.sh; endpoints are api.the-last-test.com/serve/run and /serve/skill. Documented in the ~h commands FOR RENT block.",
+      "aiDoes": "Invokes be/tools/tlt-dispatch.sh to send the test intent to the the-last-test cloud endpoint, receives the sealed RunResult, and surfaces the outcome while the metered charge is recorded.",
+      "source": "be/docs/help-blocks.md § commands (FOR RENT block)",
+      "created": null,
+      "updated": null,
+      "datesApprox": true,
+      "model": "haiku"
+    },
+    {
+      "cmd": "~fu",
+      "cat": "Ops",
+      "aliases": [
+        "~fu"
+      ],
+      "name": "Follow Up",
+      "oneLiner": "Sweep artifact comment threads, act on operator comments/tilde-commands, reply, mark seen.",
+      "spec": "be/docs/commands.md#fu",
+      "aiDoes": "On-demand comment sweep via the gcp-bridge; zero-idle Attendant.",
+      "source": "kernel",
+      "created": "2026-07-02",
+      "updated": "2026-07-05",
+      "datesApprox": true,
+      "model": "sonnet"
+    }
   ],
   "realityCheckNote": "16 website-vs-kernel drifts were found by the 2026-06-30 deep ~i; the most severe was ~d shown as 'Delete' (it is Design). This site now renders from tildes.json (kernel-mirrored), eliminating those drifts. See metal be/plans/2026-06-30-inspect-metal-vs-website.html for the full drift list."
 }
