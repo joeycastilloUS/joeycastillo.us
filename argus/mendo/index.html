@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!-- CONFIDENTIAL · TRADE SECRET · PROPRIETARY · Property of Joseph M. Castillo · All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited. -->
 <html lang="en">
 <head>
@@ -507,7 +507,7 @@ let APP = localStorage.getItem("argus_app") || "meraki";
 let APPSW_OPEN = false; // app-switcher dropdown open state
 const APPS = {
   meraki:  { label:"Meraki",  icon:"&#128225;", tag:"Network operations", tabs:["operations","network","audit"] },
-  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["comments","apibrowser"], source:"zendesk" },
+  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["comments","zdaudit","apibrowser"], source:"zendesk" },
   cloudflare: { label:"Cloudflare", icon:"&#9729;&#65039;", tag:"Edge · read-only", tabs:["apibrowser"], source:"cloudflare" },
   gcp: { label:"GCP", icon:"&#128176;", tag:"Cloud cost", tabs:["cost"] }
 };
@@ -1958,6 +1958,7 @@ function render(){
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Comments</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
+    zdaudit:"<button class='tabv"+(TAB==="zdaudit"?" on":"")+"' data-tab='zdaudit'><span class='ti'>&#128203;</span><span class='tl'>Audit"+((ZAUD.run&&ZAUD.run.findings.length)?" &middot; <b class='bad'>"+ZAUD.run.findings.length+"</b>":"")+"</span></button>",
     cost:"<button class='tabv"+(TAB==="cost"?" on":"")+"' data-tab='cost'><span class='ti'>&#128202;</span><span class='tl'>Cost</span></button>"
   };
   const cur=APPS[APP];
@@ -1994,11 +1995,141 @@ function render(){
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
   h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+commentsPane()+"</div>";
   h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+apiBrowserPane()+"</div>";
+  h+="<div id='pane-zdaudit' class='"+paneCls("zdaudit")+"'>"+zdAuditPane()+"</div>";
   // GCP Cost -- cost per project you own, drillable to service -> SKU (gcp-bridge, ADC, read-only)
   h+="<div id='pane-cost' class='"+paneCls("cost")+"'>"+costPane()+"</div>";
 
   document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML; TAB_ANIM=false;
 }
+
+// ================= Zendesk Feature Audit — business rules (triggers + automations) =================
+// Board 1 First Move. Read-only, DETERMINISTIC (same config -> same grades/findings/order, every run).
+// Engine is vanilla JS (owned code; language law). The bridge does GETs only. No model in the grading path.
+let ZAUD = { run:null, busy:false, err:"", prog:"" };
+// Fetch every page of a paged Zendesk collection through the read-only bridge.
+async function zdAll(baseEntry, pageEntry, key){
+  let items=[], page=1, guard=0;
+  let r=await zdFetch("/read?entry="+baseEntry);
+  if(!r.ok) throw { code:r.status };
+  let d=await r.json(); items=items.concat((d.data&&d.data[key])||[]);
+  while(d.data && d.data.next_page && guard<25){ guard++; page++; ZAUD.prog=key+" · page "+page; renderZAUD();
+    let rp=await zdFetch("/read?entry="+pageEntry+"&page="+page);
+    if(!rp.ok) break; d=await rp.json(); items=items.concat((d.data&&d.data[key])||[]); }
+  return items;
+}
+function zdIsGR(o){ const s=((o.title||"")+" "+(o.raw_title||"")).toLowerCase(); return s.indexOf("guest")>=0||s.indexOf("relations")>=0||/(^|[^a-z])gr([^a-z]|$)/.test(s); }
+// A safe automation nullifies its own trigger: it changes status, or removes/sets a tag or a field it conditions on.
+function zdAutoNullifies(a){ const acts=a.actions||[]; if(acts.some(x=>x.field==="status")) return true;
+  const cf=[]; ["all","any"].forEach(k=>((a.conditions&&a.conditions[k])||[]).forEach(c=>cf.push(c.field)));
+  return acts.some(x=> cf.indexOf(x.field)>=0 || x.field==="remove_tags" || x.field==="set_tags" || x.field==="current_tags"); }
+function zdNames(arr,n){ n=n||12; return arr.slice(0,n).map(t=>t.title).join(", ")+(arr.length>n?", +"+(arr.length-n)+" more":""); }
+// Sourced check library (research doc 2026-07-04-0110). Each: pure predicate over fetched JSON.
+const ZD_CHECKS = [
+  { id:"trg-dead", area:"Triggers", title:"No dead active triggers", tag:"wasting",
+    run:(c)=>{ const active=c.triggers.filter(t=>t.active); const dead=active.filter(t=>(+t.usage_30d||0)===0);
+      const st=dead.length?"FAIL":"PASS", imp=dead.length>20?"high":dead.length>5?"med":"low";
+      return { status:st, impact:imp, gr:dead.some(zdIsGR), offenders:dead,
+        detail: dead.length+" of "+active.length+" active triggers fired 0 times in the last 30 days",
+        fix: dead.length? (dead.length+" active triggers fired 0× in the last 30 days — dead weight on every ticket's evaluation. Disable: "+zdNames(dead)+". Re-enable any seasonal ones and category-tag them so the next audit knows.") : "Every active trigger fired at least once in 30 days." }; } },
+  { id:"trg-sprawl", area:"Triggers", title:"Trigger count is maintainable", tag:"human-cost",
+    run:(c)=>{ const n=c.triggers.filter(t=>t.active).length; const st=n>250?"FAIL":n>150?"WARN":"PASS";
+      return { status:st, impact:n>250?"high":"med", gr:false, offenders:[],
+        detail: n+" active triggers",
+        fix: st==="PASS"? (n+" active triggers — within a maintainable range.") : (n+" active triggers is well past the ~150 where evaluation slows on every ticket and the rule set gets hard to audit or port. Consolidate — start with the dead ones above, then merge overlapping ones by category.") }; } },
+  { id:"trg-inactive", area:"Triggers", title:"Inactive triggers not piling up", tag:"human-cost",
+    run:(c)=>{ const inact=c.triggers.filter(t=>!t.active); const st=inact.length>25?"WARN":"PASS";
+      return { status:st, impact:"low", gr:false, offenders:inact,
+        detail: inact.length+" inactive triggers retained",
+        fix: st==="PASS"? (inact.length+" inactive triggers — fine.") : (inact.length+" inactive triggers are retained. Fine if they're seasonal; delete the truly-dead ones so the list stays legible: "+zdNames(inact)+".") }; } },
+  { id:"aut-dead", area:"Automations", title:"No dead active automations", tag:"wasting",
+    run:(c)=>{ const active=c.automations.filter(a=>a.active); const dead=active.filter(a=>(+a.usage_30d||0)===0);
+      const st=dead.length?"FAIL":"PASS";
+      return { status:st, impact:dead.length>5?"med":"low", gr:dead.some(zdIsGR), offenders:dead,
+        detail: dead.length+" of "+active.length+" active automations fired 0 times in the last 30 days",
+        fix: dead.length? (dead.length+" active automations fired 0× in the last 30 days. Disable: "+zdNames(dead)+".") : "Every active automation fired at least once in 30 days." }; } },
+  { id:"aut-refire", area:"Automations", title:"Automations nullify their own condition", tag:"wasting",
+    run:(c)=>{ const risky=c.automations.filter(a=>a.active&&(+a.usage_30d||0)>0&&!zdAutoNullifies(a));
+      const st=risky.length?"WARN":"PASS";
+      return { status:st, impact:risky.length>3?"high":"med", gr:risky.some(zdIsGR), offenders:risky,
+        detail: risky.length+" active automations may re-fire on every pass",
+        fix: risky.length? (risky.length+" active automations don't clearly nullify their own trigger condition — they can re-fire every hour, churning updates (and any billable action). Review: "+zdNames(risky)+". Add a closing action (set status, or remove the qualifying tag/field) so each ticket qualifies once.") : "Every active automation closes its own condition." }; } }
+];
+// NOT-AUDITED areas (honest gaps — bridge reads land on later boards; never a silent pass).
+const ZD_NOTAUDITED = [
+  ["SLA policies","confirmed endpoint — grading lands next board"],
+  ["Macros","needs /macros +usage read (Board 2)"],
+  ["Fields & forms","needs /ticket_fields + /ticket_forms (Board 2)"],
+  ["Business hours","needs /business_hours/schedules (Board 2)"],
+  ["Groups & routing","needs /group_memberships (Board 2)"],
+  ["Knowledge / HC coverage","needs /help_center/articles (Board 3)"],
+  ["Intelligent triage adoption","needs prediction-field read (Board 3)"],
+  ["AI agent / autoreplies / AR spend","API reachability under probe (Board 3)"]
+];
+async function zdRunAudit(){
+  ZAUD.busy=true; ZAUD.err=""; ZAUD.prog="triggers"; renderZAUD();
+  try{
+    const triggers=await zdAll("triggers","triggers-page","triggers");
+    ZAUD.prog="automations";
+    const automations=await zdAll("automations","automations-page","automations");
+    const ctx={triggers,automations};
+    const results=ZD_CHECKS.map(chk=>Object.assign({id:chk.id,area:chk.area,title:chk.title,tag:chk.tag},chk.run(ctx)));
+    const areas={};
+    results.forEach(r=>{ const a=areas[r.area]||(areas[r.area]={area:r.area,checks:[],pass:0}); a.checks.push(r); if(r.status==="PASS")a.pass++; });
+    Object.keys(areas).forEach(k=>{ const a=areas[k]; a.grade=a.checks.some(c=>c.status==="FAIL")?"FAIL":a.checks.some(c=>c.status==="WARN")?"WARN":"PASS"; });
+    const findings=results.filter(r=>r.status!=="PASS").map(r=>{ const sev=r.status==="FAIL"?2:1, imp=r.impact==="high"?3:r.impact==="med"?2:1; r.rank=sev*imp+(r.gr?0.5:0); return r; })
+      .sort((a,b)=> (b.rank-a.rank) || a.id.localeCompare(b.id));
+    ZAUD.run={ areas:Object.keys(areas).map(k=>areas[k]), findings, passCount:results.filter(r=>r.status==="PASS").length, total:results.length,
+      nTrg:triggers.length, nAct:triggers.filter(t=>t.active).length, nAut:automations.length, ts:new Date() };
+  }catch(e){ ZAUD.err=(e&&e.code===401)?"Unlock the Argus gate (top-right), then Run Audit.":"Couldn’t reach the bridge — try again."; }
+  ZAUD.busy=false; ZAUD.prog=""; renderZAUD();
+}
+function zdGradeChip(g){ const col=g==="FAIL"?"zf":g==="WARN"?"zw":"zp"; return "<span class='zchip "+col+"'>"+g+"</span>"; }
+function zdTagChip(t){ return "<span class='ztag zt-"+t+"'>"+t+"</span>"; }
+function zdAuditInner(){
+  const run=ZAUD.run;
+  let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'>"
+    +"<h2 style='margin:0'>Audit &mdash; Business Rules</h2><span class='zro'>READ-ONLY</span></div>"
+    +"<div class='muted' style='margin-bottom:12px'>Grade this Zendesk instance's live triggers &amp; automations against best practice. Deterministic &mdash; nothing is changed.</div>";
+  h+="<button class='zgo' data-zdrun"+(ZAUD.busy?" disabled":"")+">"+(ZAUD.busy?("<span class='spin'></span> reading "+esc(ZAUD.prog||"")+"…"):(run?"&#8635; Re-run Audit":"&#9654; Run Audit"))+"</button>";
+  if(ZAUD.err) h+="<div class='zerr'>"+esc(ZAUD.err)+"</div>";
+  h+="</div>";
+  if(run){
+    const pct=Math.round(100*run.passCount/run.total);
+    h+="<div class='box'><div class='zscore'><div class='zpct "+(pct>=80?"zp":pct>=50?"zw":"zf")+"'>"+pct+"%</div>"
+      +"<div class='zscd'><b>"+run.passCount+" of "+run.total+" checks passing</b><div class='muted'>"+run.nAct+" active triggers · "+run.nAut+" automations · "+ZD_NOTAUDITED.length+" areas not audited yet · "+run.ts.toLocaleString()+"</div></div></div>";
+    h+="<div class='zareas'>"+run.areas.map(a=>"<div class='zarea'><div class='zan'>"+esc(a.area)+"</div>"+zdGradeChip(a.grade)+"<div class='muted' style='font-size:11px'>"+a.pass+"/"+a.checks.length+" passing</div></div>").join("")+"</div></div>";
+    // findings
+    h+="<div class='box'><div class='feat-h'>Findings &middot; "+run.findings.length+"</div>";
+    if(!run.findings.length) h+="<div class='muted'>No issues on the audited checks. &#9989;</div>";
+    else h+=run.findings.map(f=>"<div class='zfind'><div class='zfh'>"+zdGradeChip(f.status)+"<span class='zft'>"+esc(f.title)+"</span>"+zdTagChip(f.tag)+(f.gr?"<span class='zgr'>GR</span>":"")+"<span class='zar'>"+esc(f.area)+"</span></div>"
+      +"<div class='zfd'>"+esc(f.detail)+"</div>"
+      +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div></div>").join("");
+    h+="</div>";
+    // honest not-audited
+    h+="<div class='box'><div class='feat-h'>Not audited yet</div><div class='muted' style='margin-bottom:8px'>Excluded from the score — never a silent pass. Grades flip on as the bridge reads land.</div>"
+      +"<div class='zna'>"+ZD_NOTAUDITED.map(x=>"<div class='znac'><span class='znat'>"+esc(x[0])+"</span><span class='znam'>"+esc(x[1])+"</span></div>").join("")+"</div></div>";
+  } else if(!ZAUD.busy && !ZAUD.err){
+    h+="<div class='box'><div class='muted'>Click <b>Run Audit</b> &mdash; it reads your live triggers and automations (nothing is fetched until you do) and grades them. First finding you'll likely see: dead triggers firing 0× in 30 days.</div></div>";
+  }
+  return h;
+}
+function zdAuditPane(){
+  return "<style>"
+    +"#pane-zdaudit .zro{display:inline-block;background:#06251a;color:#7CFFB2;border:1px solid #1f5f47;border-radius:5px;padding:1px 8px;font-size:11px;font-weight:700;letter-spacing:.04em}"
+    +"#pane-zdaudit .zgo{background:#6FC3DF;color:#06222c;border:0;border-radius:6px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:13px}#pane-zdaudit .zgo:disabled{opacity:.6;cursor:default}"
+    +"#pane-zdaudit .zerr{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:10px}"
+    +"#pane-zdaudit .zscore{display:flex;align-items:center;gap:16px}.zpct{font-size:34px;font-weight:800;line-height:1}.zpct.zp{color:#7CFFB2}.zpct.zw{color:#ffd479}.zpct.zf{color:#ff9b9b}"
+    +"#pane-zdaudit .zareas{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.zarea{background:#0f1519;border:1px solid #222c33;border-radius:8px;padding:10px 14px;min-width:150px}.zan{color:#cfe9f2;font-weight:700;font-size:13px;margin-bottom:4px}"
+    +"#pane-zdaudit .zchip{display:inline-block;border-radius:5px;padding:1px 8px;font-size:11px;font-weight:800;letter-spacing:.03em}.zchip.zp{background:#06251a;color:#7CFFB2}.zchip.zw{background:#332608;color:#ffd479}.zchip.zf{background:#3a1212;color:#ff9b9b}"
+    +"#pane-zdaudit .zfind{border-bottom:1px solid #1a2128;padding:12px 0}.zfh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.zft{color:#e6edf2;font-weight:700;font-size:13.5px}.zar{color:#6b7a82;font-size:11px;margin-left:auto}"
+    +"#pane-zdaudit .ztag{font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 6px;text-transform:uppercase}.zt-wasting{background:#3a1212;color:#ff9b9b}.zt-human-cost{background:#332608;color:#ffd479}.zt-dark-value{background:#0c1c22;color:#7CFFB2}"
+    +"#pane-zdaudit .zgr{background:#2a1840;color:#c9a9ff;font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 6px}"
+    +"#pane-zdaudit .zfd{color:#c7d0d8;font-size:12.5px;margin:6px 0 6px}.zrec{background:#0a1013;border-left:3px solid #6FC3DF;border-radius:4px;padding:8px 12px;font-size:12.5px;color:#d6e6ec}.zrl{color:#6FC3DF;font-weight:800;font-size:10px;letter-spacing:.06em;margin-right:6px}"
+    +"#pane-zdaudit .zna{display:flex;flex-wrap:wrap;gap:8px}.znac{background:#111417;border:1px dashed #2a343b;border-radius:7px;padding:8px 12px;min-width:180px}.znat{display:block;color:#8a93a0;font-weight:700;font-size:12px}.znam{display:block;color:#5c6670;font-size:11px}"
+    +"</style><div id='zd-wrap'>"+zdAuditInner()+"</div>";
+}
+function renderZAUD(){ const w=document.getElementById("zd-wrap"); if(w) w.innerHTML=zdAuditInner(); }
+document.addEventListener("click", function(e){ if(e.target.closest("[data-zdrun]")) zdRunAudit(); });
 
 // ================= GCP app — Cloud Cost =================
 // "My cost per project I own, at lower levels." Projects come from Cloud Billing; cost per
@@ -2139,8 +2270,8 @@ function gcInner(){
 function renderGC(){ const el=document.getElementById("gc-inner"); if(el) el.innerHTML=gcInner(); }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Comments"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
-function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Comments"; if(TAB==="zdaudit") return "Audit — Business Rules"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
   if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
@@ -2645,7 +2776,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r299 . 5c76a1b . 2026-07-02</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r359 . 1c55881 . 2026-07-04</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
@@ -2658,3 +2789,4 @@ renderFeatures();
 </a>
 </body>
 </html>
+
