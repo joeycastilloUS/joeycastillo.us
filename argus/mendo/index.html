@@ -2231,6 +2231,7 @@ async function zdRunAudit(){
     const findings=results.filter(r=>r.status!=="PASS").map(r=>{ const sev=r.status==="FAIL"?2:1, imp=r.impact==="high"?3:r.impact==="med"?2:1; r.rank=sev*imp+(r.gr?0.5:0)+(tagW[r.tag]||0); return r; })
       .sort((a,b)=> (b.rank-a.rank) || a.id.localeCompare(b.id));
     ZAUD.run={ areas:Object.keys(areas).map(k=>areas[k]), findings, passCount:results.filter(r=>r.status==="PASS").length, total:results.length,
+      nFail:results.filter(r=>r.status==="FAIL").length, nWarn:results.filter(r=>r.status==="WARN").length,
       nTrg:triggers.length, nAct:triggers.filter(t=>t.active).length, nAut:automations.length,
       nMac:macros.length, nGrp:(groups||[]).filter(g=>!g.deleted).length,
       nArt:articles.length, nTri:zdTriageFields(fields).length,
@@ -2244,25 +2245,43 @@ function zdTagChip(t){ return "<span class='ztag zt-"+t+"'>"+t+"</span>"; }
 var ZD_TAG_MEANING = { wasting:"Money out now", "human-cost":"Converts to agent hours", "dark-value":"Paid-for, sitting unused" };
 function zdImpactLine(f){ const n=(f.offenders&&f.offenders.length)||0; const mean=ZD_TAG_MEANING[f.tag]||""; if(!mean) return "";
   return "<div class='zimp zt-"+f.tag+"'>"+esc(mean)+(n?(" · "+n+" affected"):"")+(f.gr?" · touches Guest Relations":"")+"</div>"; }
+// Board 6 — full surface. Each graded area belongs to General config or the AI/knowledge surface.
+var ZD_AI_AREAS = { "Intelligent Triage":1, "Knowledge / HC":1, "AI Answers":1 };
+// Ordered read stages (must match the ZAUD.prog labels set in zdRunAudit) — drives the streaming checklist.
+var ZD_RUN_STAGES = ["triggers","automations","macros","schedules","addresses","groups","fields","group memberships","help center","AI settings","SLA policies","views","ticket forms","agent seats","HC sections"];
+// Expandable offender list — "show me the N" without cluttering the card until asked.
+function zdOffenders(f){ const o=f.offenders||[]; if(o.length<2) return "";
+  return "<details class='zoff'><summary>show all "+o.length+" affected</summary><div class='zoffl'>"+o.map(x=>esc(zdLabel(x))).join(" &middot; ")+"</div></details>"; }
+function zdStageList(){ const cur=ZD_RUN_STAGES.indexOf(ZAUD.prog); return "<div class='zstages'>"+ZD_RUN_STAGES.map(function(s,i){
+  var cls = (cur<0||i<cur)?"done":(i===cur?"cur":"todo"); var mark = cls==="done"?"&#10003;":(cls==="cur"?"<span class='spin'></span>":"&middot;");
+  return "<span class='zstg "+cls+"'>"+mark+" "+esc(s)+"</span>"; }).join("")+"</div>"; }
 function zdAuditInner(){
   const run=ZAUD.run;
   let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'>"
-    +"<h2 style='margin:0'>Audit &mdash; Business Rules</h2><span class='zro'>READ-ONLY</span></div>"
-    +"<div class='muted' style='margin-bottom:12px'>Grade this Zendesk instance's live triggers &amp; automations against best practice. Deterministic &mdash; nothing is changed.</div>";
+    +"<h2 style='margin:0'>Audit &mdash; Feature &amp; Config Usage</h2><span class='zro'>READ-ONLY</span></div>"
+    +"<div class='muted' style='margin-bottom:12px'>Grade this Zendesk instance's live configuration &mdash; rules, routing, seats, knowledge, and the AI you pay for &mdash; against best practice. Deterministic; nothing is changed.</div>";
   h+="<button class='zgo' data-zdrun"+(ZAUD.busy?" disabled":"")+">"+(ZAUD.busy?("<span class='spin'></span> reading "+esc(ZAUD.prog||"")+"…"):(run?"&#8635; Re-run Audit":"&#9654; Run Audit"))+"</button>";
+  if(ZAUD.busy) h+=zdStageList();
   if(ZAUD.err) h+="<div class='zerr'>"+esc(ZAUD.err)+"</div>";
   h+="</div>";
   if(run){
     const pct=Math.round(100*run.passCount/run.total);
     h+="<div class='box'><div class='zscore'><div class='zpct "+(pct>=80?"zp":pct>=50?"zw":"zf")+"'>"+pct+"%</div>"
-      +"<div class='zscd'><b>"+run.passCount+" of "+run.total+" checks passing</b><div class='muted'>"+run.nAct+" triggers · "+run.nAut+" automations · "+run.nMac+" macros · "+run.nView+" views · "+run.nGrp+" groups · "+run.nSeat+" seats · "+run.nArt+" articles · "+run.nTri+" triage fields · "+ZD_NOTAUDITED.length+" not audited · "+run.ts.toLocaleString()+"</div></div></div>";
-    h+="<div class='zareas'>"+run.areas.map(a=>"<div class='zarea'><div class='zan'>"+esc(a.area)+"</div>"+zdGradeChip(a.grade)+"<div class='muted' style='font-size:11px'>"+a.pass+"/"+a.checks.length+" passing</div></div>").join("")+"</div></div>";
-    // findings
+      +"<div class='zscd'><b>"+run.passCount+" of "+run.total+" checks passing</b>"
+      +"<div class='zbreak'><span class='zb zf'>"+run.nFail+" failing</span><span class='zb zw'>"+run.nWarn+" warnings</span><span class='zb zp'>"+run.passCount+" passing</span><span class='zb zn'>"+ZD_NOTAUDITED.length+" not audited</span></div>"
+      +"<div class='muted'>"+run.nAct+" triggers · "+run.nAut+" automations · "+run.nMac+" macros · "+run.nView+" views · "+run.nGrp+" groups · "+run.nSeat+" seats · "+run.nArt+" articles · "+run.nTri+" triage fields · "+run.ts.toLocaleString()+"</div></div></div>";
+    // grade cards, grouped General vs AI
+    const genAreas=run.areas.filter(a=>!ZD_AI_AREAS[a.area]), aiAreas=run.areas.filter(a=>ZD_AI_AREAS[a.area]);
+    const cards=list=>"<div class='zareas'>"+list.map(a=>"<div class='zarea "+(a.grade==="FAIL"?"gf":a.grade==="WARN"?"gw":"gp")+"'><div class='zan'>"+esc(a.area)+"</div>"+zdGradeChip(a.grade)+"<div class='muted' style='font-size:11px'>"+a.pass+"/"+a.checks.length+" passing</div></div>").join("")+"</div>";
+    if(genAreas.length) h+="<div class='zgrp'>General configuration</div>"+cards(genAreas);
+    if(aiAreas.length) h+="<div class='zgrp'>AI &amp; knowledge</div>"+cards(aiAreas);
+    h+="</div>";
+    // findings — ranked, with expandable offenders
     h+="<div class='box'><div class='feat-h'>Findings &middot; "+run.findings.length+"</div>";
     if(!run.findings.length) h+="<div class='muted'>No issues on the audited checks. &#9989;</div>";
     else h+=run.findings.map(f=>"<div class='zfind'><div class='zfh'>"+zdGradeChip(f.status)+"<span class='zft'>"+esc(f.title)+"</span>"+zdTagChip(f.tag)+(f.gr?"<span class='zgr'>GR</span>":"")+"<span class='zar'>"+esc(f.area)+"</span></div>"
       +"<div class='zfd'>"+esc(f.detail)+"</div>"+zdImpactLine(f)
-      +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div></div>").join("");
+      +"<div class='zrec'><span class='zrl'>RECOMMEND</span> "+esc(f.fix)+"</div>"+zdOffenders(f)+"</div>").join("");
     h+="</div>";
     // honest not-audited
     h+="<div class='box'><div class='feat-h'>Not audited yet</div><div class='muted' style='margin-bottom:8px'>Excluded from the score — never a silent pass. Grades flip on as the bridge reads land.</div>"
@@ -2285,6 +2304,11 @@ function zdAuditPane(){
     +"#pane-zdaudit .zgr{background:#2a1840;color:#c9a9ff;font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 6px}"
     +"#pane-zdaudit .zfd{color:#c7d0d8;font-size:12.5px;margin:6px 0 6px}.zrec{background:#0a1013;border-left:3px solid #6FC3DF;border-radius:4px;padding:8px 12px;font-size:12.5px;color:#d6e6ec}.zrl{color:#6FC3DF;font-weight:800;font-size:10px;letter-spacing:.06em;margin-right:6px}"
     +"#pane-zdaudit .zimp{display:inline-block;font-size:10.5px;font-weight:700;border-radius:4px;padding:2px 8px;margin:0 0 7px}.zimp.zt-wasting{background:#2a1010;color:#ff9b9b}.zimp.zt-human-cost{background:#2a2208;color:#ffd479}.zimp.zt-dark-value{background:#08191f;color:#7CFFB2}"
+    +"#pane-zdaudit .zbreak{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.zb{font-size:11px;font-weight:700;border-radius:5px;padding:2px 9px}.zb.zf{background:#3a1212;color:#ff9b9b}.zb.zw{background:#332608;color:#ffd479}.zb.zp{background:#06251a;color:#7CFFB2}.zb.zn{background:#14181c;color:#8a93a0}"
+    +"#pane-zdaudit .zgrp{color:#8fb7c4;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:16px 0 8px}"
+    +"#pane-zdaudit .zarea{border-left:3px solid #2a343b}.zarea.gf{border-left-color:#ff9b9b}.zarea.gw{border-left-color:#ffd479}.zarea.gp{border-left-color:#7CFFB2}"
+    +"#pane-zdaudit .zstages{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.zstg{font-size:10.5px;border-radius:4px;padding:2px 7px;background:#0f1519;color:#5c6670}.zstg.done{color:#7CFFB2}.zstg.cur{color:#6FC3DF;background:#0c1c22}"
+    +"#pane-zdaudit .zoff{margin-top:8px}.zoff summary{cursor:pointer;color:#6FC3DF;font-size:11.5px;font-weight:700}.zoffl{color:#9aa7b0;font-size:11.5px;margin-top:6px;line-height:1.7}"
     +"#pane-zdaudit .zna{display:flex;flex-wrap:wrap;gap:8px}.znac{background:#111417;border:1px dashed #2a343b;border-radius:7px;padding:8px 12px;min-width:180px}.znat{display:block;color:#8a93a0;font-weight:700;font-size:12px}.znam{display:block;color:#5c6670;font-size:11px}"
     +"</style><div id='zd-wrap'>"+zdAuditInner()+"</div>";
 }
@@ -2430,7 +2454,7 @@ function gcInner(){
 function renderGC(){ const el=document.getElementById("gc-inner"); if(el) el.innerHTML=gcInner(); }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Comments"; if(TAB==="zdaudit") return "Audit — Business Rules"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Comments"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
@@ -2936,7 +2960,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r371 . 81db7bd . 2026-07-04</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r374 . 66bbb96 . 2026-07-04</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
