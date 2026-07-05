@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~d~b &mdash; Per-Section Latchkey Widget + Personal URL</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 820px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 24px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 18px; margin: 14px 0; }
+  ul { margin: 8px 0 8px 20px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; color: #6FC3DF; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid #333; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .pass { color: #22c55e; font-weight: 600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 40px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~d~b &mdash; Per-Section Latchkey Widget</span>
+  <span class="pub">Published 2026-07-04 19:12 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/76e3b29b-090b-434a-adb2-895816387177/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>~d~b &mdash; Per-Section Latchkey Widget + Personal URL</h1>
+<p style="color:#999;">From Joey's comment on the last artifact ("this comments is not right, look at argus") &mdash; rebuild the Latchkey comment widget the argus way: per-section, with a Share button, on the promised personal cap-URL. Comment on any <strong>section above</strong> to try it.</p>
+
+<h2>Need</h2><div class="lk-sec" data-obj="need"></div>
+<div class="section">
+  <p>metal's Latchkey thread was <strong>one box at the bottom</strong> with a manual "section" field, so every comment landed as <code>general</code> &mdash; exactly what happened to Joey's feedback. argus (on neo) does it right: <strong>every section is commentable inline</strong>, and <code>obj</code> is set to that section automatically (surface / value / design / estimate&hellip;). And the <code>~i</code> before this flagged the cap-URL as not-personal (hardcoded joeycastillo.us). This build closes both.</p>
+</div>
+
+<h2>Design (the shape)</h2><div class="lk-sec" data-obj="design-the-shape"></div>
+<div class="section">
+  <ul>
+    <li><strong>Per-section anchors.</strong> After every real <code>&lt;h2&gt;</code>, inject an empty <code>&lt;div class="lk-sec" data-obj="KEY"&gt;</code>. <code>KEY</code> = the heading's <code>id</code> if it has one, else a stable slug of its text. One shared script fills each anchor with a clickable "N comments / Comment on this section" bar that expands an inline thread + form, posting with <code>obj = KEY</code>.</li>
+    <li><strong>Whole-artifact box</strong> stays at the bottom (<code>obj = page</code>) for comments that aren't about one section.</li>
+    <li><strong>Share button</strong> in the nav &mdash; copies the cap-URL (unchanged, kept prominent).</li>
+    <li><strong>Personal cap-URL.</strong> <code>PUBLIC_BASE</code> / <code>SITE_ROOT</code> / prefix now come from <code>be/config.json</code> (<code>latchkey</code> section) or env &mdash; so each operator's Share button copies <em>their own</em> domain. Scotty sets <code>public_base: https://scottyledell.us</code> and his Latchkeys land there.</li>
+    <li><strong>doc = token</strong> unchanged &mdash; so <code>~fu</code> still resolves every comment (section or page) regardless of domain.</li>
+  </ul>
+</div>
+
+<h2>Built</h2><div class="lk-sec" data-obj="built"></div>
+<div class="section">
+  <table>
+    <tr><th>Change</th><th>Where</th></tr>
+    <tr><td><code>_config()</code> reads <code>be/config.json</code> latchkey section (env wins) &mdash; personal base/root/prefix</td><td><code>latchkey_publish.py</code></td></tr>
+    <tr><td><code>_add_section_anchors()</code> &mdash; one anchor per <code>&lt;h2&gt;</code>, obj = id or slug</td><td><code>latchkey_publish.py</code></td></tr>
+    <tr><td><code>thread_block()</code> v3 &mdash; per-section fill + page box + one shared script (event delegation, name remembered, errors surfaced)</td><td><code>latchkey_publish.py</code></td></tr>
+    <tr><td><code>_excise()</code> &mdash; republish strips prior widget + anchors + style, reinjects clean (no accumulation)</td><td><code>latchkey_publish.py</code></td></tr>
+    <tr><td><code>be/config.json</code> &mdash; latchkey section added (joeycastillo.us default, per-operator note)</td><td>config</td></tr>
+  </table>
+</div>
+
+<h2>Proof</h2><div class="lk-sec" data-obj="proof"></div>
+<div class="section">
+  <table>
+    <tr><th>Check</th><th>Result</th></tr>
+    <tr><td>Personal cap-URL from config (<code>public_base: scottyledell.us</code>)</td><td><span class="pass">cap-url = https://scottyledell.us/metal/s/&hellip;</span></td></tr>
+    <tr><td>One anchor per section (3-section fixture)</td><td><span class="pass">3 anchors; obj used the explicit <code>id="surface"</code></span></td></tr>
+    <tr><td>Share button + v3 thread + no-referrer</td><td><span class="pass">present</span></td></tr>
+    <tr><td>Idempotent republish (no accumulation)</td><td><span class="pass">still 3 anchors, 1 thread, 1 style, 1 share</span></td></tr>
+    <tr><td>The <code>~i</code> Joey commented on, re-published</td><td><span class="pass">7 per-section anchors live</span></td></tr>
+    <tr><td>This report itself</td><td><span class="pass">born with the per-section widget &mdash; try the bars above</span></td></tr>
+  </table>
+</div>
+
+<h2>What's Next</h2><div class="lk-sec" data-obj="what-s-next"></div>
+<div class="section">
+  <ul>
+    <li><strong>Bulk re-publish</strong> the recent artifacts so they all carry the per-section widget (this build only re-published the <code>~i</code> + itself).</li>
+    <li><strong>Scotty's personal URL</strong> &mdash; set <code>latchkey.public_base = https://scottyledell.us</code> + his site root in his box's <code>be/config.json</code>, and stand up his Pages mirror (per the FQDN convention). Then his Latchkeys are truly his.</li>
+    <li>Per-operator comment bridge stays future work; <code>doc = token</code> keeps the shared bridge safe for now.</li>
+  </ul>
+</div>
+
+<h2>Definition of Done</h2><div class="lk-sec" data-obj="definition-of-done"></div>
+<div class="section">
+  <ul>
+    <li><span class="pass">&#10003;</span> Per-section widget + Share button built + tested (3-anchor, personal-URL, idempotency)</li>
+    <li><span class="pass">&#10003;</span> Personal cap-URL config-driven (closes the <code>~i</code> gap)</li>
+    <li><span class="pass">&#10003;</span> Committed + pushed; born a Latchkey with the new widget</li>
+  </ul>
+</div>
+
+</div>
+<style id="lk-style">.lk-sec{margin:2px 0 18px}.lk-bar{display:inline-block;font-size:12px;color:#6FC3DF;background:#141414;border:1px solid #262626;border-radius:14px;padding:3px 12px;cursor:pointer;user-select:none}.lk-bar:hover{border-color:#6FC3DF}.lk-body{margin-top:10px}.lk-c{background:#141414;border:1px solid #1e1e1e;border-radius:8px;padding:10px 12px;margin:8px 0}.lk-c .m{font-size:12px;color:#999;margin-bottom:3px}.lk-c .t{font-size:13px;color:#ccc;white-space:pre-wrap}.lk-form{margin:8px 0}.lk-form input,.lk-form textarea{background:#0a0a0a;border:1px solid #333;color:#e0e0e0;border-radius:6px;font-size:13px;padding:8px 10px;font-family:inherit;box-sizing:border-box}.lk-form .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}.lk-form input{flex:1;min-width:140px;max-width:240px}.lk-form textarea{width:100%;resize:vertical}.lk-form button{background:#6FC3DF;color:#000;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;margin-top:6px}.lk-st{font-size:12px;margin-left:10px}</style><!-- LATCHKEY THREAD v3 (per-section) -- doc = this artifact's cap token; ~fu attends via the gcp-bridge --><div id="lk-thread" style="max-width:840px;margin:0 auto;padding:0 16px 32px;"><h2 style="color:#6FC3DF;font-size:20px;margin:32px 0 12px;border-bottom:1px solid #333;padding-bottom:8px;">Comments &amp; Follow-up <span id="lk-count" style="font-size:12px;color:#000;background:#6FC3DF;border-radius:10px;padding:1px 8px;font-weight:700;margin-left:6px;">&middot;</span> <span style="font-size:12px;color:#555;font-weight:400;margin-left:4px;">comment on any section above &middot; <code>~fu</code> attends</span></h2><div id="lk-seen" style="font-size:12px;color:#22c55e;margin-bottom:8px;display:none;">&#10003; seen by metal</div><div id="lk-page"></div></div>
+<script>
+(function(){
+  var BRIDGE='https://gcp-bridge-692654781984.us-west1.run.app', TOKEN='76e3b29b-090b-434a-adb2-895816387177';
+  var esc=function(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;};
+  var author=''; try{author=localStorage.getItem('lk-author')||'';}catch(e){}
+  var groups={};
+  function cHtml(c){
+    var who=esc(c.author||'anon'), isM=(c.author==='metal');
+    var cmd=(c.text&&c.text.charAt(0)==='~')?' <span style="color:#f59e0b;font-weight:600;">&#9655; command</span>':'';
+    return '<div class="lk-c"><div class="m"><strong style="color:'+(isM?'#6FC3DF':'#e0e0e0')+';">'+who+'</strong>'+cmd+
+      ' <span style="color:#555;">'+esc(c.ts||'')+'</span></div><div class="t">'+esc(c.text)+'</div></div>';
+  }
+  function formHtml(obj,ph){
+    return '<div class="lk-form" data-obj="'+esc(obj)+'"><div class="row">'+
+      '<input class="lk-n" placeholder="Your name" value="'+esc(author)+'"></div>'+
+      '<textarea class="lk-t" rows="2" placeholder="'+esc(ph)+' -- start with ~ for a tilde command"></textarea>'+
+      '<button class="lk-send">Comment</button><span class="lk-st"></span></div>';
+  }
+  function sectionHtml(obj){
+    var cs=groups[obj]||[]; var n=cs.length;
+    var bar=n?(n+' comment'+(n>1?'s':'')):'Comment on this section';
+    return '<span class="lk-bar" data-t="'+esc(obj)+'">'+bar+'</span>'+
+      '<div class="lk-body" id="lkb-'+esc(obj)+'" style="display:none">'+cs.map(cHtml).join('')+formHtml(obj,'Comment on this section')+'</div>';
+  }
+  function render(d){
+    if(d&&d.seenByMetal){document.getElementById('lk-seen').style.display='block';}
+    var list=(d&&d.comments)||[]; groups={};
+    list.forEach(function(c){var o=c.obj||'page';(groups[o]=groups[o]||[]).push(c);});
+    document.getElementById('lk-count').textContent=String(list.length);
+    var secs=document.querySelectorAll('.lk-sec');
+    for(var i=0;i<secs.length;i++){secs[i].innerHTML=sectionHtml(secs[i].getAttribute('data-obj'));}
+    var page=groups['page']||groups['general']||[];
+    var ph=document.getElementById('lk-page');
+    ph.innerHTML='<div style="font-size:12px;color:#777;margin-bottom:6px;">Whole-artifact comments</div>'+
+      (page.length?page.map(cHtml).join(''):'<div style="color:#666;font-size:13px;margin-bottom:8px;">No page-level comments yet.</div>')+
+      formHtml('page','Comment on the whole artifact');
+  }
+  function load(){
+    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN))
+      .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
+      .then(render)
+      .catch(function(){document.getElementById('lk-page').innerHTML='<span style="color:#f59e0b;">comments unavailable -- bridge did not answer.</span>';});
+  }
+  document.addEventListener('click',function(e){
+    var t=e.target;
+    if(t.classList&&t.classList.contains('lk-bar')){
+      var b=document.getElementById('lkb-'+t.getAttribute('data-t'));
+      if(b){b.style.display=(b.style.display==='none'?'block':'none');}
+      return;
+    }
+    if(t.classList&&t.classList.contains('lk-send')){
+      var form=t.closest('.lk-form'); if(!form)return;
+      var obj=form.getAttribute('data-obj');
+      var name=(form.querySelector('.lk-n').value||'').trim();
+      var text=(form.querySelector('.lk-t').value||'').trim();
+      var st=form.querySelector('.lk-st');
+      if(!name){st.textContent='Enter your name.';st.style.color='#f59e0b';return;}
+      if(!text){st.textContent='Write a comment.';st.style.color='#f59e0b';return;}
+      try{localStorage.setItem('lk-author',name);author=name;}catch(e){}
+      t.textContent='Posting...';t.disabled=true;st.textContent='';
+      fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN),{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({author:name,text:text,obj:obj})})
+        .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json().catch(function(){return{};});})
+        .then(function(){st.textContent='Posted. Run ~fu to have metal attend.';st.style.color='#22c55e';t.textContent='Comment';t.disabled=false;load();})
+        .catch(function(err){st.textContent='Post failed ('+((err&&err.message)||'network')+'). Text kept.';st.style.color='#f87171';t.textContent='Comment';t.disabled=false;});
+    }
+  });
+  load();
+})();
+</script>
+
+<footer>v0 &middot; r1774 &middot; 2026-07-04 &middot; Be &middot; metal console</footer>
+</body>
+</html>

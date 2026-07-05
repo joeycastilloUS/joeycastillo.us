@@ -46,13 +46,13 @@
 <h1>Does metal.CE have solid Latchkey support with a real personal URL + comments for ~fu?</h1>
 <p class="sub">Read-only inspection of the Latchkey publish chain: <code>be/tools/latchkey_publish.py</code>, <code>be/tools/cap_tokens.py</code>, the Latchkey Publish Protocol, the <code>~fu</code> spec, the a-d-d pattern, and the C99 skill spec. Three questions, three honest verdicts.</p>
 
-<h2>What It Is</h2>
+<h2>What It Is</h2><div class="lk-sec" data-obj="what-it-is"></div>
 <div class="card">
 <p>The Latchkey capability today: every metal artifact is supposed to be <strong>born a Latchkey</strong> — at publish time, <code>latchkey_publish.py</code> mints (or idempotently reuses) an unguessable UUIDv4 token, records it in the private Ledger (<code>be/cap-tokens.json</code>), injects a Share button + a live comment Thread into the HTML, hardens it (no-referrer, gate stripped), stages the Door copy at <code>be/s/&lt;token&gt;/index.html</code>, and mirrors it to the public site at <code>/metal/s/&lt;token&gt;/</code>. The token is the whole credential — possession is admission. Comments post to a GCP bridge keyed on <code>doc=&lt;token&gt;</code>, and <code>~fu</code> is the Attendant: one sweep reads the operator's comments and acts on them.</p>
 <p>Five named parts per the pattern (<code>a-d-d/patterns/latchkey.md:19-25</code>): <span class="hl">Latchkey</span> (the token), <span class="hl">Ledger</span> (private registry), <span class="hl">Door</span> (the <code>/s/&lt;uuid&gt;/</code> serving convention), <span class="hl">Thread</span> (comments keyed on the token), <span class="hl">Attendant</span> (<code>~fu</code>).</p>
 </div>
 
-<h2>The Three Questions</h2>
+<h2>The Three Questions</h2><div class="lk-sec" data-obj="the-three-questions"></div>
 <table>
 <tr><th>Part</th><th>Verdict</th><th>Evidence</th></tr>
 <tr>
@@ -72,7 +72,7 @@
 </tr>
 </table>
 
-<h2>Structure — how a cap-URL is produced today, end to end</h2>
+<h2>Structure — how a cap-URL is produced today, end to end</h2><div class="lk-sec" data-obj="structure-how-a-cap-url"></div>
 <pre>
 tilde saves artifact          be/&lt;kind&gt;/YYYY-MM-DD-HHMM-&lt;slug&gt;.html
         |
@@ -97,7 +97,7 @@ latchkey_publish.py &lt;kind&gt; &lt;key&gt; &lt;html&gt; "&lt;title&gt;"      (
 </pre>
 <p class="ev">Boundary held correctly: the tool mints + injects + stages + publishes; it does not host the Thread and is not the Attendant (conventions.md:743-745, skill CLAUDE.md:119-131).</p>
 
-<h2>The Personal-URL Gap</h2>
+<h2>The Personal-URL Gap</h2><div class="lk-sec" data-obj="the-personal-url-gap"></div>
 <div class="card">
 <p><strong>What's hardcoded.</strong> Three constants pin every operator to Joey's domain:</p>
 <ul>
@@ -116,7 +116,7 @@ latchkey_publish.py &lt;kind&gt; &lt;key&gt; &lt;html&gt; "&lt;title&gt;"      (
 <p class="irony"><strong>The irony is not lost:</strong> this very inspection, when published per protocol, will get a cap-URL on <code>joeycastillo.us/metal/s/&lt;token&gt;/</code> — a live demonstration of the exact gap it documents. The report about the missing personal URL cannot be served from a personal URL.</p>
 </div>
 
-<h2>Comments + ~fu — is the loop real?</h2>
+<h2>Comments + ~fu — is the loop real?</h2><div class="lk-sec" data-obj="comments-fu-is-the-loop"></div>
 <div class="card">
 <p><strong>Yes, the loop is real and closed — for one operator.</strong></p>
 <ul>
@@ -127,12 +127,12 @@ latchkey_publish.py &lt;kind&gt; &lt;key&gt; &lt;html&gt; "&lt;title&gt;"      (
 <p><strong>Why PARTIAL, not SOLID:</strong> the backend is a single shared bridge — <code>https://gcp-bridge-692654781984.us-west1.run.app</code> — hardcoded in both the publisher (latchkey_publish.py:29) and the <code>~fu</code> spec (commands.md:1865). Not per-operator: all operators' comments would land in one store Joey controls, and <code>~fu</code>'s <code>/comments/recent</code> sweep is global — a multi-operator world would leak everyone's threads into everyone's sweep. The pattern itself names this debt: "a GCP bridge-tier dependency that must later retire to the Pantheon mesh" (latchkey.md:45), and the skill boundary agrees the bridge URL must be a parameter (skill CLAUDE.md:116-117, 124-125). For the single-operator present, the loop works end to end; for the personal/per-operator future, the bridge is the second hardcoded Joey-ism.</p>
 </div>
 
-<h2>Bottom Line</h2>
+<h2>Bottom Line</h2><div class="lk-sec" data-obj="bottom-line"></div>
 <div class="card">
 <p><strong>Partial — one of three, honestly.</strong> The Latchkey engine itself is genuinely solid: idempotent mint, a private Ledger correctly anchored across worktrees and never published, UUID validation, hardening, idempotent injection, a verified Door (robots.txt live), and a protocol that makes every new artifact born a Latchkey. The comments loop is real and closed — widget, bridge, <code>doc=token</code> keying, and a working <code>~fu</code> Attendant sweep — but it rides a single shared, hardcoded bridge rather than anything per-operator. And the crux — a <em>real personal URL</em> — is flatly missing: <code>PUBLIC_BASE</code> is hardcoded to <code>https://joeycastillo.us</code>, so every operator on the Pantheon publishes into Joey's domain (or fails to publish at all), in direct violation of the skill spec's own "parameters, never hardcoded" rule and the FQDN-is-identity convention the kernel is built on. The fix is well-scoped — derive base/root/prefix from the operator's FQDN, stand up the per-operator Door on their existing domain, parameterize the bridge — and the <code>doc=token</code> design means the Thread survives the move untouched. metal.CE has a solid Latchkey with working comments for <code>~fu</code>; it does not yet have a personal one.</p>
 </div>
 
-<h2>DoD Checklist</h2>
+<h2>DoD Checklist</h2><div class="lk-sec" data-obj="dod-checklist"></div>
 <div class="card">
 <ul style="list-style:none; padding-left:4px;">
 <li><span class="pass">&#10003;</span> A-D-D read first (pattern <code>latchkey.md</code> + skill spec read in full before verdicts)</li>
@@ -148,50 +148,74 @@ latchkey_publish.py &lt;kind&gt; &lt;key&gt; &lt;html&gt; "&lt;title&gt;"      (
 </div>
 
 </main>
-
-<!-- LATCHKEY THREAD -- doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
-<div style="max-width:840px;margin:0 auto;padding:0 16px 24px;">
-<h2 style="color:#6FC3DF;font-size:20px;margin:32px 0 12px;border-bottom:1px solid #333;padding-bottom:8px;">Comments &amp; Follow-up <span style="font-size:12px;color:#555;font-weight:400;">Latchkey thread &middot; <code>~fu</code> attends</span></h2>
-<div style="background:#1A1A1A;border-radius:8px;padding:18px;">
-  <div id="lk-seen" style="font-size:12px;color:#22c55e;margin-bottom:8px;display:none;">&#10003; seen by metal</div>
-  <div id="lk-comments" style="color:#888;">Loading&hellip;</div>
-  <div style="margin-top:14px;border-top:1px solid #333;padding-top:12px;">
-    <input id="lk-name" placeholder="Your name" style="background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:6px 8px;border-radius:4px;margin:0 6px 6px 0;font-size:13px;">
-    <input id="lk-obj" placeholder="section, e.g. Shape (optional)" style="background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:6px 8px;border-radius:4px;margin:0 6px 6px 0;font-size:13px;width:230px;">
-    <br>
-    <textarea id="lk-text" rows="2" placeholder="Comment... start with ~ to issue a tilde command scoped to this artifact" style="width:100%;background:#0a0a0a;border:1px solid #333;color:#e0e0e0;padding:8px;border-radius:4px;font-size:13px;font-family:inherit;margin:4px 0;box-sizing:border-box;"></textarea>
-    <button id="lk-post" onclick="lkPost()" style="background:#6FC3DF;color:#000;border:none;padding:7px 16px;border-radius:4px;font-weight:600;cursor:pointer;">Comment</button>
-  </div>
-</div>
-</div>
+<style id="lk-style">.lk-sec{margin:2px 0 18px}.lk-bar{display:inline-block;font-size:12px;color:#6FC3DF;background:#141414;border:1px solid #262626;border-radius:14px;padding:3px 12px;cursor:pointer;user-select:none}.lk-bar:hover{border-color:#6FC3DF}.lk-body{margin-top:10px}.lk-c{background:#141414;border:1px solid #1e1e1e;border-radius:8px;padding:10px 12px;margin:8px 0}.lk-c .m{font-size:12px;color:#999;margin-bottom:3px}.lk-c .t{font-size:13px;color:#ccc;white-space:pre-wrap}.lk-form{margin:8px 0}.lk-form input,.lk-form textarea{background:#0a0a0a;border:1px solid #333;color:#e0e0e0;border-radius:6px;font-size:13px;padding:8px 10px;font-family:inherit;box-sizing:border-box}.lk-form .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}.lk-form input{flex:1;min-width:140px;max-width:240px}.lk-form textarea{width:100%;resize:vertical}.lk-form button{background:#6FC3DF;color:#000;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;margin-top:6px}.lk-st{font-size:12px;margin-left:10px}</style><!-- LATCHKEY THREAD v3 (per-section) -- doc = this artifact's cap token; ~fu attends via the gcp-bridge --><div id="lk-thread" style="max-width:840px;margin:0 auto;padding:0 16px 32px;"><h2 style="color:#6FC3DF;font-size:20px;margin:32px 0 12px;border-bottom:1px solid #333;padding-bottom:8px;">Comments &amp; Follow-up <span id="lk-count" style="font-size:12px;color:#000;background:#6FC3DF;border-radius:10px;padding:1px 8px;font-weight:700;margin-left:6px;">&middot;</span> <span style="font-size:12px;color:#555;font-weight:400;margin-left:4px;">comment on any section above &middot; <code>~fu</code> attends</span></h2><div id="lk-seen" style="font-size:12px;color:#22c55e;margin-bottom:8px;display:none;">&#10003; seen by metal</div><div id="lk-page"></div></div>
 <script>
 (function(){
-  var BRIDGE='https://gcp-bridge-692654781984.us-west1.run.app';
-  var TOKEN='25a09833-bd85-4f71-bfcc-0669c4aa3ee0';
-  function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;}
-  function load(){
-    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN)).then(function(r){return r.json();}).then(function(d){
-      if(d.seenByMetal){document.getElementById('lk-seen').style.display='block';}
-      var box=document.getElementById('lk-comments');
-      if(!d.comments||!d.comments.length){box.innerHTML='<span style="color:#666;">No comments yet. Leave one &mdash; then run ~fu.</span>';return;}
-      box.innerHTML=d.comments.map(function(c){
-        var who=esc(c.author||'anon');
-        var obj=(c.obj&&c.obj!=='page'&&c.obj!=='general')?' <span style="color:#6FC3DF;">['+esc(c.obj)+']</span>':'';
-        var isCmd=(c.text&&c.text.charAt(0)==='~')?' <span style="color:#f59e0b;">&#9655; command</span>':'';
-        return '<div style="border-bottom:1px solid #222;padding:8px 0;"><div style="font-size:12px;color:#999;"><strong style="color:'+(who==='metal'?'#6FC3DF':'#e0e0e0')+';">'+who+'</strong>'+obj+isCmd+' <span style="color:#555;">'+esc(c.ts||'')+'</span></div><div style="margin-top:3px;white-space:pre-wrap;">'+esc(c.text)+'</div></div>';
-      }).join('');
-    }).catch(function(){document.getElementById('lk-comments').innerHTML='<span style="color:#f59e0b;">comments unavailable</span>';});
+  var BRIDGE='https://gcp-bridge-692654781984.us-west1.run.app', TOKEN='25a09833-bd85-4f71-bfcc-0669c4aa3ee0';
+  var esc=function(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;};
+  var author=''; try{author=localStorage.getItem('lk-author')||'';}catch(e){}
+  var groups={};
+  function cHtml(c){
+    var who=esc(c.author||'anon'), isM=(c.author==='metal');
+    var cmd=(c.text&&c.text.charAt(0)==='~')?' <span style="color:#f59e0b;font-weight:600;">&#9655; command</span>':'';
+    return '<div class="lk-c"><div class="m"><strong style="color:'+(isM?'#6FC3DF':'#e0e0e0')+';">'+who+'</strong>'+cmd+
+      ' <span style="color:#555;">'+esc(c.ts||'')+'</span></div><div class="t">'+esc(c.text)+'</div></div>';
   }
-  window.lkPost=function(){
-    var name=(document.getElementById('lk-name').value||'').trim();
-    var text=(document.getElementById('lk-text').value||'').trim();
-    var obj=(document.getElementById('lk-obj').value||'').trim()||'page';
-    if(!name||!text){return;}
-    var b=document.getElementById('lk-post');b.textContent='...';b.disabled=true;
-    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN)+'&obj='+encodeURIComponent(obj),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({author:name,text:text})})
-    .then(function(){document.getElementById('lk-text').value='';b.textContent='Comment';b.disabled=false;load();})
-    .catch(function(){b.textContent='Comment';b.disabled=false;alert('post failed');});
-  };
+  function formHtml(obj,ph){
+    return '<div class="lk-form" data-obj="'+esc(obj)+'"><div class="row">'+
+      '<input class="lk-n" placeholder="Your name" value="'+esc(author)+'"></div>'+
+      '<textarea class="lk-t" rows="2" placeholder="'+esc(ph)+' -- start with ~ for a tilde command"></textarea>'+
+      '<button class="lk-send">Comment</button><span class="lk-st"></span></div>';
+  }
+  function sectionHtml(obj){
+    var cs=groups[obj]||[]; var n=cs.length;
+    var bar=n?(n+' comment'+(n>1?'s':'')):'Comment on this section';
+    return '<span class="lk-bar" data-t="'+esc(obj)+'">'+bar+'</span>'+
+      '<div class="lk-body" id="lkb-'+esc(obj)+'" style="display:none">'+cs.map(cHtml).join('')+formHtml(obj,'Comment on this section')+'</div>';
+  }
+  function render(d){
+    if(d&&d.seenByMetal){document.getElementById('lk-seen').style.display='block';}
+    var list=(d&&d.comments)||[]; groups={};
+    list.forEach(function(c){var o=c.obj||'page';(groups[o]=groups[o]||[]).push(c);});
+    document.getElementById('lk-count').textContent=String(list.length);
+    var secs=document.querySelectorAll('.lk-sec');
+    for(var i=0;i<secs.length;i++){secs[i].innerHTML=sectionHtml(secs[i].getAttribute('data-obj'));}
+    var page=groups['page']||groups['general']||[];
+    var ph=document.getElementById('lk-page');
+    ph.innerHTML='<div style="font-size:12px;color:#777;margin-bottom:6px;">Whole-artifact comments</div>'+
+      (page.length?page.map(cHtml).join(''):'<div style="color:#666;font-size:13px;margin-bottom:8px;">No page-level comments yet.</div>')+
+      formHtml('page','Comment on the whole artifact');
+  }
+  function load(){
+    fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN))
+      .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
+      .then(render)
+      .catch(function(){document.getElementById('lk-page').innerHTML='<span style="color:#f59e0b;">comments unavailable -- bridge did not answer.</span>';});
+  }
+  document.addEventListener('click',function(e){
+    var t=e.target;
+    if(t.classList&&t.classList.contains('lk-bar')){
+      var b=document.getElementById('lkb-'+t.getAttribute('data-t'));
+      if(b){b.style.display=(b.style.display==='none'?'block':'none');}
+      return;
+    }
+    if(t.classList&&t.classList.contains('lk-send')){
+      var form=t.closest('.lk-form'); if(!form)return;
+      var obj=form.getAttribute('data-obj');
+      var name=(form.querySelector('.lk-n').value||'').trim();
+      var text=(form.querySelector('.lk-t').value||'').trim();
+      var st=form.querySelector('.lk-st');
+      if(!name){st.textContent='Enter your name.';st.style.color='#f59e0b';return;}
+      if(!text){st.textContent='Write a comment.';st.style.color='#f59e0b';return;}
+      try{localStorage.setItem('lk-author',name);author=name;}catch(e){}
+      t.textContent='Posting...';t.disabled=true;st.textContent='';
+      fetch(BRIDGE+'/comments?doc='+encodeURIComponent(TOKEN),{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({author:name,text:text,obj:obj})})
+        .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json().catch(function(){return{};});})
+        .then(function(){st.textContent='Posted. Run ~fu to have metal attend.';st.style.color='#22c55e';t.textContent='Comment';t.disabled=false;load();})
+        .catch(function(err){st.textContent='Post failed ('+((err&&err.message)||'network')+'). Text kept.';st.style.color='#f87171';t.textContent='Comment';t.disabled=false;});
+    }
+  });
   load();
 })();
 </script>
