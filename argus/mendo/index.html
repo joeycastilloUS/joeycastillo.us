@@ -2112,14 +2112,45 @@ const ZD_CHECKS = [
       const st = pub<20?"WARN":"PASS";
       return { status:st, impact:"med", gr:false, offenders:[],
         detail:"Automatic Answers ON; "+pub+" published articles available to ground answers",
-        fix: st==="WARN"? ("Automatic Answers is firing but only "+pub+" published articles back it — thin grounding means weak deflection and wrong answers. Publish more coverage on your top intents.") : ("Automatic Answers is ON with "+pub+" published articles to ground on — the deflection path has content behind it.") }; } }
+        fix: st==="WARN"? ("Automatic Answers is firing but only "+pub+" published articles back it — thin grounding means weak deflection and wrong answers. Publish more coverage on your top intents.") : ("Automatic Answers is ON with "+pub+" published articles to ground on — the deflection path has content behind it.") }; } },
+  { id:"sla-bizhours", area:"SLA Policies", title:"SLAs measure in business hours", tag:"human-cost",
+    run:(c)=>{ const pols=(c.slas||[]); const haveSched=(c.schedules||[]).length>0;
+      const cal=pols.filter(p=>{ const ms=p.policy_metrics||[]; return ms.length>0 && !ms.some(m=>m.business_hours===true); });
+      if(!pols.length) return { status:"PASS", impact:"low", gr:false, offenders:[], detail:"No SLA policies.", fix:"No SLA policies defined." };
+      const st=(haveSched && cal.length)?"WARN":"PASS";
+      return { status:st, impact: cal.length>4?"med":"low", gr:cal.some(zdIsGR), offenders:cal,
+        detail: cal.length+" of "+pols.length+" SLA policies measure on calendar hours",
+        fix: st==="WARN"? (cal.length+" SLA policies run on calendar hours while you keep a business-hours schedule — nights and weekends count against the clock, producing false breaches and premature escalations. Point these at the schedule (leave genuinely 24/7 ones as-is): "+zdNames(cal)+".") : (pols.length+" SLA policies measure in business hours (or you run 24/7).") }; } },
+  { id:"view-sprawl", area:"Views", title:"View count is maintainable", tag:"human-cost",
+    run:(c)=>{ const vs=(c.views||[]); const act=vs.filter(v=>v.active); const inact=vs.filter(v=>!v.active);
+      const st=act.length>150?"FAIL":act.length>100?"WARN":"PASS";
+      return { status:st, impact:act.length>150?"med":"low", gr:false, offenders:inact,
+        detail: act.length+" active views ("+inact.length+" inactive retained)",
+        fix: st==="PASS"? (act.length+" active views — manageable.") : (act.length+" active views is well past the point agents can find the right queue — long pick-lists slow every triage. Consolidate by team/role and retire the "+inact.length+" inactive ones cluttering admin.") }; } },
+  { id:"form-inactive", area:"Fields & Forms", title:"Ticket forms aren't sprawling", tag:"human-cost",
+    run:(c)=>{ const forms=(c.forms||[]); const act=forms.filter(f=>f.active); const inact=forms.filter(f=>!f.active);
+      const st=inact.length>10?"WARN":"PASS";
+      return { status:st, impact:"low", gr:false, offenders:inact,
+        detail: act.length+" active ticket forms ("+inact.length+" inactive)",
+        fix: st==="WARN"? (inact.length+" inactive ticket forms are retained — they clutter admin and can resurface on old links. Delete the truly-dead ones: "+zdNames(inact)+".") : (act.length+" active forms, "+inact.length+" inactive — tidy.") }; } },
+  { id:"seat-idle", area:"Users & Seats", title:"Agent seats are in use", tag:"wasting",
+    run:(c)=>{ const ag=(c.agents||[]).filter(u=>u.active); const cutoff=Date.now()-90*24*3600*1000;
+      const idle=ag.filter(u=> !u.last_login_at || Date.parse(u.last_login_at)<cutoff);
+      const pct=ag.length?idle.length/ag.length:0; const st=pct>0.25?"WARN":"PASS";
+      return { status:st, impact: idle.length>20?"high":"med", gr:false, offenders:idle,
+        detail: idle.length+" of "+ag.length+" active agent/admin seats have no login in 90 days",
+        fix: st==="WARN"? (idle.length+" active agent seats haven't logged in for 90+ days ("+Math.round(pct*100)+"%) — on a per-seat Enterprise plan that's money out for nothing. Downgrade the departed to light agents or deactivate: "+zdNames(idle)+".") : (idle.length+" idle of "+ag.length+" seats — within tolerance.") }; } },
+  { id:"agent-2fa", area:"Users & Seats", title:"Agents have 2FA enabled", tag:"human-cost",
+    run:(c)=>{ const ag=(c.agents||[]).filter(u=>u.active); const no2fa=ag.filter(u=>u.two_factor_auth_enabled===false);
+      const pct=ag.length?no2fa.length/ag.length:0; const st=pct>0.20?"WARN":"PASS";
+      return { status:st, impact: no2fa.length>30?"med":"low", gr:false, offenders:no2fa,
+        detail: no2fa.length+" of "+ag.length+" active agents without two-factor auth",
+        fix: st==="WARN"? (no2fa.length+" active agents ("+Math.round(pct*100)+"%) have no two-factor auth — every one is a phishable path into customer PII. Enforce 2FA account-wide (Admin Center › Security), starting with admins.") : (no2fa.length+" of "+ag.length+" agents without 2FA — acceptable.") }; } }
 ];
 // NOT-AUDITED areas (honest gaps — bridge reads land on later boards; never a silent pass).
 const ZD_NOTAUDITED = [
-  ["SLA policies","confirmed endpoint — grading lands next board"],
-  ["Ticket forms","forms read live — form/field-coverage checks land next board"],
-  ["Brands","brands read live — multi-brand routing checks land next board"],
-  ["Contradictory rule pairs","condition-overlap logic (Board 4) — deferred to avoid false positives on a live demo"],
+  ["Contradictory rule pairs","condition-overlap logic (Board 5) — needs careful pairwise diffing; deferred to avoid false positives on a live demo"],
+  ["Recommendation templates","richer $-quantified templates land next board (Board 5)"],
   ["AR spend / deflection counts","Automatic-Resolution usage counts are Admin-Center-only — not in the public API (probed: 404). Enablement is graded; consumption counts aren't reachable read-only."],
   ["AI agent (advanced / ZRA)","enablement read from account/settings (currently off); per-bot config is Admin-Center-only"]
 ];
@@ -2145,17 +2176,29 @@ async function zdRunAudit(){
     const articles=await zdAll("hc-articles","hc-articles-page","articles");
     ZAUD.prog="AI settings"; renderZAUD();
     const settings=await zdOne("account-settings","settings");
-    const ctx={triggers,automations,macros,schedules,addrs,groups,memberships,fields,articles,settings};
-    const results=ZD_CHECKS.map(chk=>Object.assign({id:chk.id,area:chk.area,title:chk.title,tag:chk.tag},chk.run(ctx)));
+    ZAUD.prog="SLA policies"; renderZAUD();
+    const slas=await zdOne("sla-policies","sla_policies");
+    ZAUD.prog="views"; renderZAUD();
+    const views=await zdAll("views","views-page","views");
+    ZAUD.prog="ticket forms"; renderZAUD();
+    const forms=await zdOne("ticket-forms","ticket_forms");
+    ZAUD.prog="agent seats"; renderZAUD();
+    const agents=await zdAll("agents","agents-page","users");
+    const ctx={triggers,automations,macros,schedules,addrs,groups,memberships,fields,articles,settings,slas,views,forms,agents};
+    // Hardened core: one throwing check can't blank the audit — it surfaces as an errored finding, never a silent pass.
+    const results=ZD_CHECKS.map(chk=>{ try{ return Object.assign({id:chk.id,area:chk.area,title:chk.title,tag:chk.tag},chk.run(ctx)); }
+      catch(e){ return {id:chk.id,area:chk.area,title:chk.title,tag:chk.tag,status:"WARN",impact:"low",gr:false,offenders:[],detail:"check could not run (data unavailable)",fix:"This check errored on the fetched data — treat as unaudited, not a pass."}; } });
     const areas={};
     results.forEach(r=>{ const a=areas[r.area]||(areas[r.area]={area:r.area,checks:[],pass:0}); a.checks.push(r); if(r.status==="PASS")a.pass++; });
     Object.keys(areas).forEach(k=>{ const a=areas[k]; a.grade=a.checks.some(c=>c.status==="FAIL")?"FAIL":a.checks.some(c=>c.status==="WARN")?"WARN":"PASS"; });
-    const findings=results.filter(r=>r.status!=="PASS").map(r=>{ const sev=r.status==="FAIL"?2:1, imp=r.impact==="high"?3:r.impact==="med"?2:1; r.rank=sev*imp+(r.gr?0.5:0); return r; })
+    const tagW={wasting:0.3,"human-cost":0.2,"dark-value":0.1};
+    const findings=results.filter(r=>r.status!=="PASS").map(r=>{ const sev=r.status==="FAIL"?2:1, imp=r.impact==="high"?3:r.impact==="med"?2:1; r.rank=sev*imp+(r.gr?0.5:0)+(tagW[r.tag]||0); return r; })
       .sort((a,b)=> (b.rank-a.rank) || a.id.localeCompare(b.id));
     ZAUD.run={ areas:Object.keys(areas).map(k=>areas[k]), findings, passCount:results.filter(r=>r.status==="PASS").length, total:results.length,
       nTrg:triggers.length, nAct:triggers.filter(t=>t.active).length, nAut:automations.length,
       nMac:macros.length, nGrp:(groups||[]).filter(g=>!g.deleted).length,
-      nArt:articles.length, nTri:zdTriageFields(fields).length, ts:new Date() };
+      nArt:articles.length, nTri:zdTriageFields(fields).length,
+      nView:views.filter(v=>v.active).length, nSeat:agents.filter(u=>u.active).length, ts:new Date() };
   }catch(e){ ZAUD.err=(e&&e.code===401)?"Unlock the Argus gate (top-right), then Run Audit.":"Couldn’t reach the bridge — try again."; }
   ZAUD.busy=false; ZAUD.prog=""; renderZAUD();
 }
@@ -2172,7 +2215,7 @@ function zdAuditInner(){
   if(run){
     const pct=Math.round(100*run.passCount/run.total);
     h+="<div class='box'><div class='zscore'><div class='zpct "+(pct>=80?"zp":pct>=50?"zw":"zf")+"'>"+pct+"%</div>"
-      +"<div class='zscd'><b>"+run.passCount+" of "+run.total+" checks passing</b><div class='muted'>"+run.nAct+" active triggers · "+run.nAut+" automations · "+run.nMac+" macros · "+run.nGrp+" groups · "+run.nArt+" articles · "+run.nTri+" triage fields · "+ZD_NOTAUDITED.length+" areas not audited yet · "+run.ts.toLocaleString()+"</div></div></div>";
+      +"<div class='zscd'><b>"+run.passCount+" of "+run.total+" checks passing</b><div class='muted'>"+run.nAct+" triggers · "+run.nAut+" automations · "+run.nMac+" macros · "+run.nView+" views · "+run.nGrp+" groups · "+run.nSeat+" seats · "+run.nArt+" articles · "+run.nTri+" triage fields · "+ZD_NOTAUDITED.length+" not audited · "+run.ts.toLocaleString()+"</div></div></div>";
     h+="<div class='zareas'>"+run.areas.map(a=>"<div class='zarea'><div class='zan'>"+esc(a.area)+"</div>"+zdGradeChip(a.grade)+"<div class='muted' style='font-size:11px'>"+a.pass+"/"+a.checks.length+" passing</div></div>").join("")+"</div></div>";
     // findings
     h+="<div class='box'><div class='feat-h'>Findings &middot; "+run.findings.length+"</div>";
@@ -2852,7 +2895,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r366 . 2c4d1b5 . 2026-07-04</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r368 . 529935c . 2026-07-04</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
