@@ -34,7 +34,7 @@
   .pill.dead{background:#1c0c0c;border-color:#5f1f1f;color:#EF9E9E;text-decoration:line-through}
   footer{max-width:820px;margin:0 auto;padding:20px;color:var(--mut);font-size:12px;border-top:1px solid #262626}
 </style>
-<nav><span class="brand">Be</span><span class="pub">Published 2026-07-05 14:15 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/ad9b334e-78d0-4afa-84a1-39b957965dc9/').then(function(){var t=b.textContent;b.textContent='✓ Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-05 19:00 MST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/ad9b334e-78d0-4afa-84a1-39b957965dc9/').then(function(){var t=b.textContent;b.textContent='✓ Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
 </nav>
 <main>
 
@@ -44,6 +44,41 @@
 <div class="verdict">
 <p class="q">One key at the top. Every login below it resolves to one of two things: a Purcius key, or an OIDC user.</p>
 <p style="margin:0">The <strong>Overlord</strong> holds the Purcius root (already minted &mdash; Genesis). <strong>Operators</strong> mint their own Purcius keys. <strong>Users</strong> arrive by Slack / Discord / Google. <span class="good">The passphrase is retired.</span> Login proves <em>who</em>; the Crew allow-list decides <em>what</em> &mdash; identity and access stay separate.</p>
+</div>
+
+<h2 id="roadmap">Where this sits &mdash; the Argus master roadmap</h2>
+<div data-cm="roadmap" class="card">
+<p style="margin-top:0">You asked: <em>"is this the big giant plan we spoke of?"</em> Honest answer last pass: no &mdash; it floated. Grounded now. The master roadmap (<code>be/plans/2026-06-29-1543-plan-argus-master-v2-replan-all.html</code>) sequences Argus 0&rarr;5; this identity system is the <strong>substrate under it</strong>: it is what master Phase 1's go-live sign-in grows into, and it sits above Phase 4's tenant model. One table, phase by phase:</p>
+<table>
+<tr><th>Master phase</th><th>Identity's part</th></tr>
+<tr><td><strong>0 &mdash; Stop the bleeding</strong> (RV P1s, ~22 pts)</td><td><strong>Identity waits.</strong> Four open P1s make the read-only invariant false (auth fails <em>open</em> when <code>BRIDGE_TOKEN</code> unset). Nothing here touches <code>Auth.cs</code> before those land.</td></tr>
+<tr><td><strong>1 &mdash; Go-live sign-in</strong> (MA, ~16 pts, built)</td><td><strong>The USE half ships here, as planned.</strong> Slack OIDC + Crew allow-list is built + tested (91+27 asserts), blocked only on Slack creds. Identity adds one 2-pt seed: <code>tenants/mendo</code> + <code>system/overlords</code> + <code>ResolveAccess</code> (tenant-access First Move), so access is per-tenant from day one.</td></tr>
+<tr><td><strong>2 &mdash; Seam + Zendesk Browser</strong> (the "right away" ask)</td><td><strong>Identity does not jump it.</strong> Note the rhyme, not a merge: Phase 2 cuts C#'s first seam (<code>ISource</code>, per-source token scope); identity cuts the substrate's first seam (wire). Two seams, sequenced apart on purpose.</td></tr>
+<tr><td><strong>after 2 / parallel 3</strong></td><td><strong>Overlord key-login</strong> &mdash; the pure-C skill's first three wire ops, Overlord hard-seated. Master Phase 1's session code gets replaced by <code>SESSION_CHECK</code> here, not before.</td></tr>
+<tr><td><strong>4 &mdash; Multi-tenant</strong> (MT, 21 pts, when 2nd tenant real)</td><td><strong>This design's Organization IS the tenant</strong> &mdash; one entity, two words (flagged below). The control plane (<code>purcius_operators_v1</code>) sits one level above <code>tenants/{slug}</code>; Invite + the second operator (Scotty) land with the real 2nd tenant, per the master's own gate.</td></tr>
+<tr><td><strong>5 &mdash; Depth &amp; hardening</strong></td><td>Enforced rotation joins the hardening pull.</td></tr>
+</table>
+<p style="margin:.6em 0 .2em"><strong>Drift flags &mdash; Rule 11, proposed not assumed:</strong></p>
+<ul>
+<li><strong>The key-login track is absent from master v1.</strong> This section is the proposed master-v2 amendment: add the identity track as rows riding Phases 1/2&ndash;3/4/5. Needs your bless before any board item is written.</li>
+<li><strong>"Organization" here = "tenant" there.</strong> Same entity. The tenant-access design's &sect;3a a-d-d amendment (per-tenant Crew + overlord tier) is still awaiting bless &mdash; it is a prerequisite of both.</li>
+<li><strong><code>SESSION_CHECK</code> replaces the home-rolled HMAC session in <code>Auth.cs</code></strong> &mdash; a change to live auth code, gated behind Phase 0's P1 fixes. Never before.</li>
+<li><strong>Master constraint "no new runtime in the bridge container"</strong> vs. the wire client: if the seam needs a C sidecar rather than an in-process client, that constraint must be amended first. Named, unresolved (Unknown #2).</li>
+</ul>
+<p style="margin:0"><strong>Bigger-than-Argus check, swept for real:</strong> <code>purcius-genesis/be</code> (inspect + retro only), <code>kastil-systems</code>, and metal's conventions were searched for a Purcius-wide identity roadmap. <span class="warn">None exists.</span> The platform-level truth today is two canons (&sect; Operator-Identity Auth, &sect; Purcius + Wire Protocol) plus the auth-skill spec &mdash; principles, not a plan. Until a platform <code>~p</code> exists, this artifact is the identity plan of record, scoped through Argus. That gap is a finding, not an assumption.</p>
+</div>
+
+<h2 id="priors">Four designs, one truth</h2>
+<div data-cm="priors" class="card">
+<p style="margin-top:0">Four prior identity designs exist. This document dispositions each &mdash; adopted or superseded, stated plainly &mdash; so it is the single source of truth, not a fifth competitor.</p>
+<table>
+<tr><th>Design</th><th>Verdict</th><th>Carries forward / dies</th></tr>
+<tr><td><strong>overlord-auth</strong><br><span class="mut">06-30 16:08</span></td><td>Adopted: anchors. Superseded: mechanism.</td><td><span class="good">Keeps</span> <code>_key.&lt;fqdn&gt;</code> + <code>_purcius</code> records, fail-closed challenge&ndash;response, device-bind. <span class="bad">Dies:</span> the TOTP factor and the <code>~/.nous/operator.key</code> file &mdash; the root never persists whole anymore (<code>genesis_mint</code> wipes it after the split); the compiled-in pin as sole authority yields to the Warrant chain verified against the published anchor.</td></tr>
+<tr><td><strong>overlord-onboarding</strong><br><span class="mut">06-30 21:17</span></td><td>Adopted: the ceremony UX.</td><td><span class="good">Keeps</span> the Genesis ceremony's smoothness law &mdash; Be does the tool, live &#10003; per step, resumable &mdash; governing the Genesis app + operator onboarding here. <span class="bad">Dies:</span> the BIP-39 Way-Back &mdash; recovery is Shamir shares (<code>genesis_recover</code>/<code>genesis_resplit</code>), no 12 words.</td></tr>
+<tr><td><strong>sovereign-identity</strong><br><span class="mut">07-01 11:22</span></td><td>Adopted: the structure. Renamed by the build.</td><td><span class="good">Keeps</span> the whole hierarchy: Keystone = the Genesis-minted root (cold, Shamir-split, signs only Warrants + recovery); <strong>Warrant</strong> kept by name (<code>genesis_sign</code>); Writ = the device key under a device Warrant. Mesh key <code>a61bdace</code> stays a certified subordinate, never an identity. Nothing material dies &mdash; this design's apex is now built code.</td></tr>
+<tr><td><strong>tenant-access</strong><br><span class="mut">06-29 15:50</span></td><td>Adopted whole, for USE.</td><td><span class="good">Keeps</span> everything: <code>tenants/{slug}</code> + <code>allowedDomains</code>, <code>system/overlords</code>, <code>ResolveAccess</code>, email-domain &rarr; tenant. This design adds the OPERATE verb and the key spine <em>above</em> it; it changes nothing below it.</td></tr>
+</table>
+<p style="margin:0">Where two disagreed, the later, built thing won: sovereign-identity superseded overlord-auth's "adopt the mesh key" (its own words), and Genesis-as-shipped superseded both file-key and BIP-39 recovery. All four dispositions are traceable above &mdash; no silent contradiction.</p>
 </div>
 
 <h2 id="map">The map</h2>
@@ -73,6 +108,21 @@ APP / MODULE ── Argus, … ── access = the whole app (for now) ── ga
 <li><strong>Challenge&ndash;response.</strong> The console hands the device a random nonce; the device signs it; the edge verifies the signature against the Warrant, and the Warrant against the <em>published</em> <code>_key.&lt;fqdn&gt;</code> anchor (DNS/TXT, third-party-verifiable). No secret ever sits on the server.</li>
 </ol>
 <p style="margin:0"><span class="good">Best-on-earth, honestly:</span> the crypto is your own audited substrate &mdash; ed25519 + X25519 + AES-GCM + Shamir, all KAT-tested in <code>test_substrate.c</code> (RFC 8032/7748, NIST GCM). We are not buying WebAuthn; we are <em>being</em> the authority. The device key is the convenience layer; the Purcius key is the root of trust.</p>
+</div>
+
+<h2 id="genesis-map">Genesis call map &mdash; every step names its call</h2>
+<div data-cm="genesis-map" class="card">
+<p style="margin-top:0">No hand-waving. Every identity step below resolves to an exported op in <code>purcius-genesis/core/genesis_core.h</code>, compiled and self-verifying today:</p>
+<table>
+<tr><th>Identity step</th><th>Genesis call (exact signature)</th><th>Note</th></tr>
+<tr><td><strong>Root identity</strong> &mdash; Overlord root, and every operator key</td><td><code>genesis_mint(int n, int t, uint8_t out_pub[32], uint8_t *out_shares, char *out_anchor, size_t anchor_cap)</code></td><td>Mints the Ed25519 root, Shamir-splits n-of-t (ceremony default 5/3), emits the anchor, self-verifies by recombining, then <strong>wipes the root before return</strong>. An operator key is not a lesser thing &mdash; it is the same mint, on their device, for their FQDN.</td></tr>
+<tr><td><strong>The <code>_key.&lt;fqdn&gt;</code> anchor</strong></td><td><code>genesis_anchor(const uint8_t root_sk[64], char *out_anchor, size_t anchor_cap)</code></td><td>Emits <code>"k=&lt;pubhex&gt; s=&lt;selfsig-hex&gt;"</code>, selfsig = <code>ed25519(root, pub&nbsp;&#8214;&nbsp;"operator")</code>. <code>genesis_mint</code> writes it inline at birth; <code>genesis_anchor</code> re-emits it from a recovered root.</td></tr>
+<tr><td><strong>Login + Warrant issuance</strong></td><td><code>genesis_sign(const uint8_t root_sk[64], const uint8_t *msg, size_t msg_len, uint8_t out_sig[64])</code></td><td>Three uses of one op: the Overlord root signs <code>op_pub&nbsp;&#8214;&nbsp;fqdn&nbsp;&#8214;&nbsp;role&nbsp;&#8214;&nbsp;expires</code> (an operator's Warrant); the operator key signs <code>device_pub&nbsp;&#8214;&nbsp;"console"&nbsp;&#8214;&nbsp;issued_at</code> (a device Warrant); the header's own comment names the pattern &mdash; "a node cert = pub&#8214;role, or a roster body."</td></tr>
+<tr><td><strong>Recovery</strong> &mdash; lost device</td><td><code>genesis_recover(int t, const uint8_t *shares, uint8_t out_sk[64])</code></td><td>Any t 65-byte shares (<code>x(1)&#8214;y(64)</code>) &rarr; the same 64B root, same pubkey. Caller MUST <code>secure_zero</code> after use (header contract).</td></tr>
+<tr><td><strong>Share hygiene</strong> after any recovery</td><td><code>genesis_resplit(const uint8_t root_sk[64], int n, int t, uint8_t out_pub[32], uint8_t *out_shares, char *out_anchor, size_t anchor_cap)</code></td><td>Same key, fresh n-of-t share set &mdash; the old set (including whatever the lost device held) is dead. Anchor unchanged, Warrants stay valid.</td></tr>
+<tr><td><strong>Encoding</strong></td><td><code>genesis_hex(const uint8_t *in, size_t len, char *out, size_t out_cap)</code></td><td>Lowercase hex for anchors and pubkeys.</td></tr>
+</table>
+<p style="margin:0"><span class="good">Proven, not promised:</span> the primitives underneath (ed25519, x25519, aes-gcm, hkdf, hmac, shamir) are KAT-tested against RFC 8032/7748/5869/4231 + NIST GCM in <code>tests/test_substrate.c</code>; the CLI (<code>genesis_cli.c</code>: <code>selftest</code> / <code>mint</code> / <code>recover</code>) is the air-gapped ceremony harness. This design invents zero cryptography &mdash; it sequences calls that already compile.</p>
 </div>
 
 <h2 id="roles">The five roles</h2>
@@ -281,53 +331,59 @@ Michelle clicks ─▶ OIDC login (Slack) ─▶ identity slack:U… bound to or
 <p style="margin:0"><strong>What Argus keeps:</strong> the C# bridge stays exactly what the Language Boundary canon allows — a jacket on foreign OIDC manufacturers (Slack/Discord/Google token exchange). Its home-rolled HMAC session (<code>Auth.cs</code>) is the drift PRACTICES #12 already names; it is replaced by one wire call per request: <code>SESSION_CHECK</code>. The next product gets login by speaking the same six ops — zero auth code written in the product, ever again.</p>
 </div>
 
-<h2 id="plan">~p — the build plan</h2>
+<h2 id="plan">~p — the build plan, sequenced into the master roadmap</h2>
 <div data-cm="plan" class="card">
-<p style="margin-top:0"><strong>Intent.</strong> The Overlord logs into argus.com.ai with a key and no password; every lifecycle state above is enforced at the edge by the pure-C skill.</p>
-<p><strong>Scope.</strong> Key login, Warrants, invites, control plane, enforced rotation. Out: per-feature authz, non-<code>.us</code> FQDNs, multi-Overlord.</p>
-<p><strong>Approach.</strong> Build the skill on the Genesis substrate (crypto is done and KAT-tested — this is plumbing, not research). Argus consumes over wire; C# keeps the OIDC jacket only. Each phase lands live and externally verified before the next widens.</p>
+<p style="margin-top:0"><strong>Intent.</strong> The Overlord logs into argus.com.ai with a key and no password; every lifecycle state above is enforced at the edge by the pure-C skill — landed as a <strong>track through the Argus master phases</strong>, not a parallel universe.</p>
+<p><strong>Scope.</strong> Key login, Warrants, invites, control plane, enforced rotation. Out: per-feature authz, non-<code>.us</code> FQDNs, multi-Overlord, a Purcius-wide rollout beyond Argus (no platform plan exists yet — flagged in the roadmap section).</p>
+<p><strong>Approach.</strong> Build the skill on the Genesis substrate (crypto is done and KAT-tested — this is plumbing, not research). Argus consumes over wire; C# keeps the OIDC jacket only. Each step rides a master phase and inherits its gate; nothing jumps the master's order.</p>
 <table>
-<tr><th>Phase</th><th>Ships</th><th>Live means</th></tr>
-<tr><td><strong>1 — Overlord key-login</strong></td><td>Skill core: CHALLENGE_*, WARRANT_VERIFY, SESSION_MINT/CHECK; wire seam from the bridge; device enroll + anchor check. Overlord only, hard-seated.</td><td>Joey signs a nonce and is in — no password anywhere</td></tr>
-<tr><td><strong>2 — Control plane</strong></td><td><code>purcius_operators_v1</code> + STATUS_SET + per-request SESSION_CHECK; pause/cut-off/expire from the console</td><td>Pause at 2:14 = out by 2:15, verified from a second browser</td></tr>
-<tr><td><strong>3 — Invite</strong></td><td>INVITE_MINT/REDEEM, join page, crew append</td><td>Michelle/Elbert/Brendan in Argus off one DM'd link each</td></tr>
-<tr><td><strong>4 — Enforced rotation</strong></td><td>Max ages live at the edge; 7-day banner; refusal paths</td><td>A back-dated device Warrant is refused on purpose, on camera</td></tr>
-<tr><td><strong>5 — Second operator</strong></td><td>Genesis-app QR enrollment end to end; Scotty minted, Warranted, granted</td><td>Scotty key-logs-in with zero Joey keystrokes on his box</td></tr>
+<tr><th>Identity step</th><th>Rides master phase</th><th>Ships</th><th>Live means</th></tr>
+<tr><td><strong>I0 — Tenant seed</strong></td><td><strong>1</strong> (after Phase 0's P1 fixes)</td><td><code>tenants/mendo</code> + <code>system/overlords</code> docs; <code>EmailAllowed</code> &rarr; <code>ResolveAccess</code> (tenant-access First Move, adopted verbatim)</td><td>Three resolutions prove out: mendo member / overlord / clean "none"</td></tr>
+<tr><td><strong>I1 — Overlord key-login</strong></td><td><strong>after 2</strong> (the Zendesk "right away" ask keeps its slot)</td><td>Skill core: CHALLENGE_*, WARRANT_VERIFY, SESSION_MINT/CHECK — the substrate's <strong>first wire seam</strong>; device enroll + anchor check. Overlord only, hard-seated.</td><td>Joey signs a nonce and is in — no password anywhere</td></tr>
+<tr><td><strong>I2 — Control plane</strong></td><td><strong>3</strong> (parallel to widen-and-prove)</td><td><code>purcius_operators_v1</code> + STATUS_SET + per-request SESSION_CHECK; pause/cut-off/expire from the console</td><td>Pause at 2:14 = out by 2:15, verified from a second browser</td></tr>
+<tr><td><strong>I3 — Invite</strong></td><td><strong>4</strong> (invites name the org; needs the tenant real)</td><td>INVITE_MINT/REDEEM, join page, crew append</td><td>Michelle/Elbert/Brendan in Argus off one DM'd link each</td></tr>
+<tr><td><strong>I4 — Enforced rotation</strong></td><td><strong>5</strong> (hardening pull)</td><td>Max ages live at the edge; 7-day banner; refusal paths</td><td>A back-dated device Warrant is refused on purpose, on camera</td></tr>
+<tr><td><strong>I5 — Second operator</strong></td><td><strong>4</strong> (with the real 2nd tenant, per the master's own gate)</td><td>Genesis-app QR enrollment end to end; Scotty minted (<code>genesis_mint</code> on his box), Warranted, granted</td><td>Scotty key-logs-in with zero Joey keystrokes on his box</td></tr>
 </table>
-<p><strong>Constraints.</strong> Skill is C99 in kastil-systems (PRACTICES #12); wire only into the substrate; no vendor auth, no WebAuthn; no Cloud Run custom domains; secrets by env-var name only.</p>
-<p><strong>Unknowns — named.</strong> (1) Ed25519 in Web Crypto on older Safari/enterprise browsers — may force a P-256 device-key fallback under the same Warrant format. (2) How the C# jacket speaks wire — an in-process wire client vs. a small C sidecar; picked in phase 1, first contact. (3) Firestore status-read latency inside a 60&thinsp;s cache — budget unproven. (4) Phone-to-phone enrollment when the key device <em>is</em> the browser — carried open from above. (5) Wire reachability Cloud Run &rarr; mesh from the bridge's egress.</p>
-<p style="margin:0"><strong>When to revisit.</strong> v2 triggers: any Unknown resolves against the design; a customer needs per-feature grants; a second Overlord/tenant appears; revocation must beat 60&thinsp;s; phase 1's wire seam costs &gt;2&times; its estimate — that last one means the seam design was wrong, stop and re-plan, don't push through.</p>
+<p><strong>Constraints.</strong> The master's constraints bind here too: read-only invariant; no auth-code change before Phase 0's P1s land; Rule 11 flow-up (the roadmap-section amendments get blessed before board items are written). Plus this track's own: skill is C99 in kastil-systems (PRACTICES #12); wire only into the substrate; no vendor auth, no WebAuthn; no Cloud Run custom domains; secrets by env-var name only.</p>
+<p><strong>Unknowns — named.</strong> (1) Ed25519 in Web Crypto on older Safari/enterprise browsers — may force a P-256 device-key fallback under the same Warrant format. (2) How the C# jacket speaks wire — an in-process wire client vs. a small C sidecar; the sidecar path collides with the master's "no new runtime in the bridge container" constraint and needs an amendment first. (3) Firestore status-read latency inside a 60&thinsp;s cache — budget unproven. (4) Phone-to-phone enrollment when the key device <em>is</em> the browser. (5) Wire reachability Cloud Run &rarr; mesh from the bridge's egress. (6) Whether a Purcius-wide identity plan supersedes this track — none exists today; if one is written, it wins.</p>
+<p style="margin:0"><strong>When to revisit.</strong> v2 triggers: the master roadmap re-plans (this track re-sequences with it, automatically); any Unknown resolves against the design; a customer needs per-feature grants; a second Overlord/tenant appears; revocation must beat 60&thinsp;s; I1's wire seam costs &gt;2&times; its estimate — that last one means the seam design was wrong, stop and re-plan, don't push through.</p>
 </div>
 
 <h2 id="estimate">~e — points, path, hump</h2>
 <div data-cm="estimate" class="card">
 <table>
-<tr><th>Phase</th><th>Pts</th><th>Why that size</th></tr>
-<tr><td>1 — Overlord key-login</td><td class="c"><strong>8</strong></td><td>New wire seam + Web Crypto enroll + challenge flow. Crypto pre-built; the seam is the work.</td></tr>
-<tr><td>2 — Control plane</td><td class="c"><strong>5</strong></td><td>One doc, one wire op, one console page; enforcement rides the phase-1 SESSION_CHECK</td></tr>
-<tr><td>3 — Invite</td><td class="c"><strong>5</strong></td><td>Latchkey-shaped: mint/burn ledger + join page + crew append (exists)</td></tr>
-<tr><td>4 — Enforced rotation</td><td class="c"><strong>3</strong></td><td>Timestamp comparisons on already-signed material + banner</td></tr>
-<tr><td>5 — Second operator</td><td class="c"><strong>5</strong></td><td>Genesis-app QR UX + a ceremony doc a non-Joey human can follow</td></tr>
-<tr><td><strong>Total</strong></td><td class="c"><strong>26</strong></td><td>&nbsp;</td></tr>
+<tr><th>Identity step</th><th>Master phase</th><th>Pts</th><th>Why that size</th></tr>
+<tr><td>I0 — Tenant seed</td><td class="c">1</td><td class="c"><strong>2</strong></td><td>Two Firestore docs + one pure-function swap (<code>ResolveAccess</code>), already designed and unit-testable with bare asserts</td></tr>
+<tr><td>I1 — Overlord key-login</td><td class="c">after 2</td><td class="c"><strong>8</strong></td><td>New wire seam + Web Crypto enroll + challenge flow. Crypto pre-built; the seam is the work.</td></tr>
+<tr><td>I2 — Control plane</td><td class="c">3</td><td class="c"><strong>5</strong></td><td>One doc, one wire op, one console page; enforcement rides I1's SESSION_CHECK</td></tr>
+<tr><td>I3 — Invite</td><td class="c">4</td><td class="c"><strong>5</strong></td><td>Latchkey-shaped: mint/burn ledger + join page + crew append (exists)</td></tr>
+<tr><td>I4 — Enforced rotation</td><td class="c">5</td><td class="c"><strong>3</strong></td><td>Timestamp comparisons on already-signed material + banner</td></tr>
+<tr><td>I5 — Second operator</td><td class="c">4</td><td class="c"><strong>5</strong></td><td>Genesis-app QR UX + a ceremony doc a non-Joey human can follow</td></tr>
+<tr><td><strong>Total</strong></td><td class="c">&nbsp;</td><td class="c"><strong>28</strong></td><td>+2 over the prior 26: the tenant seed was previously unowned by any track</td></tr>
 </table>
-<p><strong>Critical path:</strong> 1 &rarr; 2 &rarr; 4 (the enforcement spine — every check phase 4 tightens rides phase 1's session and phase 2's status doc). 3 and 5 hang off it and can parallel.</p>
-<p style="margin:0"><strong>The immovable hump is phase 1's wire seam</strong> — the first time a product consumes a kastil-systems skill over the wire protocol instead of importing code. Everything after inherits it; nothing before needs it. Phase 1 clears it by keeping the skill's first surface to three ops (challenge, verify, session) and hard-seating a single operator — small enough to debug byte-by-byte on the wire, real enough that when Joey logs in, the seam is production-proven, not demo-proven. Once that call round-trips, phases 2&ndash;4 are additional ops on a proven pipe.</p>
+<p><strong>Critical path:</strong> I1 &rarr; I2 &rarr; I4 (the enforcement spine — every check I4 tightens rides I1's session and I2's status doc). I0 rides master Phase 1 independently; I3 and I5 hang off the spine and can parallel once Phase 4's tenant gate opens.</p>
+<p style="margin:0"><strong>The immovable hump is I1's wire seam</strong> — the first time a product consumes a kastil-systems skill over the wire protocol instead of importing code. Everything after inherits it; nothing before needs it. I1 clears it by keeping the skill's first surface to three ops (challenge, verify, session) and hard-seating a single operator — small enough to debug byte-by-byte on the wire, real enough that when Joey logs in, the seam is production-proven, not demo-proven. Once that call round-trips, I2&ndash;I4 are additional ops on a proven pipe.</p>
 </div>
 
 <h2 id="dod">DoD</h2>
 <div class="card"><ul>
 <li>&#10003; A-D-D read &mdash; Genesis core/CLI/tests (mint · recover · resplit · sign, KAT-tested), <code>Auth.cs</code> live bridge, Operator-Identity + Wire Protocol + Language Boundary canons, PRACTICES #12</li>
+<li>&#10003; Reconciled with the Argus master roadmap &mdash; identity lands as a track through Phases 1/2&ndash;5; four drift flags proposed per Rule 11, none silently assumed</li>
+<li>&#10003; Four prior designs dispositioned &mdash; overlord-auth, overlord-onboarding, sovereign-identity, tenant-access: each adopted or superseded, stated plainly; this is the single source of truth</li>
+<li>&#10003; Genesis wired literally &mdash; every identity step cites its exported op by exact header signature (call-map section); zero invented cryptography</li>
+<li>&#10003; Purcius-wide plan swept &mdash; purcius-genesis/be, kastil-systems, metal conventions: none exists; gap flagged, this track is the identity plan of record through Argus</li>
 <li>&#10003; Built on your system &mdash; <code>artifact-comments.js</code> + gcp-bridge Thread, same doc uuid, your comment trail intact</li>
-<li>&#10003; Model baked from your comments &mdash; roll-our-own key login, passphrase retired, Overlord = platform provider, whole-app grants</li>
+<li>&#10003; Model baked from your comments &mdash; roll-our-own key login, passphrase retired, Overlord = platform provider, module-level grants</li>
 <li>&#10003; Lifecycle covered end to end &mdash; onboard · invite · active · pause · cut-off · expire · recover · rotate, each with its enforcement point</li>
 <li>&#10003; Auth placed per PRACTICES #12 &mdash; pure-C99 kastil-systems skill over wire; Argus consumes; C# stays a foreign-OIDC jacket only</li>
 <li>&#10003; Rotation enforced, not requested &mdash; max ages inside signed material; the edge refuses stale</li>
-<li>&#10003; ~p~e attached &mdash; phases to a live Overlord key-login first; Unknowns named; 26 honest points</li>
+<li>&#10003; ~p~e attached &mdash; identity steps sequenced into the master phases; Unknowns named; 28 honest points</li>
 <li>&#10003; Live &mdash; HTTP 200 at the joeycastillo.us Door, verified externally after push</li>
 </ul></div>
 
 </main>
-<footer>Be &middot; v0 &middot; ~i ~d ~p~e Purcius Identity — final &middot; 2026-07-05 &middot; Latchkey ad9b334e</footer>
+<footer>Be &middot; v0 &middot; ~i ~d ~p~e Purcius Identity — grounded in the Argus master roadmap &middot; 2026-07-05 &middot; Latchkey ad9b334e</footer>
 
 <!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
 <script>window.ARTIFACT={doc:"ad9b334e-78d0-4afa-84a1-39b957965dc9"};</script>
