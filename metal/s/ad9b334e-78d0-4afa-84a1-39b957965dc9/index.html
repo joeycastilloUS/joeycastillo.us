@@ -105,12 +105,23 @@ APP / MODULE ── Argus, … ── access = the whole app (for now) ── ga
 
 <h2 id="authz">Who reaches what</h2>
 <div data-cm="authz" class="card">
-<p style="margin-top:0">Two decisions from you, both locked here:</p>
-<ul>
-<li><strong>The Overlord decides operator access.</strong> You &mdash; and only you &mdash; say which Operator reaches which Orgs and which Apps. That grant is the edge above the whole tree; operators cannot self-grant.</li>
-<li><strong>App access = the whole app, for now.</strong> Being granted an app means the entire app and all its features. No per-feature permissioning yet &mdash; a deliberate v1 simplification, flagged for revisit when a customer actually needs finer grain.</li>
-</ul>
-<p style="margin:0">Underneath, the mechanism already exists: the Crew allow-list (<code>argus_crew_v1</code>, an email or <code>@domain</code> list in the Firestore settings doc) gates users into an app. The Overlord's operator&rarr;org&rarr;app grant is the same idea one level up. Login &ne; access stays the law: proving who you are never, by itself, opens a door.</p>
+<p style="margin-top:0">Access has <strong>two verbs</strong> and <strong>five grantable resources</strong>. Keep them separate and the whole model stays simple.</p>
+<p><span class="pill">OPERATE &mdash; add/update an app's modules</span><span class="pill">USE &mdash; log in and run what you're granted</span><span class="pill dead">app = whole app for now</span></p>
+<table>
+<tr><th>Verb</th><th>Means</th><th>Proven by</th><th>Granted by</th></tr>
+<tr><td><strong>Operate</strong></td><td>Add / update the modules of an app (e.g. wire Meraki or Zendesk into Argus)</td><td>Purcius operator key (Warranted)</td><td>Overlord &mdash; you decide who operates Argus <span class="warn">(pending your confirm)</span></td></tr>
+<tr><td><strong>Use</strong></td><td>Log in and use a granted app / API / module</td><td>OIDC login (Slack/Discord/Google)</td><td>Overlord grants the user the resource</td></tr>
+</table>
+<p style="margin:.6em 0 .2em"><strong>Grantable resources</strong> &mdash; a user (or operator) is granted any of these, coarsest to finest:</p>
+<table>
+<tr><th>Resource</th><th>Example</th></tr>
+<tr><td><strong>Application</strong></td><td><code>Argus</code></td></tr>
+<tr><td><strong>API</strong></td><td><code>nous.api</code></td></tr>
+<tr><td><strong>Organization</strong></td><td>Mendocino Farms &middot; Philz Coffee &middot; Acme Dev</td></tr>
+<tr><td><strong>App within an org</strong></td><td>Argus <em>for Mendocino Farms</em></td></tr>
+<tr><td><strong>Module within an app</strong></td><td><code>Argus for Meraki</code> &middot; <code>Argus for Zendesk</code></td></tr>
+</table>
+<p style="margin:0"><span class="good">Retired:</span> "app = whole app for now" &mdash; grants now reach down to the module. A user can hold both hats: <strong>Joey</strong> is Overlord <em>and</em> a user; <strong>Elbert</strong> can operate Argus <em>and</em> be granted to use "Argus for Meraki" in one org. Mechanism underneath is the same Crew allow-list (<code>argus_crew_v1</code>) you already run, extended from app-level to resource-level. Login &ne; access stays the law.</p>
 </div>
 
 <h2 id="settings">Settings &mdash; module-specific + global</h2>
@@ -118,8 +129,8 @@ APP / MODULE ── Argus, … ── access = the whole app (for now) ── ga
 <p style="margin-top:0">You want Settings back, and redesigned: per-module, plus a global layer. Shape:</p>
 <table>
 <tr><th>Layer</th><th>Owns</th><th>Who edits</th></tr>
-<tr><td><strong>Global settings</strong></td><td>Orgs, operators, operator&rarr;org&rarr;app grants, identity providers</td><td>Overlord</td></tr>
-<tr><td><strong>Module settings</strong> (per app)</td><td>That app's Crew allow-list, app-specific config, which users reach it</td><td>Overlord / granted Operator</td></tr>
+<tr><td><strong>Global settings</strong></td><td>Orgs, operators, APIs, operator&rarr;org&rarr;app&rarr;module grants, identity providers</td><td>Overlord</td></tr>
+<tr><td><strong>Module settings</strong> (per app, per module)</td><td>That module's Crew allow-list, module config, which users reach it (e.g. "Argus for Meraki")</td><td>Overlord / operator who operates that app</td></tr>
 </table>
 <p style="margin:0">The gear returns for anyone holding a key; a plain user sees only what their access allows (often nothing but the app itself). "Which users can access each app" lives in <em>module</em> settings &mdash; that's the per-app permission surface you asked for.</p>
 </div>
