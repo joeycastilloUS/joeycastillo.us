@@ -1,0 +1,897 @@
+<!-- the-last-family.com -- Mirakyl 2026 -- offline PCS road-trip companion. Built on the kASTIL substrate. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<meta name="theme-color" content="#0b0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="The Last Family">
+<meta name="description" content="Hampton, VA to Anchorage, AK. Every stop, every hospital, vet and grocery, the pet border rules and your notes -- offline, one tap away.">
+<title>The Last Family -- Road North</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Cpath d='M20 48 L32 16 L44 48' fill='none' stroke='%237fd1c4' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='16' r='4' fill='%23d8a84b'/%3E%3C/svg%3E" type="image/svg+xml">
+<style>
+:root{
+  --bg:#0b0d10; --bg-2:#12151a; --bg-3:#1a1e25; --bg-4:#232833;
+  --ink:#f4f3f0; --ink-dim:#b3b8c2; --ink-mute:#767c88;
+  --gold:#d8a84b; --gold-soft:#e7c587;
+  --aurora:#7fd1c4; --aurora-soft:#a8e6da;
+  --sos:#ef4a54; --sos-soft:#ff7b83; --sos-bg:#2a1113;
+  --line:#242832; --line-2:#2f3644;
+  --face:"Helvetica Neue",Helvetica,Arimo,Arial,sans-serif;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:72px;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  --nav-h:60px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--face);line-height:1.5;
+  padding-bottom:calc(var(--nav-h) + var(--safe-b));-webkit-font-smoothing:antialiased;overscroll-behavior-y:none;}
+a{color:inherit;}
+button{font-family:inherit;}
+.wrap{max-width:640px;margin:0 auto;padding:0 var(--s4);}
+h1,h2,h3,h4{margin:0;letter-spacing:-0.02em;}
+.eyebrow{font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);font-weight:700;}
+.mute{color:var(--ink-mute);} .dim{color:var(--ink-dim);}
+
+/* top bar */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(11,13,16,.86);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);padding:calc(var(--s3) + var(--safe-t)) var(--s4) var(--s3);}
+.topbar .wrap{display:flex;align-items:center;justify-content:space-between;padding:0;}
+.brand{font-weight:700;font-size:15px;letter-spacing:-0.01em;display:flex;align-items:center;gap:8px;}
+.brand .glyph{width:22px;height:22px;flex:0 0 22px;}
+.brand b{color:var(--aurora);} .brand .yr{color:var(--ink-mute);font-weight:400;}
+.online-dot{font-size:11px;color:var(--ink-mute);display:flex;align-items:center;gap:6px;letter-spacing:.04em;}
+.online-dot i{width:7px;height:7px;border-radius:50%;background:var(--aurora);display:inline-block;box-shadow:0 0 8px var(--aurora);}
+.online-dot.off i{background:var(--ink-mute);box-shadow:none;}
+
+/* screens */
+.screen{display:none;animation:fade .25s ease;padding-top:var(--s5);}
+.screen.on{display:block;}
+@keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+/* cards */
+.card{background:var(--bg-3);border:1px solid var(--line);border-radius:16px;padding:var(--s4);}
+.card + .card{margin-top:var(--s3);}
+.stack>*+*{margin-top:var(--s3);}
+
+/* today hero */
+.hero{position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--line-2);
+  background:linear-gradient(160deg,#0e2a2a 0%,#111a2e 45%,#0b0d10 100%);padding:var(--s5) var(--s4) var(--s4);}
+.hero::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(120% 80% at 15% -10%,rgba(127,209,196,.30),transparent 60%),
+  radial-gradient(90% 70% at 95% 0%,rgba(216,168,75,.16),transparent 55%);pointer-events:none;}
+.hero>*{position:relative;}
+.hero .daytag{display:inline-flex;align-items:center;gap:8px;background:rgba(0,0,0,.35);border:1px solid var(--line-2);
+  border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--aurora-soft);}
+.hero h1{font-size:clamp(26px,7vw,34px);line-height:1.05;margin:var(--s3) 0 var(--s2);}
+.hero .route-sub{color:var(--ink-dim);font-size:15px;}
+.hero .metrics{display:flex;gap:var(--s4);margin-top:var(--s4);flex-wrap:wrap;}
+.metric{background:rgba(0,0,0,.28);border:1px solid var(--line-2);border-radius:12px;padding:10px 14px;min-width:88px;}
+.metric .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mute);}
+.metric .v{font-size:18px;font-weight:700;margin-top:2px;}
+.metric .v.gold{color:var(--gold-soft);} .metric .v.aur{color:var(--aurora-soft);}
+.hero .note{margin-top:var(--s4);color:var(--ink-dim);font-size:14px;font-style:italic;border-left:2px solid var(--gold);padding-left:var(--s3);}
+
+/* progress */
+.prog{margin-top:var(--s4);}
+.prog .bar{height:8px;background:var(--bg-4);border-radius:999px;overflow:hidden;}
+.prog .fill{height:100%;background:linear-gradient(90deg,var(--aurora),var(--gold));border-radius:999px;transition:width .4s ease;}
+.prog .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute);margin-top:6px;}
+
+/* quick actions grid */
+.qa{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s3);margin-top:var(--s4);}
+.qa button, .qa a{display:flex;align-items:center;gap:10px;background:var(--bg-3);border:1px solid var(--line-2);
+  border-radius:14px;padding:14px;color:var(--ink);text-decoration:none;font-size:14px;font-weight:600;cursor:pointer;text-align:left;
+  transition:border-color .15s ease,background .15s ease;min-height:56px;}
+.qa button:active,.qa a:active{background:var(--bg-4);}
+.qa .ic{font-size:20px;flex:0 0 24px;text-align:center;}
+.qa .sos{background:var(--sos-bg);border-color:rgba(239,74,84,.5);color:var(--sos-soft);}
+.qa .sos .ic{filter:none;}
+
+/* section head */
+.shead{display:flex;align-items:baseline;justify-content:space-between;margin:var(--s6) 0 var(--s3);}
+.shead h2{font-size:20px;} .shead .cnt{font-size:12px;color:var(--ink-mute);}
+
+/* stop list */
+.stop-row{display:flex;gap:var(--s3);align-items:stretch;background:var(--bg-3);border:1px solid var(--line);
+  border-radius:14px;padding:var(--s3) var(--s4);cursor:pointer;transition:border-color .15s ease,transform .1s ease;}
+.stop-row:active{transform:scale(.99);border-color:var(--line-2);}
+.stop-row.now{border-color:var(--aurora);box-shadow:0 0 0 1px rgba(127,209,196,.25);}
+.stop-row.done{opacity:.62;}
+.stop-row + .stop-row{margin-top:var(--s2);}
+.stop-day{flex:0 0 42px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-right:1px solid var(--line);padding-right:var(--s3);}
+.stop-day .n{font-size:20px;font-weight:700;line-height:1;color:var(--gold-soft);}
+.stop-day .d{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mute);margin-top:2px;}
+.stop-main{flex:1;min-width:0;}
+.stop-route{font-weight:700;font-size:15px;letter-spacing:-0.01em;}
+.stop-meta{color:var(--ink-mute);font-size:12.5px;margin-top:2px;display:flex;gap:10px;flex-wrap:wrap;}
+.stop-flags{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+.chip{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;}
+.chip.border{background:rgba(216,168,75,.16);color:var(--gold-soft);border:1px solid rgba(216,168,75,.35);}
+.chip.arrive{background:rgba(127,209,196,.16);color:var(--aurora-soft);border:1px solid rgba(127,209,196,.35);}
+.chip.rest{background:var(--bg-4);color:var(--ink-dim);border:1px solid var(--line-2);}
+.chip.now{background:var(--aurora);color:#04211d;}
+.chip.done{background:var(--bg-4);color:var(--ink-mute);border:1px solid var(--line-2);}
+.stop-go{align-self:center;color:var(--ink-mute);font-size:20px;}
+
+/* detail sheet */
+.sheet-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s ease;backdrop-filter:blur(2px);}
+.sheet-back.on{opacity:1;pointer-events:auto;}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:70;background:var(--bg-2);border-top:1px solid var(--line-2);
+  border-radius:20px 20px 0 0;max-height:92vh;overflow-y:auto;transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);
+  padding-bottom:calc(var(--s7) + var(--safe-b));-webkit-overflow-scrolling:touch;}
+.sheet.on{transform:translateY(0);}
+.sheet-grip{position:sticky;top:0;background:var(--bg-2);padding:var(--s3) var(--s4) var(--s2);z-index:2;border-bottom:1px solid var(--line);}
+.sheet-grip .bar{width:38px;height:4px;background:var(--line-2);border-radius:999px;margin:0 auto var(--s3);}
+.sheet-grip .row{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s3);}
+.sheet-grip h3{font-size:18px;}
+.sheet-grip .close{background:var(--bg-4);border:1px solid var(--line-2);color:var(--ink);border-radius:10px;width:34px;height:34px;font-size:18px;cursor:pointer;flex:0 0 34px;}
+.sheet-body{padding:var(--s4);}
+.sheet-body h4{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:var(--s5) 0 var(--s2);}
+.sheet-body h4:first-child{margin-top:var(--s2);}
+
+/* service rows */
+.svc{display:flex;align-items:center;gap:var(--s3);background:var(--bg-3);border:1px solid var(--line);border-radius:12px;padding:var(--s3);}
+.svc + .svc{margin-top:var(--s2);}
+.svc.med{border-color:rgba(239,74,84,.4);}
+.svc-ic{flex:0 0 38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--bg-4);}
+.svc.med .svc-ic{background:var(--sos-bg);}
+.svc-main{flex:1;min-width:0;}
+.svc-lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mute);}
+.svc-name{font-size:14px;font-weight:600;line-height:1.25;margin-top:1px;}
+.svc-acts{display:flex;gap:6px;flex:0 0 auto;}
+.iact{width:40px;height:40px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-4);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;font-size:17px;text-decoration:none;cursor:pointer;}
+.iact.call{color:var(--aurora-soft);border-color:rgba(127,209,196,.4);}
+.iact.dir{color:var(--gold-soft);border-color:rgba(216,168,75,.4);}
+.iact.disabled{opacity:.3;pointer-events:none;}
+
+/* fields */
+.field{margin-top:var(--s2);}
+.field label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:4px;}
+.field input, .field textarea, .field select{width:100%;background:var(--bg-3);border:1px solid var(--line-2);color:var(--ink);
+  border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--aurora);}
+.field.row2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);}
+textarea{resize:vertical;min-height:64px;}
+
+/* notes */
+.note-item{background:var(--bg-3);border:1px solid var(--line);border-radius:12px;padding:var(--s3);font-size:14px;}
+.note-item + .note-item{margin-top:var(--s2);}
+.note-item .ts{font-size:11px;color:var(--ink-mute);margin-top:6px;display:flex;justify-content:space-between;}
+.note-item .del{color:var(--sos-soft);cursor:pointer;font-size:11px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--aurora);color:#04211d;border:none;
+  border-radius:11px;padding:12px 16px;font-weight:700;font-size:14px;cursor:pointer;width:100%;}
+.btn.ghost{background:transparent;border:1px solid var(--line-2);color:var(--ink);}
+.btn.gold{background:var(--gold);color:#1c1406;}
+.btn:active{transform:scale(.99);}
+
+/* photo/doc grid */
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);margin-top:var(--s3);}
+.pcell{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--bg-3);}
+.pcell img{width:100%;height:100%;object-fit:cover;display:block;}
+.pcell .x{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.65);color:#fff;border-radius:50%;width:22px;height:22px;
+  display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;}
+.padd{aspect-ratio:1;border:1.5px dashed var(--line-2);border-radius:10px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;color:var(--ink-mute);font-size:11px;cursor:pointer;background:var(--bg-2);}
+.padd .plus{font-size:22px;color:var(--aurora);}
+
+/* emergency screen */
+.sos-hero{background:linear-gradient(160deg,#2a1113,#150a0c);border:1px solid rgba(239,74,84,.4);border-radius:18px;padding:var(--s5) var(--s4);}
+.sos-hero .eyebrow{color:var(--sos-soft);}
+.sos-hero h2{font-size:24px;margin:var(--s2) 0;}
+.sos-hero p{color:var(--ink-dim);font-size:14px;margin:0;}
+.sos-911{display:flex;align-items:center;gap:var(--s3);background:var(--sos);color:#fff;border-radius:14px;padding:16px;
+  font-weight:800;font-size:18px;text-decoration:none;margin-top:var(--s4);letter-spacing:.02em;}
+.sos-911 .ic{font-size:24px;}
+
+/* checklist */
+.ck-sec{margin-top:var(--s5);}
+.ck-sec h3{font-size:15px;color:var(--gold-soft);margin-bottom:var(--s2);display:flex;align-items:center;gap:8px;}
+.ck-item{display:flex;gap:var(--s3);align-items:flex-start;background:var(--bg-3);border:1px solid var(--line);
+  border-radius:11px;padding:12px;cursor:pointer;}
+.ck-item + .ck-item{margin-top:var(--s2);}
+.ck-box{flex:0 0 24px;width:24px;height:24px;border:1.5px solid var(--ink-mute);border-radius:7px;display:flex;
+  align-items:center;justify-content:center;font-size:15px;color:transparent;transition:all .12s ease;margin-top:1px;}
+.ck-item.on .ck-box{border-color:var(--aurora);background:rgba(127,209,196,.16);color:var(--aurora);}
+.ck-item.on .ck-txt{color:var(--ink-mute);text-decoration:line-through;}
+.ck-txt{font-size:14px;line-height:1.4;}
+
+/* border reference */
+.brd{background:var(--bg-3);border:1px solid var(--line);border-radius:14px;padding:var(--s4);}
+.brd + .brd{margin-top:var(--s3);}
+.brd h3{font-size:15px;color:var(--gold-soft);display:flex;align-items:center;gap:8px;}
+.brd .day{font-size:11px;color:var(--ink-mute);font-weight:400;}
+.brd ul{margin:var(--s3) 0 0;padding-left:18px;color:var(--ink-dim);font-size:13.5px;}
+.brd li{margin-bottom:6px;}
+.brd b{color:var(--ink);}
+
+/* small print / empty */
+.empty{text-align:center;color:var(--ink-mute);font-size:13px;padding:var(--s5) var(--s4);border:1px dashed var(--line-2);border-radius:12px;}
+.hint{font-size:12px;color:var(--ink-mute);margin-top:6px;}
+
+/* bottom nav */
+.tabnav{position:fixed;left:0;right:0;bottom:0;z-index:50;height:calc(var(--nav-h) + var(--safe-b));
+  padding-bottom:var(--safe-b);background:rgba(11,13,16,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  display:flex;justify-content:space-around;align-items:stretch;}
+.tabnav button{flex:1;background:none;border:none;color:var(--ink-mute);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;font-size:10px;letter-spacing:.02em;cursor:pointer;padding:6px 2px;}
+.tabnav button .ic{font-size:20px;line-height:1;}
+.tabnav button.on{color:var(--aurora);}
+.tabnav button.sos.on,.tabnav button.sos{color:var(--sos-soft);}
+.tabnav button.on .ic{transform:translateY(-1px);}
+
+/* route map svg */
+.rmap{background:linear-gradient(160deg,#0e1620,#0b0d10);border:1px solid var(--line);border-radius:16px;padding:var(--s3);margin-bottom:var(--s3);}
+.rmap svg{width:100%;height:auto;display:block;}
+
+.footer{text-align:center;color:var(--ink-mute);font-size:11px;padding:var(--s7) var(--s4) var(--s5);}
+.footer b{color:var(--aurora);}
+.toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + 16px + var(--safe-b));transform:translateX(-50%) translateY(20px);
+  background:var(--bg-4);border:1px solid var(--line-2);color:var(--ink);padding:10px 18px;border-radius:999px;font-size:13px;
+  z-index:90;opacity:0;pointer-events:none;transition:all .25s ease;white-space:nowrap;box-shadow:0 8px 30px rgba(0,0,0,.5);}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#12151a"/><path d="M18 50 L32 14 L46 50" fill="none" stroke="#7fd1c4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="14" r="4.5" fill="#d8a84b"/></svg>
+      The Last Family <span class="yr">· 2026</span>
+    </div>
+    <div class="online-dot" id="netdot"><i></i><span id="netlbl">online</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ TODAY ============ -->
+  <section id="s-today" class="screen on"></section>
+
+  <!-- ============ ROUTE ============ -->
+  <section id="s-route" class="screen">
+    <div class="eyebrow">4,400 miles · 19 stops · the Alaska Highway</div>
+    <div class="shead" style="margin-top:8px;"><h2>The Route</h2><span class="cnt" id="route-cnt"></span></div>
+    <div class="rmap" id="rmap"></div>
+    <div id="stoplist" class="stack"></div>
+  </section>
+
+  <!-- ============ EMERGENCY ============ -->
+  <section id="s-sos" class="screen"></section>
+
+  <!-- ============ CHECKLIST ============ -->
+  <section id="s-check" class="screen">
+    <div class="eyebrow">Fill it in pen — it's yours</div>
+    <div class="shead" style="margin-top:8px;"><h2>Pre-Departure</h2><span class="cnt" id="check-cnt"></span></div>
+    <div id="checklist"></div>
+  </section>
+
+  <!-- ============ DOCS / MORE ============ -->
+  <section id="s-docs" class="screen">
+    <div class="eyebrow">Offline · stored on this device only</div>
+    <div class="shead" style="margin-top:8px;"><h2>Pet &amp; Trip Docs</h2></div>
+    <p class="dim" style="font-size:14px;margin:0 0 4px;">Snap a photo of each document so it's one tap away at the border — even with no signal.</p>
+    <div id="docvault" class="stack" style="margin-top:16px;"></div>
+
+    <div class="shead"><h2>Trip Settings</h2></div>
+    <div class="card">
+      <div class="field"><label>Departure date</label><input type="date" id="set-start"></div>
+      <div class="field"><label>Crew</label><input type="text" id="set-crew" placeholder="2 adults, 1 dog, 1 cat"></div>
+      <div style="display:flex;gap:12px;margin-top:16px;">
+        <button class="btn ghost" id="btn-export">⬇ Backup (JSON)</button>
+        <button class="btn ghost" id="btn-import">⬆ Restore</button>
+      </div>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <p class="hint">Backup saves your notes, photos, check-ins and documents to a file you can keep or move to another phone.</p>
+    </div>
+    <div class="footer">
+      <div style="font-weight:700;color:var(--ink);font-size:14px;margin-bottom:6px;">Drive safe. Stop every two hours.</div>
+      <b>the-last-family.com</b> · Hampton → Anchorage · built on the kASTIL substrate
+    </div>
+  </section>
+
+</main>
+
+<!-- detail sheet -->
+<div class="sheet-back" id="sheet-back"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-grip">
+    <div class="bar"></div>
+    <div class="row"><h3 id="sheet-title">Stop</h3><button class="close" id="sheet-close">×</button></div>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
+</div>
+
+<nav class="tabnav">
+  <button data-tab="today" class="on"><span class="ic">🧭</span>Today</button>
+  <button data-tab="route"><span class="ic">🗺️</span>Route</button>
+  <button data-tab="sos" class="sos"><span class="ic">🚨</span>Help</button>
+  <button data-tab="check"><span class="ic">✅</span>Prep</button>
+  <button data-tab="docs"><span class="ic">📁</span>Docs</button>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/6b7f0337-763b-47ac-9b8a-d5fcf4ae1737/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================= DATA (seed) */
+var TRIP = { title:"Hampton, VA → Anchorage, AK", crewDefault:"2 adults (one 5 mo pregnant), 1 dog, 1 elderly cat" };
+
+var ORIGIN = { name:"Hampton, VA", lat:37.0299, lng:-76.3452 };
+
+var STOPS = [
+ {d:1, from:"Hampton, VA", to:"Charleston, WV", miles:"305 mi", time:"5 hr", lat:38.3498, lng:-81.6326,
+  note:"Easy first leg west over the Appalachians.",
+  hotel:{name:"La Quinta by Wyndham (Elkview / Charleston NE)", phone:"3042242885", tip:"Genuinely pet-loving; ask for the government / per-diem rate."},
+  hosp:{name:"CAMC General Hospital, Charleston (full ER)", phone:""},
+  vet:{name:"Charleston-area 24-hr emergency vet — confirm on arrival", phone:""},
+  groc:{name:"Kroger (multiple Charleston locations)", phone:""}},
+ {d:2, from:"Charleston, WV", to:"Angola, IN", miles:"330 mi", time:"5.5 hr", lat:41.6348, lng:-84.9994,
+  note:"Pokagon State Park next door — great for pet walks.",
+  hotel:{name:"Wingate by Wyndham Angola", phone:"2607391752", tip:"4.7★ extended-stay (fridge/microwave); Wyndham gov rate."},
+  hosp:{name:"Cameron Memorial Community Hospital, Angola", phone:""},
+  vet:{name:"Angola-area vet — write in on arrival", phone:""},
+  groc:{name:"Walmart Supercenter, Angola", phone:""}},
+ {d:3, from:"Angola, IN", to:"Madison, WI", miles:"290 mi", time:"4.75 hr", lat:43.0731, lng:-89.4012,
+  note:"Routes north around Chicago on I-90.",
+  hotel:{name:"AmericInn by Wyndham Madison West", phone:"6085354712", tip:"Pet-friendly; Wyndham rate. Alt: Hampton Inn & Suites Madison-West."},
+  hosp:{name:"UW Health / SSM — write in nearest ER", phone:""},
+  vet:{name:"Full-service city — write in", phone:""},
+  groc:{name:"Hy-Vee / Metro Market", phone:""}},
+ {d:4, from:"Madison, WI", to:"Minneapolis, MN", miles:"270 mi", time:"4.25 hr", lat:44.9778, lng:-93.2650, rest:true,
+  note:"Good place to build in a rest day.",
+  hotel:{name:"Extended Stay America (Eden Prairie or Fridley)", phone:"9529426818", tip:"Full kitchen — ideal for the pregnancy & a rest day."},
+  hosp:{name:"Full-service metro — write in nearest ER", phone:""},
+  vet:{name:"Full-service metro — write in", phone:""},
+  groc:{name:"Cub Foods", phone:""}},
+ {d:5, from:"Minneapolis, MN", to:"Fargo, ND", miles:"240 mi", time:"3.75 hr", lat:46.8772, lng:-96.7898,
+  note:"Short, flat day across western Minnesota.",
+  hotel:{name:"La Quinta by Wyndham Fargo-Medical Center", phone:"7016399731", tip:"Pet-friendly, literally next to the hospital; Wyndham gov rate."},
+  hosp:{name:"Sanford Medical Center, 5225 23rd Ave S (24 hr)", phone:"7014172000"},
+  vet:{name:"Fargo-area vet — write in", phone:""},
+  groc:{name:"Hornbacher's / Cashwise", phone:""}},
+ {d:6, from:"Fargo, ND", to:"Bismarck, ND", miles:"195 mi", time:"3 hr", lat:46.8083, lng:-100.7837,
+  note:"Easy short day — rest and re-provision.",
+  hotel:{name:"La Quinta by Wyndham Bismarck", phone:"7012040024", tip:"Pet-friendly; Wyndham government rate."},
+  hosp:{name:"Sanford / CHI St. Alexius, Bismarck (full ER)", phone:""},
+  vet:{name:"Bismarck-area vet — write in", phone:""},
+  groc:{name:"Cash Wise Foods", phone:""}},
+ {d:7, from:"Bismarck, ND", to:"Billings, MT", miles:"370 mi", time:"5.5 hr", lat:45.7833, lng:-108.5007, long:true,
+  note:"Longest leg. Optional split: overnight in Miles City, MT to halve it.",
+  hotel:{name:"Best Western Plus Clocktower Inn", phone:"4062595511", tip:"4.3★, dog treats on arrival, covered parking; BW gov rate."},
+  hosp:{name:"Billings Clinic Hospital, 2800 10th Ave N", phone:"4062382500"},
+  vet:{name:"Moore Lane Veterinary (24/7), 30 Moore Ln", phone:"4062524159"},
+  groc:{name:"Albertsons", phone:""}},
+ {d:8, from:"Billings, MT", to:"Great Falls, MT", miles:"220 mi", time:"3.5 hr", lat:47.5053, lng:-111.3008,
+  note:"Last big U.S. city before Canada — top off groceries and fuel.",
+  hotel:{name:"Baymont by Wyndham Great Falls City Center", phone:"4067613410", tip:"Dedicated pet floor; Wyndham rate."},
+  hosp:{name:"Benefis Health System, 1101 26th St S (24 hr)", phone:"4064555000"},
+  vet:{name:"Great Falls-area vet — write in", phone:""},
+  groc:{name:"Albertsons, 2250 10th Ave S (open to midnight)", phone:""}},
+ {d:9, from:"Great Falls, MT", to:"Calgary, AB", miles:"300 mi", time:"5 hr", lat:51.0447, lng:-114.0719, border:"canada",
+  note:"CROSS INTO CANADA at Coutts / Sweetgrass — DECLARE PETS, rabies certificates in hand.",
+  hotel:{name:"Best Western Premier Calgary Plaza", phone:"4032488888", tip:"Pet-friendly, big lot. Ask re: military rate (inconsistent in Canada)."},
+  hosp:{name:"Foothills Medical Centre / Rockyview General (full ER)", phone:""},
+  vet:{name:"24-hr CARE Centre — write in", phone:""},
+  groc:{name:"Real Canadian Superstore / Save-On-Foods", phone:""}},
+ {d:10, from:"Calgary, AB", to:"Edmonton, AB", miles:"185 mi", time:"3 hr", lat:53.5461, lng:-113.4938,
+  note:"Your last major metro to stock up before the north.",
+  hotel:{name:"Hilton Garden Inn West Edmonton", phone:"7804432233", tip:"Near groceries; confirm pet fee. Alt: Quality Inn West Edmonton."},
+  hosp:{name:"University of Alberta Hospital / Royal Alexandra (full ER)", phone:""},
+  vet:{name:"Full-service city — write in", phone:""},
+  groc:{name:"Real Canadian Superstore (major-metro stock-up)", phone:""}},
+ {d:11, from:"Edmonton, AB", to:"Grande Prairie, AB", miles:"285 mi", time:"4.5 hr", lat:55.1707, lng:-118.7947,
+  note:"Heading into the Peace Country.",
+  hotel:{name:"Sandman Hotel Grande Prairie", phone:"7805135555", tip:"Explicitly pet- and kid-friendly; near hospital and 7-day vet."},
+  hosp:{name:"Queen Elizabeth II Hospital, 10409 98 St", phone:"7805387100"},
+  vet:{name:"Animal Medical Centre North (7 days), 10814 100 St", phone:"7805390636"},
+  groc:{name:"Real Canadian Superstore", phone:""}},
+ {d:12, from:"Grande Prairie, AB", to:"Dawson Creek, BC", miles:"85 mi", time:"1.5 hr", lat:55.7596, lng:-120.2377, milezero:true,
+  note:"Short day into Alaska Highway Mile 0. Photo op at the Mile 0 marker.",
+  hotel:{name:"Super 8 by Wyndham Dawson Creek", phone:"8665416880", tip:"Pet-friendly per guests. Kitchenette option: Stonebridge Hotel."},
+  hosp:{name:"Dawson Creek & District Hospital, 11100 13 St (24 hr)", phone:"2507847355"},
+  vet:{name:"Dawson Creek Veterinary Clinic", phone:"2507825616"},
+  groc:{name:"Save-On-Foods", phone:""}},
+ {d:13, from:"Dawson Creek, BC", to:"Fort Nelson, BC", miles:"283 mi", time:"4.75 hr", lat:58.8050, lng:-122.6972, remote:true,
+  note:"The highway starts getting remote — fuel up, watch for wildlife at dawn/dusk.",
+  hotel:{name:"Lakeview Inns & Suites", phone:"2502335001", tip:"Spotless, an Alaska-drive favorite. Alt: Super 8 by Wyndham."},
+  hosp:{name:"Fort Nelson General Hospital, 5315 Liard St", phone:"2507748100"},
+  vet:{name:"Tamarack Veterinary Services — limited weekday hrs", phone:"2507741098"},
+  groc:{name:"IGA Fort Nelson, 4823 50th Ave S", phone:""}},
+ {d:14, from:"Fort Nelson, BC", to:"Watson Lake, YT", miles:"326 mi", time:"5.5 hr", lat:60.0632, lng:-128.7085, remote:true,
+  note:"Muncho Lake + Liard Hot Springs en route (skip soaking while pregnant). Optional split at Muncho Lake.",
+  hotel:{name:"A Nicer Motel", phone:"8675364639", tip:"4.6★, riverside cabins w/ kitchenettes. Independent — ask for a rate."},
+  hosp:{name:"Watson Lake Community Hospital, 801 Ravenhill Dr — LIMITED HRS", phone:"8675364444"},
+  vet:{name:"No vet in town — nearest is Whitehorse", phone:""},
+  groc:{name:"Watson Lake Foods — only real resupply Fort Nelson→Whitehorse", phone:""}},
+ {d:15, from:"Watson Lake, YT", to:"Whitehorse, YT", miles:"275 mi", time:"4.5 hr", lat:60.7212, lng:-135.0568,
+  note:"Into the Yukon capital — biggest city on the highway. Smart rest / major-resupply stop.",
+  hotel:{name:"Best Western Gold Rush Inn", phone:"8676684500", tip:"Central, pet-friendly; Best Western rate."},
+  hosp:{name:"Whitehorse General Hospital, 5 Hospital Rd", phone:"8673938700"},
+  vet:{name:"All Paws Veterinary Clinic", phone:"8676677387"},
+  groc:{name:"Real Canadian Superstore, 2270 2nd Ave (major resupply)", phone:""}},
+ {d:16, from:"Whitehorse, YT", to:"Beaver Creek, YT", miles:"283 mi", time:"5 hr", lat:62.3833, lng:-140.8764, remote:true,
+  note:"Last Canadian community before the border — overnight here so you cross fresh.",
+  hotel:{name:"1202 Motor Inn", phone:"8678627600", tip:"Basic; only two motels in town. Get the quoted price IN WRITING."},
+  hosp:{name:"No hospital — nearest: Whitehorse (behind) or Tok Clinic (ahead)", phone:""},
+  vet:{name:"None — nearest is Whitehorse", phone:""},
+  groc:{name:"Limited (gas-station store) — stock up in Whitehorse", phone:""}},
+ {d:17, from:"Beaver Creek, YT", to:"Tok, AK", miles:"110 mi", time:"2.5–3 hr", lat:63.3367, lng:-142.9856, border:"usa",
+  note:"RE-ENTER THE U.S. at Port Alcan — have the CDC Dog Import Form receipt ready.",
+  hotel:{name:"Roberts Lodge", phone:"9075050613", tip:"5.0★, spotless pet-friendly cabins, light breakfast. Alt: Young's Motel."},
+  hosp:{name:"Tok Clinic (weekdays); nearest full hospital: Fairbanks", phone:"9078835855"},
+  vet:{name:"No vet in Tok — nearest is Wasilla / Anchorage", phone:""},
+  groc:{name:"Three Bears, 1314 Alaska Hwy", phone:"9078835195"}},
+ {d:18, from:"Tok, AK", to:"Glennallen / Copper Center, AK", miles:"140 mi", time:"3 hr", lat:62.1097, lng:-145.5464,
+  note:"Tok Cutoff is rough and bumpy — take it slow.",
+  hotel:{name:"Uncle Nicolai's Inn (Copper Center)", phone:"9072593117", tip:"Kitchenette, rustic — confirm pet policy. Alt: Caribou Hotel, Glennallen."},
+  hosp:{name:"Cross Road Medical Center, Glennallen (clinic)", phone:""},
+  vet:{name:"None nearby", phone:""},
+  groc:{name:"Glennallen market (Park's Place)", phone:""}},
+ {d:19, from:"Glennallen, AK", to:"Anchorage, AK", miles:"190 mi", time:"3.5 hr", lat:61.2181, lng:-149.9003, arrive:true,
+  note:"Glenn Highway home stretch — Matanuska Glacier, Palmer, and you're there.",
+  hotel:{name:"JBER on-base lodging (pet rooms; TLA-friendly) — book EARLY. Backup: Motel 6 Midtown", phone:"9076778000", tip:"Base TLF is cheapest + PCS-designed. Motel 6 = pets stay free."},
+  hosp:{name:"Providence Alaska Medical Center, 3200 Providence Dr — best OB/maternity", phone:"9075622211"},
+  vet:{name:"PET Emergency Treatment (24 hr)", phone:"9072745636"},
+  groc:{name:"Fred Meyer, 2000 W Dimond Blvd", phone:"9072676700"}}
+];
+
+var BACKSTOPS = [
+  {name:"Moore Lane Veterinary — Billings, MT (24/7)", phone:"4062524159"},
+  {name:"PET Emergency Treatment — Anchorage, AK (24/7)", phone:"9072745636"}
+];
+
+var BORDERS = [
+ {title:"Entering Canada", day:"Coutts / Sweetgrass · Day 9", items:[
+   "Both <b>dog and cat</b> need a valid <b>rabies vaccination certificate</b> — signed by a licensed vet, in English, identifying the animal (breed, sex, color, weight) with vaccine name/lot/duration, dated within 3 years.",
+   "Dogs over 8 months old need <b>nothing more</b> than the rabies certificate.",
+   "<b>Declare both pets</b> to the officer. Possible small inspection fee (~$30 CAD).",
+   "Carry <b>ORIGINAL paper certificates</b> — not photos."]},
+ {title:"Re-entering the U.S.", day:"Port Alcan, Alaska · Day 17", items:[
+   "The <b>dog</b> is the tricky one: at least 6 months old, microchipped (ISO chip on/before the rabies shot), healthy, and you must submit the <b>CDC Dog Import Form</b> online <b>before</b> crossing — carry the receipt.",
+   "That CDC receipt is the main federal requirement returning (dog only transited low-risk Canada).",
+   "The <b>cat</b> has no CDC rabies requirement returning — but carry its rabies certificate anyway.",
+   "A driver's DUI / criminal record can bar entry to <b>Canada</b> — check ahead if that could apply."]}
+];
+
+var CHECKLIST = [
+ {sec:"🐾 Pets", ic:"", items:[
+   "Rabies certificate for the DOG — signed vet, English, breed/sex/color/weight + vaccine name/lot/duration (within 3 yrs)",
+   "Rabies certificate for the CAT — same requirements",
+   "Dog microchipped (ISO chip) on or before the rabies vaccination date",
+   "Dog is at least 6 months old (required to re-enter the U.S.)",
+   "CDC Dog Import Form submitted online BEFORE the Alaska border — receipt printed",
+   "Vet health records + anxiety/motion meds for the elderly cat",
+   "Litter setup, harnesses, food/water buffer, bowls, waste bags"]},
+ {sec:"📄 Documents", items:[
+   "Copies of PCS orders (several) + military IDs",
+   "Driver's licenses / passports (recommended for the border)",
+   "Vehicle registration + insurance (valid in Canada)",
+   "Envelope/app folder for per-diem lodging + fuel receipts",
+   "OB contact + prenatal records; nearest hospitals noted along route"]},
+ {sec:"🚗 Vehicle & Safety", items:[
+   "Spare tire checked + jack; roadside assistance number saved",
+   "Offline maps downloaded (Google/Apple) for the whole route",
+   "First-aid kit; jumper cables; basic tools; blanket",
+   "Water + non-perishable food buffer for remote stretches",
+   "Plan to stop and walk every ~2 hours (circulation + the dog)"]}
+];
+
+var DOCKINDS = [
+  {id:"rabies-dog", label:"Rabies cert — Dog", ic:"🐕"},
+  {id:"rabies-cat", label:"Rabies cert — Cat", ic:"🐈"},
+  {id:"microchip", label:"Microchip record", ic:"🔖"},
+  {id:"cdc", label:"CDC Dog Import receipt", ic:"🛂"},
+  {id:"health", label:"Vet health records", ic:"🩺"},
+  {id:"pcs", label:"PCS orders", ic:"🎖️"}
+];
+
+/* ============================================================= STATE / STORAGE */
+var LS_KEY = "mirakyl.v1";
+var state = load();
+function load(){
+  try{ var s = JSON.parse(localStorage.getItem(LS_KEY)); if(s) return s; }catch(e){}
+  return { start:"", crew:"", stops:{}, check:{}, todayOverride:null };
+}
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){ toast("Storage full — back up & clear space"); } }
+function stopState(d){ if(!state.stops[d]) state.stops[d] = {conf:"", ci:"", co:"", notes:[]}; return state.stops[d]; }
+
+/* IndexedDB for image blobs (photos + docs) */
+var DB=null;
+function idb(){ return new Promise(function(res,rej){
+  if(DB) return res(DB);
+  var r = indexedDB.open("mirakyl-media",1);
+  r.onupgradeneeded=function(e){ var db=e.target.result;
+    if(!db.objectStoreNames.contains("img")) db.createObjectStore("img",{keyPath:"id"}); };
+  r.onsuccess=function(e){ DB=e.target.result; res(DB); };
+  r.onerror=function(){ rej(r.error); };
+}); }
+function idbPut(id,dataURL){ return idb().then(function(db){ return new Promise(function(res,rej){
+  var tx=db.transaction("img","readwrite"); tx.objectStore("img").put({id:id,data:dataURL});
+  tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);}; }); }); }
+function idbDel(id){ return idb().then(function(db){ return new Promise(function(res){
+  var tx=db.transaction("img","readwrite"); tx.objectStore("img").delete(id); tx.oncomplete=function(){res();}; }); }); }
+function idbAll(){ return idb().then(function(db){ return new Promise(function(res){
+  var out={}; var tx=db.transaction("img","readonly"); var cur=tx.objectStore("img").openCursor();
+  cur.onsuccess=function(e){ var c=e.target.result; if(c){ out[c.value.id]=c.value.data; c.continue(); } else res(out); };
+  cur.onerror=function(){res(out);}; }); }); }
+var MEDIA={}; /* id -> dataURL cache */
+
+/* ============================================================= HELPERS */
+function el(html){ var t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstChild; }
+function telHref(p){ return p ? "tel:+1"+p : ""; }
+function prettyPhone(p){ if(!p) return ""; return "("+p.slice(0,3)+") "+p.slice(3,6)+"-"+p.slice(6); }
+function dirHref(q){ return "https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q); }
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function toast(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(function(){t.classList.remove("on");},1900); }
+
+/* current day index (0-based) from start date, else override, else 0 */
+function currentIdx(){
+  if(state.todayOverride!=null) return Math.max(0,Math.min(18,state.todayOverride));
+  if(state.start){
+    var s=new Date(state.start+"T06:00:00"); var now=new Date();
+    var diff=Math.floor((now - s)/86400000);
+    if(diff>=0 && diff<19) return diff;
+    if(diff>=19) return 18;
+  }
+  return 0;
+}
+
+/* ============================================================= RENDER: TODAY */
+function renderToday(){
+  var idx=currentIdx(), s=STOPS[idx];
+  var doneMi=0; for(var i=0;i<idx;i++){ doneMi+=parseInt(STOPS[i].miles)||0; }
+  var totMi=0; for(var j=0;j<STOPS.length;j++){ totMi+=parseInt(STOPS[j].miles)||0; }
+  var pct=Math.round((idx)/(STOPS.length-1)*100);
+  var flag = s.arrive?'<span class="chip arrive">Arrive 🎉</span>' : s.border=="canada"?'<span class="chip border">🇨🇦 Border</span>' : s.border=="usa"?'<span class="chip border">🇺🇸 Border</span>' : s.rest?'<span class="chip rest">Rest day</span>' : "";
+  var host = document.getElementById("s-today");
+  host.innerHTML="";
+  var hero = el(
+   '<div class="hero">'+
+     '<span class="daytag">📍 Day '+s.d+' of 19 '+(flag?'· ':'')+'</span>'+(flag?' ':'')+
+     '<h1>'+esc(s.from)+' <span style="color:var(--ink-mute);font-weight:400;">→</span> '+esc(s.to)+'</h1>'+
+     '<div class="route-sub">'+s.miles+' · about '+s.time+' driving</div>'+
+     (flag?'<div class="stop-flags" style="margin-top:12px;">'+flag+'</div>':'')+
+     '<div class="metrics">'+
+       '<div class="metric"><div class="k">Today</div><div class="v aur">'+s.miles+'</div></div>'+
+       '<div class="metric"><div class="k">Drive time</div><div class="v">'+s.time+'</div></div>'+
+       '<div class="metric"><div class="k">Miles behind</div><div class="v gold">'+doneMi+'</div></div>'+
+     '</div>'+
+     '<div class="note">'+esc(s.note)+'</div>'+
+     '<div class="prog"><div class="bar"><div class="fill" style="width:'+pct+'%"></div></div>'+
+       '<div class="lbl"><span>Hampton, VA</span><span>'+pct+'%</span><span>Anchorage, AK</span></div></div>'+
+   '</div>');
+  host.appendChild(hero);
+
+  var qa = el('<div class="qa"></div>');
+  qa.appendChild(el('<button class="sos" data-act="sos"><span class="ic">🚨</span>Emergency &amp; services</button>'));
+  qa.appendChild(el('<button data-act="detail"><span class="ic">📋</span>Today\'s stop details</button>'));
+  var callH = s.hosp.phone ? '<a href="'+telHref(s.hosp.phone)+'"><span class="ic">🏥</span>Call hospital</a>' : '<a class="" data-act="detail"><span class="ic">🏥</span>Hospital info</a>';
+  qa.appendChild(el(callH));
+  qa.appendChild(el('<a href="'+dirHref(s.to)+'" target="_blank" rel="noopener"><span class="ic">🧭</span>Directions to '+esc(s.to.split(",")[0])+'</a>'));
+  host.appendChild(qa);
+
+  // day stepper
+  var step = el('<div class="card" style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'+
+    '<button class="btn ghost" style="width:auto;padding:10px 16px;" data-step="-1">‹ Prev</button>'+
+    '<div style="text-align:center;font-size:13px;color:var(--ink-dim);">Viewing <b style="color:var(--ink);">Day '+s.d+'</b>'+(state.todayOverride!=null?' <span class="mute">(manual)</span>':'')+'</div>'+
+    '<button class="btn ghost" style="width:auto;padding:10px 16px;" data-step="1">Next ›</button></div>');
+  host.appendChild(step);
+  if(state.todayOverride!=null){
+    var reset=el('<button class="btn ghost" style="margin-top:10px;font-size:13px;">↻ Back to today by date</button>');
+    reset.onclick=function(){ state.todayOverride=null; save(); renderToday(); };
+    host.appendChild(reset);
+  }
+  if(!state.start){
+    var setd=el('<div class="card" style="margin-top:16px;"><div class="field"><label>Set your departure date to auto-track the day</label><input type="date" id="quick-start"></div></div>');
+    host.appendChild(setd);
+    setd.querySelector("#quick-start").onchange=function(e){ state.start=e.target.value; state.todayOverride=null; save(); renderToday(); toast("Trip started — safe travels"); };
+  }
+
+  host.querySelector('[data-act="sos"]').onclick=function(){ go("sos"); };
+  var dets=host.querySelectorAll('[data-act="detail"]'); for(var k=0;k<dets.length;k++) dets[k].onclick=function(){ openStop(idx); };
+  var steps=host.querySelectorAll('[data-step]'); for(var m=0;m<steps.length;m++){ (function(btn){ btn.onclick=function(){
+    var cur=currentIdx()+parseInt(btn.getAttribute("data-step")); cur=Math.max(0,Math.min(18,cur)); state.todayOverride=cur; save(); renderToday();
+  }; })(steps[m]); }
+}
+
+/* ============================================================= RENDER: ROUTE */
+function renderRoute(){
+  var idx=currentIdx();
+  document.getElementById("route-cnt").textContent = "Day "+STOPS[idx].d+" · today";
+  var list=document.getElementById("stoplist"); list.innerHTML="";
+  STOPS.forEach(function(s,i){
+    var cls="stop-row"+(i===idx?" now":"")+(i<idx?" done":"");
+    var flags="";
+    if(i===idx) flags+='<span class="chip now">You are here</span>';
+    else if(i<idx) flags+='<span class="chip done">✓ done</span>';
+    if(s.border=="canada") flags+='<span class="chip border">🇨🇦 Declare pets</span>';
+    if(s.border=="usa") flags+='<span class="chip border">🇺🇸 CDC form</span>';
+    if(s.milezero) flags+='<span class="chip rest">Mile 0</span>';
+    if(s.arrive) flags+='<span class="chip arrive">Arrive 🎉</span>';
+    if(s.rest) flags+='<span class="chip rest">Rest option</span>';
+    var row=el('<div class="'+cls+'">'+
+      '<div class="stop-day"><span class="n">'+s.d+'</span><span class="d">day</span></div>'+
+      '<div class="stop-main"><div class="stop-route">'+esc(s.from.split(",")[0])+' → '+esc(s.to.split(",")[0])+'</div>'+
+      '<div class="stop-meta"><span>'+s.miles+'</span><span>·</span><span>'+s.time+'</span><span>·</span><span>'+esc(s.hotel.name.split("(")[0].split("—")[0].trim().slice(0,26))+'</span></div>'+
+      (flags?'<div class="stop-flags">'+flags+'</div>':'')+'</div>'+
+      '<div class="stop-go">›</div></div>');
+    row.onclick=function(){ openStop(i); };
+    list.appendChild(row);
+  });
+  renderMap(idx);
+}
+
+function renderMap(idx){
+  var W=600,H=150,pad=24;
+  var pts=STOPS.map(function(s,i){ return { x: pad + (W-2*pad)*(i/(STOPS.length-1)), y: H/2 + Math.sin(i*0.9)*(30 - i*0.6) }; });
+  var path="M "+pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L ");
+  var donePts=pts.slice(0,idx+1);
+  var donePath = donePts.length>1 ? "M "+donePts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L ") : "";
+  var dots="";
+  pts.forEach(function(p,i){
+    var s=STOPS[i];
+    var r = (i===idx)?6:(s.border||s.arrive)?4.5:3;
+    var fill = (i===idx)?"#7fd1c4":(i<idx)?"#d8a84b":(s.border?"#e7c587":(s.arrive?"#a8e6da":"#3a4150"));
+    dots+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+r+'" fill="'+fill+'"'+(i===idx?' stroke="#0b0d10" stroke-width="2"':'')+'></circle>';
+  });
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">'+
+    '<path d="'+path+'" fill="none" stroke="#2a303c" stroke-width="2.5" stroke-linecap="round"/>'+
+    (donePath?'<path d="'+donePath+'" fill="none" stroke="url(#g)" stroke-width="3" stroke-linecap="round"/>':'')+
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7fd1c4"/><stop offset="1" stop-color="#d8a84b"/></linearGradient></defs>'+
+    dots+
+    '<text x="'+pts[0].x+'" y="'+(H-6)+'" fill="#767c88" font-size="11" text-anchor="start" font-family="Helvetica,Arial">VA</text>'+
+    '<text x="'+pts[18].x+'" y="'+(H-6)+'" fill="#a8e6da" font-size="11" text-anchor="end" font-family="Helvetica,Arial">AK</text>'+
+    '</svg>';
+  document.getElementById("rmap").innerHTML=svg;
+}
+
+/* ============================================================= STOP DETAIL SHEET */
+var curStop=null;
+function openStop(i){
+  curStop=i; var s=STOPS[i]; var ss=stopState(s.d);
+  document.getElementById("sheet-title").innerHTML="Day "+s.d+" · "+esc(s.to.split(",")[0]);
+  var b=document.getElementById("sheet-body"); b.innerHTML="";
+
+  // border banner
+  if(s.border){
+    var bd = s.border=="canada"?BORDERS[0]:BORDERS[1];
+    b.appendChild(el('<div class="brd" style="border-color:rgba(216,168,75,.4);background:linear-gradient(160deg,rgba(216,168,75,.08),var(--bg-3));">'+
+      '<h3>'+(s.border=="canada"?"🇨🇦":"🇺🇸")+' '+bd.title+' <span class="day">'+bd.day+'</span></h3>'+
+      '<ul>'+bd.items.map(function(x){return "<li>"+x+"</li>";}).join("")+'</ul></div>'));
+  }
+
+  b.appendChild(el('<div class="note" style="margin:8px 0 0;border-left:2px solid var(--aurora);padding-left:12px;color:var(--ink-dim);font-style:italic;">'+esc(s.note)+'</div>'));
+
+  // logistics
+  b.appendChild(el('<h4>Where you sleep</h4>'));
+  var hotel=el('<div class="card">'+
+    '<div style="font-weight:700;font-size:15px;">'+esc(s.hotel.name)+'</div>'+
+    (s.hotel.tip?'<div class="dim" style="font-size:13px;margin-top:4px;">'+esc(s.hotel.tip)+'</div>':'')+
+    '<div style="display:flex;gap:8px;margin-top:12px;">'+
+      (s.hotel.phone?'<a class="iact call" href="'+telHref(s.hotel.phone)+'" style="width:auto;padding:0 14px;gap:8px;font-size:13px;font-weight:700;">📞 '+prettyPhone(s.hotel.phone)+'</a>':'')+
+      '<a class="iact dir" href="'+dirHref(s.hotel.name.split("—")[0]+" "+s.to)+'" target="_blank" rel="noopener" style="width:auto;padding:0 14px;gap:8px;font-size:13px;font-weight:700;">🧭 Directions</a>'+
+    '</div>'+
+    '<div class="field"><label>Confirmation #</label><input type="text" id="f-conf" placeholder="write it here" value="'+esc(ss.conf)+'"></div>'+
+    '<div class="field row2"><div><label>Check-in</label><input type="text" id="f-ci" placeholder="—" value="'+esc(ss.ci)+'"></div>'+
+      '<div><label>Check-out</label><input type="text" id="f-co" placeholder="—" value="'+esc(ss.co)+'"></div></div>'+
+    '</div>');
+  b.appendChild(hotel);
+  hotel.querySelector("#f-conf").oninput=function(e){ ss.conf=e.target.value; save(); };
+  hotel.querySelector("#f-ci").oninput=function(e){ ss.ci=e.target.value; save(); };
+  hotel.querySelector("#f-co").oninput=function(e){ ss.co=e.target.value; save(); };
+
+  // services
+  b.appendChild(el('<h4>Nearest services</h4>'));
+  b.appendChild(svcRow("Hospital","🏥",s.hosp,true));
+  b.appendChild(svcRow("Vet","🐾",s.vet,false));
+  b.appendChild(svcRow("Grocery","🛒",s.groc,false));
+
+  // notes
+  b.appendChild(el('<h4>Notes for this day</h4>'));
+  var notesWrap=el('<div id="notes-wrap"></div>'); b.appendChild(notesWrap);
+  renderNotes(notesWrap, s.d);
+  var na=el('<div class="field" style="margin-top:10px;"><textarea id="note-in" placeholder="Fuel stops, wildlife, how the pets did, what to remember…"></textarea></div>');
+  b.appendChild(na);
+  var addBtn=el('<button class="btn" style="margin-top:8px;">+ Add note</button>');
+  b.appendChild(addBtn);
+  addBtn.onclick=function(){ var v=na.querySelector("#note-in").value.trim(); if(!v) return;
+    ss.notes.unshift({t:v, ts:Date.now()}); save(); na.querySelector("#note-in").value=""; renderNotes(notesWrap,s.d); toast("Note saved"); };
+
+  // photos
+  b.appendChild(el('<h4>Photos</h4>'));
+  var pg=el('<div class="pgrid" id="photo-grid"></div>'); b.appendChild(pg);
+  renderPhotos(pg, s.d);
+
+  openSheet();
+}
+
+function svcRow(lbl,ic,svc,med){
+  var name=svc.name, phone=svc.phone;
+  var q = name.split("—")[0].split("(")[0].trim();
+  var row=el('<div class="svc'+(med?' med':'')+'">'+
+    '<div class="svc-ic">'+ic+'</div>'+
+    '<div class="svc-main"><div class="svc-lbl">'+lbl+'</div><div class="svc-name">'+esc(name)+'</div></div>'+
+    '<div class="svc-acts">'+
+      (phone?'<a class="iact call" href="'+telHref(phone)+'" aria-label="Call">📞</a>':'<span class="iact call disabled">📞</span>')+
+      '<a class="iact dir" href="'+dirHref(q)+'" target="_blank" rel="noopener" aria-label="Directions">🧭</a>'+
+    '</div></div>');
+  return row;
+}
+
+function renderNotes(wrap,day){
+  var ss=stopState(day); wrap.innerHTML="";
+  if(!ss.notes.length){ wrap.appendChild(el('<div class="empty">No notes yet for this day.</div>')); return; }
+  ss.notes.forEach(function(n,i){
+    var dt=new Date(n.ts); var when=dt.toLocaleDateString([], {month:"short",day:"numeric"})+" · "+dt.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
+    var item=el('<div class="note-item">'+esc(n.t).replace(/\n/g,"<br>")+'<div class="ts"><span>'+when+'</span><span class="del">delete</span></div></div>');
+    item.querySelector(".del").onclick=function(){ ss.notes.splice(i,1); save(); renderNotes(wrap,day); };
+    wrap.appendChild(item);
+  });
+}
+
+/* photos stored in idb under key photo:<day>:<n> ; index kept in stopState */
+function renderPhotos(grid,day){
+  var ss=stopState(day); if(!ss.photos) ss.photos=[];
+  grid.innerHTML="";
+  ss.photos.forEach(function(pid){
+    var src=MEDIA[pid]||"";
+    var cell=el('<div class="pcell">'+(src?'<img src="'+src+'">':'<div class="padd">…</div>')+'<div class="x">×</div></div>');
+    cell.querySelector(".x").onclick=function(ev){ ev.stopPropagation();
+      idbDel(pid); delete MEDIA[pid]; ss.photos=ss.photos.filter(function(x){return x!==pid;}); save(); renderPhotos(grid,day); };
+    grid.appendChild(cell);
+  });
+  var add=el('<label class="padd"><span class="plus">+</span>Add photo<input type="file" accept="image/*" capture="environment" hidden></label>');
+  add.querySelector("input").onchange=function(e){ var f=e.target.files[0]; if(!f) return;
+    compress(f,1280,0.72).then(function(url){ var pid="photo:"+day+":"+Date.now();
+      idbPut(pid,url).then(function(){ MEDIA[pid]=url; ss.photos.push(pid); save(); renderPhotos(grid,day); toast("Photo saved offline"); });
+    }); };
+  grid.appendChild(add);
+}
+
+function compress(file,maxDim,quality){
+  return new Promise(function(res){
+    var img=new Image(); var rd=new FileReader();
+    rd.onload=function(){ img.onload=function(){
+      var w=img.width,h=img.height; var sc=Math.min(1,maxDim/Math.max(w,h)); w=Math.round(w*sc); h=Math.round(h*sc);
+      var c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h);
+      res(c.toDataURL("image/jpeg",quality));
+    }; img.src=rd.result; };
+    rd.readAsDataURL(file);
+  });
+}
+
+/* ============================================================= EMERGENCY */
+function renderSOS(){
+  var idx=currentIdx(), s=STOPS[idx];
+  var host=document.getElementById("s-sos"); host.innerHTML="";
+  host.appendChild(el('<div class="sos-hero"><div class="eyebrow">If it counts, it\'s here</div>'+
+    '<h2>Emergency &amp; Services</h2>'+
+    '<p>Nearest help for <b style="color:var(--ink);">Day '+s.d+' — '+esc(s.to)+'</b>. Tap to call or navigate.</p>'+
+    '<a class="sos-911" href="tel:911"><span class="ic">☎️</span>Call 911</a></div>'));
+
+  var wrap=el('<div style="margin-top:20px;"></div>');
+  wrap.appendChild(el('<h4 style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:0 0 10px;">Today · '+esc(s.to.split(",")[0])+'</h4>'));
+  wrap.appendChild(svcRow("Hospital","🏥",s.hosp,true));
+  wrap.appendChild(svcRow("Vet","🐾",s.vet,true));
+  wrap.appendChild(svcRow("Grocery","🛒",s.groc,false));
+  host.appendChild(wrap);
+
+  var bs=el('<div style="margin-top:24px;"></div>');
+  bs.appendChild(el('<h4 style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:0 0 10px;">24-hour vet backstops</h4>'));
+  BACKSTOPS.forEach(function(v){ bs.appendChild(svcRow("Open 24/7","🚑",v,true)); });
+  host.appendChild(bs);
+
+  var bref=el('<div style="margin-top:24px;"></div>');
+  bref.appendChild(el('<h4 style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:0 0 10px;">Border crossings — with pets</h4>'));
+  BORDERS.forEach(function(bd){ bref.appendChild(el('<div class="brd"><h3>'+bd.title+' <span class="day">'+bd.day+'</span></h3>'+
+    '<ul>'+bd.items.map(function(x){return "<li>"+x+"</li>";}).join("")+'</ul></div>')); });
+  host.appendChild(bref);
+}
+
+/* ============================================================= CHECKLIST */
+function renderCheck(){
+  var host=document.getElementById("checklist"); host.innerHTML="";
+  var total=0,done=0;
+  CHECKLIST.forEach(function(sec,si){
+    var wrap=el('<div class="ck-sec"><h3>'+sec.sec+'</h3></div>');
+    sec.items.forEach(function(txt,ii){
+      total++; var key=si+":"+ii; var on=!!state.check[key]; if(on) done++;
+      var item=el('<div class="ck-item'+(on?" on":"")+'"><div class="ck-box">✓</div><div class="ck-txt">'+esc(txt)+'</div></div>');
+      item.onclick=function(){ state.check[key]=!state.check[key]; save(); renderCheck(); };
+      wrap.appendChild(item);
+    });
+    host.appendChild(wrap);
+  });
+  document.getElementById("check-cnt").textContent=done+" / "+total+" done";
+}
+
+/* ============================================================= DOCS VAULT */
+function renderDocs(){
+  var host=document.getElementById("docvault"); host.innerHTML="";
+  DOCKINDS.forEach(function(k){
+    var pid="doc:"+k.id; var has=!!MEDIA[pid];
+    var card=el('<div class="card" style="display:flex;align-items:center;gap:14px;">'+
+      '<div class="svc-ic" style="flex:0 0 44px;height:44px;font-size:22px;">'+k.ic+'</div>'+
+      '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:14px;">'+k.label+'</div>'+
+      '<div class="mute" style="font-size:12px;margin-top:2px;">'+(has?'✓ saved on this device':'not added yet')+'</div></div>'+
+      (has?'<button class="iact dir" data-view style="flex:0 0 40px;">👁</button><button class="iact" data-del style="flex:0 0 40px;color:var(--sos-soft);">🗑</button>'
+          :'<label class="btn gold" style="width:auto;padding:10px 14px;cursor:pointer;">Add<input type="file" accept="image/*,application/pdf" capture="environment" hidden></label>')+
+    '</div>');
+    if(has){
+      card.querySelector("[data-view]").onclick=function(){ viewDoc(k); };
+      card.querySelector("[data-del]").onclick=function(){ idbDel(pid); delete MEDIA[pid]; renderDocs(); toast("Removed"); };
+    } else {
+      card.querySelector("input").onchange=function(e){ var f=e.target.files[0]; if(!f) return;
+        if(f.type==="application/pdf"){ var rd=new FileReader(); rd.onload=function(){ idbPut(pid,rd.result).then(function(){ MEDIA[pid]=rd.result; renderDocs(); toast(k.label+" saved"); }); }; rd.readAsDataURL(f); }
+        else compress(f,1600,0.8).then(function(url){ idbPut(pid,url).then(function(){ MEDIA[pid]=url; renderDocs(); toast(k.label+" saved"); }); });
+      };
+    }
+    host.appendChild(card);
+  });
+}
+function viewDoc(k){
+  var src=MEDIA["doc:"+k.id]; if(!src) return;
+  var w=window.open(); if(w){ if(src.indexOf("application/pdf")>-1){ w.location=src; } else { w.document.write('<title>'+k.label+'</title><body style="margin:0;background:#0b0d10;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="'+src+'" style="max-width:100%;max-height:100%;">
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"6b7f0337-763b-47ac-9b8a-d5fcf4ae1737"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>'); } }
+  else toast("Allow pop-ups to view");
+}
+
+/* ============================================================= NAV / SHEET */
+var SCREENS={today:"s-today",route:"s-route",sos:"s-sos",check:"s-check",docs:"s-docs"};
+function go(tab){
+  Object.keys(SCREENS).forEach(function(t){ document.getElementById(SCREENS[t]).classList.toggle("on",t===tab); });
+  var btns=document.querySelectorAll(".tabnav button"); btns.forEach(function(b){ b.classList.toggle("on",b.getAttribute("data-tab")===tab); });
+  if(tab==="today")renderToday(); if(tab==="route")renderRoute(); if(tab==="sos")renderSOS(); if(tab==="check")renderCheck(); if(tab==="docs")renderDocs();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll(".tabnav button").forEach(function(b){ b.onclick=function(){ go(b.getAttribute("data-tab")); }; });
+
+function openSheet(){ document.getElementById("sheet-back").classList.add("on"); document.getElementById("sheet").classList.add("on"); document.body.style.overflow="hidden"; }
+function closeSheet(){ document.getElementById("sheet-back").classList.remove("on"); document.getElementById("sheet").classList.remove("on"); document.body.style.overflow=""; }
+document.getElementById("sheet-close").onclick=closeSheet;
+document.getElementById("sheet-back").onclick=closeSheet;
+
+/* settings */
+document.getElementById("set-start").value=state.start||"";
+document.getElementById("set-crew").value=state.crew||"";
+document.getElementById("set-crew").placeholder=TRIP.crewDefault;
+document.getElementById("set-start").onchange=function(e){ state.start=e.target.value; state.todayOverride=null; save(); toast("Departure set"); };
+document.getElementById("set-crew").oninput=function(e){ state.crew=e.target.value; save(); };
+
+/* export / import */
+document.getElementById("btn-export").onclick=function(){
+  var payload={ state:state, media:MEDIA, v:1, exported:new Date().toISOString() };
+  var blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
+  var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="the-last-family-backup.json"; a.click();
+  toast("Backup downloaded");
+};
+document.getElementById("btn-import").onclick=function(){ document.getElementById("import-file").click(); };
+document.getElementById("import-file").onchange=function(e){ var f=e.target.files[0]; if(!f) return;
+  var rd=new FileReader(); rd.onload=function(){ try{ var p=JSON.parse(rd.result);
+    if(p.state){ state=p.state; save(); }
+    if(p.media){ MEDIA=p.media; var ks=Object.keys(MEDIA); ks.forEach(function(id){ idbPut(id,MEDIA[id]); }); }
+    document.getElementById("set-start").value=state.start||""; document.getElementById("set-crew").value=state.crew||"";
+    toast("Restored from backup"); go("today");
+  }catch(err){ toast("Could not read that file"); } }; rd.readAsText(f); };
+
+/* net status */
+function net(){ var on=navigator.onLine; var d=document.getElementById("netdot"); d.classList.toggle("off",!on);
+  document.getElementById("netlbl").textContent=on?"online":"offline · all good"; }
+window.addEventListener("online",net); window.addEventListener("offline",net); net();
+
+/* ============================================================= BOOT */
+idbAll().then(function(all){ MEDIA=all||{}; renderToday(); }).catch(function(){ renderToday(); });
+</script>
+</body>
+</html>
