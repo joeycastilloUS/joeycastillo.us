@@ -2,7 +2,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta name="referrer" content="no-referrer">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
 <meta name="theme-color" content="#0b0d10">
@@ -283,7 +282,8 @@ textarea{resize:vertical;min-height:64px;}
     <div class="card">
       <div class="field"><label>Departure date</label><input type="date" id="set-start"></div>
       <div class="field"><label>Crew</label><input type="text" id="set-crew" placeholder="2 adults, 1 dog, 1 cat"></div>
-      <div style="display:flex;gap:12px;margin-top:16px;">
+      <button class="btn" id="btn-share" style="margin-top:16px;">🔗 Share this app</button>
+      <div style="display:flex;gap:12px;margin-top:12px;">
         <button class="btn ghost" id="btn-export">⬇ Backup (JSON)</button>
         <button class="btn ghost" id="btn-import">⬆ Restore</button>
       </div>
@@ -314,7 +314,6 @@ textarea{resize:vertical;min-height:64px;}
   <button data-tab="sos" class="sos"><span class="ic">🚨</span>Help</button>
   <button data-tab="check"><span class="ic">✅</span>Prep</button>
   <button data-tab="docs"><span class="ic">📁</span>Docs</button>
-  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/6b7f0337-763b-47ac-9b8a-d5fcf4ae1737/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -839,12 +838,12 @@ function renderDocs(){
 }
 function viewDoc(k){
   var src=MEDIA["doc:"+k.id]; if(!src) return;
-  var w=window.open(); if(w){ if(src.indexOf("application/pdf")>-1){ w.location=src; } else { w.document.write('<title>'+k.label+'</title><body style="margin:0;background:#0b0d10;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="'+src+'" style="max-width:100%;max-height:100%;">
-<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
-<script>window.ARTIFACT={doc:"6b7f0337-763b-47ac-9b8a-d5fcf4ae1737"};</script>
-<script src="/metal/artifact-comments.js"></script>
-</body>'); } }
-  else toast("Allow pop-ups to view");
+  var w=window.open("","_blank"); if(!w){ toast("Allow pop-ups to view the doc"); return; }
+  if(src.indexOf("application/pdf")>-1){ w.location.href=src; return; }
+  var d=w.document; d.title=k.label;
+  d.body.style.cssText="margin:0;background:#0b0d10;display:flex;align-items:center;justify-content:center;min-height:100vh;";
+  var img=d.createElement("img"); img.src=src; img.style.cssText="max-width:100%;max-height:100vh;display:block;";
+  d.body.appendChild(img);
 }
 
 /* ============================================================= NAV / SHEET */
@@ -870,6 +869,12 @@ document.getElementById("set-start").onchange=function(e){ state.start=e.target.
 document.getElementById("set-crew").oninput=function(e){ state.crew=e.target.value; save(); };
 
 /* export / import */
+document.getElementById("btn-share").onclick=function(){
+  var url=location.href;
+  if(navigator.share){ navigator.share({title:"The Last Family — Road North", url:url}).catch(function(){}); }
+  else if(navigator.clipboard){ navigator.clipboard.writeText(url).then(function(){ toast("Link copied"); }).catch(function(){ toast(url); }); }
+  else toast(url);
+};
 document.getElementById("btn-export").onclick=function(){
   var payload={ state:state, media:MEDIA, v:1, exported:new Date().toISOString() };
   var blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
@@ -890,8 +895,14 @@ function net(){ var on=navigator.onLine; var d=document.getElementById("netdot")
   document.getElementById("netlbl").textContent=on?"online":"offline · all good"; }
 window.addEventListener("online",net); window.addEventListener("offline",net); net();
 
-/* ============================================================= BOOT */
-idbAll().then(function(all){ MEDIA=all||{}; renderToday(); }).catch(function(){ renderToday(); });
+/* ============================================================= BOOT
+   First paint never waits on IndexedDB — render Today immediately, then
+   hydrate stored photos/docs in the background and refresh media screens. */
+renderToday();
+idbAll().then(function(all){ MEDIA=all||{};
+  var active=document.querySelector(".tabnav button.on");
+  if(active && active.getAttribute("data-tab")==="docs") renderDocs();
+}).catch(function(){});
 </script>
 </body>
 </html>
