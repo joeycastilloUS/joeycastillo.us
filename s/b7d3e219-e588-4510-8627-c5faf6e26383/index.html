@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex, nofollow">
-<title>~p — NPS Reports + Food-Borne Illness Handling · Mendocino Farms Phase 1</title>
+<title>~p v2 — Real-Time NPS Action + Food-Borne Illness Handling · Mendocino Farms Phase 1</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:#0d0d0d; color:#e0e0e0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.62; }
@@ -20,12 +20,19 @@
   code{background:#0a1013;padding:2px 6px;border-radius:4px;font-size:12.5px;color:#6FC3DF;}
   table{width:100%;border-collapse:collapse;margin:10px 0;} th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #22303a;font-size:12.5px;vertical-align:top;} th{color:#6FC3DF;font-size:10.5px;text-transform:uppercase;}
   b,strong{color:#e6edf2;} em{color:#7CFFB2;font-style:normal;}
+  a.art{color:#6FC3DF;text-decoration:underline;text-underline-offset:3px;font-weight:600;}
+  a.art:hover{color:#9fdcf0;}
   .plain{background:#0f151a;border-left:3px solid #6FC3DF;border-radius:0 8px 8px 0;padding:10px 14px;margin:10px 0;font-size:13px;color:#b8c4c9;}
   .plain b{color:#6FC3DF;}
   footer{text-align:center;color:#555;font-size:12px;margin-top:40px;padding:24px;border-top:1px solid #222;}
   .dod li{list-style:none;margin:4px 0;font-size:13px;}
   .dod .ok{color:#7CFFB2;font-weight:700;margin-right:6px;}
   .dod .pend{color:#ffce85;font-weight:700;margin-right:6px;}
+  /* trace badges — every claim shows where it came from */
+  .src{display:inline-block;border-radius:4px;padding:0 7px;font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;vertical-align:middle;margin-left:6px;white-space:nowrap;}
+  .src.call{border:1px solid #2f6b45;color:#7CFFB2;background:#0a1a10;}
+  .src.rec{border:1px solid #6a5a2a;color:#ffce85;background:#1a1408;}
+  .done-tag{display:inline-block;border:1px solid #2f6b45;color:#7CFFB2;background:#0a1a10;border-radius:4px;padding:0 7px;font-size:10px;font-weight:800;letter-spacing:.5px;}
 
   /* ============ ARGUS MOCKUP FRAME (house style: argus/web/index.html) ============ */
   .mock{--bg:#0a0a0a;--surface:#141414;--line:#262626;--accent:#6FC3DF;--text:#e8e8e8;--dim:#888;--ok:#7CFFB2;--warn:#ffce85;--bad:#ff6b6b;
@@ -42,51 +49,42 @@
   .m-tab{background:var(--surface);color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:6px 13px;font-size:12px;font-weight:700;}
   .m-tab.on{background:#1d2a31;color:var(--accent);border-color:rgba(111,195,223,.45);}
   .m-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
-  .m-week{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;color:var(--text);}
-  .m-week .arr{color:var(--accent);font-weight:800;padding:0 4px;}
-  .m-week b{color:var(--accent);}
+  .m-live{display:inline-flex;align-items:center;gap:8px;color:var(--ok);font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+  .m-live .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px rgba(124,255,178,.7);}
   .m-cadence{color:var(--dim);font-size:11px;}
   .m-cadence b{color:var(--ok);}
-  /* score header */
   .m-hero{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
   .m-kpi{flex:1;min-width:130px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
   .m-kpi .n{font-size:30px;font-weight:800;line-height:1.05;color:var(--text);font-variant-numeric:tabular-nums;}
-  .m-kpi .n.ac{color:var(--accent);} .m-kpi .n.bd{color:var(--bad);}
+  .m-kpi .n.ac{color:var(--accent);} .m-kpi .n.bd{color:var(--bad);} .m-kpi .n.gd{color:var(--ok);}
   .m-kpi .l{color:var(--dim);font-size:10.5px;text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
   .m-kpi .d{font-size:11.5px;margin-top:3px;font-weight:700;}
   .m-kpi .d.up{color:var(--ok);} .m-kpi .d.dn{color:var(--bad);} .m-kpi .d.fl{color:var(--dim);}
-  /* trend */
-  .m-trend{display:flex;align-items:flex-end;gap:6px;height:52px;margin-top:8px;}
-  .m-trend .tb{flex:1;background:#1d2a31;border-radius:3px 3px 0 0;position:relative;}
-  .m-trend .tb.cur{background:var(--accent);}
-  .m-trend-l{display:flex;gap:6px;margin-top:4px;} .m-trend-l span{flex:1;text-align:center;color:var(--dim);font-size:8.5px;}
-  /* sections */
   .m-h2{color:var(--accent);font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin:16px 0 8px;}
-  .m-row{display:flex;align-items:center;gap:10px;margin:5px 0;font-size:12.5px;}
-  .m-row .nm{flex:0 0 200px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .m-row .nm small{color:var(--dim);}
-  .m-row .track{flex:1;height:12px;background:#101418;border-radius:6px;overflow:hidden;}
-  .m-row .fill{height:100%;background:linear-gradient(90deg,#2a5666,var(--accent));border-radius:6px;}
-  .m-row .fill.hot{background:linear-gradient(90deg,#5a2222,var(--bad));}
-  .m-row .ct{flex:0 0 26px;text-align:right;color:var(--accent);font-weight:800;font-variant-numeric:tabular-nums;}
-  .m-row .ct.hot{color:var(--bad);}
-  /* issue chips */
-  .m-issues{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0 2px;}
-  .m-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:4px 12px;font-size:12px;color:var(--text);font-weight:600;}
-  .m-chip b{color:var(--accent);font-variant-numeric:tabular-nums;}
-  .m-chip.ill{border-color:var(--bad);color:var(--bad);} .m-chip.ill b{color:var(--bad);}
-  /* comment feed */
+  /* live feed entries */
   .m-com{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:10px 13px;margin:8px 0;}
+  .m-com .top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:5px;}
+  .m-com .tm{color:var(--warn);font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
   .m-com .q{color:#cdd6da;font-size:13px;font-style:italic;line-height:1.55;}
   .m-com .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:7px;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;}
   .m-com .meta .st{color:var(--accent);font-weight:700;}
   .m-com .meta .sc{border:1px solid var(--line);border-radius:4px;padding:0 6px;font-weight:800;color:var(--warn);}
   .m-com .meta .tag{border:1px solid var(--line);border-radius:4px;padding:0 6px;font-weight:700;}
   .m-com .meta .tag.ill{border-color:var(--bad);color:var(--bad);}
-  .m-com .meta .routed{color:var(--ok);font-weight:700;}
   .m-com.illrow{border-left:3px solid var(--bad);}
+  .notif{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px;font-size:10.5px;}
+  .notif .nl{color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
+  .n-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(111,195,223,.4);background:#0e1a1f;color:var(--accent);border-radius:5px;padding:1px 8px;font-weight:700;}
+  .n-chip.sent{border-color:#2f6b45;background:#0a1a10;color:var(--ok);}
+  .n-chip .ch{opacity:.7;font-weight:400;}
+  .stat{display:inline-block;border-radius:4px;padding:0 7px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
+  .stat.held{border:1px solid var(--warn);color:var(--warn);}
+  .stat.done{border:1px solid #2f6b45;color:var(--ok);}
   .m-foot{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);color:var(--dim);font-size:10.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;}
   .m-foot b{color:var(--accent);}
+  /* precedent strip — the backloading engine visible inside the feed */
+  .prec{background:#0e1a13;border:1px solid #2f6b45;border-radius:7px;padding:7px 11px;margin-top:7px;font-size:11.5px;color:#a9d9bd;line-height:1.5;}
+  .prec b{color:var(--ok);}
 
   /* ============ MOCKUP B — illness flow ============ */
   .f-step{display:flex;gap:12px;margin:10px 0;}
@@ -106,6 +104,7 @@
   .f-quote{background:#0d0d0d;border:1px solid var(--line);border-radius:7px;padding:8px 11px;font-size:12.5px;font-style:italic;color:#b8c4c9;margin-top:6px;line-height:1.55;}
   .f-route{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:12.5px;}
   .f-route .hop{background:#0e1a1f;border:1px solid rgba(111,195,223,.4);color:var(--accent);border-radius:7px;padding:4px 11px;font-weight:700;}
+  .f-route .hop small{color:var(--dim);font-weight:400;}
   .f-route .arr{color:var(--dim);font-weight:800;}
   .rest{background:#0a0f12;border:1px solid #1a2830;border-radius:8px;padding:10px 13px;overflow:auto;font-size:11.5px;color:#cdd6da;line-height:1.55;margin:8px 0 4px;font-family:ui-monospace,Consolas,monospace;white-space:pre;}
   .rest .k{color:#6FC3DF;} .rest .v{color:#7CFFB2;} .rest .m{color:#ffce85;font-weight:700;}
@@ -121,135 +120,187 @@
   .rulebanner .tx{font-size:12.5px;color:#f0c9c9;line-height:1.55;}
   .rulebanner .tx b{color:var(--bad);}
   .held{display:inline-block;border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:0 7px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;margin-left:6px;vertical-align:middle;}
-  @media(max-width:620px){ .m-row .nm{flex-basis:120px;font-size:11.5px;} }
+  /* Zora voice sample block */
+  .zvoice{background:#0f1418;border:1px solid #2a3f48;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 14px;margin:8px 0 4px;}
+  .zvoice .zh{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px;}
+  .zvoice .zh b{color:var(--accent);font-size:11px;letter-spacing:1px;text-transform:uppercase;}
+  .zvoice .zdisc{border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:0 7px;font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
+  .zvoice .zt{font-size:13px;color:#dbe6ea;line-height:1.65;font-style:italic;}
+  .zvoice .zt b{color:#fff;font-style:normal;}
 </style>
 </head>
 <body>
 <nav>
-  <span class="brand">Be · argus · <span class="sub-t">~p · NPS Reports + Food-Borne Illness Handling · Mendocino Farms Phase 1</span></span>
-  <span class="pub">Published 2026-07-06 09:12 PT</span>
+  <span class="brand">Be · argus · <span class="sub-t">~p v2 · Real-Time NPS Action + Food-Borne Illness Handling · Mendocino Farms Phase 1</span></span>
+  <span class="pub">Published 2026-07-06 19:26 PT</span>
 </nav>
 <div class="wrap">
 
-<h1>Phase 1 Plan — NPS Reports &amp; Food-Borne Illness Handling</h1>
-<div class="sub">Prepared for Mendocino Farms · Guest Relations, Help Desk &amp; IT · builds directly on the approved NPS auto-reply work already in flight. Two deliverables, one plan, both shown as working pictures below.</div>
+<h1>Phase 1 Plan v2 — Real-Time NPS Action &amp; Food-Borne Illness Handling</h1>
+<div class="sub">Prepared for Mendocino Farms · Guest Relations, Help Desk &amp; IT · <b>v2 of the Phase-1 plan</b>, revised on operator review. The whole plan in one place: complete automation for guest recovery, real-time — powered by an engine that has already read your ticket history.</div>
+
+<div class="plain" style="margin-top:2px;"><b>How to read this page:</b> every claim carries a source badge — <span class="src call">from the 7/2 call</span> means it traces to the planning-meeting notes; <span class="src rec">our recommendation</span> means it goes beyond what was said on the call and we're proposing it explicitly. Every referenced design or plan is a <a class="art" href="../designs/2026-07-03-0000-design-nps-mission1.html">clickable link</a> — click it, read it, comment on it.</div>
 
 <h2>Summary — where this fits</h2>
 <div class="card" data-cm="intent">
-<p>In our planning meeting we agreed Phase&nbsp;1 has two jobs: <b>respond</b> to negative guest surveys automatically (with a human approving every guest-facing word), and <b>route</b> after-hours food-illness tickets to the right District Operator, store, and the FSQA team. The auto-reply side is already designed and planned in detail — see <code>2026-07-03-0000-design-nps-mission1.html</code> and <code>2026-07-03-0110-plan-nps-mission1-fable5.html</code> (Mission&nbsp;1: 7 phases, 22 points, roughly $0.007 of model cost per detractor ticket). <b>This plan does not re-plan that work.</b> It plans the two pieces that sit on top of it:</p>
+<p><b>v2 supersedes v1 (2026-07-06-0912).</b> Same two Phase-1 deliverables from the planning meeting <span class="src call">from the 7/2 call</span>, upgraded on operator review in four ways: <b>real-time instead of weekly</b>, <b>complete automation instead of a report</b>, <b>multi-channel notification instead of Zendesk-only</b>, and the <b>backloading engine — "every conversation is a program" — pulled in as the backbone</b> rather than referenced in passing.</p>
+<p>Phase 1 still has two jobs <span class="src call">from the 7/2 call</span>: <b>respond</b> to negative guest surveys automatically (a human approving every guest-facing word), and <b>route</b> after-hours food-illness tickets to the right District Operator, store, and FSQA. The auto-reply machinery is designed and planned in Mission&nbsp;1 — see the <a class="art" href="../designs/2026-07-03-0000-design-nps-mission1.html">NPS Mission-1 design</a> and the <a class="art" href="../plans/2026-07-03-0110-plan-nps-mission1-fable5.html">Mission-1 plan</a> (7 phases, 22 points, ~$0.007 of model cost per detractor ticket). This plan does not re-plan that work. It plans what sits on top:</p>
 <ul>
-  <li><b>Focus A — NPS Reports.</b> The weekly report Guest Relations, Marketing, and the District Operators actually open and read: the score, who's hurting, why, and the guests' own words — per store, per DO, per issue type. Today this is manual; the meeting left "how is the marketing food-illness report generated and delivered?" as an open question. This answers it.</li>
-  <li><b>Focus B — Food-Borne Illness Handling.</b> The safety-critical path: a guest says they got sick, after hours. The ticket must land with the right DO, the right store, and the FSQA group — and on severe cases, <b>nothing is ever sent automatically</b>. A person approves every action, every time.</li>
+  <li><b>Focus A — Real-Time NPS Action.</b> The moment a detractor or illness signal lands, the right people see it — email, Slack, or text — and the response is already drafted and waiting for approval. The weekly view still exists, but as a rollup of what already happened, not the place anyone learns bad news. <span class="src rec">our recommendation</span></li>
+  <li><b>Focus B — Food-Borne Illness Handling.</b> The safety-critical path <span class="src call">from the 7/2 call</span>: a guest says they got sick, after hours. The ticket lands with the right DO, the right store, and FSQA — on the channels operations chooses — and on severe cases <b>nothing is ever sent automatically</b>. A person approves every guest-facing word, every time.</li>
+  <li><b>The backbone — every conversation is a program.</b> Both focuses run on the same engine: your ticket history, decoded into small programs that already ran, mined for what worked, guiding what happens next. Already designed in three parts — <a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">design v1</a>, <a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">design v2</a>, <a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">design v3</a> — and already proven on real Mendo tickets. <span class="src rec">our recommendation</span></li>
 </ul>
-<div class="plain"><b>Plain-language promise:</b> everything in this document traces back to the 7/2 planning meeting notes and the decisions layered on them since. Nothing here is new scope invented on our side.</div>
+<div class="plain"><b>Plain-language promise:</b> everything here traces to the 7/2 planning meeting or carries the amber "our recommendation" badge so you can see exactly where we went beyond the call — and push back.</div>
 </div>
 
 <h2>Scope</h2>
 <div class="card" data-cm="scope">
 <p><strong>In scope</strong></p>
 <ul>
-  <li><b>Focus A:</b> a weekly NPS report — score and trend, detractor breakdown per store / per DO / per issue type, and a feed of the actual negative comments. Replaces the manual weekly help-desk report path Brenden owns today, and answers the open "marketing food-illness report" question (illness shows up as a flagged issue type, per store).</li>
-  <li><b>Focus B:</b> food-illness ticket detection, severity classification, routing to DO + store + FSQA (after-hours aware), and an operator-gated action panel for anything that writes to Zendesk.</li>
-  <li>Verify-first on illness: the meeting noted a foodborne automation <b>may already exist in Zendesk</b> — Brenden is confirming. We map what's live before we build; Argus overlays it, it doesn't duplicate or fight it.</li>
+  <li><b>Focus A:</b> a <b>live detractor feed</b> — the moment a negative survey or illness mention arrives it is decoded, routed, and put in front of the right people, with the recovery reply already drafted for approval. Per-store / per-DO / per-issue slices and the guests' own words, live. The <b>weekly rollup</b> is generated automatically from the same facts (this also answers the open "marketing food-illness report" question <span class="src call">from the 7/2 call</span> — illness shows up flagged, per store, in both the live feed and the rollup).</li>
+  <li><b>Focus B:</b> food-illness detection, severity classification, and <b>multi-channel routing</b> — email, Slack, SMS text, and Zendesk assignment — to DO + store + FSQA, after-hours aware, with the operator-gated action panel on anything that writes or sends. <b>The exact channel set per role is confirmed with operations before it goes live</b> — we build to what ops wants, not to what's convenient. <span class="src rec">our recommendation</span></li>
+  <li><b>The backloading engine:</b> your ticket history decoded into programs — what was tried, what worked, what didn't — feeding both focuses with precedent ("what worked last time for exactly this situation") and feeding operations with the trends nobody wrote down. Detailed in its own section below.</li>
+  <li>Verify-first on illness: the meeting noted a foodborne automation <b>may already exist in Zendesk</b> — Brenden is confirming <span class="src call">from the 7/2 call</span>. We map what's live before we build; Argus overlays it, never fights it.</li>
   <li>Store and DO identity resolved on our side: the survey alert carries a survey id (the "nps-id") in its Store/Order fields with the store name blank — we treat that id as the key and resolve store → DO from Zendesk's own groups (13 "DO&nbsp;–&nbsp;&lt;name&gt;" groups today; the real map moves to Airtable later).</li>
 </ul>
 <p><strong>Out of scope (already covered, or deliberately excluded)</strong></p>
 <ul>
-  <li>The NPS auto-reply itself — designed and planned in Mission&nbsp;1; referenced, not repeated.</li>
+  <li>The NPS auto-reply machinery itself — designed and planned in <a class="art" href="../plans/2026-07-03-0110-plan-nps-mission1-fable5.html">Mission&nbsp;1</a>; referenced, not repeated.</li>
   <li>Fixing the survey alert's field mapping upstream — agreed: we adapt on our side instead.</li>
   <li>Any write to the "I'm Sorry Code" coupon sheet — Argus only <b>reads</b> the next available code; a person enters it. Always.</li>
-  <li>Any Zendesk write that hasn't been previewed and approved by a person — at any stage, in any mode.</li>
-  <li>Email delivery outside Zendesk — Zendesk owns email for Phase&nbsp;1.</li>
+  <li>Any Zendesk write or outbound guest message that hasn't been previewed and approved by a person — at any stage, in any mode. (Internal notifications to your own team — "a detractor just landed" — do not need approval to send; guest-facing words always do.)</li>
 </ul>
 </div>
 
 <h2>Approach — how it works, in plain language</h2>
 <div class="card" data-cm="approach">
+<p>One loop drives everything — the same loop from the <a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">conversation-as-program design</a>, applied to every ticket, old and new:</p>
 <ol>
-  <li><b>Read.</b> Every survey alert and support ticket is read by a deterministic decoder — a small, exact program (not an AI model), so the same ticket always reads the same way. It extracts the facts: score, guest, store id, illness language.</li>
-  <li><b>Resolve.</b> The survey id resolves to a store, the store resolves to its District Operator, using the map seeded from Zendesk's own groups.</li>
-  <li><b>Judge &amp; draft.</b> Where judgment or wording is needed, a model is used — Google's Gemini today, on your cloud, swappable by design (the model layer is live at <code>api.3-nous.net</code>). Guest-facing wording is trained on Zora's language, so it sounds like Mendo.</li>
-  <li><b>Gate.</b> Before anything is written to Zendesk, the operator sees the <b>exact</b> action about to happen — in plain words and as the literal API call — and approves, edits, or rejects it. Then, and only then, it fires. We call this the gated-write pattern; it's the same discipline on every write, and it is non-negotiable on food illness.</li>
-  <li><b>Report.</b> The same facts collected along the way roll up into the weekly report — no second data-entry pass, no manual spreadsheet assembly.</li>
+  <li><b>Reduce.</b> Every survey alert and support ticket is read by a deterministic decoder — a small, exact program (not an AI model), so the same ticket always reads the same way. It extracts who, what, what's being done, and how it ended. This is real today: it has already read your ten biggest ticket threads and reduced 80,832 characters of raw email back-and-forth to a 20,844-character intent digest — <b>74% smaller, no meaning lost</b>.</li>
+  <li><b>Infer.</b> What does this situation need? First the engine <em>classifies</em> it (illness? missing order? vendor billing?) and <em>retrieves precedent</em> — the past tickets with the same shape and how they got resolved. Only what precedent can't answer goes to an AI model. Pure mechanics first, model last.</li>
+  <li><b>Verify.</b> Anything a model proposes is fact-checked against the deterministic read before it's shown to anyone. A suggestion that can't cite its evidence doesn't ship.</li>
+  <li><b>Voice.</b> The reply is drafted in your voice — Zora's warmth, Mendo's brand — for a human to approve. (Pulling Zora's actual replies as the tone corpus is an open action item <span class="src call">from the 7/2 call</span>; the samples below are honest placeholders until then.)</li>
+  <li><b>Replay.</b> After the fact, every handled ticket can be walked step by step — this move, then this response, then resolved — so what worked becomes visible, provable, and reusable. That's where the reports come from: not a spreadsheet pass, a replay of what actually happened.</li>
 </ol>
+<p><b>Gate.</b> Wrapped around all of it: before anything is written to Zendesk or sent to a guest, the operator sees the <b>exact</b> action — plain words and the literal API call — and approves, edits, or rejects. Non-negotiable on food illness.</p>
 </div>
 
 <!-- ================================================================ -->
-<h2>Focus A — the Weekly NPS Report</h2>
-<div class="card" data-cm="focus-a">
-<p>Delivered <b>every Monday morning</b> covering the prior week. One page, three ways to slice it — by store, by District Operator, by issue type — plus the guests' own words, because a number never tells the whole story. Food-illness mentions are flagged in red and cross-linked to their FSQA ticket, which is the "marketing food-illness report" from the meeting, answered inside the weekly report rather than as a separate manual document.</p>
-<p>Below is what it looks like. This is a picture of the real screen, populated with sample data.</p>
+<h2>The Backbone — Every Conversation Is a Program <span class="sub" style="display:inline">(the backloading engine)</span></h2>
+<div class="card" data-cm="backloading">
+<p><b>This is the whole plan's engine, not a footnote.</b> A support ticket isn't a record of a conversation — it's a small program that already ran: inputs (the guest, the store, the issue), instructions (each move the guest and your team made), and an exit code (resolved, escalated, lost, recovered). Ten thousand tickets are ten thousand programs that already executed on real infrastructure — your people. Decode them and the archive stops being a pile of text and becomes the most honest account of how Mendo support actually works.</p>
+<p><b>This is already designed — in three reviewed parts:</b></p>
+<ul>
+  <li><a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">Design v1 — the loop</a>: reduce → infer → verify → voice → replay; mining what worked; the operational codebase; human curation.</li>
+  <li><a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">Design v2 — trees, precedent, drift</a>: real threads branch into multiple issues (tree-shaped programs); inference is classify-and-retrieve before any model runs; drift and new discoveries are where the gold is.</li>
+  <li><a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">Design v3 — the memory</a>: the program library lives in memory, deduped, ranked by what keeps working — precedent lookup in microseconds, and a catalog of what replay buys.</li>
+</ul>
+<p><b>And already proven on your data.</b> Your ten biggest real threads have been decoded end to end <span class="done-tag">✓ DONE</span>. One concrete example — ticket <b>#341562</b>, a 19-comment, 8,520-character US Foods late-invoice thread for the Cherry Creek store, reduces to a five-step program: <em>request → provide → invoicing → resolved → closed</em>. Requester, vendor contact, account, dollar amount — all extracted, deterministically, for $0 of model cost. Nineteen comments of quoted email, legible in one glance.</p>
+
+<h3>The 18 ways to slice the past — enumerated, each already designed</h3>
+<table>
+<thead><tr><th>#</th><th>Slice</th><th>What it tells Mendo</th><th>Where designed</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Reduce to program</td><td>Every ticket becomes its exact skeleton — who, what, each move, how it ended. 74% smaller, nothing lost. <span class="done-tag">✓ proven on your tickets</span></td><td><a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">v1</a></td></tr>
+<tr><td>2</td><td>Tree-shaped threads</td><td>A guest raising two problems, or a fix that breeds a new problem, splits into branches — each judged on its own outcome</td><td><a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">v2</a></td></tr>
+<tr><td>3</td><td>Situation typing</td><td>"Missing order," "late vendor invoice," "illness claim" — recognized mechanically from the skeleton, same answer every time</td><td><a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">v2</a></td></tr>
+<tr><td>4</td><td>Precedent retrieval</td><td>"What worked last time for exactly this?" — answered from your own history in microseconds, before any AI model is asked</td><td><a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">v2</a> · <a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">v3</a></td></tr>
+<tr><td>5</td><td>Outcome labeling</td><td>Every program gets its exit code — resolved clean, reopened, escalated, lost — pulled from Zendesk's own metrics</td><td><a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">v1</a></td></tr>
+<tr><td>6</td><td>Mining what worked</td><td>The pattern shared by the wins and absent from the losses, per situation — e.g. "fast vendor-credit closes confirmed the invoice number before contacting the vendor"</td><td><a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">v1</a></td></tr>
+<tr><td>7</td><td>Recurrence counting</td><td>The same fix recurring isn't clutter, it's evidence — a lesson backed by 40 runs outranks one backed by 2</td><td><a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">v1</a></td></tr>
+<tr><td>8</td><td>Replay</td><td>Walk any past ticket move by move with cause and effect attached — a debugger for a conversation</td><td><a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">v1</a></td></tr>
+<tr><td>9</td><td>Drift detection</td><td>Where the team routes around the documented process — and whether the workaround beats the SOP (promote it) or hurts (fix it)</td><td><a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">v2</a></td></tr>
+<tr><td>10</td><td>Discovery of new vectors</td><td>The winning resolution path your team invented that nobody wrote down — found mechanically, surfaced with evidence</td><td><a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">v2</a></td></tr>
+<tr><td>11</td><td>The operational codebase</td><td>The real, evidence-mined map of how support executes — the code that's actually running, vs. the binder</td><td><a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">v1</a></td></tr>
+<tr><td>12</td><td>Curation</td><td>Your head of ops promotes, retires, or flags mined practices — a human decides what becomes law, with the evidence attached</td><td><a class="art" href="../designs/2026-07-03-0740-design-conversation-as-program-fable5.html">v1</a></td></tr>
+<tr><td>13</td><td>Bottleneck detection</td><td>Which step, across all tickets, waits the longest — the process choke points, named exactly</td><td><a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">v3</a></td></tr>
+<tr><td>14</td><td>Outcome forecasting</td><td>Given a ticket in flight, the history of tickets that started the same way IS the forecast of how it ends</td><td><a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">v3</a></td></tr>
+<tr><td>15</td><td>Counterfactual replay</td><td>"What if we'd offered the coupon at step 2?" — re-walk the past with one move changed, read the outcomes of tickets that did</td><td><a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">v3</a></td></tr>
+<tr><td>16</td><td>Coaching by replay</td><td>A failed ticket beside its nearest successful twin — the fork between them is the teachable moment, shown not told</td><td><a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">v3</a></td></tr>
+<tr><td>17</td><td>Dry-run before acting</td><td>Walk a proposed resolution against precedent, step by step, before a human commits — a flight simulator for the reply</td><td><a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">v3</a></td></tr>
+<tr><td>18</td><td>Anomaly &amp; root-cause</td><td>A ticket that matches nothing in history is flagged as genuinely new before anyone guesses; causal chains trace a symptom back to the fix that bred it</td><td><a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">v3</a></td></tr>
+</tbody>
+</table>
+<p><b>How this powers the two focuses:</b> Focus A's live feed uses slices 1–5 on every arriving signal (decode it, type it, pull precedent, draft the recovery). Focus B's illness path uses the same plus 14 (how do illness claims like this one usually end?) and 17 (dry-run the proposed handling before approval). Operations gets 6–13 as the standing view of the past. One engine, both focuses, and the reporting falls out for free — <b>this is the whole plan, not pieces.</b></p>
+<div class="plain"><b>Status honesty:</b> the decoding pass is built and proven on your real tickets (the big-10 run, including #341562, is done). The precedent index, outcome labeling, replay, and drift passes are designed — linked above — and are scheduled as the B-phases below.</div>
 </div>
 
-<div class="mock-label"><span>MOCKUP A · <b>Argus — Weekly NPS Report view</b></span><span>sample data</span></div>
-<div class="mock" role="img" aria-label="Mockup of the Argus weekly NPS report">
-  <div class="m-nav"><span class="be">ARGUS</span><span class="ctx">Guest Relations · Weekly NPS Report</span><span class="who">Mendocino Farms</span></div>
+<!-- ================================================================ -->
+<h2>Focus A — Real-Time NPS Action <span class="sub" style="display:inline">(complete automation, as it happens)</span></h2>
+<div class="card" data-cm="focus-a">
+<p><b>What changed from v1, and why.</b> v1 framed Focus A as a weekly report. Operator review called it: waiting until Monday to learn a guest had a bad Tuesday is a week of lost recovery time. <b>v2 makes Focus A real-time.</b> The moment a detractor or illness signal lands: it's decoded, typed, matched against precedent, the recovery reply is drafted in your voice, and <b>every Zendesk user who should know, knows — as it happens</b>, on the channel they actually watch. The weekly view survives as an automatic rollup — a look back at what was already handled, never the place anyone learns bad news. <span class="src rec">our recommendation — the 7/2 call asked for the auto-reply and left report generation an open question; real-time-first is the answer we're proposing</span></p>
+<p><b>This is complete automation, not a report:</b> detect → decode → route → draft → notify runs with no human in the loop; the one thing held for a human is the guest-facing send. That split — automate everything except the final word to the guest — is exactly the discipline agreed on the call. <span class="src call">from the 7/2 call</span></p>
+<p>Below is what it looks like. The three feed entries are grounded in the real complaint shapes from your own ticket history — a missing pickup order, a slow lunch line, an illness mention.</p>
+</div>
+
+<div class="mock-label"><span>MOCKUP A · <b>Argus — Live Detractor Feed</b></span><span>sample data · real complaint shapes</span></div>
+<div class="mock" role="img" aria-label="Mockup of the Argus live detractor feed">
+  <div class="m-nav"><span class="be">ARGUS</span><span class="ctx">Guest Relations · Live Detractor Feed</span><span class="who">Mendocino Farms</span></div>
   <div class="m-body">
     <div class="m-bar">
-      <div class="m-week"><span class="arr">◀</span> Week of <b>Jun 29 – Jul 5, 2026</b> <span class="arr">▶</span></div>
-      <div class="m-cadence">Cadence: <b>every Monday 7:00 AM</b> · to Guest Relations, Marketing &amp; all DOs</div>
+      <span class="m-live"><span class="dot"></span> Live — as it happens</span>
+      <div class="m-cadence">Weekly rollup auto-generated <b>every Monday 7:00 AM</b> from this same feed</div>
+    </div>
+
+    <div class="m-tabs">
+      <span class="m-tab on">Live feed</span><span class="m-tab">Weekly rollup</span><span class="m-tab">By store</span><span class="m-tab">By District Operator</span><span class="m-tab">By issue type</span>
     </div>
 
     <div class="m-hero">
-      <div class="m-kpi"><div class="n ac">61</div><div class="l">NPS this week</div><div class="d up">▲ +3 vs last week</div></div>
-      <div class="m-kpi"><div class="n">418</div><div class="l">Survey responses</div><div class="d fl">— steady</div></div>
-      <div class="m-kpi"><div class="n bd">13</div><div class="l">Detractor alerts</div><div class="d up">▼ 2 fewer than last week</div></div>
-      <div class="m-kpi"><div class="n bd">1</div><div class="l">Food-illness mention</div><div class="d up">routed to FSQA ✓</div></div>
+      <div class="m-kpi"><div class="n ac">6</div><div class="l">Signals today</div><div class="d fl">4 handled · 2 awaiting approval</div></div>
+      <div class="m-kpi"><div class="n gd">0:47</div><div class="l">Median time-to-eyes</div><div class="d up">signal landed → right person notified</div></div>
+      <div class="m-kpi"><div class="n bd">1</div><div class="l">Illness mention</div><div class="d up">routed to FSQA in 0:31 ✓</div></div>
+      <div class="m-kpi"><div class="n ac">61</div><div class="l">NPS this week</div><div class="d up">▲ +3 · full trend in rollup</div></div>
     </div>
 
-    <div class="m-h2">8-week NPS trend</div>
-    <div class="m-trend">
-      <div class="tb" style="height:58%"></div><div class="tb" style="height:52%"></div><div class="tb" style="height:63%"></div><div class="tb" style="height:60%"></div><div class="tb" style="height:55%"></div><div class="tb" style="height:66%"></div><div class="tb" style="height:70%"></div><div class="tb cur" style="height:74%"></div>
-    </div>
-    <div class="m-trend-l"><span>5/11</span><span>5/18</span><span>5/25</span><span>6/1</span><span>6/8</span><span>6/15</span><span>6/22</span><span>6/29</span></div>
+    <div class="m-h2">As it happens</div>
 
-    <div class="m-tabs" style="margin-top:16px;">
-      <span class="m-tab on">By store</span><span class="m-tab">By District Operator</span><span class="m-tab">By issue type</span>
-    </div>
-
-    <div class="m-h2">Detractors by store</div>
-    <div class="m-row"><span class="nm">El Segundo <small>· DO – Maria</small></span><span class="track"><span class="fill" style="display:block;width:100%"></span></span><span class="ct">4</span></div>
-    <div class="m-row"><span class="nm">Marina del Rey <small>· DO – Maria</small></span><span class="track"><span class="fill hot" style="display:block;width:75%"></span></span><span class="ct hot">3 ⚑</span></div>
-    <div class="m-row"><span class="nm">DTLA – FIGat7th <small>· DO – Kevin</small></span><span class="track"><span class="fill" style="display:block;width:50%"></span></span><span class="ct">2</span></div>
-    <div class="m-row"><span class="nm">Irvine – Park Place <small>· DO – Dana</small></span><span class="track"><span class="fill" style="display:block;width:50%"></span></span><span class="ct">2</span></div>
-    <div class="m-row"><span class="nm">San Diego – UTC <small>· DO – Dana</small></span><span class="track"><span class="fill" style="display:block;width:25%"></span></span><span class="ct">1</span></div>
-    <div class="m-row"><span class="nm">Sacramento – Ice Blocks <small>· DO – Kevin</small></span><span class="track"><span class="fill" style="display:block;width:25%"></span></span><span class="ct">1</span></div>
-
-    <div class="m-h2">Detractors by issue type</div>
-    <div class="m-issues">
-      <span class="m-chip">Order accuracy <b>5</b></span>
-      <span class="m-chip">Wait time <b>3</b></span>
-      <span class="m-chip">Food quality <b>2</b></span>
-      <span class="m-chip">Staff interaction <b>1</b></span>
-      <span class="m-chip">Online ordering <b>1</b></span>
-      <span class="m-chip ill">⚑ Food illness <b>1</b></span>
-    </div>
-
-    <div class="m-h2">What guests actually said</div>
-    <div class="m-com">
-      <div class="q">"Ordered the Not So Fried Chicken for pickup and half the order was missing. Waited 25 minutes past the pickup time to find out."</div>
-      <div class="meta"><span class="st">El Segundo</span><span class="sc">NPS 3</span><span class="tag">Order accuracy</span><span>Ticket #48192 · replied, coupon offered</span></div>
-    </div>
-    <div class="m-com">
-      <div class="q">"The sandwich was great as always, but the lunch line took over 30 minutes. I can't do that on a workday."</div>
-      <div class="meta"><span class="st">DTLA – FIGat7th</span><span class="sc">NPS 5</span><span class="tag">Wait time</span><span>Ticket #48201 · replied</span></div>
-    </div>
     <div class="m-com illrow">
-      <div class="q">"I felt sick a few hours after eating my bowl on Tuesday night. Just wanted someone to know."</div>
-      <div class="meta"><span class="st">Marina del Rey</span><span class="sc">NPS 2</span><span class="tag ill">⚑ Food illness</span><span class="routed">→ FSQA + DO – Maria · Ticket #48213</span></div>
+      <div class="top"><span class="tm">7:42 PM · 4 min ago · after hours</span><span class="stat held">reply held — severe · human approval required</span></div>
+      <div class="q">"I ordered the Chicken Pesto Caprese from your Marina del Rey location tonight and I've been feeling really nauseous since. Just wanted someone to know."</div>
+      <div class="meta"><span class="st">Marina del Rey</span><span class="sc">NPS 2</span><span class="tag ill">⚑ Food illness · SEVERE</span><span>Ticket #48213</span></div>
+      <div class="notif"><span class="nl">Notified 0:31 after arrival:</span>
+        <span class="n-chip sent">FSQA <span class="ch">· Slack ✓</span></span>
+        <span class="n-chip sent">DO – Maria <span class="ch">· SMS ✓</span></span>
+        <span class="n-chip sent">Store GM <span class="ch">· email ✓</span></span>
+        <span class="n-chip sent">Guest Relations <span class="ch">· Zendesk ✓</span></span>
+      </div>
+      <div class="prec"><b>Precedent:</b> 7 similar illness claims in history · all 7 acknowledged same-day recovered the guest · median close 2 exchanges. Zora-voice acknowledgment drafted — waiting in the gated panel (see Focus B below).</div>
     </div>
 
-    <div class="m-foot"><span>Sources: Zendesk tickets + survey alerts · assembled automatically, no manual spreadsheet step</span><span>Argus · <b>read-only view</b> — this report writes nothing</span></div>
+    <div class="m-com">
+      <div class="top"><span class="tm">6:15 PM · 1 hr 31 min ago</span><span class="stat held">reply drafted — awaiting approval</span></div>
+      <div class="q">"Ordered the Not So Fried Chicken for pickup and half the order was missing. Waited 25 minutes past the pickup time to find out."</div>
+      <div class="meta"><span class="st">El Segundo</span><span class="sc">NPS 3</span><span class="tag">Order accuracy</span><span>Ticket #48192</span></div>
+      <div class="notif"><span class="nl">Notified 0:52 after arrival:</span>
+        <span class="n-chip sent">DO – Maria <span class="ch">· SMS ✓</span></span>
+        <span class="n-chip sent">Store GM <span class="ch">· email ✓</span></span>
+      </div>
+      <div class="prec"><b>Precedent:</b> missing-item detractors who got an apology + coupon within 24h: 82% recovered. Zora-voice apology drafted · next "I'm Sorry Code" peeked (read-only) — approve to send.</div>
+    </div>
+
+    <div class="m-com">
+      <div class="top"><span class="tm">5:03 PM · 2 hrs 43 min ago</span><span class="stat done">handled — reply approved &amp; sent 5:19 PM</span></div>
+      <div class="q">"The sandwich was great as always, but the lunch line took over 30 minutes. I can't do that on a workday."</div>
+      <div class="meta"><span class="st">DTLA – FIGat7th</span><span class="sc">NPS 5</span><span class="tag">Wait time</span><span>Ticket #48201</span></div>
+      <div class="notif"><span class="nl">Notified 0:44 after arrival:</span>
+        <span class="n-chip sent">DO – Kevin <span class="ch">· Slack ✓</span></span>
+        <span class="n-chip sent">Store GM <span class="ch">· email ✓</span></span>
+      </div>
+    </div>
+
+    <div class="m-foot"><span>Every signal decoded, routed &amp; drafted automatically · guest-facing sends always human-approved · notification channels per role set by Operations</span><span>Argus · <b>live</b> · weekly rollup is a byproduct</span></div>
   </div>
 </div>
-<div class="sub" style="margin-top:6px;">Store, DO, and guest data above are illustrative samples. Slices come straight from the same store → DO map the auto-reply uses, so the report and the routing can never disagree.</div>
+<div class="sub" style="margin-top:6px;">Guests, stores, and times above are illustrative samples — but the complaint shapes (missing pickup item, long lunch line, post-meal illness mention) are the real shapes from Mendo's own ticket history, and the precedent lines show exactly what the backloading engine feeds into the moment. Slices come from the same store → DO map the auto-reply uses, so the feed and the routing can never disagree.</div>
 
 <!-- ================================================================ -->
-<h2>Focus B — Food-Borne Illness Handling</h2>
+<h2>Focus B — Food-Borne Illness Handling <span class="sub" style="display:inline">(multi-channel, gated, severe never auto)</span></h2>
 <div class="card" data-cm="focus-b">
-<p>The rule comes first, because it's the whole point: <b>a severe food-illness ticket never triggers an automatic message or an automatic write. Ever.</b> Argus detects, classifies, routes, and <em>prepares</em> — then stops and waits for a person. That's true at every level of automation trust, now and later.</p>
-<p>And we build <b>verify-first</b>: the meeting flagged that a foodborne automation may already exist in Zendesk. Brenden is confirming whether it's live and correctly configured. Step one of this focus is mapping what that trigger already does — Argus layers on top of it (severity, DO + store resolution, the gated panel); it does not blindly rebuild or double-fire it.</p>
-<p>Here's the flow, exactly as the operator sees it — an after-hours illness ticket, start to finish.</p>
+<p>The rule comes first, because it's the whole point: <b>a severe food-illness ticket never triggers an automatic message to a guest and never auto-fires a write. Ever.</b> Argus detects, classifies, routes, notifies your team, and <em>prepares</em> — then stops and waits for a person. That's true at every level of automation trust, now and later. <span class="src call">from the 7/2 call</span></p>
+<p><b>What changed from v1:</b> routing is now <b>multi-channel</b>. Sending email, Slack, and text is the easy part — the discipline is sending the <em>right</em> alert to the <em>right</em> role on the channel that role actually watches at 9:47 PM. FSQA might live in Slack; a District Operator on the road needs a text; the store GM reads email in the morning. <b>The exact channel-per-role matrix is confirmed with Operations before go-live — we do what operations desires, not what's convenient to build.</b> <span class="src rec">our recommendation — the call specified routing to DO + store; the channel matrix is ours to confirm with ops</span></p>
+<p>And we build <b>verify-first</b>: the meeting flagged that a foodborne automation may already exist in Zendesk — Brenden is confirming. Step one is mapping what that trigger already does; Argus layers on top (severity, DO + store resolution, multi-channel notify, the gated panel); it does not double-fire it. <span class="src call">from the 7/2 call</span></p>
+<p>Here's the flow, exactly as the operator sees it — an after-hours illness ticket, start to finish, including <b>the actual reply text</b> waiting for approval.</p>
 </div>
 
 <div class="mock-label"><span>MOCKUP B · <b>Argus — Food-Illness Handling flow</b></span><span>sample data</span></div>
@@ -268,11 +319,12 @@
     <div class="f-step">
       <div class="f-dot">2</div>
       <div class="f-card">
-        <div class="fh"><b>Detected &amp; classified</b><span class="tm">deterministic decoder + model judge · &lt;1s</span></div>
-        <p>Illness language recognized ("feeling really nauseous since"). Store resolved from order details. Severity assessed.</p>
+        <div class="fh"><b>Detected, classified &amp; matched against history</b><span class="tm">deterministic decoder + precedent + model judge · &lt;1s</span></div>
+        <p>Illness language recognized ("feeling really nauseous since"). Store resolved from order details. Severity assessed. Precedent pulled: 7 prior illness claims of this shape, all recovered with a same-day personal acknowledgment.</p>
         <div class="f-tags">
           <span class="f-tag ac">sick</span>
           <span class="f-tag ac">gastroenteritis-screen</span>
+          <span class="f-tag ac">precedent: 7 similar · 7 recovered</span>
           <span class="f-tag warn">after-hours</span>
           <span class="f-tag bad">SEVERITY: SEVERE</span>
         </div>
@@ -282,22 +334,28 @@
     <div class="f-step">
       <div class="f-dot">3</div>
       <div class="f-card">
-        <div class="fh"><b>Routed — right people, immediately</b><span class="tm">no approval needed to <i>notify</i>; approval needed to <i>write</i></span></div>
+        <div class="fh"><b>Routed — right people, right channels, immediately</b><span class="tm">no approval needed to <i>notify your team</i>; approval always needed to <i>write or message a guest</i></span></div>
         <div class="f-route">
-          <span class="hop">Store: Marina del Rey</span><span class="arr">→</span>
-          <span class="hop">DO – Maria</span><span class="arr">→</span>
-          <span class="hop">Group: FSQA</span>
+          <span class="hop">FSQA <small>· Slack</small></span><span class="arr">+</span>
+          <span class="hop">DO – Maria <small>· SMS text</small></span><span class="arr">+</span>
+          <span class="hop">Store GM <small>· email</small></span><span class="arr">+</span>
+          <span class="hop">Guest Relations <small>· Zendesk assignment</small></span>
         </div>
-        <p style="margin-top:8px;">Existing Zendesk foodborne trigger: <span class="f-tag ok" style="text-transform:none;">detected — Argus overlays, does not double-fire</span></p>
+        <p style="margin-top:8px;">Channel-per-role matrix: <span class="f-tag ok" style="text-transform:none;">set by Operations — confirmed before go-live, changeable any time</span></p>
+        <p>Existing Zendesk foodborne trigger: <span class="f-tag ok" style="text-transform:none;">detected — Argus overlays, does not double-fire</span></p>
       </div>
     </div>
 
     <div class="f-step">
       <div class="f-dot red">4</div>
       <div class="f-card" style="border-color:#3a2a00;">
-        <div class="fh"><b>Gated action panel — preview before anything fires</b><span class="g-wait"><span class="pulse"></span> Waiting for operator — nothing has been sent</span></div>
-        <p><b>Proposed actions</b> (in Zora's voice where guest-facing; sign-off authority: Elbert / Brenden / Brandi):</p>
-        <p style="margin:6px 0 2px;">1. Assign ticket to <b>FSQA</b> + add <b>DO – Maria</b> as follower · 2. Apply tags <code>sick</code>, <code>food_illness</code>, <code>store_marina_del_rey</code> · 3. Acknowledgment reply to the guest <span class="held">HELD — severe: human approval required</span></p>
+        <div class="fh"><b>Gated action panel — the exact reply and the exact call, before anything fires</b><span class="g-wait"><span class="pulse"></span> Waiting for operator — nothing has been sent to the guest</span></div>
+        <p><b>Proposed guest reply</b> (sign-off authority: Elbert / Brenden / Brandi):</p>
+        <div class="zvoice">
+          <div class="zh"><b>Drafted reply — guest-facing</b><span class="zdisc">Sample voice — final tone trained on Zora's actual replies</span></div>
+          <div class="zt">"Hi Danielle — thank you for reaching out, and I'm so sorry you're not feeling well tonight. That is never the experience we want anyone to have at Mendo. I've personally shared this with our Food Safety &amp; Quality team and with the leadership team at our Marina del Rey location — they're looking into it right away. If you're up to it, anything you can share about your visit helps us get to the bottom of it quickly, and we'll follow up with you directly either way. Most importantly, please take care of yourself. — Guest Relations, Mendocino Farms"</div>
+        </div>
+        <p style="margin:8px 0 2px;"><b>Proposed Zendesk actions:</b> 1. Assign ticket to <b>FSQA</b> + add <b>DO – Maria</b> as follower · 2. Apply tags <code>sick</code>, <code>food_illness</code>, <code>store_marina_del_rey</code> · 3. Send the reply above <span class="held">HELD — severe: human approval required</span></p>
         <div class="rest"><span class="m">PUT</span> /api/v2/tickets/48213.json
 {
   <span class="k">"ticket"</span>: {
@@ -311,57 +369,73 @@
           <span class="g-btn fire">Approve &amp; fire</span>
           <span class="g-btn edit">Edit</span>
           <span class="g-btn rej">Reject</span>
-          <span style="color:#888;font-size:11px;">This is the exact call that will run — nothing more, nothing else.</span>
+          <span style="color:#888;font-size:11px;">This is the exact reply and the exact call that will run — nothing more, nothing else.</span>
         </div>
       </div>
     </div>
 
     <div class="rulebanner">
       <span class="ic">⛔</span>
-      <span class="tx"><b>SEVERE-BRANCH RULE — always on, cannot be disabled.</b> A severe food-illness ticket never auto-sends a reply and never auto-fires a write. Argus routes and prepares; a person approves every action. This rule does not relax as automation earns trust elsewhere.</span>
+      <span class="tx"><b>SEVERE-BRANCH RULE — always on, cannot be disabled.</b> A severe food-illness ticket never auto-sends a reply and never auto-fires a write. Argus routes, notifies your team, and prepares; a person approves every guest-facing action. This rule does not relax as automation earns trust elsewhere.</span>
     </div>
 
     <div class="m-foot"><span>Every approval, edit, and rejection is logged — a full audit trail per ticket</span><span>Argus · gated writes · <b>preview → approve → fire</b></span></div>
   </div>
 </div>
-<div class="sub" style="margin-top:6px;">Guest, store, ticket, and group ids above are illustrative samples. The panel in step 4 is the same gated-write pattern used everywhere in Argus — illness is simply the branch where the gate never graduates to auto.</div>
+<div class="sub" style="margin-top:6px;">Guest, store, ticket, and group ids above are illustrative samples. The reply text is written in the warm, personal register we're aiming for — and honestly labeled: it's a placeholder until Zora's (and possibly Tyler's) actual reply corpus is pulled from Zendesk, which is an open action item from the 7/2 call. For contrast, the everyday non-severe version of the same voice: <em>"Hi Marcus — I'm so sorry we let you down. Waiting past your pickup time only to find half your order missing isn't the Mendo experience, full stop. I've shared this with our El Segundo team so it gets fixed at the source, and your next meal is on us with the code below. Thank you for telling us — it genuinely helps us get better."</em> (same label: sample voice, final tone trained on Zora's replies).</div>
 
 <!-- ================================================================ -->
 <h2>Phases &amp; estimate</h2>
 <div class="card" data-cm="phases">
-<p>These phases sit <b>on top of</b> Mission&nbsp;1 (the auto-reply: 22 points, already planned) and reuse its foundations — the decoder, the store → DO map, the gated-write pane.</p>
-<h3>Focus A — NPS Reports · 8 pts</h3>
+<p>These phases sit <b>on top of</b> <a class="art" href="../plans/2026-07-03-0110-plan-nps-mission1-fable5.html">Mission&nbsp;1</a> (the auto-reply: 22 points, already planned) and reuse its foundations — the decoder, the store → DO map, the gated-write pane. The B-phases build the backloading engine both focuses run on; B0 is <b>already done</b>.</p>
+
+<h3>The Backbone — backloading engine · 13 pts (1 phase already done)</h3>
+<table>
+<thead><tr><th>Phase</th><th>Deliverable</th><th>Pts</th><th>Status / depends on</th></tr></thead>
+<tbody>
+<tr><td>B0</td><td>Decode real Mendo history: the big-10 threads atomized end to end (incl. #341562), 74% reduction proven</td><td>—</td><td><span class="done-tag">✓ DONE</span></td></tr>
+<tr><td>B1</td><td>Outcome labeling: pull Zendesk ticket-metrics + satisfaction for decoded tickets; hand-label 20 programs to validate the automated labels</td><td>2</td><td>B0</td></tr>
+<tr><td>B2</td><td>Precedent index: the program library with situation typing + "what worked last time" retrieval — the memory both focuses query</td><td>3</td><td>B1 · <a class="art" href="../designs/2026-07-04-0035-design-conversation-as-program-v3-fable5.html">design v3</a></td></tr>
+<tr><td>B3</td><td>Replay + first mined lesson end to end (reduce → infer → verify → replay → lesson), proven on history</td><td>3</td><td>B2</td></tr>
+<tr><td>B4</td><td>Drift + discovery pass over history + the trend/library view for operations (slices 6–13)</td><td>5</td><td>B3 · <a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">design v2</a></td></tr>
+<tr><td>Z0</td><td>Zora voice corpus: identify GR-agent Zora, pull her public replies as the tone training set (open action item from 7/2; replaces the sample-voice placeholders)</td><td>1</td><td>Zendesk data · <a class="art" href="../designs/2026-07-04-0010-design-conversation-as-program-v2-fable5.html">design v2 Q&amp;A</a></td></tr>
+</tbody>
+</table>
+
+<h3>Focus A — Real-Time NPS Action · 8 pts</h3>
 <table>
 <thead><tr><th>Phase</th><th>Deliverable</th><th>Pts</th><th>Depends on</th></tr></thead>
 <tbody>
-<tr><td>R0</td><td>Confirm data sources: full survey counts (score needs promoters too, not just detractor alerts) + Brenden's current manual weekly report as the baseline to match, then beat</td><td>1</td><td>Brenden's report sample</td></tr>
-<tr><td>R1</td><td>Weekly data assembly: per-store / per-DO / per-issue slices, illness flagged, guest comments attached</td><td>3</td><td>Mission 1 P0 (store → DO map)</td></tr>
-<tr><td>R2</td><td>The report view itself — Mockup A made real, in Argus, week selector + three slices + comment feed</td><td>3</td><td>R1</td></tr>
-<tr><td>R3</td><td>Monday delivery: report generated and shared to Guest Relations, Marketing &amp; DOs via a private link</td><td>1</td><td>R2</td></tr>
+<tr><td>R0</td><td>Confirm data sources: full survey counts (a true NPS needs promoters too, not just detractor alerts) + Brenden's current manual weekly report as the baseline to match, then beat</td><td>1</td><td>Brenden's report sample</td></tr>
+<tr><td>R1</td><td>Live signal pipeline: arriving detractor/illness signal → decoded → typed → precedent attached → team notified, under a minute end to end</td><td>3</td><td>Mission 1 P0 (store → DO map) · B2</td></tr>
+<tr><td>R2</td><td>The live feed view — Mockup A made real in Argus: as-it-happens entries, who-was-notified receipts, precedent lines, slice tabs</td><td>3</td><td>R1</td></tr>
+<tr><td>R3</td><td>Weekly rollup auto-generated from the same facts, delivered Monday 7 AM to Guest Relations, Marketing &amp; DOs</td><td>1</td><td>R2</td></tr>
 </tbody>
 </table>
+
 <h3>Focus B — Food-Borne Illness Handling · 9 pts</h3>
 <table>
 <thead><tr><th>Phase</th><th>Deliverable</th><th>Pts</th><th>Depends on</th></tr></thead>
 <tbody>
-<tr><td>F0</td><td><b>Verify first:</b> Brenden confirms the existing Zendesk foodborne trigger; we document exactly what it does today so Argus overlays instead of duplicating</td><td>1</td><td>Brenden</td></tr>
-<tr><td>F1</td><td>Detection &amp; severity: illness language recognized, severe/non-severe split, measured against historical tickets — the one unacceptable miss is a false negative</td><td>3</td><td>Mission 1 P1–P2</td></tr>
-<tr><td>F2</td><td>Routing: DO + store + FSQA, after-hours aware, existing-trigger aware</td><td>2</td><td>F0, F1</td></tr>
-<tr><td>F3</td><td>Gated action panel — Mockup B made real: preview → approve → fire, severe branch permanently human-approved</td><td>3</td><td>Mission 1 P5 (gated-write pane)</td></tr>
+<tr><td>F0</td><td><b>Verify first:</b> Brenden confirms the existing Zendesk foodborne trigger; we document exactly what it does today so Argus overlays instead of duplicating. <b>Plus:</b> sit with Operations and confirm the channel-per-role matrix (who gets Slack, who gets SMS, who gets email)</td><td>1</td><td>Brenden · Operations</td></tr>
+<tr><td>F1</td><td>Detection &amp; severity: illness language recognized, severe/non-severe split, measured against historical tickets — the one unacceptable miss is a false negative</td><td>3</td><td>Mission 1 P1–P2 · B0</td></tr>
+<tr><td>F2</td><td>Multi-channel routing: email / Slack / SMS / Zendesk assignment per the ops-confirmed matrix, after-hours aware, existing-trigger aware</td><td>2</td><td>F0, F1</td></tr>
+<tr><td>F3</td><td>Gated action panel — Mockup B made real: the drafted Zora-voice reply + the literal API call, preview → approve → fire, severe branch permanently human-approved</td><td>3</td><td>Mission 1 P5 (gated-write pane) · Z0</td></tr>
 </tbody>
 </table>
-<p><b>This plan: 17 pts</b> (8 + 9), alongside Mission&nbsp;1's 22. Running cost stays where Mission&nbsp;1 put it — model spend only on detractor/illness traffic, under a penny per ticket.</p>
+<p><b>This plan: 31 pts</b> (13 backbone + 1 voice + 8 + 9), alongside Mission&nbsp;1's 22. Running cost stays where Mission&nbsp;1 put it — model spend only on detractor/illness traffic and voice drafting, under a penny per ticket; the backloading engine's decode/retrieve path costs $0 per ticket because it's deterministic, not a model.</p>
 </div>
 
 <h2>Constraints — the promises this plan is built around</h2>
 <div class="card" data-cm="constraints">
 <ul>
-<li><b>Every Zendesk write is gated.</b> The operator sees the exact call — plain words and the literal API request — approves it, and then it fires. No silent writes, in any mode, at any trust level.</li>
+<li><b>Every Zendesk write and every guest-facing message is gated.</b> The operator sees the exact reply and the exact call — plain words and the literal API request — approves it, and then it fires. No silent writes, in any mode, at any trust level.</li>
 <li><b>Food illness never fires a write without approval.</b> The severe branch is permanently human-approved; it does not graduate to auto as trust builds elsewhere.</li>
+<li><b>Internal notifications are automatic; guest words are not.</b> Telling your own team "a detractor just landed" needs no approval — that's the real-time promise. Words to a guest always wait for a human.</li>
+<li><b>The channel set is Operations' call.</b> Email, Slack, SMS, Zendesk — per role, confirmed before go-live, changeable any time. We do what ops desires.</li>
 <li><b>The coupon sheet is read-only.</b> Argus only peeks the next available "I'm Sorry Code"; a person enters it. Argus never writes that sheet.</li>
-<li><b>Tone is Zora's.</b> Guest-facing language is trained on her responses; sign-off authority on wording and automation steps is Elbert / Brenden / Brandi. RJ is not burdened with day-to-day.</li>
-<li><b>Zendesk owns email</b> in Phase 1 — alerts come in as tickets, replies go out through Zendesk.</li>
-<li><b>Reading is deterministic; judgment is swappable.</b> Tickets are parsed by an exact decoder (same input, same result, every time — not a model). The model layer (Gemini on your Google cloud today) is a swappable socket, live at <code>api.3-nous.net</code> — no vendor lock.</li>
+<li><b>Tone is Zora's.</b> Guest-facing language is trained on her actual replies (corpus pull = Z0); until then every drafted reply is labeled as sample voice. Sign-off authority on wording and automation steps is Elbert / Brenden / Brandi. RJ is not burdened with day-to-day.</li>
+<li><b>Reading is deterministic; judgment is swappable.</b> Tickets are parsed by an exact decoder (same input, same result, every time — not a model), and precedent comes from your own history. The model layer (Gemini on your Google cloud today) is a swappable socket — no vendor lock — and by design it shrinks: the more history the engine holds, the less the model is needed.</li>
 <li><b>We adapt to the survey alert as-is.</b> The survey id arriving in the Store/Order fields is treated as the key; store and DO resolve on our side. No upstream HubSpot fix required.</li>
 </ul>
 </div>
@@ -369,45 +443,49 @@
 <h2>Unknowns <span class="sub" style="display:inline">(named, not hidden)</span></h2>
 <div class="card" data-cm="unknowns">
 <ul>
+<li><b>The ops channel matrix.</b> Who wants Slack, who wants SMS, who wants email, per role and per hour of day — F0 confirms it with Operations before anything goes live.</li>
 <li><b>Is the existing foodborne trigger live?</b> Brenden is confirming. F0 exists precisely because we don't know yet.</li>
-<li><b>Full-score data source.</b> Detractor alerts alone can't compute a true NPS (that needs promoters and passives too). R0 confirms where the full survey counts come from — survey export, report feed, or HubSpot.</li>
-<li><b>The current weekly report's exact shape.</b> We match Brenden's manual report before we improve on it; we haven't seen its final format yet.</li>
+<li><b>Is "worked" cleanly labelable?</b> The backloading engine mines what worked — but resolved-without-reopen may be a weaker signal than it looks (silent churn, courtesy satisfaction scores). B1's 20-ticket hand-label is the test; if it disagrees with the automated labels, the outcome model gets its own design pass first.</li>
+<li><b>Which Zora?</b> Zendesk holds several users named Zora — Z0's first step is confirming which one is the Guest-Relations voice Brenden means, then pulling her public replies as the tone corpus.</li>
+<li><b>Full-score data source.</b> Detractor alerts alone can't compute a true NPS (that needs promoters and passives too). R0 confirms where the full survey counts come from.</li>
 <li><b>Illness detection recall on history.</b> How reliably illness language is caught across all historical tickets — F1 measures it; a false negative is the one unacceptable miss.</li>
 <li><b>Store → DO map coverage.</b> Whether Zendesk's 13 DO groups + historical tickets resolve every live store, until the Airtable map takes over.</li>
-<li><b>Delivery preference.</b> Whether Marketing wants the Monday report as a link, an email, or inside a tool they already open.</li>
 </ul>
 </div>
 
-<h2>When To Revisit <span class="sub" style="display:inline">(the signals that trigger v2)</span></h2>
+<h2>When To Revisit <span class="sub" style="display:inline">(the signals that trigger v3)</span></h2>
 <div class="card" data-cm="revisit">
 <ul>
-<li><b>Brenden confirms the foodborne trigger is live and sufficient</b> → F-phases shrink to a thin overlay (severity + DO/store + gate); re-estimate down.</li>
-<li><b>A full survey-response feed lands</b> → report v2 with the true score, not an estimate assembled from alerts.</li>
-<li><b>Any illness false negative</b> → immediate v2 of the detection branch, before anything else proceeds.</li>
-<li><b>The Airtable store → DO map arrives</b> → re-slice the report and routing against the real map; retire the Zendesk seed.</li>
-<li><b>Marketing asks for a new slice</b> (daypart, region, item) → report v2; the data assembly is built to add slices cheaply.</li>
-<li><b>Operators reject or heavily edit more than ~1 in 3 proposed actions</b> → the judgment layer is wrong, stop and re-plan rather than tune in place.</li>
+<li><b>Operations' channel matrix surprises us</b> (e.g. nobody wants SMS, or stores want a shared channel) → F2 re-shapes around what ops actually said, before build.</li>
+<li><b>Brenden confirms the foodborne trigger is live and sufficient</b> → F-phases shrink to a thin overlay (severity + multi-channel + gate); re-estimate down.</li>
+<li><b>B1's hand-label disagrees with the automated outcome labels</b> on more than a handful of the 20 → stop; the outcome model needs its own design pass before B2–B4 proceed.</li>
+<li><b>A full survey-response feed lands</b> → the live feed and rollup carry the true score, not an estimate assembled from alerts.</li>
+<li><b>Any illness false negative</b> → immediate revision of the detection branch, before anything else proceeds.</li>
+<li><b>The Zora corpus lands (Z0)</b> → every sample-voice placeholder is retrained and re-reviewed against her actual register; the "sample voice" labels come off only after sign-off.</li>
+<li><b>The Airtable store → DO map arrives</b> → re-slice feed and routing against the real map; retire the Zendesk seed.</li>
+<li><b>Operators reject or heavily edit more than ~1 in 3 proposed actions</b> → the judgment layer is wrong; stop and re-plan rather than tune in place.</li>
 </ul>
 </div>
 
 <h2>Definition of Done — this artifact</h2>
 <div class="card dod" data-cm="dod">
 <ul>
-<li><span class="ok">✓</span> A-D-D verified — builds on the approved Mission 1 design + plan; no drift, nothing re-planned</li>
-<li><span class="ok">✓</span> Traces to source — every scope item maps to the 7/2 meeting notes or a decision layered since</li>
-<li><span class="ok">✓</span> Two mockups embedded — real HTML/CSS in the Argus house style, populated with sample data</li>
-<li><span class="ok">✓</span> Both Phase-1 focuses planned — NPS Reports (R0–R3, 8 pts) + Food-Illness Handling (F0–F3, 9 pts)</li>
-<li><span class="ok">✓</span> Severe-branch safety visible on screen — the ⛔ rule banner and the held reply in Mockup B</li>
-<li><span class="ok">✓</span> Hard constraints stated — gated writes, read-only coupon sheet, Zora's tone, Zendesk-owns-email</li>
-<li><span class="ok">✓</span> Rule 6 honored — Unknowns and When To Revisit sections present and specific</li>
-<li><span class="ok">✓</span> Plain language throughout — client-readable, internal terms explained where they appear</li>
-<li><span class="ok">✓</span> Publication date top-right · house template · comment hooks live on every section</li>
+<li><span class="ok">✓</span> A-D-D verified — builds on the approved Mission-1 design + plan and the three conversation-as-program designs; no drift, nothing re-planned</li>
+<li><span class="ok">✓</span> Comment 1 answered — every referenced artifact is a real clickable link (2 Mission-1 + 3 conversation-as-program designs), styled as links</li>
+<li><span class="ok">✓</span> Comment 2 answered — Focus A reframed to complete automation on the conversation-as-program loop; every claim badged "from the 7/2 call" or "our recommendation"</li>
+<li><span class="ok">✓</span> Comment 3 answered — Focus B is multi-channel (email/Slack/SMS/Zendesk), channel matrix confirmed with Operations (F0), gated + severe-never-auto preserved</li>
+<li><span class="ok">✓</span> Comment 4 answered — real-time replaces weekly: live detractor feed with time-to-eyes and notified-receipts; the Monday report is now a rollup byproduct</li>
+<li><span class="ok">✓</span> Comment 5 answered — dedicated Backbone section: 18 enumerated ways to slice the past, all linked to their designs, B0 marked done, B-phases scheduled — the whole plan, not pieces</li>
+<li><span class="ok">✓</span> Zora voice shown, not told — actual sample replies (severe illness ack + detractor apology), honestly labeled as placeholders pending the real corpus (Z0)</li>
+<li><span class="ok">✓</span> Real-world grounding — ticket #341562 (US Foods invoice, Cherry Creek) + the big-10 reduction (80,832 → 20,844 chars, 74%) cited as proof the engine runs on Mendo data today</li>
+<li><span class="ok">✓</span> Rule 6 honored — Unknowns and When To Revisit updated for v2's new scope</li>
+<li><span class="ok">✓</span> Comment anchors preserved — same section ids as v1, so existing operator comments stay attached on re-publish</li>
 <li><span class="pend">◌</span> Commit, push &amp; Latchkey publish — fires with the operator's ship chain</li>
 </ul>
 </div>
 
 </div>
-<footer>v0 · r430 · 2026-07-06 · Be · argus · ~p NPS Reports + Food-Borne Illness Handling · Mendocino Farms Phase 1 · 17 pts</footer>
+<footer>v0 · r433 · 2026-07-06 · v2 · Be · argus · ~p Real-Time NPS Action + Food-Borne Illness Handling · Mendocino Farms Phase 1 · v2 supersedes v1 (2026-07-06-0912) · 31 pts</footer>
 <script>window.ARTIFACT={doc:"b7d3e219-e588-4510-8627-c5faf6e26383"};</script>
 <script src="https://joeycastillo.us/s/artifact-comments.js"></script>
 </body>
