@@ -536,7 +536,7 @@ let APP = localStorage.getItem("argus_app") || "meraki";
 let APPSW_OPEN = false; // app-switcher dropdown open state
 const APPS = {
   meraki:  { label:"Meraki",  icon:"&#128225;", tag:"Network operations", tabs:["operations","network","audit"] },
-  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["comments","zdaudit","apibrowser"], source:"zendesk" },
+  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["focus","comments","zdaudit","apibrowser"], source:"zendesk" },
   cloudflare: { label:"Cloudflare", icon:"&#9729;&#65039;", tag:"Edge · read-only", tabs:["apibrowser"], source:"cloudflare" },
   airbyte: { label:"Airbyte", icon:"&#128260;", tag:"Philz migration", tabs:["helm","apibrowser"], source:"airbyte" },
   gcp: { label:"GCP", icon:"&#128176;", tag:"Cloud cost", tabs:["cost"] }
@@ -2524,6 +2524,120 @@ function cmSearchList(q){ q=(q||"").toLowerCase().trim(); if(!q) return []; retu
 function cmSearchDropdown(){ const q=CM.q; if(!(q&&q.trim())) return ""; const m=cmSearchList(q); if(!m.length) return "<div class='cmsd-empty'>no match in the loaded tickets</div>"; return m.map(t=>{ const g=cmTags(t); return "<div class='cmsd-row' data-cmg='"+t.id+"'><span class='cmsd-sub'>"+abEsc(t.subject||("#"+t.id))+"</span><span class='cmsd-meta'>#"+t.id+(g.intent?" · "+abEsc(g.intent.split(" › ")[0]):"")+(g.idk?" · idk":g.conf==="low"?" · low":"")+"</span></div>"; }).join(""); }
 function cmStat(label,count,key,cls){ const on = key==="__all__" ? CM.filter===null : CM.filter===key; return "<button class='cmstat"+(on?" on":"")+(cls?(" "+cls):"")+"' data-cmfilter='"+key+"'>"+abEsc(label)+" <b>"+count+"</b></button>"; }
 function renderCMSearch(){ const w=document.getElementById("cm-sd"); if(w) w.innerHTML=cmSearchDropdown(); }
+// ── Focus tab — the NPS-detractor + food-illness surface. Sample data for the first
+// visible slice (real-looking, shaped like the live payloads). Everything read-only;
+// the one write (food-illness) is gated + severe-never-auto. See the v2 plan.
+const FOCUS_SAMPLE = {
+  nps: 61, responses: 418, medianEyes: "0:47",
+  detractors: [
+    { id:"375102", store:"Marina del Rey", dov:"Maria", score:2, when:"3 min ago", status:"open",
+      read:"Online order was missing the Not So Fried Chicken and half the sides — guest says it's the second time this month.",
+      verdict:"grounded", issue:"Missing items",
+      notified:[{who:"GM · Marina del Rey",ch:"email"},{who:"DO · Maria",ch:"SMS"}],
+      precedent:"12 similar detractors → apology + I'm Sorry Code recovered 9" },
+    { id:"375088", store:"Cherry Creek", dov:"Devin", score:3, when:"18 min ago", status:"open",
+      read:"A US Foods invoice dispute bled into the guest thread — 19 comments; the guest just wants the refund confirmed.",
+      verdict:"grounded", issue:"Billing / refund",
+      notified:[{who:"GM · Cherry Creek",ch:"email"}],
+      precedent:"nearest program #341562 — 5 steps, resolved in 2 replies" },
+    { id:"375061", store:"El Segundo", dov:"Maria", score:1, when:"41 min ago", status:"open",
+      read:"Rude counter experience; guest named the shift. Tone reads hot — recommend a manager callback, not a coupon.",
+      verdict:"unverified", issue:"Service / staff",
+      notified:[{who:"GM · El Segundo",ch:"email"},{who:"DO · Maria",ch:"SMS"}],
+      precedent:"named-staff complaints: escalate to GM, hold the auto-reply" }
+  ],
+  illness: {
+    id:"48213", store:"Marina del Rey", dov:"Maria", when:"9:47 PM · after hours",
+    tags:["sick","food_illness","store_marina_del_rey"],
+    zora:"Hi Danielle — I'm so sorry to hear you're feeling unwell after eating with us. Your health is what matters most right now. I've flagged this to our Food Safety team and the manager at our Marina del Rey location directly, and someone will personally follow up with you today. Thank you for telling us — it genuinely helps us keep everyone safe.",
+    rest:'PUT /api/v2/tickets/48213.json\n{\n  "ticket": {\n    "group_id": 28004417,          // FSQA\n    "additional_tags": ["sick", "food_illness", "store_marina_del_rey"],\n    "followers": [{ "group": "DO - Maria" }],\n    "priority": "urgent"\n  }\n}'
+  }
+};
+function focusPane(){
+  const F=FOCUS_SAMPLE;
+  let s="<style>"
+   +"#pane-focus .fwrap{max-width:900px;}"
+   +"#pane-focus .fhead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;}"
+   +"#pane-focus .flive{display:flex;align-items:center;gap:7px;color:#7CFFB2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}"
+   +"#pane-focus .fdot{width:9px;height:9px;border-radius:50%;background:#7CFFB2;box-shadow:0 0 0 0 rgba(124,255,178,.6);animation:fpulse 1.8s infinite;}"
+   +"@keyframes fpulse{0%{box-shadow:0 0 0 0 rgba(124,255,178,.55);}70%{box-shadow:0 0 0 8px rgba(124,255,178,0);}100%{box-shadow:0 0 0 0 rgba(124,255,178,0);}}"
+   +"#pane-focus .foff{background:#2a1414;color:#ff9b9b;border:1px solid #6b2035;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;}"
+   +"#pane-focus .fkpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 16px;}"
+   +"#pane-focus .fkpi{background:#101c22;border:1px solid #14323e;border-radius:10px;padding:10px 15px;}"
+   +"#pane-focus .fkpi .n{color:#6FC3DF;font-size:22px;font-weight:700;line-height:1;}"
+   +"#pane-focus .fkpi .l{color:#8a93a0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-top:4px;}"
+   +"#pane-focus .fsh{color:#6FC3DF;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;}"
+   +"#pane-focus .fcard{background:#0f1519;border:1px solid #223038;border-radius:10px;padding:13px 15px;margin-bottom:10px;}"
+   +"#pane-focus .fcard.sev{border-color:#6b2035;background:#160e10;}"
+   +"#pane-focus .frow{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}"
+   +"#pane-focus .fwho{color:#e6edf2;font-weight:600;font-size:14px;}"
+   +"#pane-focus .fmeta{color:#8a93a0;font-size:12px;}"
+   +"#pane-focus .fscore{background:#2a1414;color:#ff9b9b;border-radius:6px;padding:2px 8px;font-weight:700;font-size:12px;}"
+   +"#pane-focus .fread{color:#dfe4e9;font-size:13.5px;margin:8px 0;line-height:1.5;}"
+   +"#pane-focus .fchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}"
+   +"#pane-focus .fchip{border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;}"
+   +"#pane-focus .c-issue{background:#101c22;color:#6FC3DF;}"
+   +"#pane-focus .c-grounded{background:#06251a;color:#7CFFB2;}"
+   +"#pane-focus .c-unverified{background:#2a2206;color:#ffd479;}"
+   +"#pane-focus .c-tag{background:#161d21;color:#9aa3ad;font-family:ui-monospace,Consolas,monospace;}"
+   +"#pane-focus .fnote{color:#8a93a0;font-size:12px;margin-top:7px;}"
+   +"#pane-focus .fnote b{color:#cdd6da;}"
+   +"#pane-focus .fsev{background:#6b2035;color:#ffd0d8;border-radius:6px;padding:2px 9px;font-size:11px;font-weight:800;letter-spacing:.04em;}"
+   +"#pane-focus .fgate{background:#0b0f12;border:1px solid #2c4a55;border-radius:10px;padding:14px 16px;margin-top:12px;}"
+   +"#pane-focus .fgate .hd{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;}"
+   +"#pane-focus .fwait{color:#ffd479;font-size:11px;font-weight:800;letter-spacing:.04em;}"
+   +"#pane-focus .fzora{background:#0f1410;border:1px solid #243024;border-radius:8px;padding:11px 13px;color:#dfe6df;font-size:13.5px;line-height:1.55;}"
+   +"#pane-focus .fzlab{color:#7CFFB2;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;font-weight:700;}"
+   +"#pane-focus .fsample{color:#8a93a0;font-size:11px;font-style:italic;margin-top:6px;}"
+   +"#pane-focus pre.frest{background:#08191f;border:1px solid #123;border-radius:8px;padding:11px 13px;color:#7fd6ea;font-size:12px;overflow:auto;margin:11px 0;font-family:ui-monospace,Consolas,monospace;}"
+   +"#pane-focus .fbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}"
+   +"#pane-focus .fbtn{border-radius:7px;padding:8px 16px;font-size:13px;font-weight:700;cursor:not-allowed;border:1px solid transparent;}"
+   +"#pane-focus .fb-app{background:#1f3a2a;color:#5a7a68;border-color:#2a4a38;}"
+   +"#pane-focus .fb-edit{background:#16242b;color:#9aa3ad;border-color:#2c4a55;}"
+   +"#pane-focus .fb-rej{background:#241417;color:#a06b72;border-color:#4a2a30;}"
+   +"#pane-focus .frule{background:#160e10;border:1px solid #6b2035;border-radius:8px;padding:9px 13px;color:#ffb3bd;font-size:12px;margin-top:11px;display:flex;gap:8px;align-items:flex-start;}"
+   +"#pane-focus .frecv{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}"
+   +"#pane-focus .frecpt{background:#101c22;border:1px solid #14323e;border-radius:6px;padding:2px 8px;font-size:11px;color:#9fd6e6;}"
+   +"</style>";
+  s+="<div class='fwrap'>";
+  // header + KPIs
+  s+="<div class='fhead'><div class='flive'><span class='fdot'></span> Live &middot; as it happens</div>"
+    +"<span class='foff'>&#9679; WRITE MODE OFF</span></div>";
+  s+="<div class='fkpis'>"
+    +"<div class='fkpi'><div class='n'>"+F.nps+"</div><div class='l'>NPS</div></div>"
+    +"<div class='fkpi'><div class='n'>"+F.responses+"</div><div class='l'>responses (30d)</div></div>"
+    +"<div class='fkpi'><div class='n'>"+F.detractors.filter(d=>d.status!=='resolved').length+"</div><div class='l'>open detractors</div></div>"
+    +"<div class='fkpi'><div class='n'>"+F.medianEyes+"</div><div class='l'>median time-to-eyes</div></div></div>";
+  // live detractor feed
+  s+="<div class='fsh'>Detractor feed &mdash; routed &amp; notified the moment it lands</div>";
+  F.detractors.forEach(d=>{
+    s+="<div class='fcard'><div class='frow'><span class='fwho'>#"+d.id+" &middot; "+esc(d.store)+"</span>"
+      +"<span class='fmeta'>DO &middot; "+esc(d.dov)+" &nbsp;|&nbsp; "+esc(d.when)+" &nbsp; <span class='fscore'>NPS "+d.score+"</span></span></div>";
+    s+="<div class='fread'>"+esc(d.read)+"</div>";
+    s+="<div class='fchips'><span class='fchip c-issue'>"+esc(d.issue)+"</span>"
+      +"<span class='fchip c-"+d.verdict+"'>"+(d.verdict==="grounded"?"&#10003; GROUNDED":"&#9888; UNVERIFIED")+"</span></div>";
+    s+="<div class='frecv'>"+d.notified.map(n=>"<span class='frecpt'>&#128233; "+esc(n.who)+" &middot; "+esc(n.ch)+"</span>").join("")+"</div>";
+    s+="<div class='fnote'><b>Precedent:</b> "+esc(d.precedent)+"</div></div>";
+  });
+  // food-illness gated panel
+  const il=F.illness;
+  s+="<div class='fsh'>Food-illness &mdash; after-hours routing, human-gated</div>";
+  s+="<div class='fcard sev'><div class='frow'><span class='fwho'>#"+il.id+" &middot; "+esc(il.store)+"</span>"
+    +"<span class='fmeta'>DO &middot; "+esc(il.dov)+" &nbsp;|&nbsp; "+esc(il.when)+" &nbsp; <span class='fsev'>SEVERE</span></span></div>";
+  s+="<div class='fchips' style='margin-top:8px'>"+il.tags.map(t=>"<span class='fchip c-tag'>"+esc(t)+"</span>").join("")
+    +"<span class='fchip c-issue'>route &rarr; "+esc(il.store)+" &rarr; DO-"+esc(il.dov)+" &rarr; FSQA</span></div>";
+  s+="<div class='fgate'><div class='hd'><b style='color:#cdd6da;font-size:13px'>Gated action &mdash; preview before anything fires</b>"
+    +"<span class='fwait'>&#9679; WAITING FOR OPERATOR &mdash; NOTHING HAS BEEN SENT</span></div>";
+  s+="<div class='fzora'><div class='fzlab'>Acknowledgement to the guest &middot; Zora voice</div>"+esc(il.zora)+"</div>";
+  s+="<div class='fsample'>Sample voice &mdash; final tone trained on Zora's actual replies (corpus pull is an open action item).</div>";
+  s+="<pre class='frest'>"+esc(il.rest)+"</pre>";
+  s+="<div class='fbtns'><span class='fbtn fb-app'>Approve &amp; fire</span><span class='fbtn fb-edit'>Edit</span><span class='fbtn fb-rej'>Reject</span>"
+    +"<span class='fmeta' style='margin-left:6px'>This is the exact call that will run &mdash; nothing more.</span></div>";
+  s+="<div class='frule'><span>&#9940;</span><span><b>Severe branch never auto-fires.</b> A human approves every food-illness action. This rule does not relax &mdash; not after hours, not at volume, not ever.</span></div>";
+  s+="</div></div>";
+  s+="</div>";
+  return s;
+}
 function commentsPane(){
   return "<style>"
     +"#pane-comments .cmwrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}"
@@ -2690,6 +2804,7 @@ function render(){
     operations:"<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>",
     network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
+    focus:"<button class='tabv"+(TAB==="focus"?" on":"")+"' data-tab='focus'><span class='ti'>&#127919;</span><span class='tl'>Focus"+(FOCUS_SAMPLE?" &middot; <b class='bad'>"+FOCUS_SAMPLE.detractors.filter(d=>d.status!=='resolved').length+"</b>":"")+"</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Tickets</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
     zdaudit:"<button class='tabv"+(TAB==="zdaudit"?" on":"")+"' data-tab='zdaudit'><span class='ti'>&#128203;</span><span class='tl'>Audit"+((ZAUD.run&&ZAUD.run.findings.length)?" &middot; <b class='bad'>"+ZAUD.run.findings.length+"</b>":"")+"</span></button>",
@@ -2728,6 +2843,7 @@ function render(){
   // Security Audit -- own target picker (always present, run/re-run any time)
   h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+auditPane()+"</div>";
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
+  h+="<div id='pane-focus' class='"+paneCls("focus")+"'>"+focusPane()+"</div>";
   h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+commentsPane()+"</div>";
   h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+apiBrowserPane()+"</div>";
   h+="<div id='pane-zdaudit' class='"+paneCls("zdaudit")+"'>"+zdAuditPane()+"</div>";
@@ -3404,8 +3520,8 @@ function gcInner(){
 function renderGC(){ const el=document.getElementById("gc-inner"); if(el) el.innerHTML=gcInner(); }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
-function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
   if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
@@ -3523,7 +3639,7 @@ function dataObjs(d){ return d.rows.map(r=>{ const o={}; d.headers.forEach((h,i)
 function scopeTables(scope){
   let root;
   if(scope.indexOf("sect:")===0){ root=document.getElementById("secbody-"+scope.slice(5)); }
-  else { const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="comments"?"pane-comments":"pane-audit"; root=document.getElementById(id); }
+  else { const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="comments"?"pane-comments":"pane-audit"; root=document.getElementById(id); }
   return root ? [...root.querySelectorAll("table")].filter(t=>!t.classList.contains("histtbl")&&!t.classList.contains("nosort")) : [];
 }
 async function exportRun(fmt, scope){
@@ -3956,7 +4072,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r432 . 1385b0b . 2026-07-06</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r435 . f4273c4 . 2026-07-06</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
