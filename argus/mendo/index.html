@@ -2410,6 +2410,10 @@ function helmInner(){
 }
 function renderHELM(){ const w=document.getElementById("helm-wrap"); if(w) w.innerHTML=helmInner(); }
 document.addEventListener("click", function(e){
+  // Drill-in wiring for Focus + Programs (module-level PROG_SEL / FOCUS_SEL + render()).
+  var pd=e.target.closest("[data-progdrill]"); if(pd){ PROG_SEL=pd.getAttribute("data-progdrill"); render(); return; }
+  var fd=e.target.closest("[data-focusdrill]"); if(fd){ FOCUS_SEL=fd.getAttribute("data-focusdrill"); render(); return; }
+  var bk=e.target.closest("[data-drillback]"); if(bk){ PROG_SEL=null; FOCUS_SEL=null; render(); return; }
   if(e.target.closest("[data-helm='check']")){ helmCheck(); return; }
   if(e.target.closest("[data-helm='plan']")){ helmPlan(); return; }
   if(e.target.closest("[data-helm='apply']")){ helmApply(); return; }
@@ -2530,6 +2534,139 @@ function cmSearchList(q){ q=(q||"").toLowerCase().trim(); if(!q) return []; retu
 function cmSearchDropdown(){ const q=CM.q; if(!(q&&q.trim())) return ""; const m=cmSearchList(q); if(!m.length) return "<div class='cmsd-empty'>no match in the loaded tickets</div>"; return m.map(t=>{ const g=cmTags(t); return "<div class='cmsd-row' data-cmg='"+t.id+"'><span class='cmsd-sub'>"+abEsc(t.subject||("#"+t.id))+"</span><span class='cmsd-meta'>#"+t.id+(g.intent?" · "+abEsc(g.intent.split(" › ")[0]):"")+(g.idk?" · idk":g.conf==="low"?" · low":"")+"</span></div>"; }).join(""); }
 function cmStat(label,count,key,cls){ const on = key==="__all__" ? CM.filter===null : CM.filter===key; return "<button class='cmstat"+(on?" on":"")+(cls?(" "+cls):"")+"' data-cmfilter='"+key+"'>"+abEsc(label)+" <b>"+count+"</b></button>"; }
 function renderCMSearch(){ const w=document.getElementById("cm-sd"); if(w) w.innerHTML=cmSearchDropdown(); }
+// ── Drill-in: click any Focus/Programs card to see the whole pipeline for that ticket —
+// raw Zendesk thread -> what the decoder did -> what nous.api + the models did -> Zora voice.
+let PROG_SEL=null, FOCUS_SEL=null;
+const DRILL = {
+  "341562": { subject:"US Foods vendor support — 'Unspecified Item' invoice", group:"84 - Cherry Creek", status:"open", rawChars:"19 comments · 8,520 chars", gated:false,
+    thread:[
+      {who:"GM · Cherry Creek", pub:true, when:"08/16 09:12", body:"Hi US Foods — we received almost $600 of invoicing for 'Food, COGS' / 'Unspecified Item' dated 08/14, but it says the invoice date is 06/04. Can you clarify what this is for and why it's more than 2 months delayed? Account Name: Mendocino Farms."},
+      {who:"Guest Relations", pub:true, when:"08/16 10:04", body:"Thanks for flagging this — I'm pulling the invoice detail from the US Foods portal now and will come back with a line-item breakdown."},
+      {who:"Guest Relations", pub:false, when:"08/16 10:20", body:"Internal: portal shows the 08/14 charge under COGS-Unspecified tied to a 06/04 delivery correction. Looks like a backdated catch-up bill. Confirming with the vendor rep before we approve anything."},
+      {who:"US Foods (vendor)", pub:true, when:"08/17 08:41", body:"The 08/14 charge is a backdated adjustment for a 06/04 delivery. We can send the itemization on request."},
+      {who:"GM · Cherry Creek", pub:true, when:"08/17 09:55", body:"So we're being billed now for something from June? We are not approving $600 until it's fully itemized."},
+      {who:"Guest Relations", pub:true, when:"08/17 10:30", body:"Completely understood — we will not approve until it's itemized and makes sense to you. Requesting the full breakdown from US Foods now and holding the charge."}
+    ],
+    decode:{ strip:74, atoms:[{t:"ENTITY",v:"US Foods"},{t:"ENTITY",v:"Cherry Creek"},{t:"ENTITY",v:"invoice"},{t:"PROPERTY",v:"$600"},{t:"PROPERTY",v:"Unspecified Item"},{t:"PROPERTY",v:"delayed 2mo"},{t:"ACTION",v:"clarify"},{t:"ACTION",v:"dispute"},{t:"ACTION",v:"hold approval"},{t:"STRUCTURE",v:"QUANTITY $600"},{t:"STRUCTURE",v:"CAUSAL delay->dispute"}],
+      program:[["GUEST","disputes a $600 'Unspecified Item' charge, 2 months delayed"],["AGENT","separates the vendor billing dispute from the guest thread"],["SYSTEM","retrieves the invoice + delivery record (read-only)"],["AGENT","refuses approval until itemized; confirms the hold"],["SYSTEM","routes the vendor issue to accounting, tags pending-itemization"]] },
+    models:{ verdict:"GROUNDED", verdictNote:"The judge confirmed the draft cites only facts present in the thread ($600, 08/14, 06/04, 'Unspecified Item') — no invented amounts or dates.", tone:"firm · frustrated (justified)", panel:"gemini-2.5-flash + gemini-2.5-pro + judge", cost:"$0.004",
+      precedents:[{id:"228640",label:"expired noodles -> credit",out:"recovered"},{id:"251801",label:"double-charge dispute",out:"recovered"},{id:"261912",label:"invoice mismatch -> credit",out:"recovered"}],
+      draft:"Acknowledge the delay is unreasonable, commit to withholding approval until itemized, and set the expectation of a follow-up once US Foods returns the breakdown." },
+    zora:"Hi — thank you for catching this, and I'm sorry for the runaround. I've asked US Foods for a full line-item breakdown of the $600 'Unspecified Item' charge from 08/14, and we won't approve anything until it's itemized and makes sense to you. You shouldn't have to chase a two-month-old invoice — we're on it, and I'll come straight back to you the moment they send the detail." },
+  "375102": { subject:"Missing items — Not So Fried Chicken + sides", group:"Marina del Rey", status:"open", rawChars:"6 comments · 2,140 chars", gated:false,
+    thread:[
+      {who:"Guest (NPS 2)", pub:true, when:"Today 6:31 PM", body:"Ordered online for pickup and half of it was missing — no Not So Fried Chicken, no sides. This is the second time this month. Really disappointing."},
+      {who:"Guest Relations", pub:true, when:"Today 6:44 PM", body:"I'm so sorry — that's not the experience we want, especially twice. Let me make this right."},
+      {who:"Guest Relations", pub:false, when:"Today 6:45 PM", body:"Internal: 2nd missing-items report this month for this guest. Pull next I'm Sorry Code (read-only), notify GM + DO-Maria."}
+    ],
+    decode:{ strip:61, atoms:[{t:"ENTITY",v:"Not So Fried Chicken"},{t:"ENTITY",v:"Marina del Rey"},{t:"PROPERTY",v:"missing items"},{t:"PROPERTY",v:"2nd this month"},{t:"ACTION",v:"apologize"},{t:"ACTION",v:"pull coupon"},{t:"STRUCTURE",v:"REPEAT x2"}],
+      program:[["GUEST","reports missing Not So Fried Chicken + sides (2nd time)"],["AGENT","acknowledges + apologizes in Zora's voice"],["SYSTEM","peeks the next I'm Sorry Code (read-only — never writes the sheet)"],["AGENT","sends the code + confirms the store was notified"],["SYSTEM","routes to DO-Maria + store, tags resolved"]] },
+    models:{ verdict:"GROUNDED", verdictNote:"Draft references only what the guest stated (missing items, second occurrence). No promise beyond the coupon policy.", tone:"disappointed -> recoverable", panel:"gemini-2.5-flash + gemini-2.5-pro + judge", cost:"$0.002",
+      precedents:[{id:"375061",label:"missing sides -> coupon",out:"recovered"},{id:"374920",label:"wrong order -> coupon",out:"recovered"},{id:"374811",label:"missing entree (no reply)",out:"lost"}],
+      draft:"Warm apology, own the repeat, offer the I'm Sorry Code, confirm the store was told so it doesn't happen a third time." },
+    zora:"Hi — I'm really sorry, especially since this is the second time. That's on us, not you. I've shared a code below for your next visit, and I've let the Marina del Rey team know directly so we tighten up the pickup checks. Thank you for giving us the chance to make it right — I'd love to hear it's better next time." },
+  "375061": { subject:"Rude counter experience — named shift", group:"El Segundo", status:"open", rawChars:"4 comments · 1,510 chars", gated:false,
+    thread:[
+      {who:"Guest (NPS 1)", pub:true, when:"Today 5:58 PM", body:"The person at the counter this afternoon was flat-out rude to my kids. I asked a simple question and got attitude. Won't be back if that's the vibe."},
+      {who:"Guest Relations", pub:true, when:"Today 6:10 PM", body:"I'm so sorry — that is absolutely not who we are. Thank you for telling me; I want to get this to the right person."},
+      {who:"Guest Relations", pub:false, when:"Today 6:11 PM", body:"Internal: guest named a specific shift/person. Do NOT auto-reply with a coupon — a coupon reads as buying silence on a staff issue. Escalate to GM for a personal callback."}
+    ],
+    decode:{ strip:58, atoms:[{t:"ENTITY",v:"counter staff"},{t:"ENTITY",v:"El Segundo"},{t:"PROPERTY",v:"rude / attitude"},{t:"PROPERTY",v:"named shift"},{t:"ACTION",v:"escalate to GM"},{t:"STRUCTURE",v:"NEGATION won't return"}],
+      program:[["GUEST","reports a rude, named staff experience; churn risk"],["AGENT","acknowledges, does NOT offer a coupon"],["SYSTEM","flags UNVERIFIED — a person was named; holds auto-send"],["AGENT","escalates to the GM for a personal callback"]] },
+    models:{ verdict:"UNVERIFIED", verdictNote:"The judge HELD the auto-reply: the complaint names a specific person, so a canned coupon reply could inflame it. This is exactly where the human takes over — the oracle locked the gate.", tone:"hot · churn risk", panel:"gemini-2.5-flash + gemini-2.5-pro + judge", cost:"$0.002",
+      precedents:[{id:"371940",label:"named-staff rudeness -> GM callback",out:"recovered"},{id:"370112",label:"coupon sent on staff issue",out:"lost"}],
+      draft:"Do not send. Escalate to GM with a summary; recommend a personal callback within 24h, no coupon." },
+    zora:"(Held — no automated reply sent.) Recommended GM opener: 'Hi, this is the GM at our El Segundo location. I read what happened at the counter today and I'm genuinely sorry — that's not okay, and I'd like to make it right personally. Do you have a few minutes to talk?'" },
+  "228640": { subject:"US Foods credit request — expired noodles", group:"79 - Kirkland", status:"solved", rawChars:"8 comments · 3,020 chars", gated:false,
+    thread:[
+      {who:"GM · Kirkland", pub:true, when:"10/29 14:02", body:"The case of noodles we received today has been expired since April 2024. Recovery: Yes. Account 3025709. Item: Noodle - cooked, Item #7162175. Invoice #3457830. Delivery 10-29-2024."},
+      {who:"Guest Relations", pub:true, when:"10/29 15:10", body:"Thank you — filing a credit request with US Foods against invoice #3457830 for the expired case now."},
+      {who:"US Foods (vendor)", pub:true, when:"10/30 09:20", body:"Credit approved for the expired case, item #7162175. Applied to account 3025709."},
+      {who:"Guest Relations", pub:true, when:"10/30 09:45", body:"Credit confirmed and applied. Closing this out — thanks for the quick flag."}
+    ],
+    decode:{ strip:68, atoms:[{t:"ENTITY",v:"noodles"},{t:"ENTITY",v:"invoice #3457830"},{t:"ENTITY",v:"US Foods"},{t:"PROPERTY",v:"expired 04/2024"},{t:"ACTION",v:"credit request"},{t:"ACTION",v:"credit approved"},{t:"STRUCTURE",v:"QUANTITY 1 case"}],
+      program:[["GUEST","reports an expired case of noodles with full invoice detail"],["AGENT","files the credit against invoice #3457830"],["SYSTEM","retrieves account + item record (read-only)"],["AGENT","confirms the approved credit and closes"]] },
+    models:{ verdict:"GROUNDED", verdictNote:"Straightforward, fully-specified claim — every fact (item #, invoice #, account, date) is present. Nothing to invent.", tone:"matter-of-fact", panel:"gemini-2.5-flash + judge", cost:"$0.001",
+      precedents:[{id:"341562",label:"US Foods unspecified invoice",out:"recovered"},{id:"261912",label:"invoice mismatch -> credit",out:"recovered"}],
+      draft:"Confirm the credit request is filed, then confirm approval and close — no embellishment needed." },
+    zora:"Thanks for catching this and sending all the detail — that made it fast. The credit for the expired case (item #7162175, invoice #3457830) has been approved and applied to your account. Appreciate you flagging it so quickly; that's exactly how we keep the quality up." },
+  "48213": { subject:"Guest reports feeling ill after eating", group:"FSQA (routed)", status:"SEVERE · after-hours", rawChars:"3 comments · 980 chars", gated:true,
+    thread:[
+      {who:"Guest", pub:true, when:"9:47 PM", body:"I ate at your Marina del Rey location tonight and a few hours later I've been really sick — nausea and stomach cramps. I wanted to let you know in case it's the food."},
+      {who:"After-hours auto-receipt", pub:false, when:"9:47 PM", body:"Internal: sick/gastroenteritis language detected after hours. SEVERE branch. Route FSQA + DO-Maria + store. HOLD all guest-facing writes for human approval."}
+    ],
+    decode:{ strip:40, atoms:[{t:"ENTITY",v:"Marina del Rey"},{t:"PROPERTY",v:"nausea"},{t:"PROPERTY",v:"cramps"},{t:"PROPERTY",v:"after eating"},{t:"ACTION",v:"report illness"},{t:"STRUCTURE",v:"TEMPORAL hours-after"},{t:"STRUCTURE",v:"SEVERITY high"}],
+      program:[["GUEST","reports illness symptoms after eating (after hours)"],["SYSTEM","detects sick/gastroenteritis -> SEVERE branch"],["SYSTEM","routes to FSQA + DO-Maria + store, priority urgent"],["AGENT","(HELD) acknowledgement drafted — awaits human approval"]] },
+    models:{ verdict:"GROUNDED", verdictNote:"Symptoms + timing are stated plainly. But severe food-illness NEVER auto-fires — the model drafts, a human sends.", tone:"concerned · urgent", panel:"gemini-2.5-flash + gemini-2.5-pro + judge", cost:"$0.003",
+      precedents:[{id:"41120",label:"illness -> FSQA + callback",out:"handled"},{id:"39880",label:"illness -> health-dept loop",out:"handled"}],
+      draft:"Warm, non-admitting acknowledgement; alert FSQA + manager; promise a personal same-day follow-up. Do not admit fault or diagnose." },
+    zora:"Hi Danielle — I'm so sorry to hear you're feeling unwell after eating with us. Your health is what matters most right now. I've flagged this to our Food Safety team and the manager at our Marina del Rey location directly, and someone will personally follow up with you today. Thank you for telling us — it genuinely helps us keep everyone safe." }
+};
+function drillStages(id){
+  const D=DRILL[id];
+  let s="<style>"
+   +".drwrap{max-width:900px;}"
+   +".dback{background:#16242b;color:#6FC3DF;border:1px solid #2c4a55;border-radius:7px;padding:7px 14px;font-size:13px;cursor:pointer;margin-bottom:14px;font-weight:600;}"
+   +".dback:hover{border-color:#6FC3DF;}"
+   +".dhd{color:#e6edf2;font-size:16px;font-weight:600;margin-bottom:2px;}"
+   +".dsub{color:#8a93a0;font-size:12px;margin-bottom:16px;}"
+   +".dstage{border:1px solid #223038;border-radius:12px;padding:15px 17px;margin-bottom:14px;background:#0f1519;}"
+   +".dsh{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}"
+   +".dnum{width:28px;height:28px;border-radius:50%;background:#101c22;border:1px solid #2c4a55;color:#6FC3DF;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 28px;}"
+   +".dtitle{color:#6FC3DF;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}"
+   +".dtag{margin-left:auto;font-size:11px;color:#8a93a0;}"
+   +".dcmt{border-left:2px solid #2c4a55;padding:6px 0 6px 12px;margin:8px 0;}"
+   +".dcmt.int{border-left-color:#5a4a1e;}"
+   +".dcmh{font-size:11px;color:#8a93a0;margin-bottom:3px;}"
+   +".dcmh .who{color:#6FC3DF;font-weight:700;}"
+   +".dcmh .bpub{background:#06251a;color:#7CFFB2;border-radius:4px;padding:0 5px;font-size:9.5px;font-weight:700;margin-left:5px;}"
+   +".dcmh .bint{background:#251d06;color:#ffd479;border-radius:4px;padding:0 5px;font-size:9.5px;font-weight:700;margin-left:5px;}"
+   +".dcmb{color:#dfe4e9;font-size:13px;line-height:1.5;}"
+   +".datoms{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}"
+   +".datom{font-family:ui-monospace,Consolas,monospace;font-size:11px;border-radius:5px;padding:2px 8px;}"
+   +".at-ENTITY{background:#101c22;color:#6FC3DF;}.at-ACTION{background:#0f1410;color:#7CFFB2;}.at-PROPERTY{background:#1c1708;color:#ffd479;}.at-STRUCTURE{background:#161d21;color:#9aa3ad;}"
+   +".dstrip{height:22px;border-radius:6px;background:#2a1414;overflow:hidden;position:relative;border:1px solid #3a1c1c;margin:8px 0;}"
+   +".dstrip .keep{position:absolute;right:0;top:0;bottom:0;background:#06251a;border-left:2px solid #7CFFB2;}"
+   +".dstrip .l1{position:absolute;left:8px;top:2px;font-size:11px;color:#ff9b9b;font-weight:700;}.dstrip .l2{position:absolute;right:8px;top:2px;font-size:11px;color:#7CFFB2;font-weight:700;}"
+   +".dstep{display:flex;gap:10px;padding:5px 0;align-items:flex-start;}"
+   +".dstep .n{color:#6FC3DF;font-weight:700;font-size:12px;flex:0 0 18px;}"
+   +".dstep .r{font-size:10px;font-weight:800;flex:0 0 62px;padding-top:2px;}"
+   +".dv{background:#06251a;color:#7CFFB2;border-radius:6px;padding:2px 9px;font-size:11px;font-weight:800;}"
+   +".dv.un{background:#2a2206;color:#ffd479;}"
+   +".dmrow{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}"
+   +".dmc{background:#101c22;border:1px solid #14323e;border-radius:8px;padding:7px 11px;font-size:12px;color:#cdd6da;}"
+   +".ddraft{background:#0b0f12;border:1px solid #2c4a55;border-radius:8px;padding:11px 13px;color:#c7d2da;font-size:13px;line-height:1.5;margin-top:8px;}"
+   +".dzora{background:#0f1410;border:1px solid #243024;border-radius:8px;padding:12px 14px;color:#dfe6df;font-size:13.5px;line-height:1.6;}"
+   +".dzlab{color:#7CFFB2;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;font-weight:700;}"
+   +".dsample{color:#8a93a0;font-size:11px;font-style:italic;margin-top:7px;}"
+   +".drule{background:#160e10;border:1px solid #6b2035;border-radius:8px;padding:9px 13px;color:#ffb3bd;font-size:12px;margin-top:11px;display:flex;gap:8px;}"
+   +"</style>";
+  s+="<div class='drwrap'><button class='dback' data-drillback>&larr; back</button>";
+  if(!D){ s+="<div class='dstage'>No drill detail wired for #"+esc(id)+" yet.</div></div>"; return s; }
+  s+="<div class='dhd'>#"+esc(id)+" &middot; "+esc(D.subject)+"</div>";
+  s+="<div class='dsub'>"+esc(D.group)+" &middot; "+esc(D.status)+" &middot; "+esc(D.rawChars)+"</div>";
+  s+="<div class='dstage'><div class='dsh'><span class='dnum'>1</span><span class='dtitle'>The raw Zendesk ticket &amp; conversation</span><span class='dtag'>as it arrived</span></div>";
+  D.thread.forEach(c=>{ s+="<div class='dcmt"+(c.pub?"":" int")+"'><div class='dcmh'><span class='who'>"+esc(c.who)+"</span>"+(c.pub?"<span class='bpub'>PUBLIC</span>":"<span class='bint'>INTERNAL</span>")+" &middot; "+esc(c.when)+"</div><div class='dcmb'>"+esc(c.body)+"</div></div>"; });
+  s+="</div>";
+  s+="<div class='dstage'><div class='dsh'><span class='dnum'>2</span><span class='dtitle'>What the decoder did &mdash; nous understand()</span><span class='dtag'>deterministic &middot; pure C &middot; $0 &middot; no model</span></div>";
+  s+="<div class='dstrip'><span class='l1'>"+D.decode.strip+"% noise stripped</span><span class='keep' style='width:"+(100-D.decode.strip)+"%'></span><span class='l2'>"+(100-D.decode.strip)+"% signal</span></div>";
+  s+="<div class='datoms'>"+D.decode.atoms.map(a=>"<span class='datom at-"+a.t+"'>"+a.t+": "+esc(a.v)+"</span>").join("")+"</div>";
+  s+="<div style='color:#8a93a0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px'>Ordered program (.pi)</div>";
+  D.decode.program.forEach((st,i)=>{ const col=st[0]==='GUEST'?'#ffd479':st[0]==='AGENT'?'#7CFFB2':'#6FC3DF'; s+="<div class='dstep'><span class='n'>"+(i+1)+"</span><span class='r' style='color:"+col+"'>"+st[0]+"</span><span style='color:#dfe4e9;font-size:13px'>"+esc(st[1])+"</span></div>"; });
+  s+="</div>";
+  s+="<div class='dstage'><div class='dsh'><span class='dnum'>3</span><span class='dtitle'>What nous.api + the models did</span><span class='dtag'>api.3-nous.net &middot; "+esc(D.models.cost)+"</span></div>";
+  s+="<div class='dmrow'><span class='dmc'>Trust: <span class='dv"+(D.models.verdict==='GROUNDED'?'':' un')+"'>"+esc(D.models.verdict)+"</span></span><span class='dmc'>Tone: "+esc(D.models.tone)+"</span><span class='dmc'>Panel: "+esc(D.models.panel)+"</span></div>";
+  s+="<div style='color:#9aa3ad;font-size:12px;margin:6px 0;line-height:1.5'>"+esc(D.models.verdictNote)+"</div>";
+  s+="<div style='color:#8a93a0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px'>Nearest precedents (retrieval)</div><div class='dmrow'>"+D.models.precedents.map(p=>"<span class='dmc'>#"+p.id+" &middot; "+esc(p.label)+" <span class='dv"+(p.out==='lost'?' un':'')+"' style='font-size:9.5px'>"+p.out.toUpperCase()+"</span></span>").join("")+"</div>";
+  s+="<div style='color:#8a93a0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px'>The model's draft (intent)</div><div class='ddraft'>"+esc(D.models.draft)+"</div>";
+  s+="</div>";
+  s+="<div class='dstage'><div class='dsh'><span class='dnum'>4</span><span class='dtitle'>The Zora voice, applied</span><span class='dtag'>"+(D.gated?"gated &middot; preview before fire":"guest-facing reply")+"</span></div>";
+  s+="<div class='dzora'><div class='dzlab'>Reply to the guest &middot; Zora voice</div>"+esc(D.zora)+"</div>";
+  s+="<div class='dsample'>Sample voice &mdash; final tone trained on Zora's actual replies (corpus pull pending).</div>";
+  if(D.gated){ s+="<div class='drule'><span>&#9940;</span><span><b>Severe branch never auto-fires.</b> A human approves every food-illness action &mdash; the draft above is held, not sent.</span></div>"; }
+  s+="</div></div>";
+  return s;
+}
 // ── Focus tab — the NPS-detractor + food-illness surface. Sample data for the first
 // visible slice (real-looking, shaped like the live payloads). Everything read-only;
 // the one write (food-illness) is gated + severe-never-auto. See the v2 plan.
@@ -2560,6 +2697,7 @@ const FOCUS_SAMPLE = {
   }
 };
 function focusPane(){
+  if(FOCUS_SEL) return drillStages(FOCUS_SEL);
   const F=FOCUS_SAMPLE;
   let s="<style>"
    +"#pane-focus .fwrap{max-width:900px;}"
@@ -2617,7 +2755,7 @@ function focusPane(){
   // live detractor feed
   s+="<div class='fsh'>Detractor feed &mdash; routed &amp; notified the moment it lands</div>";
   F.detractors.forEach(d=>{
-    s+="<div class='fcard'><div class='frow'><span class='fwho'>#"+d.id+" &middot; "+esc(d.store)+"</span>"
+    s+="<div class='fcard' data-focusdrill='"+d.id+"' style='cursor:pointer'><div class='frow'><span class='fwho'>#"+d.id+" &middot; "+esc(d.store)+" <span style='color:#6FC3DF;font-size:11px;font-weight:600'>drill in &rarr;</span></span>"
       +"<span class='fmeta'>DO &middot; "+esc(d.dov)+" &nbsp;|&nbsp; "+esc(d.when)+" &nbsp; <span class='fscore'>NPS "+d.score+"</span></span></div>";
     s+="<div class='fread'>"+esc(d.read)+"</div>";
     s+="<div class='fchips'><span class='fchip c-issue'>"+esc(d.issue)+"</span>"
@@ -2628,7 +2766,7 @@ function focusPane(){
   // food-illness gated panel
   const il=F.illness;
   s+="<div class='fsh'>Food-illness &mdash; after-hours routing, human-gated</div>";
-  s+="<div class='fcard sev'><div class='frow'><span class='fwho'>#"+il.id+" &middot; "+esc(il.store)+"</span>"
+  s+="<div class='fcard sev' data-focusdrill='"+il.id+"' style='cursor:pointer'><div class='frow'><span class='fwho'>#"+il.id+" &middot; "+esc(il.store)+" <span style='color:#6FC3DF;font-size:11px;font-weight:600'>drill in &rarr;</span></span>"
     +"<span class='fmeta'>DO &middot; "+esc(il.dov)+" &nbsp;|&nbsp; "+esc(il.when)+" &nbsp; <span class='fsev'>SEVERE</span></span></div>";
   s+="<div class='fchips' style='margin-top:8px'>"+il.tags.map(t=>"<span class='fchip c-tag'>"+esc(t)+"</span>").join("")
     +"<span class='fchip c-issue'>route &rarr; "+esc(il.store)+" &rarr; DO-"+esc(il.dov)+" &rarr; FSQA</span></div>";
@@ -2680,6 +2818,7 @@ const PROGRAMS_SAMPLE = {
   ]
 };
 function programsPane(){
+  if(PROG_SEL) return drillStages(PROG_SEL);
   const P=PROGRAMS_SAMPLE;
   let s="<style>"
    +"#pane-programs .pwrap{max-width:900px;}"
@@ -2712,7 +2851,7 @@ function programsPane(){
   s+="<div class='pwrap'>";
   s+="<div class='plead'><b>Every conversation is a program.</b> A support thread isn't prose — it's an ordered set of actions. Reduce it (strip the noise), and what's left is a reusable program: <b>decode the past to guide the next reply.</b> Below are real Mendo tickets, decoded.</div>";
   P.tickets.forEach(t=>{
-    s+="<div class='pt'><div class='pth'><span class='ptid'>#<b>"+t.id+"</b> &middot; "+esc(t.label)+"</span><span class='ptraw'>"+esc(t.raw)+"</span></div>";
+    s+="<div class='pt' data-progdrill='"+t.id+"' style='cursor:pointer'><div class='pth'><span class='ptid'>#<b>"+t.id+"</b> &middot; "+esc(t.label)+" <span style='color:#6FC3DF;font-size:11px;font-weight:600'>drill in &rarr;</span></span><span class='ptraw'>"+esc(t.raw)+"</span></div>";
     // reduce bar
     const keep=100-t.strip;
     s+="<div class='preduce'><div class='pbar'><span class='lbl'>"+t.strip+"% noise stripped</span><span class='keep' style='width:"+keep+"%'></span><span class='lbl2'>"+keep+"% signal</span></div></div>";
@@ -4212,7 +4351,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r437 . 5b5e735 . 2026-07-06</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r438 . 588f4af . 2026-07-06</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
