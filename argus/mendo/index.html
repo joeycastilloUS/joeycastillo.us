@@ -527,6 +527,38 @@
 </div>
 
 <script>
+// ===== Argus per-area comments (Firestore via gcp-bridge) — operator + overlord (metal) threads =====
+// Comment on any area; posts land in Firestore keyed by doc="argus-zendesk" + obj=<area>. metal reads
+// the same doc from the console (~fu) and replies as "metal" (OVERLORD). Bars are re-emitted every
+// render() so they survive the SPA rebuild; counts/threads fill from a 15s-polled cache.
+var ACX={doc:"argus-zendesk",bridge:"https://gcp-bridge-692654781984.us-west1.run.app",byObj:{},loaded:false};
+(function(){var s=document.createElement("style");s.textContent=
+ ".acx{margin:14px 0 2px;border-top:1px solid #1c2830;padding-top:9px;}"
++".acx-tog{background:none;border:0;color:#6FC3DF;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;font-family:inherit;padding:0;}.acx-tog:hover{color:#9fe;}"
++".acx-n{background:#0c1c22;color:#7CFFB2;border:1px solid #1f5f47;border-radius:10px;padding:0 7px;font-size:10px;font-weight:800;margin-left:6px;}"
++".acx-p{display:none;margin-top:10px;}.acx-p.open{display:block;}"
++".acx-item{background:#10171c;border:1px solid #222c33;border-radius:10px;padding:9px 12px;margin:7px 0;}"
++".acx-item.op{box-shadow:inset 3px 0 0 #e0b56f;}.acx-item.me{box-shadow:inset 3px 0 0 #6FC3DF;}"
++".acx-ih{font-size:11px;margin-bottom:4px;color:#8a93a0;}.acx-ih b{font-weight:800;}.acx-item.op .acx-ih b{color:#e0b56f;}.acx-item.me .acx-ih b{color:#6FC3DF;}"
++".acx-ov{background:#0c1c22;color:#7CFFB2;border-radius:4px;padding:0 6px;font-size:9px;font-weight:800;margin-left:6px;}"
++".acx-tx{color:#e2e8ee;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word;}"
++".acx-post{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap;}.acx-post input{width:120px;}.acx-post textarea{flex:1;min-width:180px;min-height:34px;resize:vertical;}"
++".acx-post input,.acx-post textarea{background:#0d0d0d;color:#e6e6e6;border:1px solid #2a2f34;border-radius:7px;padding:7px 10px;font-size:12.5px;font-family:inherit;}"
++".acx-post button{background:#6FC3DF;color:#06222c;border:0;border-radius:7px;padding:7px 14px;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;}"
++".acx-empty{color:#5a636c;font-size:12px;font-style:italic;}"
++".rb{display:inline-block;border-radius:5px;padding:1px 8px;font-size:10px;font-weight:800;letter-spacing:.03em;vertical-align:middle;margin:0 0 8px 0;}"
++".rb-real,.rb-live{background:#06251a;color:#7CFFB2;border:1px solid #1f5f47;}.rb-demo{background:#2a2206;color:#ffd479;border:1px solid #4a3d17;}";
+document.head.appendChild(s);})();
+function realBadge(kind){var k=kind||"real";var t=k==="live"?"&#9679; REAL — LIVE DATA":k==="demo"?"&#9888; DEMO — NOT REAL DATA":"&#9679; REAL";return "<div><span class='rb rb-"+k+"'>"+t+"</span></div>";}
+function acxEsc(s){return String(s==null?"":s).replace(/[&<>]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
+function cmBar(obj,title){var o="zd-"+obj;var n=(ACX.byObj[o]||[]).length;return "<div class='acx'><button class='acx-tog' data-acxtog='"+o+"'>&#128172; comment"+(title?(" &middot; "+acxEsc(title)):"")+"<span class='acx-n' id='acxn-"+o+"'"+(n?"":" style='display:none'")+">"+(n||"")+"</span></button><div class='acx-p' id='acxp-"+o+"'><div id='acxl-"+o+"'></div><div class='acx-post'><input id='acxa-"+o+"' placeholder='your name' autocomplete='off'><textarea id='acxx-"+o+"' placeholder='comment on this area&hellip;'></textarea><button data-acxpost='"+o+"'>Post</button></div></div></div>";}
+function acxItemHtml(c){var me=c.author==="metal";return "<div class='acx-item "+(me?"me":"op")+"'><div class='acx-ih'><b>"+acxEsc(me?"metal":c.author)+"</b>"+(me?"<span class='acx-ov'>OVERLORD</span>":"")+" <span>"+acxEsc((c.ts||"").replace("T"," ").replace(/\..*/,"").replace("Z","")+" UTC")+"</span></div><div class='acx-tx'>"+acxEsc(c.text)+"</div></div>";}
+function acxThread(o){var cs=ACX.byObj[o]||[];return cs.length?cs.map(acxItemHtml).join(""):"<div class='acx-empty'>No comments yet &mdash; be the first.</div>";}
+function acxRender(){for(var o in ACX.byObj){var n=(ACX.byObj[o]||[]).length;var nb=document.getElementById("acxn-"+o);if(nb){nb.textContent=n||"";nb.style.display=n?"":"none";}var p=document.getElementById("acxp-"+o),l=document.getElementById("acxl-"+o);if(l&&p&&p.classList.contains("open"))l.innerHTML=acxThread(o);}}
+function acxLoad(){fetch(ACX.bridge+"/comments?doc="+ACX.doc+"&_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){var g={};((d&&d.comments)||[]).forEach(function(c){(g[c.obj]=g[c.obj]||[]).push(c);});ACX.byObj=g;ACX.loaded=true;acxRender();}).catch(function(){});}
+function acxPost(o){var a=((document.getElementById("acxa-"+o)||{}).value||"").trim()||"operator";var t=((document.getElementById("acxx-"+o)||{}).value||"").trim();if(!t)return;fetch(ACX.bridge+"/comments?doc="+ACX.doc,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({obj:o,author:a,text:t})}).then(function(r){return r.json();}).then(function(){var x=document.getElementById("acxx-"+o);if(x)x.value="";acxLoad();}).catch(function(){});}
+document.addEventListener("click",function(e){if(!e.target||!e.target.closest)return;var tg=e.target.closest("[data-acxtog]");if(tg){var o=tg.getAttribute("data-acxtog");var p=document.getElementById("acxp-"+o);if(p){p.classList.toggle("open");if(p.classList.contains("open")){var l=document.getElementById("acxl-"+o);if(l)l.innerHTML=acxThread(o);}}return;}var pb=e.target.closest("[data-acxpost]");if(pb){acxPost(pb.getAttribute("data-acxpost"));return;}});
+setTimeout(acxLoad,800);setInterval(acxLoad,15000);
 // Same-origin ("") on the proxied hosts — argus.com.ai (_worker.js) and argus.net.ai (edge) both
 // front the meraki-bridge first-party, so the argus_session cookie is never third-party (Samsung
 // Internet / Safari block those). The mendo dev mirror has no proxy: it keeps the argus.net.ai edge.
@@ -2920,7 +2952,7 @@ function cmInner(){
   let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'><h2 style='margin:0'>Tickets</h2><span class='abro'>READ-ONLY</span></div>"
     +"<div class='muted' style='margin-bottom:12px'>Read the conversation, and see where the automation is unsure. Gaps first — <b>i-don’t-know</b> and <b>low-confidence</b> intents rise to the top.</div>";
   if(CM.list===null && !CM.busy && !CM.err){ return h
-    +"<div style='padding:10px 0 4px'><button data-tload='cm' style='background:#6FC3DF;color:#06222c;border:0;border-radius:7px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit'>Load comments</button></div>"
+    +"<div style='padding:10px 0 4px'><button data-tload='cm' style='background:#6FC3DF;color:#06222c;border:0;border-radius:7px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit'>Load Tickets</button></div>"
     +"<div class='muted' style='margin-top:8px'>Nothing is fetched until you click.</div></div>"; }
   if(CM.busy && !CM.list){ return h+"<div class='muted'><span class='spin'></span> loading tickets&hellip;</div></div>"; }
   if(CM.err){ return h+"<div class='aberr'>"+abEsc(CM.err)+"</div></div>"; }
@@ -3036,7 +3068,7 @@ function render(){
     network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
     focus:"<button class='tabv"+(TAB==="focus"?" on":"")+"' data-tab='focus'><span class='ti'>&#127919;</span><span class='tl'>Focus"+(FOCUS_SAMPLE?" &middot; <b class='bad'>"+FOCUS_SAMPLE.detractors.filter(d=>d.status!=='resolved').length+"</b>":"")+"</span></button>",
-    programs:"<button class='tabv"+(TAB==="programs"?" on":"")+"' data-tab='programs'><span class='ti'>&#129513;</span><span class='tl'>Programs</span></button>",
+    programs:"<button class='tabv"+(TAB==="programs"?" on":"")+"' data-tab='programs'><span class='ti'>&#129513;</span><span class='tl'>Conversations</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Tickets</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
     zdaudit:"<button class='tabv"+(TAB==="zdaudit"?" on":"")+"' data-tab='zdaudit'><span class='ti'>&#128203;</span><span class='tl'>Audit"+((ZAUD.run&&ZAUD.run.findings.length)?" &middot; <b class='bad'>"+ZAUD.run.findings.length+"</b>":"")+"</span></button>",
@@ -3075,17 +3107,17 @@ function render(){
   // Security Audit -- own target picker (always present, run/re-run any time)
   h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+auditPane()+"</div>";
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
-  h+="<div id='pane-focus' class='"+paneCls("focus")+"'>"+focusPane()+"</div>";
-  h+="<div id='pane-programs' class='"+paneCls("programs")+"'>"+programsPane()+"</div>";
-  h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+commentsPane()+"</div>";
-  h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+apiBrowserPane()+"</div>";
-  h+="<div id='pane-zdaudit' class='"+paneCls("zdaudit")+"'>"+zdAuditPane()+"</div>";
+  h+="<div id='pane-focus' class='"+paneCls("focus")+"'>"+realBadge("demo")+focusPane()+cmBar("focus","Focus tab")+"</div>";
+  h+="<div id='pane-programs' class='"+paneCls("programs")+"'>"+realBadge("demo")+programsPane()+cmBar("conversations","Conversations tab")+"</div>";
+  h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+realBadge("live")+commentsPane()+cmBar("tickets","Tickets tab")+"</div>";
+  h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+realBadge("live")+apiBrowserPane()+cmBar("apibrowser","API Browser tab")+"</div>";
+  h+="<div id='pane-zdaudit' class='"+paneCls("zdaudit")+"'>"+realBadge("live")+zdAuditPane()+cmBar("audit","Audit tab")+"</div>";
   // Helm -- the Airbyte migration steering wheel (gated writes live here, NEVER in the API Browser)
   h+="<div id='pane-helm' class='"+paneCls("helm")+"'>"+helmPane()+"</div>";
   // GCP Cost -- cost per project you own, drillable to service -> SKU (gcp-bridge, ADC, read-only)
   h+="<div id='pane-cost' class='"+paneCls("cost")+"'>"+costPane()+"</div>";
 
-  document.getElementById("report").innerHTML=h; initSortables(); LAST=document.getElementById("report").innerHTML; TAB_ANIM=false;
+  document.getElementById("report").innerHTML=h; initSortables(); if(window.acxRender)acxRender(); LAST=document.getElementById("report").innerHTML; TAB_ANIM=false;
 }
 
 // ================= Zendesk Feature Audit — business rules (triggers + automations) =================
@@ -3524,8 +3556,8 @@ function zdApplyBlock(f){
   }).join("");
   return h+"</div>";
 }
-function zdStageList(){ const cur=ZD_RUN_STAGES.indexOf(ZAUD.prog); return "<div class='zstages'>"+ZD_RUN_STAGES.map(function(s,i){
-  var cls = (cur<0||i<cur)?"done":(i===cur?"cur":"todo"); var mark = cls==="done"?"&#10003;":(cls==="cur"?"<span class='spin'></span>":"&middot;");
+function zdStageList(){ const base=(ZAUD.prog||"").split(" · ")[0]; const cur=ZD_RUN_STAGES.indexOf(base); return "<div class='zstages'>"+ZD_RUN_STAGES.map(function(s,i){
+  var cls = i<cur?"done":(i===cur?"cur":"todo"); var mark = cls==="done"?"&#10003;":(cls==="cur"?"<span class='spin'></span>":"&middot;");
   return "<span class='zstg "+cls+"'>"+mark+" "+esc(s)+"</span>"; }).join("")+"</div>"; }
 function zdAuditInner(){
   const run=ZAUD.run;
@@ -3753,7 +3785,7 @@ function gcInner(){
 function renderGC(){ const el=document.getElementById("gc-inner"); if(el) el.innerHTML=gcInner(); }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="programs") return "Programs — every conversation is a program"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="programs") return "Conversations — every conversation is a program"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="programs"?"pane-programs":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
@@ -4351,7 +4383,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r438 . 588f4af . 2026-07-06</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r444 . c1ff587 . 2026-07-07</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
