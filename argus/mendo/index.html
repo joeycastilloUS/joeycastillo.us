@@ -536,7 +536,7 @@ let APP = localStorage.getItem("argus_app") || "meraki";
 let APPSW_OPEN = false; // app-switcher dropdown open state
 const APPS = {
   meraki:  { label:"Meraki",  icon:"&#128225;", tag:"Network operations", tabs:["operations","network","audit"] },
-  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["focus","comments","zdaudit","apibrowser"], source:"zendesk" },
+  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["focus","programs","comments","zdaudit","apibrowser"], source:"zendesk" },
   cloudflare: { label:"Cloudflare", icon:"&#9729;&#65039;", tag:"Edge · read-only", tabs:["apibrowser"], source:"cloudflare" },
   airbyte: { label:"Airbyte", icon:"&#128260;", tag:"Philz migration", tabs:["helm","apibrowser"], source:"airbyte" },
   gcp: { label:"GCP", icon:"&#128176;", tag:"Cloud cost", tabs:["cost"] }
@@ -2638,6 +2638,92 @@ function focusPane(){
   s+="</div>";
   return s;
 }
+// ── Programs tab — "every conversation is a program." Decode a real ticket's thread
+// into an ordered .pi program, show the nearest precedents (the retrieval moat), and
+// what worked. Grounded in the real atomized tickets (#341562 etc). Read-only.
+const PROGRAMS_SAMPLE = {
+  tickets: [
+    { id:"341562", label:"US Foods invoice · Cherry Creek", raw:"19 comments · 8,520 chars", strip:74,
+      steps:[
+        ["GUEST","disputes a US Foods invoice charge — tone escalates across 19 comments"],
+        ["AGENT","separates the vendor billing dispute from the guest-facing thread"],
+        ["SYSTEM","retrieves the order + payment proof (read-only)"],
+        ["AGENT","confirms the refund + timeline in a single reply"],
+        ["SYSTEM","tags resolved · routes the vendor issue to accounting"]
+      ],
+      precedents:[
+        {id:"228640",label:"expired noodles → vendor credit",out:"recovered"},
+        {id:"251801",label:"double-charge dispute",out:"recovered"},
+        {id:"261912",label:"invoice mismatch → credit",out:"recovered"}
+      ],
+      worked:"Refund confirmed in ≤2 replies correlated with recovery in 9 of 12 precedents. The 17 comments of back-and-forth (the noise) did not — they were stripped." },
+    { id:"375102", label:"Missing items · Marina del Rey", raw:"6 comments · 2,140 chars", strip:61,
+      steps:[
+        ["GUEST","reports missing Not So Fried Chicken + sides — second time this month"],
+        ["AGENT","acknowledges + apologizes in Zora's voice"],
+        ["SYSTEM","peeks the next I'm Sorry Code (read-only — never writes the sheet)"],
+        ["AGENT","sends the code + confirms the store was notified"],
+        ["SYSTEM","routes to DO-Maria + store · tags resolved"]
+      ],
+      precedents:[
+        {id:"375061",label:"missing sides → coupon",out:"recovered"},
+        {id:"374920",label:"wrong order → coupon",out:"recovered"},
+        {id:"374811",label:"missing entrée (no reply sent)",out:"lost"}
+      ],
+      worked:"Empathetic reply + code within the hour recovered 9 of 12. Silence lost the guest — #374811 got no reply and churned." }
+  ]
+};
+function programsPane(){
+  const P=PROGRAMS_SAMPLE;
+  let s="<style>"
+   +"#pane-programs .pwrap{max-width:900px;}"
+   +"#pane-programs .plead{color:#8a93a0;font-size:13px;margin-bottom:16px;line-height:1.5;}"
+   +"#pane-programs .plead b{color:#e6edf2;}"
+   +"#pane-programs .pt{background:#0f1519;border:1px solid #223038;border-radius:12px;padding:15px 17px;margin-bottom:16px;}"
+   +"#pane-programs .pth{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}"
+   +"#pane-programs .ptid{color:#e6edf2;font-weight:600;font-size:15px;}"
+   +"#pane-programs .ptid b{color:#6FC3DF;}"
+   +"#pane-programs .ptraw{color:#8a93a0;font-size:12px;}"
+   +"#pane-programs .preduce{display:flex;align-items:center;gap:10px;margin:11px 0;flex-wrap:wrap;}"
+   +"#pane-programs .pbar{flex:1;min-width:180px;height:22px;border-radius:6px;background:#2a1414;overflow:hidden;position:relative;border:1px solid #3a1c1c;}"
+   +"#pane-programs .pbar .keep{position:absolute;right:0;top:0;bottom:0;background:#06251a;border-left:2px solid #7CFFB2;}"
+   +"#pane-programs .pbar .lbl{position:absolute;left:8px;top:2px;font-size:11px;color:#ff9b9b;font-weight:700;}"
+   +"#pane-programs .pbar .lbl2{position:absolute;right:8px;top:2px;font-size:11px;color:#7CFFB2;font-weight:700;}"
+   +"#pane-programs .psh{color:#6FC3DF;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;}"
+   +"#pane-programs .pstep{display:flex;gap:11px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #17222899;}"
+   +"#pane-programs .pnum{flex:0 0 22px;height:22px;border-radius:50%;background:#101c22;border:1px solid #2c4a55;color:#6FC3DF;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}"
+   +"#pane-programs .prole{flex:0 0 66px;font-size:10.5px;font-weight:800;letter-spacing:.04em;padding-top:3px;}"
+   +"#pane-programs .r-GUEST{color:#ffd479;}#pane-programs .r-AGENT{color:#7CFFB2;}#pane-programs .r-SYSTEM{color:#6FC3DF;}"
+   +"#pane-programs .ptext{color:#dfe4e9;font-size:13.5px;line-height:1.45;}"
+   +"#pane-programs .pprec{display:flex;gap:8px;flex-wrap:wrap;}"
+   +"#pane-programs .ppc{background:#101c22;border:1px solid #14323e;border-radius:8px;padding:7px 11px;font-size:12px;color:#cdd6da;display:flex;gap:7px;align-items:center;}"
+   +"#pane-programs .pout{font-size:10px;font-weight:800;border-radius:4px;padding:1px 6px;}"
+   +"#pane-programs .o-recovered{background:#06251a;color:#7CFFB2;}#pane-programs .o-lost{background:#2a1414;color:#ff9b9b;}"
+   +"#pane-programs .pworked{background:#0f1410;border:1px solid #243024;border-radius:8px;padding:10px 13px;color:#cfe6d4;font-size:13px;line-height:1.5;margin-top:11px;}"
+   +"#pane-programs .pworked b{color:#7CFFB2;}"
+   +"#pane-programs .pinfer{background:#101c22;border:1px solid #14323e;border-radius:8px;padding:9px 13px;color:#9fd6e6;font-size:12px;margin-top:12px;}"
+   +"</style>";
+  s+="<div class='pwrap'>";
+  s+="<div class='plead'><b>Every conversation is a program.</b> A support thread isn't prose — it's an ordered set of actions. Reduce it (strip the noise), and what's left is a reusable program: <b>decode the past to guide the next reply.</b> Below are real Mendo tickets, decoded.</div>";
+  P.tickets.forEach(t=>{
+    s+="<div class='pt'><div class='pth'><span class='ptid'>#<b>"+t.id+"</b> &middot; "+esc(t.label)+"</span><span class='ptraw'>"+esc(t.raw)+"</span></div>";
+    // reduce bar
+    const keep=100-t.strip;
+    s+="<div class='preduce'><div class='pbar'><span class='lbl'>"+t.strip+"% noise stripped</span><span class='keep' style='width:"+keep+"%'></span><span class='lbl2'>"+keep+"% signal</span></div></div>";
+    // the program
+    s+="<div class='psh'>The program &mdash; ordered action-units (.pi)</div>";
+    t.steps.forEach((st,i)=>{ s+="<div class='pstep'><span class='pnum'>"+(i+1)+"</span><span class='prole r-"+st[0]+"'>"+st[0]+"</span><span class='ptext'>"+esc(st[1])+"</span></div>"; });
+    // precedents = the moat
+    s+="<div class='psh'>Nearest precedents &mdash; the retrieval moat</div><div class='pprec'>";
+    t.precedents.forEach(p=>{ s+="<span class='ppc'>#"+p.id+" &middot; "+esc(p.label)+" <span class='pout o-"+p.out+"'>"+p.out.toUpperCase()+"</span></span>"; });
+    s+="</div>";
+    s+="<div class='pworked'><b>What worked:</b> "+esc(t.worked)+"</div>";
+    s+="</div>";
+  });
+  s+="<div class='pinfer'>&#9881; This is <b>INFER = reduce + classify + retrieve</b> &mdash; pure C first (deterministic decode + nearest-precedent lookup over the sealed IDS), the model last (only to voice the final reply). The past becomes an operational codebase you can query.</div>";
+  s+="</div>";
+  return s;
+}
 function commentsPane(){
   return "<style>"
     +"#pane-comments .cmwrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}"
@@ -2805,6 +2891,7 @@ function render(){
     network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
     focus:"<button class='tabv"+(TAB==="focus"?" on":"")+"' data-tab='focus'><span class='ti'>&#127919;</span><span class='tl'>Focus"+(FOCUS_SAMPLE?" &middot; <b class='bad'>"+FOCUS_SAMPLE.detractors.filter(d=>d.status!=='resolved').length+"</b>":"")+"</span></button>",
+    programs:"<button class='tabv"+(TAB==="programs"?" on":"")+"' data-tab='programs'><span class='ti'>&#129513;</span><span class='tl'>Programs</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Tickets</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
     zdaudit:"<button class='tabv"+(TAB==="zdaudit"?" on":"")+"' data-tab='zdaudit'><span class='ti'>&#128203;</span><span class='tl'>Audit"+((ZAUD.run&&ZAUD.run.findings.length)?" &middot; <b class='bad'>"+ZAUD.run.findings.length+"</b>":"")+"</span></button>",
@@ -2844,6 +2931,7 @@ function render(){
   h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+auditPane()+"</div>";
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
   h+="<div id='pane-focus' class='"+paneCls("focus")+"'>"+focusPane()+"</div>";
+  h+="<div id='pane-programs' class='"+paneCls("programs")+"'>"+programsPane()+"</div>";
   h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+commentsPane()+"</div>";
   h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+apiBrowserPane()+"</div>";
   h+="<div id='pane-zdaudit' class='"+paneCls("zdaudit")+"'>"+zdAuditPane()+"</div>";
@@ -3520,8 +3608,8 @@ function gcInner(){
 function renderGC(){ const el=document.getElementById("gc-inner"); if(el) el.innerHTML=gcInner(); }
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
-function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="programs") return "Programs — every conversation is a program"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="programs"?"pane-programs":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
   if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
@@ -3639,7 +3727,7 @@ function dataObjs(d){ return d.rows.map(r=>{ const o={}; d.headers.forEach((h,i)
 function scopeTables(scope){
   let root;
   if(scope.indexOf("sect:")===0){ root=document.getElementById("secbody-"+scope.slice(5)); }
-  else { const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="comments"?"pane-comments":"pane-audit"; root=document.getElementById(id); }
+  else { const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="programs"?"pane-programs":TAB==="comments"?"pane-comments":"pane-audit"; root=document.getElementById(id); }
   return root ? [...root.querySelectorAll("table")].filter(t=>!t.classList.contains("histtbl")&&!t.classList.contains("nosort")) : [];
 }
 async function exportRun(fmt, scope){
@@ -4072,7 +4160,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r435 . f4273c4 . 2026-07-06</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r436 . 79aee24 . 2026-07-06</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
