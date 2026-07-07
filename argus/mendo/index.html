@@ -411,6 +411,12 @@
           <div id="keyenroll" style="display:none;">
             <div style="color:#cdd6da;margin-bottom:.4rem;">This device isn&rsquo;t Warranted yet. Its key (non-extractable, never leaves this browser):</div>
             <code id="keypub" style="display:block;word-break:break-all;background:#000;padding:4px 6px;border-radius:4px;margin-bottom:.5rem;"></code>
+            <div id="sharedrop" style="border:1px dashed #3a4a52;border-radius:6px;padding:.9rem .8rem;text-align:center;color:#cdd6da;cursor:pointer;margin-bottom:.35rem;">
+              <b style="color:#6FC3DF;">Warrant with your shares</b> &mdash; drop 3 share files here (or click to pick).<br>
+              <span class="muted">Combined and signed in this browser only. Shares are never uploaded, never logged, wiped after signing.</span>
+            </div>
+            <input id="sharefiles" type="file" multiple style="display:none;">
+            <div style="display:flex;align-items:center;gap:.6rem;color:#555;font-size:.68rem;letter-spacing:.1em;margin:.5rem 0;"><span style="flex:1;height:1px;background:#2a2a2a;"></span>OR<span style="flex:1;height:1px;background:#2a2a2a;"></span></div>
             <div class="muted" style="margin-bottom:.4rem;">On the key device: <code>genesis-cli warrant root.key &lt;device-pub-hex&gt;</code> &mdash; then paste the warrant signature:</div>
             <input id="warrantin" type="text" spellcheck="false" placeholder="warrant signature (128 hex chars)" style="width:100%;margin-bottom:.4rem;">
             <button type="button" id="warrantsave" style="width:100%;">Save warrant &amp; sign in</button>
@@ -3923,7 +3929,7 @@ async function keyLogin(){
     if(!window.isSecureContext||!crypto.subtle) throw new Error("needs a secure context (https)");
     const dev=await deviceKey().catch(()=>{ throw new Error("this browser has no Ed25519 Web Crypto yet — use current Chrome/Edge/Firefox"); });
     const w=localStorage.getItem(WARRANT_KEY);
-    if(!w){ document.getElementById("keyenroll").style.display="block"; document.getElementById("keypub").textContent=idhex(idb64ud(dev.pub)); keySay("Enrollment needed — Warrant this device with the operator root, once."); return; }
+    if(!w){ document.getElementById("keyenroll").style.display="block"; document.getElementById("keypub").textContent=idhex(idb64ud(dev.pub)); keySay("Enrollment needed — drop your shares below to Warrant this device, once."); return; }
     keySay("challenge…");
     const cr=await fetch(BRIDGE+"/auth/key/challenge",{cache:"no-store"}); const cd=await cr.json().catch(()=>({}));
     if(!cr.ok) throw new Error(cd.error==="key-login-not-configured"?"key-login is not switched on server-side yet":(cd.error||("HTTP "+cr.status)));
@@ -3936,9 +3942,55 @@ async function keyLogin(){
     throw new Error(vd.detail||vd.error||("HTTP "+vr.status));
   }catch(e){ keySay(e.message||String(e),true); }
 }
+// Warrant with your shares — terminal-free enrollment. The genesis warrant path
+// (shamir_combine + deterministic ed25519 sign, pure C, PRACTICES #12) runs as warrant.wasm
+// IN THIS BROWSER: share files are read locally, combined, the root signs
+// device_pub||"console", and root + shares are zeroed inside the module before it returns
+// (the module has ZERO imports — it cannot do I/O even if it wanted to). Nothing leaves the tab.
+async function warrantModule(){
+  if(warrantModule._x) return warrantModule._x;
+  const r=await fetch("warrant.wasm",{cache:"no-store"});
+  if(!r.ok) throw new Error("warrant.wasm is not on this surface yet (HTTP "+r.status+") — use the paste path below");
+  const m=await WebAssembly.instantiate(await r.arrayBuffer(),{});
+  const x=m.instance.exports; if(x._initialize)x._initialize();
+  warrantModule._x=x; return x;
+}
+async function shareWarrant(fileList){
+  try{
+    const dev=await deviceKey();
+    const files=Array.from(fileList||[]);
+    if(files.length<3) throw new Error("drop at least 3 share files ("+files.length+" given)");
+    const x=await warrantModule();
+    if(files.length>x.wa_max_shares()) throw new Error("too many files — "+x.wa_max_shares()+" max");
+    const SL=x.wa_share_len(); const mem=()=>new Uint8Array(x.memory.buffer);
+    const seen={};
+    for(let i=0;i<files.length;i++){
+      const b=new Uint8Array(await files[i].arrayBuffer());
+      if(b.length!==SL) throw new Error(files[i].name+" is not a "+SL+"-byte share file");
+      if(seen[b[0]]) throw new Error(files[i].name+" duplicates share #"+b[0]+" — pick distinct shares");
+      seen[b[0]]=1;
+      mem().set(b,x.wa_shares()+i*SL); b.fill(0);
+    }
+    mem().set(idb64ud(dev.pub),x.wa_devpub());
+    keySay("combining shares + signing the warrant — in this browser only…");
+    const rc=x.wa_warrant(files.length);
+    if(rc!==0) throw new Error(rc===-4?"those shares don't agree on one root — pick "+files.length+" shares from the same mint":("warrant failed (rc="+rc+")"));
+    localStorage.setItem(WARRANT_KEY,idb64u(mem().slice(x.wa_sig(),x.wa_sig()+64)));
+    document.getElementById("keyenroll").style.display="none";
+    keyLogin();
+  }catch(e){ keySay(e.message||String(e),true); }
+}
 (function(){
   var b=document.getElementById("loginKey"); if(!b) return;
   b.addEventListener("click",keyLogin);
+  var sd=document.getElementById("sharedrop"), sf=document.getElementById("sharefiles");
+  if(sd&&sf){
+    sd.addEventListener("click",function(){ sf.click(); });
+    sd.addEventListener("dragover",function(e){ e.preventDefault(); sd.style.borderColor="#6FC3DF"; });
+    sd.addEventListener("dragleave",function(){ sd.style.borderColor="#3a4a52"; });
+    sd.addEventListener("drop",function(e){ e.preventDefault(); sd.style.borderColor="#3a4a52"; shareWarrant(e.dataTransfer.files); });
+    sf.addEventListener("change",function(){ shareWarrant(sf.files); sf.value=""; });
+  }
   var ws=document.getElementById("warrantsave");
   if(ws) ws.addEventListener("click",function(){ var v=idhexToB64u(document.getElementById("warrantin").value,64); if(!v){ keySay("warrant must be 128 hex chars (64-byte ed25519 signature)",true); return; } localStorage.setItem(WARRANT_KEY,v); document.getElementById("keyenroll").style.display="none"; keyLogin(); });
   // show the key path only where the deployment actually carries the skill
@@ -4160,7 +4212,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r436 . 79aee24 . 2026-07-06</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r437 . 5b5e735 . 2026-07-06</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
