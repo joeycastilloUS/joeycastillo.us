@@ -577,6 +577,7 @@ const APPS = {
   zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["focus","programs","templates","comments","zdaudit","apibrowser"], source:"zendesk" },
   cloudflare: { label:"Cloudflare", icon:"&#9729;&#65039;", tag:"Edge · read-only", tabs:["apibrowser"], source:"cloudflare" },
   airbyte: { label:"Airbyte", icon:"&#128260;", tag:"Airbyte migration", tabs:["helm","apibrowser"], source:"airbyte" },
+  salesforce: { label:"Salesforce", icon:"&#9729;", tag:"OneDine · read-only", tabs:["apibrowser"], source:"salesforce" },
   gcp: { label:"GCP", icon:"&#128176;", tag:"Cloud cost", tabs:["cost"] }
 };
 if(!APPS[APP]) APP="meraki";
@@ -1700,11 +1701,13 @@ function auditPane(){
 const ZBRIDGE = "https://zendesk-bridge-d5vc4tye3a-uw.a.run.app"; // zendesk-bridge Cloud Run (read-only proxy)
 const CFBRIDGE = "https://cloudflare-bridge-692654781984.us-west1.run.app"; // cloudflare-bridge Cloud Run (read-only proxy)
 const ABRIDGE = "https://airbyte-bridge-692654781984.us-west1.run.app"; // airbyte-bridge Cloud Run (deterministic URL, same project/region as cloudflare-bridge; service deploys via airbyte-bridge/cloudbuild.yaml)
+const SFBRIDGE = "https://salesforce-bridge-692654781984.us-west1.run.app"; // salesforce-bridge Cloud Run (read-only OneDine proxy, Client Credentials)
 const SOURCES = {
   zendesk: { label:"Zendesk", base:ZBRIDGE, tokenKey:null, note:"Mendocino Farms support — read-only" },
   meraki:  { label:"Meraki",  base:BRIDGE,  tokenKey:null, note:"Meraki network — read-only" },
   cloudflare: { label:"Cloudflare", base:CFBRIDGE, tokenKey:null, note:"your Cloudflare — zones/DNS/Pages, read-only" },
-  airbyte: { label:"Airbyte Migration", base:ABRIDGE, tokenKey:"argus_airbyte_token", note:"Airbyte clone-and-cutover — read-only observation" }
+  airbyte: { label:"Airbyte Migration", base:ABRIDGE, tokenKey:"argus_airbyte_token", note:"Airbyte clone-and-cutover — read-only observation" },
+  salesforce: { label:"Salesforce", base:SFBRIDGE, tokenKey:null, note:"OneDine — Cases / Comments / Users, read-only" }
 };
 let AB = { source:"zendesk", cat:null, entry:"", params:{}, result:null, err:"", busy:false };
 function abToken(src){ const s=SOURCES[src]; if(!s) return ""; return s.tokenKey ? (localStorage.getItem(s.tokenKey)||"") : PW; }
@@ -2923,7 +2926,10 @@ function programsPane(){
 // Grouped by the macro's own Zendesk category (the real family), sorted by 30-day usage, dead flagged.
 // The ".pi Template Library" attribution (which mined program used which template) is the follow-on
 // board; here we ship what's live today: usage you can see.
-let ZTPL = { run:null, busy:false, err:"", prog:"" };
+let ZTPL = { run:null, busy:false, err:"", prog:"", roll:null, rollErr:"" };
+// How far back the attribution rollup looks. The bridge scans at most `max` tickets of this window
+// (default 60, hard cap 200) and says so honestly (candidates/scanned/capped — never silent truncation).
+const ZTPL_ROLL_DAYS=30, ZTPL_ROLL_MAX=60;
 function ztplTier(u, med){ u=+u||0; if(u===0) return "dead"; return u>=med ? "hot" : "warm"; }
 function ztplClassify(macros){
   // comms templates = a macro that carries a message body. Workflow-only macros (tag/route, empty body) are excluded.
@@ -2952,6 +2958,19 @@ async function ztplLoad(){
   try{
     const macros = await zdAll("macros","macros-page","macros");
     ZTPL.run = ztplClassify(macros);
+    // .pi attribution rollup — the "attributed in N tickets" backlinks. Zendesk exposes NO macro_id per
+    // comment, so the .pi engine match IS the only grounding. Fail-soft: templates render without it.
+    ZTPL.roll=null; ZTPL.rollErr="";
+    try{
+      ZTPL.prog="attribution rollup"; renderZTPL();
+      const start = Math.floor(Date.now()/1000) - ZTPL_ROLL_DAYS*86400;
+      const rr = await zdFetch("/templates/rollup?start="+start+"&max="+ZTPL_ROLL_MAX);
+      if(rr.ok){
+        const rd = await rr.json(); const by={};
+        (rd.rollup||[]).forEach(x=>{ by[String(x.templateId)]={count:+x.count||0,tickets:x.tickets||[]}; });
+        ZTPL.roll={byId:by,window:rd.window||{}};
+      } else ZTPL.rollErr="HTTP "+rr.status;
+    }catch(_){ ZTPL.rollErr="bridge unreachable"; }
   }catch(e){ ZTPL.err = (e&&e.code)? ("HTTP "+e.code+(e.code===401?" — unlock the console first":"")) : ((e&&e.message)||"load failed"); }
   ZTPL.busy=false; ZTPL.prog=""; if(TAB==="templates") renderZTPL(); render();
 }
@@ -2965,7 +2984,7 @@ function ztplInner(){
   if(!ZTPL.run){
     return "<div class='tlead'><b>Mendo's reply templates &mdash; live.</b> Every macro that carries a message body, grouped by family, ranked by how often it fired in the last 30 days. Read straight from zendesk-bridge &mdash; today's count, not a snapshot.</div>"
       +"<button class='tload' data-ztplload>&#128221; Load templates</button>"
-      +"<div class='tnote'>Read-only. The &ldquo;used in N programs&rdquo; attribution rides the .pi Template Library &mdash; the next board.</div>";
+      +"<div class='tnote'>Read-only. Loading also runs the .pi attribution rollup &mdash; &ldquo;attributed in N tickets&rdquo; backlinks per template, inferred by the .pi engine (Zendesk exposes no macro_id).</div>";
   }
   const R=ZTPL.run;
   let s="<div class='thead'>";
@@ -2976,15 +2995,32 @@ function ztplInner(){
     +"<span class='tchip warm'><b>"+R.warm+"</b> warm</span>"
     +"<span class='tchip dead'><b>"+R.dead+"</b> dead (0 in 30d)</span>"
     +"<button class='tref' data-ztplload>&#8635; Refresh</button></div></div>";
+  // HONEST LABEL — these counts are .pi engine inferences over a bounded, announced window.
+  if(ZTPL.roll){ const w=ZTPL.roll.window||{};
+    s+="<div class='tattrnote'>&#9873; attribution counts = <b>.pi engine</b> matches across the last "+ZTPL_ROLL_DAYS+" days of recent tickets (scanned "+(w.scanned||0)+" of "+(w.candidates||0)+", "+(w.capped?"capped":"full window")+"); Zendesk exposes no macro_id, so these are <b>inferred</b>, not Zendesk-reported.</div>";
+  } else if(ZTPL.rollErr){
+    s+="<div class='tattrnote'>.pi attribution rollup unavailable ("+esc(ZTPL.rollErr)+") &mdash; showing usage only.</div>";
+  }
   R.families.forEach(f=>{
     s+="<div class='tfam'>"+esc(f.name)+" <span class='tfamn'>&middot; "+f.items.length+" &middot; "+f.usage+"&times;/30d</span></div>";
     f.items.forEach(i=>{
+      // ".pi attributed in N tickets" backlink — only when the rollup found real matches; 0 shows a muted
+      // dash, NEVER a fake number. Click expands the sample ticket ids (same toggle pattern as data-hist).
+      let bk="", bkx="";
+      if(ZTPL.roll){ const a=ZTPL.roll.byId[String(i.id)];
+        if(a && a.count>0){
+          bk="<span class='tbk' data-ztplbk='"+i.id+"'>&#9873; attributed in "+a.count+" &rarr;</span>";
+          bkx="<div class='tbkx' id='ztplbk-"+i.id+"' style='display:none'>.pi-attributed tickets (sample): "+a.tickets.map(t=>"#"+t).join(", ")+"</div>";
+        } else bk="<span class='tbk none'>&mdash;</span>";
+      }
       s+="<div class='trow "+i.tier+"'>"
         +"<span class='tt'>"+esc(i.title)+(i.active?"":" <span class='tinact'>inactive</span>")+"</span>"
         +"<span class='tbody'>"+esc(i.body.slice(0,110))+(i.body.length>110?"&hellip;":"")+"</span>"
         +ztplBar(i)
         +"<span class='tuv'>"+i.usage+"<span class='lab'>&times;/30d</span></span>"
+        +bk
         +(i.tier==="dead"?"<span class='tdead'>DEAD</span>":"")
+        +bkx
         +"</div>";
     });
   });
@@ -3020,10 +3056,20 @@ function templatesPane(){
     +"#pane-templates .tuv{flex:0 0 80px;text-align:right;font-size:12.5px;font-weight:800;color:#e8e8e8;font-family:Consolas,monospace;}"
     +"#pane-templates .tuv .lab{color:#6b7a82;font-weight:400;font-size:10.5px;}"
     +"#pane-templates .tdead{flex:0 0 auto;color:#ff9b9b;font-size:10px;font-weight:800;letter-spacing:.04em;}"
+    +"#pane-templates .tattrnote{color:#8fb7c4;font-size:11.5px;line-height:1.5;background:#0c1418;border:1px solid #14323e;border-radius:8px;padding:8px 12px;margin:8px 0 4px;max-width:720px;}"
+    +"#pane-templates .tattrnote b{color:#6FC3DF;}"
+    +"#pane-templates .tbk{flex:0 0 auto;color:#6FC3DF;font-size:11px;font-weight:700;cursor:pointer;background:#0c1418;border:1px solid #14323e;border-radius:6px;padding:2px 8px;white-space:nowrap;}"
+    +"#pane-templates .tbk:hover{border-color:#6FC3DF;}"
+    +"#pane-templates .tbk.open{background:#6FC3DF;color:#06222c;border-color:#6FC3DF;}"
+    +"#pane-templates .tbk.none{color:#4a5258;background:none;border:0;cursor:default;font-weight:400;}"
+    +"#pane-templates .tbkx{flex:1 1 100%;color:#9fd6e6;font-size:11.5px;font-family:Consolas,monospace;background:#0c1418;border:1px solid #14323e;border-radius:6px;padding:6px 10px;margin-top:2px;}"
     +"</style><div id='ztpl-wrap'>"+ztplInner()+"</div>";
 }
 document.addEventListener("click", function(e){
   if(e.target && e.target.closest && e.target.closest("[data-ztplload]")){ ztplLoad(); return; }
+  // "attributed in N →" backlink — expand/collapse the sample ticket ids (same pattern as data-hist).
+  const bk = e.target && e.target.closest && e.target.closest("[data-ztplbk]");
+  if(bk){ const r=document.getElementById("ztplbk-"+bk.getAttribute("data-ztplbk")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"block"; bk.classList.toggle("open",!open); } return; }
 });
 function commentsPane(){
   return "<style>"
@@ -4509,7 +4555,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r460 . ca05295 . 2026-07-08</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r476 . 2495212 . 2026-07-09</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
