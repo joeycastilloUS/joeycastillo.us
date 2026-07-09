@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design v2 &mdash; Raw IDS out of the LLM zone: pure-C pipeline + the Argus eye</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 27px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 15px; margin: 18px 0 6px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:14px 16px; overflow-x:auto; color:#bcd; font-size:12.5px; font-family:Consolas,monospace; margin:12px 0; line-height:1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; } .fail { color:#ff6b6b; font-weight:600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~d v2 — Raw IDS out of the LLM zone: pure-C pipeline + the Argus eye</span><span class="pub">Published 2026-07-09 15:09 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/40d87e6c-5057-42fd-b341-18ea3c5b4216/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Raw IDS out of the LLM zone: pure-C pipeline + the Argus eye</h1>
+<p><strong>v2 — supersedes</strong> <code>be/designs/2026-07-09-1443-design-zendesk-raw-ids-import-tool-fable5.html</code>.
+v1's bones stand (the Argus tab, the <code>/import/*</code> contract); v1's premise was wrong.
+It said the import "keeps not landing" and "has no home." A deep inspection (<code>~i deep</code>)
+run an hour later found the fetch <em>live and nearly complete</em> — and found the real rot
+downstream: the shaper silently broken, the sealer never compiled, every deterministic step
+trapped in the LLM zone. This design corrects the premise and designs the pipeline out.</p>
+
+<!-- ============================================================ 1. NEED -->
+<div class="section">
+<h2>1. Need</h2>
+<p>Where we actually are — measured, not remembered:</p>
+<table>
+  <tr><th>Stage</th><th>Ground truth (evidence)</th><th>State</th></tr>
+  <tr>
+    <td>Fetch (pull)</td>
+    <td><code>data/full/ticket_events.jsonl</code> ≈ <strong>7 GB</strong> —
+      <strong>408,305 tickets · 934,545 comments · 2.18M events</strong>, pulled via
+      <code>incremental/ticket_events?start_time=0&amp;include=comment_events</code> through the
+      live zendesk-bridge, resumable, cursor + provenance in <code>pull-manifest.json</code>.
+      It advanced 402,865 → 406,455 → 408,305 tickets across three reads (~10 RPM), and this
+      design's own read of the manifest shows <strong>410,882</strong> — still climbing right
+      now. Commit <code>eb27c87</code>.</td>
+    <td><span class="pass">LIVE, nearly done</span></td>
+  </tr>
+  <tr>
+    <td>Fetch end-of-stream</td>
+    <td><code>eos=False</code>, <code>done:false</code>, cursor ≈ 2026-04 at inspection —
+      roughly a 3-month tail left, fully resumable from the stored cursor.</td>
+    <td><span class="warn">tail remaining</span></td>
+  </tr>
+  <tr>
+    <td>Shape → triples</td>
+    <td>Python <code>shape_triples.py</code> ran; <code>data/full/triples.tsv</code> covers
+      <strong>~2 tickets of 408K</strong>. Silent partial failure. Nobody caught it.</td>
+    <td><span class="fail">BROKEN at scale</span></td>
+  </tr>
+  <tr>
+    <td>Seal → raw IDS</td>
+    <td><code>raw_import.c</code> (the pure-C sealer) was <strong>never compiled</strong>. The
+      only sealed nous TripleStore on disk is the <strong>1,000-ticket sample</strong>
+      (Jul 4, <code>facts.bin</code> 196 KB). There is <strong>no full sealed raw IDS</strong>
+      to replay or decode from.</td>
+    <td><span class="fail">NEVER RAN</span></td>
+  </tr>
+  <tr>
+    <td>Mesh residency</td>
+    <td>Design only. No IDS handle, no manifest signal, no publish code, no commit.
+      <code>mesh.c</code> + the prime (<code>/var/nous/data</code>, NTRP0001 wire) exist but
+      have no IDS-residency layer.</td>
+    <td><span class="fail">design only</span></td>
+  </tr>
+</table>
+<p><strong>Root cause — name it plainly:</strong> the entire pull → shape → seal → import → mesh
+pipeline lives in the <strong>LLM zone</strong> — ad-hoc python scripts hand-run inside
+ephemeral Claude sessions, in a sibling repo (<code>mendo-zendesk-ai</code>), with no
+operational eye. So: the pull dies when the session dies; the shaper silently emits 2 tickets
+and nobody notices; the sealer never gets compiled; nothing watches; it stalls at "almost"
+every single time. v1 was half-wrong — the <em>fetch</em> is essentially done. The real rot is
+that the deterministic steps, which §9 says must be deterministic and ours, are trapped as
+babysat scripts in the probabilistic zone.</p>
+<blockquote>Joey: "we need to figure out where we are at and do this better. let's add to our
+bridges and pure C code base. take this away from LLM zone. i need way better tools in argus
+to keep an eye on this and let's hopefully keep this going … we were working on getting the
+raw data so we can replay and decode/ids as often as we want to."</blockquote>
+<p><strong>The move:</strong> a deterministic <strong>pure-C99 + bridge</strong> pipeline that
+runs headless, survives session death, and is watched + driven from a real Argus operational
+tool — so the raw lands, stays current, and can be replayed/decoded on demand forever.</p>
+</div>
+
+<!-- ============================================================ 2. RAW USER STORIES -->
+<div class="section">
+<h2>2. Raw User Stories</h2>
+<ul data-cm="1-need">
+  <li>As the operator, I want the pull running <strong>headless</strong>, so that closing a
+    Claude session costs zero — no more session archaeology to find where a pull died.</li>
+  <li>As the operator, I want a shaper that <strong>cannot silently do 2 of 408K</strong>, so
+    that a partial failure is a loud red number, not a discovery weeks later.</li>
+  <li>As the operator, I want the <strong>full raw sealed</strong>, so that I can replay and
+    decode into any number of derived IDS as often as I want (§7's whole point).</li>
+  <li>As the operator, I want an <strong>Argus eye</strong> that shows exactly which stage is
+    stuck — pulled vs shaped vs sealed vs published — so a glance replaces an investigation.</li>
+  <li>As the operator, I want <strong>Refresh (get-latest)</strong> from the stored cursor, so
+    the raw stays current without a full re-pull.</li>
+  <li>As the operator, I want the sealed raw <strong>resident in the mesh</strong> under a
+    content-addressed handle, so any node reads one verifiable truth.</li>
+</ul>
+</div>
+
+<!-- ============================================================ 3. SOURCED SOLUTION -->
+<div class="section">
+<h2>3. Sourced Solution</h2>
+<p>Mined in order before inventing:</p>
+<table>
+  <tr><th>Source</th><th>What it gives</th><th>Verdict</th></tr>
+  <tr>
+    <td>argus <code>a-d-d</code> §7 / §9</td>
+    <td>The blessed architecture: import once → derive many → replay forever; one writer,
+      append-only + provenance, refresh via cursor. §9's determinism split: prime =
+      deterministic (reached over wire); models = probabilistic; the edge composes. The LLM
+      belongs NOWHERE in a deterministic data pipeline.</td>
+    <td><strong>REUSE</strong> — this design finally EXECUTES it deterministically.</td>
+  </tr>
+  <tr>
+    <td><code>C:\mendo-zendesk-ai\be\tools\</code></td>
+    <td><code>pull_incremental.py</code> — resumable fetch, WORKS, is running now.
+      <code>shape_triples.py</code> — BROKEN at scale (2 of 408K).
+      <code>raw_import.c</code> — pure-C sealer, EXISTS, never compiled.
+      Plus the proven v0 decode/replay/retrieve tools (1,000-ticket sample round-trips clean).</td>
+    <td><strong>REUSE + FIX + PROMOTE</strong> — keep/port the puller; replace the shaper with
+      C99; compile + run the sealer; promote all of it into argus.</td>
+  </tr>
+  <tr>
+    <td><code>acmedevUS/zendesk-bridge</code> (live C# jacket)</td>
+    <td>The foreign-API boundary; the incremental export endpoint IS the fetch. The only
+      LLM-free-but-foreign piece — language law keeps it at the boundary.</td>
+    <td><strong>REUSE</strong> — "add to our bridges": the bridge stays the fetch jacket;
+      anything foreign-shaped that the pipeline needs lands here, never in our C.</td>
+  </tr>
+  <tr>
+    <td>nous (kastil-systems, C99)</td>
+    <td>Sealed append-only <code>triple_store</code>, <code>understand()</code> decoder,
+      wire/NTRP0001, <code>mesh.c</code>, the prime at <code>/var/nous/data</code>.</td>
+    <td><strong>REUSE</strong> — load-bearing, ours.</td>
+  </tr>
+  <tr>
+    <td>v1 design (2026-07-09-1443)</td>
+    <td>The Argus tab + <code>/import/*</code> contract shape; the "operational home" idea.</td>
+    <td><strong>REUSE the bones, CORRECT the premise</strong> — not "it has no home"; the
+      reframe is "out of the LLM zone, into pure C + bridges + an eye."</td>
+  </tr>
+</table>
+
+<pre>
+Zendesk ──C# jacket (zendesk-bridge)──▶ pull loop (C99, headless, resumable)
+                                              │ cursor + provenance
+                                              ▼
+                                        shape (C99)  ── coverage self-check:
+                                              │         shaped == pulled or HALT RED
+                                              ▼
+                                        raw_import (C99 seal, one writer, append-only)
+                                              │
+                                              ▼
+                                          RAW IDS ──▶ SHA-256 IDS handle
+                                              │            │
+                                              │            ▼
+                                              │      manifest signal (NTRP0001 wire)
+                                              │            │
+                                              ▼            ▼
+                                        replay/decode   mesh / prime (resident .ids,
+                                        (derive many)    read-only mount, any node)
+
+           Argus "Raw IDS" tab ── the eye ── watches EVERY arrow
+           (reads the pipeline's own status.json — never an LLM's word)
+</pre>
+
+<p><strong>REUSE vs FIX vs NEW, honestly.</strong> REUSE: the architecture (§7/§9), the
+bridge, the nous store/decoder/wire/mesh, the running pull + its cursor, the v1 tab/contract
+bones. FIX: compile + run <code>raw_import.c</code> at scale. NEW is small: the
+<strong>C99 shaper</strong> (replacing the broken python), the <strong>headless driver</strong>
+(off the ephemeral session), the <strong>Argus eye</strong>, and the <strong>mesh
+publish</strong>. No new architecture — this executes the one already blessed.</p>
+</div>
+
+<!-- ============================================================ 4. NAMING -->
+<div class="section">
+<h2>4. Naming</h2>
+<table data-cm="3-sourced-solution">
+  <tr><th>Thing</th><th>Name</th><th>Why</th></tr>
+  <tr><td>The standing artifact</td><td><strong>Raw IDS</strong></td>
+    <td>§7's own term. One term, kernel to console.</td></tr>
+  <tr><td>The content address</td><td><strong>IDS handle</strong> (SHA-256 of the sealed bytes)</td>
+    <td>The handle IS the hash — verification for free.</td></tr>
+  <tr><td>The wire announcement</td><td><strong>manifest signal</strong> (NTRP0001)</td>
+    <td>The Signals-canon word for "this handle now exists / resolves here."</td></tr>
+  <tr><td>The incremental refresh</td><td><strong>get-latest</strong></td>
+    <td>§7's term: cursor → incremental export → append → new cursor.</td></tr>
+  <tr><td>Comment subjects</td><td><code>comment:&lt;id&gt;</code> (+ public/internal flag triple)</td>
+    <td>First-class, same shape as <code>ticket:&lt;id&gt;</code>.</td></tr>
+  <tr><td>The tab</td><td><strong>Raw IDS</strong> (key <code>rawids</code>) — "the eye"</td>
+    <td>Joey's "way better tools to keep an eye on this," literally. No collision in the
+      Zendesk app's tab set (<code>focus, programs, templates, comments, zdaudit,
+      apibrowser</code>).</td></tr>
+  <tr><td>The pipeline binaries</td><td><code>raw_pull</code> · <code>raw_shape</code> ·
+    <code>raw_import</code> · <code>raw_publish</code></td>
+    <td>Literal verbs, one binary per stage. <code>raw_import</code> keeps its existing name.</td></tr>
+</table>
+<p>No cute names. No collisions found.</p>
+</div>
+
+<!-- ============================================================ 5. SHAPE -->
+<div class="section">
+<h2>5. Shape</h2>
+<p>Minimum viable structure — the determinism split of §9, applied to data:</p>
+<ol>
+  <li><strong>Boundary (C#, exists):</strong> zendesk-bridge stays the ONLY foreign piece —
+    the fetch jacket. Nothing else foreign, nothing else C#.</li>
+  <li><strong>Pull loop (C99, mostly built):</strong> harden the resumable puller and get its
+    driver OFF the ephemeral session — a headless runner the operator owns (Choice below).
+    Cursor + per-batch provenance stay in the manifest/store, exactly as the python version
+    proved. The python puller retires only after the C99 driver shows cursor parity.</li>
+  <li><strong>Shape (C99, NEW — replaces the broken python):</strong> JSONL → append-only
+    (s,p,o) triples; comments first-class <code>comment:&lt;id&gt;</code> subjects with the
+    public/internal flag. <strong>Coverage self-check baked in:</strong> counts
+    <code>tickets_in</code> vs <code>tickets_shaped</code>; mismatch = nonzero exit + red in
+    the eye. The 2-of-408K bug becomes structurally impossible to miss.</li>
+  <li><strong>Seal (C99, FIX):</strong> compile <code>raw_import.c</code>; run it on the FULL
+    set → the full sealed nous TripleStore. One writer, append-only, provenance per batch
+    (§7). This step has literally never run at scale — it is a compile and a run away.</li>
+  <li><strong>Mesh residency (C99, NEW, downstream):</strong> seal → SHA-256 IDS handle →
+    manifest signal on the wire (NTRP0001) → resident <code>.ids</code> the prime or any node
+    resolves and mounts read-only.</li>
+  <li><strong>The eye (vanilla JS tab, NEW):</strong> <code>rawids</code> tab in the Zendesk
+    app. Shows LIVE, from the pipeline's own <code>status.json</code> served over
+    <code>/import/status</code> — <em>never from an LLM</em>:
+    <ul>
+      <li><strong>Pull:</strong> cursor / tickets / comments / eos / pages / rate / ETA.</li>
+      <li><strong>Shape:</strong> coverage — tickets shaped vs pulled (this line alone would
+        have caught the 2-ticket bug instantly).</li>
+      <li><strong>Seal:</strong> status + IDS handle + store size.</li>
+      <li><strong>Mesh:</strong> published? handle resolvable?</li>
+      <li><strong>Controls:</strong> Resume pull · Refresh (get-latest) · Re-shape · Re-seal ·
+        Replay a ticket.</li>
+    </ul>
+    The eye is how it "keeps going": a human glances, sees the stalled stage, nudges it.</li>
+</ol>
+<h3>Invariants</h3>
+<ul>
+  <li><strong>Read-only:</strong> the pipeline READS Zendesk, WRITES only the local sealed
+    raw. No write-back path exists to disarm.</li>
+  <li><strong>Language law:</strong> C# only at the zendesk-bridge boundary; every stage after
+    the boundary is C99, compiled, deterministic, ours.</li>
+  <li><strong>Done = production (Rule 9):</strong> "sealed" means the store exists, the handle
+    resolves, and a ticket replays from it — verifiable by a third party, not by a claim in a
+    transcript.</li>
+</ul>
+<h3>Out of scope (YAGNI)</h3>
+<ul>
+  <li><span class="fail">✗</span> derive-nps / Focus wiring — a decoder pass off the landed
+    raw, its own board.</li>
+  <li><span class="fail">✗</span> Full config-object walk (triggers, automations, macros,
+    SLAs, forms) beyond tickets+comments — append-only means adding it later costs nothing now.</li>
+  <li><span class="fail">✗</span> Any write-back to Zendesk — the read-only invariant holds.</li>
+</ul>
+</div>
+
+<!-- ============================================================ 6. FIRST MOVE -->
+<div class="section">
+<h2>6. First Move</h2>
+<p><strong>The fetch is done; the missing deterministic steps are a compile and a run away.
+So run them.</strong> Compile <code>raw_import.c</code> and a pure-C shaper, run them on the
+ALREADY-PULLED 7 GB <code>ticket_events.jsonl</code> — 408K+ tickets sitting on disk right
+now — to produce the <strong>first FULL sealed raw IDS</strong>, and prove ONE real ticket
+replays from it: real comments, real thread, decoded from the seal.</p>
+<p>That single move converts the pull that's already on disk into the artifact §7 has wanted
+since 2026-07-04 — and it flushes out every at-scale surprise (memory, malformed events,
+throughput) before any service or tab exists. The shaper ships with its coverage self-check
+from line one: <code>shaped == pulled</code> or it halts red. The headless driver, the Argus
+eye, and the mesh publish follow as the plan's phases — each one watching or feeding a raw
+that already exists.</p>
+</div>
+
+<!-- ============================================================ CHOICES -->
+<div class="section">
+<h2>Choices + Consequences <span class="tag">earned — load-bearing fork</span></h2>
+<h3>Where do the deterministic steps run?</h3>
+<table>
+  <tr><th></th><th>A — bare headless C99 runner (operator box/VM)</th>
+      <th>B — C99 service behind <code>/import/*</code>, tab-driven (v1's shape)</th>
+      <th>C — folded into zendesk-bridge</th></tr>
+  <tr>
+    <td>1st order</td>
+    <td>Zero new surface; binaries run today next to the 7 GB.</td>
+    <td>Headless + resumable + a status/control contract the eye binds to.</td>
+    <td>One deploy; "add to our bridges" read literally.</td>
+  </tr>
+  <tr>
+    <td>2nd order</td>
+    <td>No status surface — the eye has nothing to read; "is it running?" is again a shell
+      archaeology question. The LLM-zone failure with the LLM swapped for a forgotten
+      terminal.</td>
+    <td>The tab reads the pipeline's own <code>status.json</code>; controls (resume, re-shape,
+      re-seal, replay) are HTTP verbs; the contract is location-blind — localhost today,
+      promoted later without a rewrite.</td>
+    <td><span class="fail">Violates language law:</span> the pipeline is OURS and deterministic
+      — putting C99 stages inside a C# service (or rewriting them in C#) plants our code in
+      the jacket. The bridge also holds the vendor secret; fattening it fattens the blast
+      radius.</td>
+  </tr>
+  <tr>
+    <td>3rd order</td>
+    <td>Every downstream board inherits "whose terminal is it on?" fragility.</td>
+    <td>The import becomes an operational fact of Argus; refresh is schedulable; the mesh
+      publish is one more verb on the same contract.</td>
+    <td>Vendor-jacket redeploys now risk the data pipeline; two lifecycles, one service.</td>
+  </tr>
+</table>
+<p><strong>Pick: B.</strong> C fails the language law outright — "add to our bridges" is
+honored at the boundary (the bridge stays the fetch jacket and takes any new foreign-shaped
+endpoint), not by moving our deterministic C into the jacket. A is B minus the eye — and the
+eye is half of Joey's direction. B strictly dominates: a compiled C99 service that IS the
+headless runner, wearing a thin <code>/import/*</code> status+control contract. First Move
+runs the bare binaries by hand (A's virtue, once); the service wraps the same binaries.
+The test — out of the LLM zone, watchable, resumable — only B passes whole.</p>
+</div>
+
+<!-- ============================================================ ESCAPE ROUTES -->
+<div class="section">
+<h2>Escape Routes <span class="tag">earned</span></h2>
+<ul data-cm="5-shape">
+  <li><strong>Re-pull.</strong> Append-only + per-batch provenance ⇒ a bad pull is a droppable
+    batch; the cursor makes any restart a resume. Worst case is wall-clock at ~10 RPM, zero
+    code.</li>
+  <li><strong>Re-shape / re-seal.</strong> Derived is rebuildable by definition (§7); the raw
+    is never migrated. A shaper bug found later = fix the C, re-run over the same JSONL,
+    re-seal, diff. The 7 GB source and the sealed raw both stand.</li>
+  <li><strong>Mesh publish.</strong> The handle is the hash of the bytes — it can never lie.
+    Only the locator can change: move the sealed file, re-signal, done. Backing out of mesh
+    residency entirely leaves a fully usable local raw.</li>
+</ul>
+</div>
+
+<!-- ============================================================ PURE METAL TEST -->
+<div class="section">
+<h2>Pure Metal Test <span class="tag">earned</span></h2>
+<ul data-cm="pure-metal-test-earned">
+  <li><span class="pass">✓</span> Every load-bearing piece is ours: nous store, decoder,
+    wire, mesh; the C99 shaper + sealer + driver; the vanilla-JS eye. No frameworks, no
+    managed runtimes, no LLM in the loop.</li>
+  <li><span class="pass">✓</span> The one foreign dep — Zendesk — is jacketed at the boundary
+    and replaceable: swap the jacket, everything after the boundary stands.</li>
+  <li><span class="pass">✓</span> The one infra dep — where the sealed bytes live — is
+    content-addressed (the handle is the hash) and therefore swappable: box, VM, prime, any
+    node.</li>
+</ul>
+</div>
+
+<!-- ============================================================ DOD -->
+<div class="section">
+<h2>Definition of Done — this design</h2>
+<ul data-cm="definition-of-done-this-design">
+  <li><span class="pass">✓</span> Six spine sections present, in order, sized to the work
+    (Need → Raw User Stories → Sourced Solution → Naming → Shape → First Move).</li>
+  <li><span class="pass">✓</span> Sourced before invented — a-d-d §7/§9, the mendo tools
+    (keep/fix/promote), zendesk-bridge, nous, and v1's bones mined in order; NEW is only the
+    C99 shaper, the headless driver, the eye, and the mesh publish.</li>
+  <li><span class="pass">✓</span> Names literal — Raw IDS, IDS handle, manifest signal,
+    get-latest, <code>comment:&lt;id&gt;</code>, the eye; no cute names, no collisions.</li>
+  <li><span class="pass">✓</span> Earned tools present — Choices+Consequences (where the
+    deterministic steps run, 2nd/3rd-order, picked), Escape Routes (re-pull / re-shape /
+    re-seal / publish), Pure Metal Test.</li>
+  <li><span class="pass">✓</span> Flows WITH a-d-d §7/§9 and PROPOSES the pipeline + eye
+    without writing a-d-d — that lands via ~p + operator approval (Rule 10).</li>
+  <li><span class="pass">✓</span> Read-only invariant stated; no write-back path exists.</li>
+  <li><span class="pass">✓</span> Language law respected — C# confined to the zendesk-bridge
+    jacket; every stage after the boundary is C99 (Choice C rejected on exactly this law).</li>
+  <li><span class="pass">✓</span> Explicitly v2 — supersedes the 2026-07-09-1443 v1; states
+    what v1 got wrong (premise) and what it keeps (tab + contract bones).</li>
+  <li><span class="pass">✓</span> Evidence-based Need — every claim carries a measured number
+    (408,305 / 934,545 / 2.18M / 7 GB / ~10 RPM / eos=False / 2-ticket triples.tsv /
+    never-compiled sealer / 196 KB sample).</li>
+  <li><span class="fail">✗</span> Revised plan (~p) — not yet done. Next step: board the
+    First Move + the service/eye/mesh phases, get operator approval on the a-d-d proposal.</li>
+</ul>
+</div>
+
+</div>
+<footer>v0 &middot; r472 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"40d87e6c-5057-42fd-b341-18ea3c5b4216"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
