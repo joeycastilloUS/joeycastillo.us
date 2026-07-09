@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — Sign in with Zendesk (Argus tenant-agent login)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 26px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .banner { background:#2a2206; border:1px solid #5a4a1a; color:#ffd479; border-radius:8px; padding:10px 14px; font-weight:700; margin:16px 0; }
+  .story { background:#141c14; border:1px solid #24451f; color:#bfe6bf; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:14px; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color:#f59e0b; font-weight:600; } .fail { color:#ff6b6b; font-weight:600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~d Fable 5 — Sign in with Zendesk</span><span class="pub">Published 2026-07-08 21:51 PST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/620278d6-dcd9-4757-b053-1e176e386e69/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+<h1>Design — Sign in with Zendesk</h1>
+<p style="color:#8a8a8a;">A fourth login door for Argus: Mendo&#39;s Zendesk agents authenticate as their Zendesk identity. One new provider row, one non-OIDC branch, one access policy. Everything else is already built.</p>
+
+<div class="banner">Rule 11 — the fork, resolved up front: Argus auth is TWO LAYERS, not one. The sovereign-operator spine (Purcius key, Overlord auth, one operator per FQDN) is Layer 1 and is untouched. &ldquo;Zendesk users log in&rdquo; is Layer 2 — tenant-agent identity, many Mendo agents, scoped and read-mostly. This design builds Layer 2 as the credential the 2026-06-29 tenant-access model already anticipated. No drift; the layering is named in &sect;Shape.</div>
+
+<h2>1 &middot; Need</h2>
+<div data-cm="1-need" class="section">
+  <p>Mendo&#39;s support agents are the people Argus serves — the NPS boards, the Focus tab, the fired-reply audit trail are all about <em>their</em> tickets — yet not one of them can get in without the operator hand-adding their email to the Crew Allow-list. That&#39;s operator toil per head, a stale list the day someone joins or leaves, and zero identity attribution when an agent-facing action fires. Being an agent in Mendo&#39;s Zendesk instance should <b>be</b> the credential: Zendesk already knows who is a real agent, what their role is, and suspends them the day they leave. Why now: <code>zendesk-bridge</code> is live, the OAuth flow is built, and NPS attribution (tying a recovery reply to a verified agent) is the next thing the Focus work needs.</p>
+</div>
+
+<h2>2 &middot; Raw user stories</h2>
+<div data-cm="2-raw-user-stories" class="section">
+  <div class="story">As a <b>Mendo support agent</b>, I want to click &ldquo;Sign in with Zendesk&rdquo; and be in Argus as myself, so that I don&#39;t have to ask anyone to add my email first.</div>
+  <div class="story">As the <b>operator</b>, I want any current agent/admin in Mendo&#39;s Zendesk to get read access automatically — and lose it when Zendesk suspends them — so that I never maintain a per-person list for this tenant again.</div>
+  <div class="story">As the <b>operator</b>, I want writes (arming a Zora reply, changing config) to stay operator-gated regardless of who signed in, so that a new door never widens the blast radius.</div>
+  <div class="story">As an <b>auditor of a fired reply</b>, I want the session that triggered it stamped with a verified Zendesk identity (id, role), so that attribution is a fact, not a guess.</div>
+  <div class="story">As a <b>Zendesk end-user</b> (a customer, not an agent), I want nothing — and the design wants me hard-denied, so that customer accounts can never open Argus.</div>
+</div>
+
+<h2>3 &middot; Sourced solution</h2>
+<div data-cm="3-sourced-solution" class="section">
+  <p>Mined what exists first. Reuse beats invention — every piece below is named to its source:</p>
+  <table>
+    <tr><th>Source</th><th>What it gives this design</th></tr>
+    <tr><td><b>Provider-as-data OAuth flow</b> — <code>bridge/Program.cs:187-281</code>, <code>bridge/providers.json</code></td><td>The whole login/callback machine: CSRF state cookie, code&rarr;token exchange, member persist, Crew gate, session mint. Adding a door = one JSON row. <code>providers.json</code> already carries <code>"idToken": true</code> per provider — the exact seam for Zendesk&#39;s non-OIDC shape.</td></tr>
+    <tr><td><b>Session core</b> — <code>bridge/Auth.cs:26-48</code></td><td>The HMAC-signed opaque <code>argus_session</code> cookie (12h, HttpOnly). Zendesk logins mint the <em>same</em> cookie; no session change.</td></tr>
+    <tr><td><b>Crew Allow-list gate</b> — <code>bridge/Auth.cs:79-111</code></td><td>Fail-closed access check, login &ne; access. Stays intact for Google/Slack; the Zendesk door adds a <em>tenant policy</em> beside it (&sect;5), it does not replace it.</td></tr>
+    <tr><td><b>Tenant-access model</b> — <code>be/designs/2026-06-29-1550-design-argus-tenant-access-model.html</code></td><td>Tenant = the unit of access; <code>tenants/{slug}</code> doc; overlord tier above. Zendesk login is the natural <em>credential</em> for that tenant-agent layer — this design fills the slot that design left open.</td></tr>
+    <tr><td><b>Overlord auth</b> — <code>be/designs/2026-06-30-1608-design-overlord-auth.html</code> + PURL board</td><td>Layer 1, untouched. Purcius device key stays the sovereign path; this design never mints operator powers.</td></tr>
+    <tr><td><b>zendesk-bridge</b> — live, <code>ZBRIDGE</code> at <code>web/index.html:1700</code></td><td>Proves Mendo&#39;s subdomain + read-only connectivity. The login door does NOT live here (see collision flag, &sect;4) — but its configured subdomain is the one the provider row targets.</td></tr>
+    <tr><td><b>Front-end sign-in row</b> — <code>web/index.html:4204-4207</code>, <code>showMemberChip()</code></td><td>One more button next to Slack/Google. Chip already renders name/email.</td></tr>
+    <tr><td><b>Firestore members/sessions</b> — <code>Program.cs</code> callback</td><td>Member + session docs persist as-is; Zendesk adds <code>role</code> + <code>subdomain</code> fields (additive).</td></tr>
+  </table>
+  <p><b>The only NEW code</b> (all inside the existing C# jacket — this IS the foreign-API boundary, per the language law; nothing we own changes language):</p>
+  <ol>
+    <li><b>The userinfo branch.</b> Zendesk returns an opaque access token, not an OIDC <code>id_token</code>. When a provider row says <code>"idToken": false</code>, the callback makes one extra call — <code>GET /api/v2/users/me.json</code> with the token — and normalizes identity from that response (<code>id</code>, <code>name</code>, <code>email</code>, <code>role</code>) via the same <code>map</code> mechanism.</li>
+    <li><b>The tenant-agent access policy.</b> A pure function beside <code>EmailAllowed</code>: given the <code>/users/me</code> result and the tenant&#39;s policy doc, allow <code>role &isin; {agent, admin}</code> in the configured subdomain; deny <code>end-user</code>; fail-closed on anything else.</li>
+  </ol>
+  <p>Outside-world check: Zendesk&#39;s Authorization Code flow (<code>/oauth/authorizations/new</code> &rarr; <code>POST /oauth/tokens</code>, scope <code>read</code>) is standard and confirmed in the 2026-07-08 inspect. Scope minimization (<code>users:read</code> vs <code>read</code>) is verified against the live API in the plan, not guessed here.</p>
+</div>
+
+<h2>4 &middot; Name it true</h2>
+<div data-cm="4-name-it-true" class="section">
+  <table>
+    <tr><th>Thing</th><th>Literal name</th><th>Why / collisions</th></tr>
+    <tr><td>The provider row</td><td><code>zendesk</code> in <code>providers.json</code>, with <code>"idToken": false</code> + <code>"userinfoUrl"</code></td><td>Follows the existing id convention; env vars auto-derive as <code>ZENDESK_CLIENT_ID</code> / <code>ZENDESK_CLIENT_SECRET</code> (the <code>{P}_CLIENT_ID</code> pattern at <code>Program.cs:204</code>). Secret handled per Rule 4: operator pastes, Be installs.</td></tr>
+    <tr><td>The non-OIDC callback path</td><td><b>userinfo branch</b></td><td>It is literally the branch that calls the userinfo endpoint. Not &ldquo;identity adapter,&rdquo; not a plugin.</td></tr>
+    <tr><td>Identity key</td><td><code>zendesk:&lt;subdomain&gt;:&lt;userid&gt;</code> &mdash; e.g. <code>zendesk:mendocinofarms:12345</code></td><td>Built by the existing <code>Auth.IdentityKey("zendesk", "&lt;subdomain&gt;:&lt;userid&gt;")</code> — sub carries the subdomain so two Zendesk instances can never collide on a numeric id. <span class="warn">Flag:</span> <code>/auth/me</code> does <code>Split(':')[0]</code> for provider — still yields <code>zendesk</code>. Verified safe.</td></tr>
+    <tr><td>The access policy</td><td><b>tenant-agent policy</b>: <code>zendeskAccess</code> field on <code>tenants/{slug}</code> &mdash; <code>{ subdomain, allowRoles: ["agent","admin"] }</code></td><td>Lives on the tenant doc per the tenant-access model (one tenant record, not two). The pure resolver is <code>ZendeskAgentAllowed(userinfo, policy)</code> in <code>Auth.cs</code>, unit-tested with bare asserts like <code>EmailAllowed</code>.</td></tr>
+    <tr><td>Role &rarr; capability map</td><td><b>role stamp</b> (v1) &mdash; <code>role</code> stored on <code>members/{key}</code> + <code>sessions/{sid}</code></td><td>v1 stamps the role for attribution; it grants nothing. A real capability map (admin &gt; agent) is deferred until a feature needs it — named now so nobody invents &ldquo;permissions&rdquo; ad hoc.</td></tr>
+    <tr><td>Collision flag</td><td><code>zendesk-bridge</code> vs the <code>zendesk</code> provider</td><td><span class="warn">Two different things, same word.</span> <code>zendesk-bridge</code> = the read-only data proxy. The <code>zendesk</code> provider = a login door in the <em>argus bridge</em>. The door does NOT move into zendesk-bridge; auth stays where the session key lives.</td></tr>
+  </table>
+</div>
+
+<h2>5 &middot; Shape</h2>
+<div data-cm="5-shape" class="section">
+  <p>The two-layer model — the load-bearing structure of this design:</p>
+  <table>
+    <tr><th>Layer</th><th>Who</th><th>Credential</th><th>Access rule</th><th>Powers</th></tr>
+    <tr><td><b>1 &middot; Sovereign operator</b></td><td>Joey / overlord</td><td>Purcius device key (PURL board) &middot; legacy password until retired</td><td>Overlord list</td><td>Everything: config, arming writes, ceremony. <b>Untouched by this design.</b></td></tr>
+    <tr><td><b>2 &middot; Tenant agent</b> <span class="pass">NEW</span></td><td>Mendo Zendesk agents/admins</td><td>Sign in with Zendesk (this design) &middot; Google/Slack OIDC via Crew list</td><td>tenant-agent policy: <code>role &isin; allowRoles</code> in the tenant&#39;s subdomain, fail-closed</td><td>Read-mostly Argus. Gated writes remain operator-approved. Role stamped for attribution.</td></tr>
+  </table>
+  <p>Parts and boundaries:</p>
+  <ul>
+    <li><b>providers.json</b> — <code>zendesk</code> row: <code>authorizeUrl = https://&lt;subdomain&gt;.zendesk.com/oauth/authorizations/new</code>, <code>tokenUrl = .../oauth/tokens</code>, <code>scope = read</code> (minimize in plan), <code>idToken: false</code>, <code>userinfoUrl = .../api/v2/users/me.json</code>, <code>map = { sub:"id", name:"name", email:"email", role:"role" }</code>.</li>
+    <li><b>Callback (C# jacket)</b> — existing flow + userinfo branch: exchange code &rarr; opaque token &rarr; <code>GET /users/me</code> &rarr; normalize &rarr; tenant-agent policy &rarr; persist member (with <code>role</code>, <code>subdomain</code>) &rarr; mint the same <code>argus_session</code>. Token is used once for identity and <b>discarded</b> — Argus never stores a Zendesk access token; data reads keep flowing through zendesk-bridge&#39;s own credential.</li>
+    <li><b>Session shape unchanged</b> — payload stays <code>{sid}|{identityKey}|{email}</code>. Role lives in the Firestore session/member docs, not the signed cookie (the tenant-model design flagged cookie-shape changes as the one expensive reversal; we don&#39;t take that cost).</li>
+    <li><b>Auth URL home</b> — the callback registers as <code>https://&lt;fqdn&gt;/auth/zendesk/callback</code>, fronted by the Cloudflare Pages Function proxy per Operator-Identity canon (<code>AUTH_REDIRECT_BASE</code> already supports this; Cloud Run custom domains stay banned; no <code>*.run.app</code> in the Zendesk client registration).</li>
+    <li><b>Front-end</b> — one button in the sign-in row; <code>showMemberChip()</code> gains role display (&ldquo;Ana &middot; agent&rdquo;).</li>
+  </ul>
+  <p><b>Explicitly out of scope (v1):</b></p>
+  <ul>
+    <li>Role-tiered capabilities (admin vs agent inside Argus) — role stamp only.</li>
+    <li>Group-scoped access (specific Zendesk groups) — named escape route, not built.</li>
+    <li>Storing/refreshing Zendesk tokens, or any Zendesk <em>write</em> on behalf of the agent — never in this design; the no-live-write law stands.</li>
+    <li>Other tenants&#39; Zendesk instances — the policy is per-tenant data, so a second tenant is a doc + a client registration, but v1 configures exactly one (Mendo).</li>
+    <li>Purcius/overlord changes of any kind.</li>
+  </ul>
+</div>
+
+<h2>6 &middot; Choices + Consequences</h2>
+<div data-cm="6-choices-consequences" class="section">
+  <table>
+    <tr><th>Access-policy fork</th><th>2nd order</th><th>3rd order</th></tr>
+    <tr><td><b>(A) Agent-of-subdomain</b> — any <code>agent</code>/<code>admin</code> in Mendo&#39;s instance is in; <code>end-user</code> denied</td><td>Zero operator toil; offboarding is automatic (Zendesk suspension kills login — the next OAuth round-trip fails). New hires get in day one.</td><td>Access truth delegates to Mendo&#39;s Zendesk admin hygiene: a contractor granted agent role gets Argus too. Acceptable — they see tickets in Zendesk already, Argus shows derivatives of the same data.</td></tr>
+    <tr><td><b>(B) Explicit allow-list</b> — Zendesk login but Crew emails still gate</td><td>Keeps the exact toil this design exists to remove; the door adds nothing over Google OIDC.</td><td>Stale lists, day-one lockouts, operator becomes the help desk for the help desk.</td></tr>
+    <tr><td><b>(C) Group-scoped</b> — only named Zendesk groups get in</td><td>Precise, but imports Mendo&#39;s group taxonomy as config Argus must track.</td><td>Silent lockouts every time a Zendesk admin reshuffles groups; debugging lands on the operator.</td></tr>
+  </table>
+  <p><b>Pick: (A) agent-of-subdomain, roles <code>agent</code> + <code>admin</code>, fail-closed.</b> One line why: being a Mendo agent is exactly the population Argus serves, and Zendesk already does the joiner/leaver work — (B) re-creates the pain, (C) buys precision v1 doesn&#39;t need. The gated-write rule makes (A) safe: login grants eyes, never hands.</p>
+</div>
+
+<h2>7 &middot; Escape Routes</h2>
+<div data-cm="7-escape-routes" class="section">
+  <table>
+    <tr><th>Choice</th><th>Reversible?</th><th>Pull path</th></tr>
+    <tr><td>The whole Zendesk door</td><td><span class="pass">Yes — fully</span></td><td>Delete the <code>zendesk</code> row from <code>providers.json</code> + unset <code>ZENDESK_CLIENT_*</code>. The flow 404s on unknown provider (<code>Program.cs:203</code>); existing sessions expire in &le;12h; revoke the OAuth client in Zendesk Admin for a hard stop. No schema, no session, no other door touched.</td></tr>
+    <tr><td>Policy (A) agent-of-subdomain</td><td><span class="pass">Yes — data-only</span></td><td>Tighten <code>zendeskAccess.allowRoles</code> to <code>["admin"]</code>, or add a <code>allowGroups</code> field (escape to fork C), or layer <code>EmailAllowed</code> back on top (escape to fork B). All are edits to the tenant doc + the pure resolver; no flow change.</td></tr>
+    <tr><td>Role stamp without capability map</td><td><span class="pass">Yes — additive</span></td><td>Role is already persisted; a future capability map reads it. Nothing to undo.</td></tr>
+    <tr><td>Identity-key shape <code>zendesk:&lt;subdomain&gt;:&lt;userid&gt;</code></td><td><span class="warn">Sticky by design</span></td><td>Keys land in <code>members/</code> docs. Changing the shape later means member-doc migration — so the shape is chosen collision-proof <em>now</em> (subdomain embedded). This is the one choice to get right the first time, and it is.</td></tr>
+  </table>
+</div>
+
+<h2>8 &middot; First Move</h2>
+<div data-cm="8-first-move" class="section">
+  <p>The single smallest step that proves the design — one real round-trip, zero writes armed:</p>
+  <ol>
+    <li>Register one OAuth client in Mendo&#39;s Zendesk Admin (redirect: <code>https://&lt;fqdn&gt;/auth/zendesk/callback</code>); operator pastes id + secret, Be installs (<code>setx</code>, Rule 4).</li>
+    <li>Add the <code>zendesk</code> provider row + the userinfo branch + <code>ZendeskAgentAllowed</code> (with bare asserts: agent&rarr;in, admin&rarr;in, end-user&rarr;denied, wrong-subdomain&rarr;denied, malformed&rarr;denied).</li>
+    <li>One real Mendo agent clicks the button and lands in Argus: member chip shows their <b>name + role</b>, <code>members/</code> doc carries <code>zendesk:&lt;subdomain&gt;:&lt;id&gt;</code> + role stamp, and every write path is still operator-gated. One end-user account tries and gets the clean denial.</li>
+  </ol>
+  <p>If that round-trip lands, the design is real. <b>These go into the plan:</b> scope minimization against the live API (<code>read</code> vs narrower), the sign-in button + chip role display, denial UX copy, attribution wiring into the fired-reply audit trail, the deferred role&rarr;capability map, second-tenant generalization, and JWKS/token-hardening alignment with the existing v2 auth list.</p>
+</div>
+
+<h2>Definition of Done</h2>
+<div data-cm="definition-of-done" class="section">
+  <ul>
+    <li><span class="pass">&#10003;</span> A-D-D verified — inspect evidence read (<code>2026-07-08-2151-inspect</code>); tenant-access model + Overlord auth built ON, not around; two-layer fork named per Rule 11</li>
+    <li><span class="pass">&#10003;</span> Six-section spine complete + Choices/Consequences + Escape Routes (design earns them: load-bearing auth choice)</li>
+    <li><span class="pass">&#10003;</span> Sourced solution mines existing first — only new code is the userinfo branch + tenant-agent policy, both inside the C# jacket (language law holds)</li>
+    <li><span class="pass">&#10003;</span> Names literal, collisions flagged (<code>zendesk-bridge</code> vs <code>zendesk</code> provider; <code>/auth/me</code> split verified)</li>
+    <li><span class="pass">&#10003;</span> Auth home on <code>&lt;fqdn&gt;/auth/*</code> per Operator-Identity canon; no Cloud Run custom domains; secrets per Rule 4</li>
+    <li><span class="pass">&#10003;</span> Design-only — no source edits, no board writes, no commits (parent handles git)</li>
+    <li><span class="warn">&#9888;</span> Awaiting operator call on policy pick (A) before <code>~p</code> — one decision, named in &sect;6</li>
+  </ul>
+</div>
+
+</div>
+<footer>v0 &middot; r465 &middot; 2026-07-08 &middot; Be &middot; argus &middot; Fable 5</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"620278d6-dcd9-4757-b053-1e176e386e69"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>

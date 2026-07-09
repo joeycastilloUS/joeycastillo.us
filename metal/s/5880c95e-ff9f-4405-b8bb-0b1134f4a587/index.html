@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inspect — Can Zendesk users log in to Argus?</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 26px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .verdict { background:#0f2617; border:1px solid #24451f; color:#bfe6bf; border-radius:8px; padding:14px 16px; font-weight:700; margin:16px 0; font-size:15px; }
+  .flag { background:#2a2206; border:1px solid #5a4a1a; color:#ffd479; border-radius:8px; padding:10px 14px; margin:16px 0; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .yes { color: #22c55e; font-weight: 600; } .warn { color:#f59e0b; font-weight:600; } .no { color:#ff6b6b; font-weight:600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~i — Can Zendesk users log in to Argus?</span><span class="pub">Published 2026-07-08 21:51 PST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/5880c95e-ff9f-4405-b8bb-0b1134f4a587/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+<h1>Inspect — Can Zendesk users log in to Argus?</h1>
+<div class="verdict">VERDICT: YES — and it&#39;s mostly already built. Adding &ldquo;Sign in with Zendesk&rdquo; is a <b>third OAuth door</b> on plumbing Argus already runs, not a new auth system. The one thing to decide is a <b>policy question</b>, not a technical one: does being an agent in Mendo&#39;s Zendesk grant access, and to what.</div>
+
+<h2>The Question</h2>
+<div data-cm="the-question" class="section">
+  <p>Operator ask: <em>&ldquo;add the ability for Zendesk users to log in&hellip; is this a possibility?&rdquo;</em> Read literally: let a person who has a Zendesk account (a Mendo support agent) authenticate into Argus <b>as their Zendesk identity</b> &mdash; &ldquo;Sign in with Zendesk&rdquo; &mdash; rather than being hand-added to an allow-list.</p>
+</div>
+
+<h2>What already exists (the 80%)</h2>
+<div data-cm="what-already-exists-the-80" class="section">
+  <p>Argus is <b>not</b> starting from zero. The bridge already runs a provider-as-data OAuth flow, built for Google + Slack. A Zendesk login reuses every piece of it:</p>
+  <table>
+    <tr><th>Piece</th><th>State today</th><th>Source</th></tr>
+    <tr><td>OAuth login/callback flow</td><td><span class="yes">BUILT</span> &mdash; <code>GET /auth/{p}/login</code> &rarr; provider &rarr; <code>GET /auth/{p}/callback</code> (code&rarr;token exchange)</td><td><code>bridge/Program.cs:187-281</code></td></tr>
+    <tr><td>Opaque session cookie</td><td><span class="yes">BUILT</span> &mdash; HMAC-signed <code>argus_session</code>, 12h, HttpOnly; all three login paths mint the same one</td><td><code>bridge/Auth.cs:26-48</code></td></tr>
+    <tr><td>Access gate</td><td><span class="yes">BUILT</span> &mdash; Crew Allow-list (email / <code>@domain</code>), fail-closed</td><td><code>bridge/Auth.cs:79-111</code></td></tr>
+    <tr><td>Member + session persistence</td><td><span class="yes">BUILT</span> &mdash; Firestore <code>members/{id}</code> + <code>sessions/{id}</code></td><td><code>Program.cs</code> callback</td></tr>
+    <tr><td>Front-end sign-in buttons</td><td><span class="yes">BUILT</span> &mdash; Slack + Google buttons, <code>showMemberChip()</code>, logout</td><td><code>web/index.html:4204-4207</code></td></tr>
+    <tr><td>Zendesk connectivity</td><td><span class="yes">LIVE</span> &mdash; <code>zendesk-bridge</code> already proxies Mendo&#39;s Zendesk read-only</td><td><code>web/index.html:1700</code> (<code>ZBRIDGE</code>)</td></tr>
+  </table>
+  <p>Login already exists three ways: a legacy operator password, Google/Slack OIDC (built, awaiting client secrets), and Purcius device-key (the sovereign-operator path, 90% wired on the active <b>PURL</b> board). They all converge on one session cookie. A Zendesk door drops into the same convergence.</p>
+</div>
+
+<h2>What Zendesk provides</h2>
+<div data-cm="what-zendesk-provides" class="section">
+  <p>Zendesk is a first-class <b>OAuth 2.0 provider</b>. The Authorization-Code flow is standard and well-documented:</p>
+  <ol>
+    <li>Register an OAuth client in Zendesk Admin (<code>Apps &amp; integrations &rarr; APIs &rarr; OAuth Clients</code>) &mdash; yields a client id/secret + redirect URI.</li>
+    <li>Redirect the user to <code>https://&lt;subdomain&gt;.zendesk.com/oauth/authorizations/new?response_type=code&amp;client_id=&hellip;&amp;scope=read</code>.</li>
+    <li>Exchange the returned code at <code>POST /oauth/tokens</code> for an access token.</li>
+    <li>Fetch the authenticated identity with <code>GET /api/v2/users/me.json</code> &rarr; returns <b>id, name, email, role</b> (<code>end-user</code> / <code>agent</code> / <code>admin</code>) and group memberships.</li>
+  </ol>
+  <div class="flag"><b>The one real difference from Google/Slack:</b> Zendesk&#39;s token endpoint returns an <b>opaque access token, not an OIDC <code>id_token</code> JWT</b>. So the callback can&#39;t decode identity from the token &mdash; it makes one extra call to <code>/users/me</code>. That&#39;s a small, well-contained branch in the existing callback, not a new mechanism.</div>
+  <p><b>Bonus that Google/Slack can&#39;t give:</b> a Zendesk login tells you the person <b>is a real agent in Mendo&#39;s instance</b>, and hands you their <b>role and groups</b> for free. That is exactly the population Argus serves. It also ties an operator action (e.g. firing a Zora recovery reply on the NPS boards) to a verified Zendesk identity &mdash; attribution the current password/allow-list model doesn&#39;t have.</p>
+</div>
+
+<h2>The actual delta (the 20%)</h2>
+<div data-cm="the-actual-delta-the-20" class="section">
+  <ul>
+    <li><b>Register</b> one Zendesk OAuth client for Mendo&#39;s subdomain (secret handled per Rule 4: operator pastes, Be installs).</li>
+    <li><b>Add a <code>zendesk</code> provider</b> to the providers-as-data list with a non-OIDC branch: exchange code &rarr; call <code>/users/me</code> &rarr; build the member from that.</li>
+    <li><b>Decide the access policy</b> (the real question, see fork): allow-list of emails, OR &ldquo;any <code>agent</code>/<code>admin</code> in subdomain <code>X</code>,&rdquo; OR role/group-scoped.</li>
+    <li><b>Add the button</b> to the web sign-in row &mdash; one line next to Slack/Google.</li>
+    <li><b>Map Zendesk role &rarr; Argus capability</b> if we want tiered access (admin vs agent vs end-user).</li>
+  </ul>
+</div>
+
+<h2>The fork to settle in ~d (flag per Rule 11)</h2>
+<div data-cm="the-fork-to-settle-in" class="section">
+  <p>Argus&#39;s auth spine has been building toward <b>one sovereign operator per FQDN</b> &mdash; the Purcius key, the <code>2026-06-30 Overlord-auth</code> &ldquo;you log in AS your domain&rdquo; model, and the Operator-Identity canon (one login app per operator). &ldquo;Zendesk users log in&rdquo; is <b>multi-user tenant identity</b> &mdash; many Mendo agents. These are not in conflict, but they are <b>two different layers</b> and the design must name them or they drift:</p>
+  <table>
+    <tr><th>Layer</th><th>Who</th><th>Credential</th><th>Powers</th></tr>
+    <tr><td>Sovereign operator</td><td>Joey / the overlord</td><td>Purcius device key (PURL board)</td><td>Everything &mdash; config, arming writes, ceremony</td></tr>
+    <tr><td>Tenant agent (NEW)</td><td>Mendo Zendesk agents</td><td>Sign in with Zendesk</td><td>Scoped, read-mostly; gated writes stay operator-approved</td></tr>
+  </table>
+  <p>There is directly-relevant prior art to build on, not around: <code>2026-06-29-1550-design-argus-tenant-access-model.html</code> (tenant = unit of access; domain&rarr;Crew + global overlord) and <code>2026-06-29-1658</code> zendesk-bridge. The Zendesk login is the natural <b>credential</b> for the tenant-agent layer that model already anticipates.</p>
+</div>
+
+<h2>Open questions (for ~d / Rule 6)</h2>
+<div data-cm="open-questions-for-d-rule" class="section">
+  <ul>
+    <li><b>Access policy</b> &mdash; is agent-of-subdomain sufficient, or does the operator still want an explicit allow-list on top? (Recommend: agent/admin role in Mendo&#39;s subdomain = in; end-users excluded.)</li>
+    <li><b>Scope minimization</b> &mdash; smallest Zendesk OAuth scope that still returns role + groups (likely <code>read</code>); confirm against the live API, don&#39;t guess.</li>
+    <li><b>Where auth lives</b> &mdash; Operator-Identity canon says <code>&lt;fqdn&gt;/auth/*</code> on the operator&#39;s FQDN via a Pages-Function proxy (Cloud Run custom domains banned). Zendesk callback URL must land there, not on <code>*.run.app</code>.</li>
+    <li><b>Role &rarr; capability map</b> &mdash; do admins get more than agents inside Argus? Or is login just &ldquo;are you real,&rdquo; with the operator still gating every write?</li>
+    <li><b>Session identity shape</b> &mdash; today the payload is <code>{sessionId}|{identityKey}|{email}</code>; a Zendesk member wants <code>zendesk:&lt;subdomain&gt;:&lt;userid&gt;</code> as the identity key + role stamped for later attribution.</li>
+  </ul>
+</div>
+
+<h2>Definition of Done</h2>
+<div data-cm="definition-of-done" class="section"><ul>
+  <li><span class="yes">&#10003;</span> Feasibility answered with evidence (file:line references to the built OAuth flow, session, gate)</li>
+  <li><span class="yes">&#10003;</span> Zendesk OAuth capability confirmed (authorize / token / <code>/users/me</code> shape)</li>
+  <li><span class="yes">&#10003;</span> Delta scoped (what&#39;s reused vs new) + the multi-user-vs-sovereign fork flagged for <code>~d</code> (Rule 11)</li>
+  <li><span class="yes">&#10003;</span> Open questions named for the design (Rule 6)</li>
+  <li><span class="yes">&#10003;</span> Read-only inspect &mdash; no source touched; report saved, indexed, committed, pushed</li>
+</ul></div>
+</div>
+<footer>v0 &middot; r465 &middot; 2026-07-08 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"5880c95e-ff9f-4405-b8bb-0b1134f4a587"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
