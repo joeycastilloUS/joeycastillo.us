@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build — Watch tab (WATCH1)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 26px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .banner { background:#0f2617; border:1px solid #24451f; color:#bfe6bf; border-radius:8px; padding:12px 16px; font-weight:700; margin:16px 0; }
+  .flag { background:#2a2206; border:1px solid #5a4a1a; color:#ffd479; border-radius:8px; padding:10px 14px; margin:16px 0; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  .pass { color: #22c55e; font-weight: 600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~a — Watch tab (WATCH1)</span><span class="pub">Published 2026-07-09 16:21 PST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/c8ccaa66-4e42-44a8-ae8c-2bac121e1f1b/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+<h1>Build — Watch tab</h1>
+<div class="banner">Board WATCH1 COMPLETE. The llm-free connectivity watcher now has a face in the console: a live Watch tab that makes device silence visible. LIVE at argus.com.ai/app.</div>
+
+<h2>What Was Added</h2>
+<div data-cm="what-was-added" class="section">
+  <p>A read-only <b>Watch</b> tab in the Argus (meraki) console that fetches <code>gcp-bridge /watch/state</code> and renders one card per watched device:</p>
+  <ul>
+    <li>Color-coded verdict badge &mdash; <span style="color:#7CFFB2">OK</span> / <span style="color:#ffce85">FLAPPING</span> / <span style="color:#ff6b6b">OFFLINE</span></li>
+    <li>flaps, offlineMin, status, humanized lastSeen + checkedAt</li>
+    <li><b>Staleness banner</b> (&gt;15 min since last check) &mdash; the tab&#39;s whole point: a stalled scheduler shows as stale, not as false calm</li>
+    <li>45s auto-refresh while the tab is visible; empty + fetch-error states; read-only GETs only</li>
+  </ul>
+  <p>Built on the existing <code>GBRIDGE</code> const and modeled byte-for-byte on the Templates tab pattern. The <code>/watch/state</code> endpoint is open (no auth); no write path anywhere.</p>
+</div>
+
+<div class="flag"><b>Operator flag (Rule 13):</b> the live <code>/watch/state</code> shows <code>checkedAt</code> ~37h old (last check 2026-07-08 03:25Z). The Watch tab correctly renders this as STALE. That staleness suggests the <b>Cloud Scheduler <code>marina-handheld-watch</code> may have stopped firing</b> &mdash; worth a look (the tab just made it visible, which is exactly its job). Separate from this build.</div>
+
+<h2>Decisions</h2>
+<div data-cm="decisions" class="section"><ul>
+  <li>Deliberate exception to the console&#39;s &ldquo;fetch on click only&rdquo; rule &mdash; a live monitor must auto-refresh; commented as such.</li>
+  <li>No auth header on the open endpoint (also avoids a needless CORS preflight).</li>
+  <li>Strings coerced (the endpoint returns flaps/offlineMin as strings).</li>
+</ul></div>
+
+<h2>Files Changed</h2>
+<div data-cm="files-changed" class="section"><p><code>web/index.html</code> (+112/&minus;3): tab registration, nav entry w/ non-OK count badge, <code>watchPane()</code> + loader/card/render helpers, scoped CSS, 45s poll. via argus <code>147b6f3</code>.</p></div>
+
+<h2>Definition of Done</h2>
+<div data-cm="definition-of-done" class="section"><ul>
+  <li><span class="pass">&#10003;</span> Built to the verified live <code>/watch/state</code> shape (read it, didn&#39;t guess)</li>
+  <li><span class="pass">&#10003;</span> Read-only; node --check clean</li>
+  <li><span class="pass">&#10003;</span> Shipped to production &mdash; edge-verified build <code>147b6f3</code> + <code>watchPane</code> in served HTML at argus.com.ai/app</li>
+  <li><span class="pass">&#10003;</span> Board WATCH1 complete; committed + pushed; indexed; commentable cap-URL (Latchkey)</li>
+  <li><span class="pass">&#10003;</span> Surfaced the stale-scheduler signal the tab exposed (operator flag above)</li>
+</ul></div>
+</div>
+<footer>v0 &middot; r479 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"c8ccaa66-4e42-44a8-ae8c-2bac121e1f1b"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
