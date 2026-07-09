@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design &mdash; Zendesk → Raw IDS: an import tool in Argus</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 27px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 15px; margin: 18px 0 6px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .optional h2 { border-bottom-style: dashed; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:14px 16px; overflow-x:auto; color:#bcd; font-size:12.5px; font-family:Consolas,monospace; margin:12px 0; line-height:1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; } .fail { color:#ff6b6b; font-weight:600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~d — Zendesk → Raw IDS: an import tool in Argus</span><span class="pub">Published 2026-07-09 14:43 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/172891a7-f68c-40e7-adac-5b8688167a0f/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Zendesk → Raw IDS: an import tool in Argus</h1>
+<p>Give the blessed import an operational home: a first tab in the Zendesk app + a small C99
+import service. Decouple <em>landing the raw</em> from mesh residency and NPS-derive. Ship the
+boring blessed thing first.</p>
+
+<!-- ============================================================ 1. NEED -->
+<div class="section">
+<h2>1. Need</h2>
+<p>The operator wants ALL of Zendesk in a sealed Raw IDS so the system can replay from it
+forever. The architecture is already blessed (<code>ARCHITECTURE.md</code> §7, operator-directed
+2026-07-04: <em>"import once to raw sealed IDS… then run replays on the raw and always
+refresh/get-latest"</em>) and already proven at v0: <strong>1,000 Mendo tickets → 5,002 triples,
+round-trip clean</strong>. And yet the full import keeps not landing. Three evidenced causes:</p>
+<ol>
+  <li><strong>No home.</strong> The importer is loose C99 in a <em>sibling</em> repo —
+    <code>C:\mendo-zendesk-ai\be\tools\</code> (<code>raw_import.c</code>, <code>derive.c</code>,
+    <code>derive_prog.c</code>, <code>scrub_derive.c</code>, <code>replay.c</code>,
+    <code>retrieve.c</code>, <code>ticket_json.c</code>, <code>program.c</code>,
+    <code>qstore.c</code>). Never wired into the Argus console. Every run is a hand-driven C
+    invocation in a side directory — no button, no progress view, no resume surface. It dies
+    when the session ends.</li>
+  <li><strong>Tangled + gated.</strong> The full pull got bundled into an AWAITING-APPROVAL
+    chain (board L1→L2→L3 + the 07-08 design) alongside mesh residency (content-address +
+    manifest signal + bulk channel) AND NPS-derive / Focus-demoware-kill. The simple blessed
+    thing — land the full raw — can't ship on its own because it's chained behind ambitious
+    things.</li>
+  <li><strong>Long job, nothing to watch.</strong> Zendesk incremental export runs
+    <strong>~10 RPM</strong>; a full-history pull is real wall-clock. With no operator surface
+    to start / watch / resume it, it stalls every time.</li>
+</ol>
+<p><strong>The reframe:</strong> decouple landing-the-raw from the mesh + NPS ambitions, and
+give the import an operational home — a tab in the Argus Zendesk app driving a small C99
+import service. Mesh residency and derive-nps come later, <em>off the already-landed raw</em>.
+Why now: every downstream board (NPS, Focus-real-data, audit) is blocked on the same missing
+artifact. Land it once and everything else becomes a decoder pass.</p>
+</div>
+
+<!-- ============================================================ 2. RAW USER STORIES -->
+<div class="section">
+<h2>2. Raw User Stories</h2>
+<ul data-cm="1-need">
+  <li>As the operator, I want to click <strong>Import all</strong> in the Argus console and
+    walk away, so that the full Zendesk history lands without me babysitting a C invocation
+    in a side repo.</li>
+  <li>As the operator, I want to <strong>watch</strong> the pull live — tickets/comments
+    pulled, current cursor, triples written, elapsed, ETA at ~10 RPM — so that a long job is
+    a progress bar, not a leap of faith.</li>
+  <li>As the operator, I want <strong>Refresh</strong> to resume from the stored cursor, so
+    that a closed laptop or a killed session costs nothing.</li>
+  <li>As the operator, I want to pick a real ticket and <strong>Replay</strong> its actual
+    thread from the raw, inside the console, so that I can see with my own eyes the raw is
+    real, not a claim.</li>
+  <li>As the operator, I want the standing raw shown as a first-class thing — count, seal,
+    last-refresh, cursor — so that "do we have the data?" is a glance, not an archaeology dig.</li>
+  <li>As the operator, I want a bad pull to be droppable and re-runnable without fear, so
+    that importing is boring.</li>
+</ul>
+</div>
+
+<!-- ============================================================ 3. SOURCED SOLUTION -->
+<div class="section">
+<h2>3. Sourced Solution</h2>
+<p>Mined in order before inventing. Almost everything already exists; the new part is small.</p>
+<table>
+  <tr><th>Source</th><th>What it gives</th><th>Verdict</th></tr>
+  <tr>
+    <td>argus <code>a-d-d</code> §7 — Raw IDS</td>
+    <td>The blessed architecture verbatim: import-once RAW sealed IDS, <em>one writer</em>,
+      append-only + provenance (cursor, wall-clock, endpoint, count), refresh via incremental
+      cursor, derived = many, rebuildable / versioned-against-decoder / cheap-to-add.</td>
+    <td><strong>REUSE</strong> — execute it, now with a home.</td>
+  </tr>
+  <tr>
+    <td><code>C:\mendo-zendesk-ai\be\tools\</code></td>
+    <td>The whole v0 pipeline, proven on 1,000 tickets: <code>raw_import.c</code> (writes the
+      sealed store), <code>derive*.c</code> (raw→.pi), <code>replay.c</code>,
+      <code>retrieve.c</code>, <code>ticket_json.c</code>, <code>program.c</code>,
+      <code>qstore.c</code>; manifest.json provenance.</td>
+    <td><strong>REUSE — PROMOTE</strong> into argus; scale inputs; comments become first-class
+      <code>comment:&lt;id&gt;</code> subjects.</td>
+  </tr>
+  <tr>
+    <td>nous (kastil-systems, C99 primitives)</td>
+    <td><code>understand()</code> decoder (generic skill — domain is .pi, not C, per §8), the
+      sealed append-only encrypted <code>triple_store</code>, the wire protocol.</td>
+    <td><strong>REUSE</strong> — load-bearing, ours.</td>
+  </tr>
+  <tr>
+    <td><code>acmedevUS/zendesk-bridge</code> (live Cloud Run, C# jacket)</td>
+    <td>The read surface: <code>incremental/ticket_events.json?start_time=0&amp;include=comment_events</code>
+      = full history WITH comments (cursor, <code>end_of_stream</code>); plus
+      <code>ticket-comments</code>, <code>tickets</code>, <code>satisfaction_ratings</code> (CSAT).</td>
+    <td><strong>REUSE</strong> — fetch stays jacketed at the boundary (language law); everything
+      after it is C99/ours.</td>
+  </tr>
+  <tr>
+    <td>07-08 design (<code>be/designs/2026-07-08-1846-design-nps-raw-ids-in-the-mesh-fable5.html</code>)</td>
+    <td>The full ambition: raw-in-the-mesh + derive-nps + Focus real data.</td>
+    <td><strong>SUPERSEDE its sequencing</strong> (architecture stands): carve out the simple
+      blessed core — import → sealed raw + refresh + prove-one-replay — as the
+      shippable-now tool; DEFER mesh residency + derive-nps to downstream boards off the
+      landed raw. Decoupled because the raw is the dependency of both ambitions, not the
+      reverse.</td>
+  </tr>
+  <tr>
+    <td>argus <code>a-d-d/patterns/</code> — Slot</td>
+    <td>Self-contained capability + operator surface.</td>
+    <td><strong>FITS</strong> — the import is a Slot: generic capability (pull → seal → replay),
+      the tab is its console surface. Applied, not forced.</td>
+  </tr>
+</table>
+
+<pre>
+Zendesk (production, foreign — READ ONLY)
+   │
+   ▼
+zendesk-bridge ·· C# jacket, existing Cloud Run
+   │  incremental/ticket_events.json?start_time=&lt;cursor&gt;&amp;include=comment_events
+   ▼
+import service ·· C99 (promoted raw_import.c + friends)
+   │  one writer · append-only · provenance per batch      /import/start
+   ▼                                                       /import/status ◀─ polls ─ Raw IDS tab
+sealed Raw IDS ·· nous triple_store                        /import/replay?ticket=      (Argus console)
+   │                                                        Import all · Refresh · Replay
+   ▼
+replay.c / retrieve.c ·· decode one ticket's real thread → trace in the tab
+</pre>
+
+<p><strong>NEW vs REUSE, honestly:</strong> NEW is only (a) the operational home — the tab +
+the small import service around the promoted code — and (b) the decoupling decision itself.
+REUSE is everything load-bearing: the architecture (§7), the pipeline (v0 tools), the store
+(nous), the read surface (zendesk-bridge). Nothing is invented that a source already provides.</p>
+</div>
+
+<!-- ============================================================ 4. NAMING -->
+<div class="section">
+<h2>4. Naming</h2>
+<table data-cm="3-sourced-solution">
+  <tr><th>Thing</th><th>Name</th><th>Why / collisions</th></tr>
+  <tr>
+    <td>The tab (first tab, Zendesk app)</td>
+    <td><strong>Raw IDS</strong> (key <code>rawids</code>)</td>
+    <td>The tab owns the <em>standing artifact</em>, not just the verb — importing is one
+      button on it; watching, refreshing, and replaying the raw are the everyday uses.
+      "Import" would name the tool after its rarest action. §7's own term, reused
+      deliberately. No collision in the existing tab set
+      (<code>focus, programs, templates, comments, zdaudit, apibrowser</code>).</td>
+  </tr>
+  <tr>
+    <td>The service</td>
+    <td><strong>import service</strong> (repo/deploy name <code>zendesk-raw-import</code>)</td>
+    <td>Literal: it imports Zendesk into the raw. <span class="warn">Collision flagged:</span>
+      "importer" vs "bridge" — the <em>bridge</em> reads the foreign API (C# jacket); the
+      <em>import service</em> orchestrates, writes the seal, owns the cursor (C99). Two names,
+      two jobs, one boundary between them.</td>
+  </tr>
+  <tr>
+    <td>Comment subjects</td>
+    <td><code>comment:&lt;id&gt;</code></td>
+    <td>First-class raw subjects, same shape as <code>ticket:&lt;id&gt;</code> in the v0 store.</td>
+  </tr>
+  <tr>
+    <td>Cursor / batch provenance</td>
+    <td><code>import:cursor</code>, <code>batch:&lt;n&gt;</code></td>
+    <td>Stored <em>in</em> the raw per §7 (cursor, wall-clock, endpoint, count) — the store
+      carries its own resume point.</td>
+  </tr>
+</table>
+<p>No cute names. The standing artifact is the <strong>Raw IDS</strong> — one term, kernel to
+console.</p>
+</div>
+
+<!-- ============================================================ 5. SHAPE -->
+<div class="section">
+<h2>5. Shape</h2>
+<p>Minimum viable structure — six pieces, five of them mostly existing:</p>
+<ol>
+  <li><strong>The tab.</strong> <code>rawids</code> becomes the FIRST tab in the Zendesk app
+    (<code>web/index.html</code> APPS registry, line 577). Three panels:
+    <em>Standing raw</em> (triple count, seal/hash, last-refresh, stored cursor) ·
+    <em>Live progress</em> during a pull (tickets/comments pulled, current cursor, triples
+    written, elapsed, ETA computed from cursor progress at ~10 RPM) ·
+    <em>Actions</em>: <strong>Import all</strong> (full pull from <code>start_time=0</code>),
+    <strong>Refresh</strong> (incremental from stored cursor), <strong>Replay</strong>
+    (pick a ticket → decoded real thread → trace shown inline).</li>
+  <li><strong>The import service (C99).</strong> One small service, one contract:
+    <code>/import/start</code>, <code>/import/status</code>,
+    <code>/import/replay?ticket=</code>. It drives zendesk-bridge for reads, writes the
+    sealed raw, stores the cursor in the raw, survives the browser closing. Home decision in
+    Choices below. Crucially: the tab talks only to this contract — <em>where</em> the
+    contract is served (localhost vs Cloud Run) is swappable.</li>
+  <li><strong>The promoted C99 tools.</strong> <code>raw_import.c</code>,
+    <code>replay.c</code>, <code>retrieve.c</code>, <code>ticket_json.c</code>,
+    <code>program.c</code>, <code>qstore.c</code> move from
+    <code>mendo-zendesk-ai/be/tools/</code> into argus (<code>src/import/</code>) — they
+    stop being a side-repo secret and become the service's body. <code>derive*.c</code>
+    comes along but stays downstream (it reads the raw; it is not the import).</li>
+  <li><strong>The read path.</strong> zendesk-bridge as-is:
+    <code>incremental/ticket_events.json?start_time=&lt;cursor&gt;&amp;include=comment_events</code>
+    pages the full history with comments until <code>end_of_stream</code>. No new bridge
+    endpoints needed for tickets+comments.</li>
+  <li><strong>The sealed raw.</strong> One nous triple_store, one writer (the import service),
+    append-only, per-batch provenance per §7. <code>ticket:&lt;id&gt;</code> +
+    <code>comment:&lt;id&gt;</code> subjects.</li>
+  <li><strong>Refresh + replay-one proof.</strong> Refresh = read cursor → incremental →
+    append → new cursor. Replay = decode one real ticket's thread from the raw and render
+    the trace in the tab — the console-native proof the raw is real and replayable.</li>
+</ol>
+<h3>Invariants</h3>
+<ul>
+  <li><strong>Read-only:</strong> the import READS Zendesk and WRITES only the local sealed
+    raw. It never writes back to Zendesk. No write path exists to disarm.</li>
+  <li><strong>Language law:</strong> C# exists only in the zendesk-bridge jacket at the
+    foreign boundary. Importer, store, replay, service — all C99, all ours.</li>
+</ul>
+<h3>Out of scope (YAGNI — deferred to downstream boards off the landed raw)</h3>
+<ul>
+  <li><span class="fail">✗</span> Mesh residency (content-address, manifest signal, bulk channel).</li>
+  <li><span class="fail">✗</span> derive-nps / Focus real-data wiring.</li>
+  <li><span class="fail">✗</span> Full config-object walk (triggers, automations, macros,
+    SLAs, forms) beyond tickets+comments — §7 wants it eventually; the raw's append-only
+    shape means adding it later costs nothing now.</li>
+</ul>
+</div>
+
+<!-- ============================================================ 6. FIRST MOVE -->
+<div class="section">
+<h2>6. First Move</h2>
+<p><strong>Prove the thinnest path end-to-end, bounded.</strong> Promote
+<code>raw_import.c</code> (+ <code>replay.c</code>, <code>retrieve.c</code>,
+<code>ticket_json.c</code>) into <code>argus/src/import/</code>, wrap the
+<code>/import/start | /import/status | /import/replay</code> contract around them, run the
+service on localhost, and drive a <em>bounded</em> pull — the last 30 days of tickets WITH
+comment events — through zendesk-bridge into a fresh sealed raw. Then, in the new Raw IDS tab,
+watch the progress land and <strong>replay ONE real ticket</strong> — real comments, real
+thread, decoded from the raw, rendered in the console.</p>
+<p>Not the whole corpus. The full <code>start_time=0</code> pull is the <em>second</em> move —
+it starts the moment the pipe is proven watchable and cursor-resumable, and by then it's just
+a bigger number on the same progress bar.</p>
+</div>
+
+<!-- ============================================================ CHOICES -->
+<div class="section optional">
+<h2>Choices + Consequences <span class="tag">earned — load-bearing fork</span></h2>
+<h3>Where does the importer live? (the "home" decision)</h3>
+<table>
+  <tr><th></th><th>A — C99 import service (own Cloud Run)</th><th>B — Local runner, tab as viewer</th></tr>
+  <tr>
+    <td>1st order</td>
+    <td>Job survives closed browser, closed laptop, ended session. Start from any machine,
+      watch from any machine.</td>
+    <td>Zero new infrastructure. Runs today with the promoted binaries.</td>
+  </tr>
+  <tr>
+    <td>2nd order</td>
+    <td>Mirrors the one-service-per-source pattern (bridge already lives there); the raw
+      accrues in a place other services can later read (mesh board inherits a running start).
+      Cost: another Cloud Run service to stand up, deploy, and keep honest — plus the sealed
+      raw now lives off-box, which changes how replay/derive tools reach it.</td>
+    <td>The job dies with the session — which is <em>cause #1 and #3 of this design's Need</em>,
+      re-created with a nicer UI. A multi-hour ~10 RPM pull on an operator box is exactly the
+      thing that has stalled every time.</td>
+  </tr>
+  <tr>
+    <td>3rd order</td>
+    <td>The import becomes an operational fact of Argus, not an operator habit — refresh can
+      later be scheduled, and downstream boards trust the raw exists without asking whose
+      laptop it's on.</td>
+    <td>The raw's existence stays coupled to one person's uptime; every downstream board
+      inherits that fragility.</td>
+  </tr>
+</table>
+<p><strong>Pick: A, staged.</strong> A long resumable job needs a home that outlives the
+session — that is the whole point of this design. But the honest cost of standing up another
+Cloud Run service before the pipe is proven is real, so the contract is designed to be
+location-blind: the First Move serves <code>/import/*</code> from localhost with the same C99
+binary; deploying that binary to Cloud Run is the promotion, not a rewrite. B is not the
+alternative — B is the failure mode we're leaving.</p>
+</div>
+
+<!-- ============================================================ ESCAPE ROUTES -->
+<div class="section optional">
+<h2>Escape Routes <span class="tag">earned</span></h2>
+<ul data-cm="5-shape">
+  <li><strong>Bad pull / full re-import.</strong> The raw is append-only with per-batch
+    provenance — a bad pull is a droppable batch, not a corrupted store. Worst case: delete
+    the store file, re-run Import all; the cursor lives in the raw, so a partial pull resumes
+    instead of restarting. Cost of total do-over: wall-clock at ~10 RPM, zero code.</li>
+  <li><strong>The home choice.</strong> Because the tab binds to the <code>/import/*</code>
+    contract and not to a location, backing out of Cloud Run = point the tab at localhost and
+    run the same binary. Backing out of the tab entirely = the promoted C99 tools still run by
+    hand, exactly as v0 did — nothing is lost, only the home.</li>
+  <li><strong>The decoupling.</strong> If the mesh/NPS boards land sooner than expected,
+    nothing here is wasted: they consume the raw this tool lands. The 07-08 design's
+    architecture is untouched — only its sequencing moved.</li>
+</ul>
+</div>
+
+<!-- ============================================================ PURE METAL TEST -->
+<div class="section optional">
+<h2>Pure Metal Test <span class="tag">earned</span></h2>
+<ul data-cm="pure-metal-test-earned">
+  <li><span class="pass">✓</span> Store, importer, decoder, replay, service — C99 on nous
+    primitives. Ours, load-bearing, no framework.</li>
+  <li><span class="pass">✓</span> Console surface — vanilla HTML/JS in the existing Argus
+    tab registry. No build step.</li>
+  <li><span class="pass">✓</span> The ONE foreign dependency — Zendesk — is jacketed
+    (zendesk-bridge, C#) at the boundary and replaceable: swap the jacket, the raw's shape
+    and everything downstream stand.</li>
+</ul>
+</div>
+
+<!-- ============================================================ DOD -->
+<div class="section">
+<h2>Definition of Done — this design</h2>
+<ul data-cm="definition-of-done-this-design">
+  <li><span class="pass">✓</span> Six spine sections present, in order, sized to the work
+    (Need → Raw User Stories → Sourced Solution → Naming → Shape → First Move).</li>
+  <li><span class="pass">✓</span> Sourced before invented — a-d-d §7, mendo v0 tools, nous,
+    zendesk-bridge, the 07-08 design, and the Slot pattern mined in order; NEW is only the
+    home + the decoupling.</li>
+  <li><span class="pass">✓</span> Names literal — Raw IDS (tab), import service; collisions
+    flagged (importer vs bridge); no cute names.</li>
+  <li><span class="pass">✓</span> Earned tools present and justified — Choices+Consequences
+    (the home fork), Escape Routes (re-import + home), Pure Metal Test.</li>
+  <li><span class="pass">✓</span> Flows WITH a-d-d §7 — executes the blessed architecture;
+    proposes the small "operational home" addition WITHOUT writing a-d-d (that lands via
+    ~p + operator approval, per Rule 10).</li>
+  <li><span class="pass">✓</span> Read-only invariant stated — import reads Zendesk, writes
+    only the local sealed raw; no write-back path exists.</li>
+  <li><span class="pass">✓</span> Language law respected — C# confined to the foreign-API
+    jacket; everything we own is C99.</li>
+  <li><span class="pass">✓</span> 07-08 design handled honestly — sequencing superseded,
+    architecture preserved, deferrals named (mesh residency, derive-nps, config walk).</li>
+  <li><span class="fail">✗</span> Plan (~p) — not yet done. Next step: board the First Move
+    + the staged service promotion, get operator approval on the a-d-d addition.</li>
+</ul>
+</div>
+
+</div>
+<footer>v0 &middot; r471 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"172891a7-f68c-40e7-adac-5b8688167a0f"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
