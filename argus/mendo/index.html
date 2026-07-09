@@ -573,7 +573,7 @@ let TAB_ANIM = false; // one-shot: animate the active pane on tab switch
 let APP = localStorage.getItem("argus_app") || "meraki";
 let APPSW_OPEN = false; // app-switcher dropdown open state
 const APPS = {
-  meraki:  { label:"Meraki",  icon:"&#128225;", tag:"Network operations", tabs:["operations","network","audit"] },
+  meraki:  { label:"Meraki",  icon:"&#128225;", tag:"Network operations", tabs:["operations","network","watch","audit"] },
   zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["focus","programs","templates","comments","zdaudit","apibrowser"], source:"zendesk" },
   cloudflare: { label:"Cloudflare", icon:"&#9729;&#65039;", tag:"Edge · read-only", tabs:["apibrowser"], source:"cloudflare" },
   airbyte: { label:"Airbyte", icon:"&#128260;", tag:"Airbyte migration", tabs:["helm","apibrowser"], source:"airbyte" },
@@ -3236,6 +3236,7 @@ function render(){
   const tabHtml={
     operations:"<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>",
     network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
+    watch:"<button class='tabv"+(TAB==="watch"?" on":"")+"' data-tab='watch'><span class='ti'>&#128065;</span><span class='tl'>Watch"+(wchBad()?" &middot; <b class='bad'>"+wchBad()+"</b>":"")+"</span></button>",
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
     focus:"<button class='tabv"+(TAB==="focus"?" on":"")+"' data-tab='focus'><span class='ti'>&#127919;</span><span class='tl'>Focus"+(FOCUS_SAMPLE?" &middot; <b class='bad'>"+FOCUS_SAMPLE.detractors.filter(d=>d.status!=='resolved').length+"</b>":"")+"</span></button>",
     programs:"<button class='tabv"+(TAB==="programs"?" on":"")+"' data-tab='programs'><span class='ti'>&#129513;</span><span class='tl'>Conversations</span></button>",
@@ -3275,6 +3276,8 @@ function render(){
   // Network
   const netDesc="Connected clients across this network &mdash; wired and Wi-Fi &mdash; plus the Meraki device inventory and every SSID. Rename any client or device inline.";
   h+="<div id='pane-network' class='"+paneCls("network")+"'>"+slotBody("network",NETV,netContent,netCanTpl)+"</div>";
+  // Watch -- read-only device-connectivity watcher state (gcp-bridge /watch/state, auto-refresh)
+  h+="<div id='pane-watch' class='"+paneCls("watch")+"'>"+realBadge("live")+watchPane()+"</div>";
   // Security Audit -- own target picker (always present, run/re-run any time)
   h+="<div id='pane-audit' class='"+paneCls("audit")+"'>"+auditPane()+"</div>";
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
@@ -3956,9 +3959,115 @@ function gcInner(){
 }
 function renderGC(){ const el=document.getElementById("gc-inner"); if(el) el.innerHTML=gcInner(); }
 
+// ================= Watch -- device-connectivity watcher (gcp-bridge /watch/state) =================
+// Read-only monitor: one card per watched device, verdict OK/FLAPPING/OFFLINE. Fetches on show and
+// every 45s while the tab is visible -- a DELIBERATE exception to the load-on-click rule, because
+// this tab exists to make watcher silence visible (a stale checkedAt means the scheduler stopped).
+// The endpoint is open (no auth) and this pane NEVER writes. Numbers arrive as strings; coerce with +.
+let WCH = { run:null, err:"", busy:false, ts:0, pend:false };
+const WCH_STALE_MIN = 15;   // checkedAt older than this => warn: the watcher may have stopped
+const WCH_POLL_MS = 45000;  // refresh cadence while the Watch tab is visible
+function wchBad(){ return WCH.run ? (WCH.run.devices||[]).filter(d=>String(d.verdict||"").toUpperCase()!=="OK").length : 0; }
+function wchAgo(t){ const ms=(typeof t==="number")?t:Date.parse(t||""); if(isNaN(ms)) return "?";
+  let s=Math.max(0,Math.round((Date.now()-ms)/1000)); if(s<60) return s+"s ago";
+  const m=Math.round(s/60); if(m<60) return m+"m ago";
+  const h=Math.round(m/60); if(h<48) return h+"h ago"; return Math.round(h/24)+"d ago"; }
+function wchAgeMin(iso){ const t=Date.parse(iso||""); return isNaN(t)?Infinity:(Date.now()-t)/60000; }
+async function wchLoad(quiet){
+  if(WCH.busy) return;
+  WCH.busy=true; if(!quiet){ WCH.err=""; renderWCH(); }
+  try{
+    const r=await fetch(GBRIDGE+"/watch/state?_="+Date.now(), { cache:"no-store" }); // open endpoint, no auth
+    if(!r.ok) throw { code:r.status };
+    const d=await r.json();
+    if(!d.ok) throw { msg:(d.error||"bridge said not ok") };
+    WCH.run=d; WCH.ts=Date.now(); WCH.err="";
+  }catch(e){ WCH.err=(e&&e.code)?("HTTP "+e.code):((e&&(e.msg||e.message))||"gcp-bridge unreachable"); }
+  WCH.busy=false; if(TAB==="watch") renderWCH(); render();
+}
+function wchCard(d){
+  const v=String(d.verdict||"").toUpperCase();
+  const cls=v==="OK"?"wok":v==="FLAPPING"?"wflap":v==="OFFLINE"?"woff":"wunk";
+  const stale=wchAgeMin(d.checkedAt)>WCH_STALE_MIN;
+  let s="<div class='wcard "+cls+"'>";
+  s+="<div class='wtop'><span class='wlabel'>"+esc(d.label||d.mac||"(unnamed)")+"</span><span class='wverdict "+cls+"'>"+esc(v||"?")+"</span></div>";
+  s+="<div class='wmeta'><span class='wmac'>"+esc(d.mac||"")+"</span>"+(d.watch?"<span class='wgrp'>"+esc(d.watch)+"</span>":"")+"</div>";
+  s+="<div class='wstats'>"
+    +"<span class='wstat'><b>"+(+d.flaps||0)+"</b> flap"+((+d.flaps||0)===1?"":"s")+"</span>"
+    +"<span class='wstat'><b>"+(+d.offlineMin||0)+"</b> min offline</span>"
+    +"<span class='wstat'>status <b>"+esc(d.status||"?")+"</b></span>"
+    +"<span class='wstat'>last seen <b>"+wchAgo(d.lastSeen)+"</b></span>"
+    +"<span class='wstat'>checked <b>"+wchAgo(d.checkedAt)+"</b></span>"
+    +"</div>";
+  if(stale) s+="<div class='wstale'>&#9888; stale &mdash; last checked "+wchAgo(d.checkedAt)+"; the watcher scheduler may have stopped</div>";
+  return s+"</div>";
+}
+function wchInner(){
+  if(WCH.busy && !WCH.run) return "<div class='wld'><span class='spin'></span> reading watcher state&hellip;</div>";
+  let s="";
+  if(WCH.err) s+="<div class='werr'>"+esc(WCH.err)+(WCH.run?" &mdash; showing last-known state ("+wchAgo(WCH.ts)+")":"")+" <button class='wref' data-wchload>&#8635; Retry</button></div>";
+  if(!WCH.run) return s+"<div class='wlead'>Live state of the device-connectivity watcher &mdash; one card per watched device, verdict per device. Read-only; refreshes itself every "+(WCH_POLL_MS/1000)+"s while this tab is open.</div>";
+  const devs=WCH.run.devices||[];
+  const nOk=devs.filter(d=>String(d.verdict||"").toUpperCase()==="OK").length;
+  const nFlap=devs.filter(d=>String(d.verdict||"").toUpperCase()==="FLAPPING").length;
+  const nOff=devs.filter(d=>String(d.verdict||"").toUpperCase()==="OFFLINE").length;
+  s+="<div class='wchips'>"
+    +"<span class='wchip'><b>"+devs.length+"</b> watched</span>"
+    +"<span class='wchip wcok'><b>"+nOk+"</b> OK</span>"
+    +"<span class='wchip wcflap'><b>"+nFlap+"</b> flapping</span>"
+    +"<span class='wchip wcoff'><b>"+nOff+"</b> offline</span>"
+    +"<span class='wchip'>refreshed <b>"+wchAgo(WCH.ts)+"</b></span>"
+    +"<button class='wref' data-wchload>&#8635; Refresh</button></div>";
+  // Tab-level staleness cue: if even the NEWEST checkedAt is old, the whole watcher went quiet.
+  const newestAge=devs.reduce((m,d)=>Math.min(m,wchAgeMin(d.checkedAt)),Infinity);
+  if(devs.length && newestAge>WCH_STALE_MIN)
+    s+="<div class='wstalebar'>&#9888; watcher state is stale &mdash; newest check was "+Math.round(newestAge)+"m ago (&gt; "+WCH_STALE_MIN+"m). The watcher scheduler may have stopped; these verdicts describe the past, not now.</div>";
+  if(!devs.length) s+="<div class='wempty'>No devices are being watched right now (count 0).</div>";
+  else s+=devs.map(wchCard).join("");
+  return s;
+}
+function renderWCH(){ const w=document.getElementById("wch-wrap"); if(w) w.innerHTML=wchInner(); }
+function watchPane(){
+  // Fetch on show (and re-fetch when shown again with data older than the poll window). The pend
+  // guard keeps rapid re-renders from queueing duplicate loads; errors wait for Retry or the timer.
+  if(TAB==="watch" && !WCH.busy && !WCH.pend && !WCH.err && Date.now()-WCH.ts>WCH_POLL_MS-5000){
+    WCH.pend=true; setTimeout(function(){ WCH.pend=false; wchLoad(!!WCH.run); },0);
+  }
+  return "<style>"
+    +"#pane-watch .wlead{color:#8a93a0;font-size:13px;line-height:1.55;margin-bottom:14px;max-width:720px;}"
+    +"#pane-watch .wld{color:#8a93a0;font-size:13px;padding:14px 0;}"
+    +"#pane-watch .werr{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:10px 13px;font-size:12.5px;margin-bottom:10px;}"
+    +"#pane-watch .wchips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}"
+    +"#pane-watch .wchip{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 10px;border:1px solid #262626;background:#0e0e0e;color:#8a93a0;}"
+    +"#pane-watch .wchip b{color:#e8e8e8;font-weight:800;}"
+    +"#pane-watch .wchip.wcok b{color:#7CFFB2;}#pane-watch .wchip.wcflap b{color:#ffce85;}#pane-watch .wchip.wcoff b{color:#ff9b9b;}"
+    +"#pane-watch .wref{margin-left:auto;background:#12181d;color:#8fb7c4;border:1px solid #2a343b;border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-watch .werr .wref{margin-left:8px;padding:2px 8px;}"
+    +"#pane-watch .wstalebar{background:#332608;border:1px solid #5a4410;color:#ffd479;border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}"
+    +"#pane-watch .wempty{color:#6b7a82;font-size:13px;padding:14px 0;}"
+    +"#pane-watch .wcard{background:#141414;border:1px solid #262626;border-left:4px solid #262626;border-radius:8px;padding:10px 14px;margin-bottom:8px;}"
+    +"#pane-watch .wcard.wok{border-left-color:#7CFFB2;}#pane-watch .wcard.wflap{border-left-color:#ffce85;}#pane-watch .wcard.woff{border-left-color:#ff6b6b;}"
+    +"#pane-watch .wtop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}"
+    +"#pane-watch .wlabel{font-weight:800;font-size:13.5px;color:#e8e8e8;flex:1 1 auto;}"
+    +"#pane-watch .wverdict{flex:0 0 auto;font-size:12px;font-weight:800;letter-spacing:.05em;border-radius:6px;padding:3px 12px;}"
+    +"#pane-watch .wverdict.wok{background:#06251a;color:#7CFFB2;}#pane-watch .wverdict.wflap{background:#332608;color:#ffd479;}#pane-watch .wverdict.woff{background:#3a1212;color:#ff9b9b;}#pane-watch .wverdict.wunk{background:#14181c;color:#8a93a0;}"
+    +"#pane-watch .wmeta{display:flex;gap:10px;flex-wrap:wrap;margin-top:3px;}"
+    +"#pane-watch .wmac{color:#9fb4bf;font-size:11.5px;font-family:Consolas,monospace;}"
+    +"#pane-watch .wgrp{color:#6FC3DF;font-size:11px;font-weight:700;background:#0c1418;border:1px solid #14323e;border-radius:5px;padding:0 7px;}"
+    +"#pane-watch .wstats{display:flex;gap:14px;flex-wrap:wrap;margin-top:7px;}"
+    +"#pane-watch .wstat{color:#8a93a0;font-size:12px;}#pane-watch .wstat b{color:#cfe9f2;font-weight:800;}"
+    +"#pane-watch .wstale{color:#ffd479;font-size:11.5px;margin-top:7px;}"
+    +"</style><div id='wch-wrap'>"+wchInner()+"</div>";
+}
+document.addEventListener("click", function(e){
+  if(e.target && e.target.closest && e.target.closest("[data-wchload]")){ wchLoad(); }
+});
+// Poll only while the Watch tab is front-and-center; other tabs (and hidden windows) cost nothing.
+setInterval(function(){ if(TAB==="watch" && !document.hidden) wchLoad(true); }, WCH_POLL_MS);
+
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="programs") return "Conversations — every conversation is a program"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
-function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="programs"?"pane-programs":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="watch") return "Watch — device connectivity"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="programs") return "Conversations — every conversation is a program"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="watch"?"pane-watch":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="programs"?"pane-programs":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
   if(TAB==="operations") return (OPS.d&&OPS.d.name)||OPS.name||"";
@@ -4555,7 +4664,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r476 . 2495212 . 2026-07-09</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r479 . 147b6f3 . 2026-07-09</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
