@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan - Complete Purcius Login (op-key signs the mesh)</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --accent:#6FC3DF; --edge:#2a2a2a;
+          --ok:#5FD08A; --warn:#E6C15A; --bad:#E86F6F; --mut:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:#eaeaea; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; margin:0; line-height:1.5; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent);
+        display:flex; align-items:center; justify-content:space-between; padding:10px 20px; }
+  nav .brand { font-weight:700; color:var(--accent); letter-spacing:1px; }
+  nav .pub { font-size:12px; color:var(--mut); }
+  main { max-width:800px; margin:0 auto; padding:24px 20px 80px; }
+  h1 { font-size:25px; margin:8px 0 2px; }
+  h2 { font-size:19px; margin:32px 0 10px; color:var(--accent); border-bottom:1px solid var(--edge); padding-bottom:6px; }
+  h3 { font-size:15px; margin:18px 0 6px; color:#cfefff; }
+  .sub { color:var(--mut); font-size:13px; margin-bottom:14px; }
+  .banner { background:#2b2411; color:var(--warn); border:1px solid #4a3d17; border-radius:6px; padding:8px 14px; font-weight:600; font-size:13px; display:inline-block; }
+  .card { background:var(--surface); border:1px solid var(--edge); border-radius:8px; padding:14px 18px; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; margin:10px 0; font-size:13px; }
+  th,td { text-align:left; padding:6px 9px; border-bottom:1px solid var(--edge); vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:3px; font-size:12px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .pill.p1 { background:#12321f; color:var(--ok); }
+  .pill.p2 { background:#0f2a33; color:var(--accent); }
+  .pill.p3 { background:#2b2411; color:var(--warn); }
+  ul,ol { margin:6px 0 6px 2px; padding-left:20px; } li { margin:3px 0; }
+  .lane { border-left:3px solid var(--accent); padding-left:12px; margin:14px 0; }
+  .mono { font-family:Consolas,monospace; font-size:12px; color:#9fd; background:#000; border:1px solid var(--edge); border-radius:6px; padding:10px 12px; white-space:pre-wrap; }
+  .muted { color:var(--mut); } .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  footer { max-width:800px; margin:0 auto; padding:20px; color:var(--mut); font-size:12px; border-top:1px solid var(--edge); }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be &middot; Argus</span>
+  <span class="pub">Published 2026-07-07 16:20 MST</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/35605571-d80d-4013-b62f-9275b0d9bbc2/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+  <h1>Complete Purcius Login &mdash; the op-key signs you into the mesh</h1>
+  <div class="sub">v0 &middot; r450 &middot; <code>~P</code> &middot; activate the &ldquo;Sign in with Purcius key&rdquo; button end-to-end &middot; ~19 pts</div>
+  <span class="banner">Plan &mdash; Awaiting Approval &nbsp;|&nbsp; touches the operator root key, live DNS, and a prod Cloud Run secret &mdash; your hand on the wheel</span>
+
+  <h2>Intent</h2>
+  <p>The button exists. The crypto is built, tested, and deployed. It is <b>dark</b> for exactly one reason: the bridge has
+  no operator pubkey and no MAC secret, so <code>/auth/key/*</code> fails closed with 503 and the login panel never shows.
+  This plan lights it up &mdash; get the root pubkey off the prime once, feed it to the env var <i>and</i> the
+  <code>_key.&lt;fqdn&gt;</code> record, set the server secret, warrant one device, and prove a real sign-in from a machine
+  that isn&rsquo;t yours. On the already-blessed <b>adopt-<code>a61bdace</code></b> path &mdash; the Keystone evolution is v2.</p>
+
+  <h2>Scope</h2>
+  <table data-cm="intent">
+    <tr><th>In</th><th>Out (this pass)</th></tr>
+    <tr><td>Emit <code>a61bdace</code> pubkey via <code>operator-key.sh adopt</code> on the prime</td><td>Minting a new <b>Keystone</b> (sovereign-identity Phase 0 &mdash; un-blessed GATE, v2)</td></tr>
+    <tr><td>Set <code>PURCIUS_ID_KEY</code> + <code>PURCIUS_OPERATOR_PUB</code> on <code>meraki-bridge</code></td><td>Re-pinning mesh binaries to a Keystone</td></tr>
+    <tr><td>Plant <code>_key.&lt;fqdn&gt;</code> via cloudflare-bridge + dig-back</td><td>Shamir <i>distribution</i> (REC2 seal-to-holders) &mdash; primitive already done, escrow later</td></tr>
+    <tr><td>Warrant one device; live end-to-end sign-in</td><td>Building <code>genesis-cli</code> (warrant.wasm + paste already cover it)</td></tr>
+    <tr><td>Sealed-Core pin round-trip (config-side, v1)</td><td>Compiled-in-pin prime rebuild (decide first, may defer)</td></tr>
+    <tr><td>Fix the button copy to the real warrant paths</td><td>Opaque server-mediated session on the prime (REG2 open item, follows)</td></tr>
+  </table>
+
+  <h2>Approach &mdash; one value unlocks the wall</h2>
+  <div data-cm="approach-one-value-unlocks-the" class="card">
+  <b>The linchpin:</b> <code>operator-key.sh adopt</code> on the prime prints <code>k=&lt;64-hex&gt;</code> &mdash; the public half of
+  <code>a61bdace</code>, nothing secret. That one string <b>is</b> both <code>PURCIUS_OPERATOR_PUB</code> and the
+  <code>_key.&lt;fqdn&gt;</code> content. Capture it once (Phase&nbsp;1); everything downstream is wiring.
+  </div>
+
+  <h2>Phases</h2>
+
+  <div data-cm="phases" class="lane">
+  <h3><span class="pill p1">Phase 1</span> Capture the anchor &middot; 3 pts &middot; <code>~a~t</code></h3>
+  <p>SSH the LV prime (34.125.36.235, where <code>~/.purcius/operator.key</code> = <code>a61bdace</code> lives). Run
+  <code>bash be/tools/operator-key.sh detect</code> then <code>adopt</code>. Capture <code>k=&lt;64-hex&gt;</code> and the self-sig
+  <code>s=</code>. <b>Verify:</b> 64-byte key confirmed (seed32&#8214;pub32), pubkey is 64 hex chars, self-sig verifies against it.
+  Private key never leaves the box.</p>
+  <div class="mono">ssh prime "cd /c/argus 2>/dev/null || cd ~/argus; bash be/tools/operator-key.sh adopt"
+# -> k=&lt;64hex&gt;   s=&lt;self-sig&gt;      (this is the whole unlock)</div>
+  </div>
+
+  <div class="lane">
+  <h3><span class="pill p1">Phase 2</span> Set the two bridge secrets &middot; 3 pts &middot; <code>~a~t</code></h3>
+  <p><code>PURCIUS_OPERATOR_PUB</code> = the Phase-1 pubkey (public). <code>PURCIUS_ID_KEY</code> = a fresh 64-hex server MAC
+  secret &mdash; <b>you paste, Be installs</b> (Rule 4): into GCP Secret Manager on <code>acmedev-platform-hq</code>, wired as
+  Cloud Run env on <code>meraki-bridge</code>. <b>Verify:</b> <code>GET /auth/key/status</code> flips
+  <code>{skill:true, challenge:true, verify:true}</code> (was 503). Also add both to <code>/version</code> so status is
+  remotely diagnosable.</p>
+  </div>
+
+  <div class="lane">
+  <h3><span class="pill p2">Phase 3</span> Plant <code>_key.&lt;fqdn&gt;</code> &middot; 3 pts &middot; <code>~a~t</code></h3>
+  <p>Plant <code>_key.joeycastillo.us</code> = <code>k=&lt;pub&gt; s=&lt;self-sig&gt;</code> through the cloudflare-bridge gated write
+  (token stays server-side). <b>Verify (Rule 9 + 13):</b> <code>dig</code> the record back from a public resolver
+  (1.1.1.1 <i>and</i> 8.8.8.8) from a vantage that isn&rsquo;t this dev box; a test signature verifies against the fetched
+  pubkey. Now the domain literally <i>is</i> the key &mdash; third-party auditable.</p>
+  </div>
+
+  <div class="lane">
+  <h3><span class="pill p2">Phase 4</span> Warrant a device + live sign-in &middot; 5 pts &middot; <code>~u~t</code></h3>
+  <p>On the console: mint the browser device key, produce the warrant (warrant.wasm with Shamir shares, or the 128-hex
+  paste), sign in. <b>Verify end-to-end (Rule 9):</b> from a second machine / clean profile &mdash; challenge &rarr; device-sign
+  &rarr; verify &rarr; <code>argus_session</code> minted &rarr; <code>/auth/me</code> returns authed. A wrong/absent warrant is
+  refused (<code>0x26</code>). Fix the enroll copy: replace the <code>genesis-cli</code> line with the real warrant.wasm +
+  paste paths.</p>
+  </div>
+
+  <div class="lane">
+  <h3><span class="pill p3">Phase 5</span> Sealed-Core pin round-trip &middot; 5 pts &middot; <code>~a~t</code></h3>
+  <p>Close Board REG1&rsquo;s open item. <b>Decide the Unknown first:</b> pin as config (the env var &mdash; v1, done in Phase 2)
+  vs compiled-in (prime rebuild). For v1 the env-var pin is the pin. Prove one live challenge &rarr; sign(offline key)
+  &rarr; verify-vs-pin round-trip against the deployed bridge. If compiled-in is chosen, that&rsquo;s a scoped follow-on, not
+  a blocker for a working button.</p>
+  </div>
+
+  <h2>Constraints</h2>
+  <ul data-cm="constraints">
+    <li><b>Adopt, never mint.</b> One root. <code>operator-key.sh</code> refuses a second. The private half never leaves the prime.</li>
+    <li><b>Pure-C auth, C# only as jacket</b> (PRACTICES #12). No crypto logic moves into the bridge. DNS write is the only vendor call that rides C#.</li>
+    <li><b>Secrets: you paste, Be handles</b> (Rule 4). <code>PURCIUS_ID_KEY</code> never touches git &mdash; only its env-var name.</li>
+    <li><b>Done = a third party can verify</b> (Rule 9). <code>dig</code> from elsewhere, sign-in from a second machine. Not &ldquo;pushed.&rdquo;</li>
+    <li><b>Verify from the right vantage</b> (Rule 13). Don&rsquo;t judge the bridge from this router; test status + dig from a real client plane.</li>
+  </ul>
+
+  <h2>Unknowns</h2>
+  <ol data-cm="unknowns">
+    <li><b>Keystone vs adopt.</b> The sovereign-identity design wants a purpose-built cold Keystone <i>above</i> <code>a61bdace</code>. This plan ships on adopt (blessed); the Keystone later swaps the pubkey without touching the wire. If you&rsquo;d rather mint the Keystone <i>first</i>, Phase 1&ndash;3 change to a cold genesis ceremony (+~13 pts, needs the air-gap/hardware decision). <b>Your call gates the whole shape.</b></li>
+    <li><b>Pin location.</b> Config (env var) vs compiled-in on the prime. v1 answer is config; compiled-in is a hardening follow-on.</li>
+    <li><b>Prime reachability + auth service.</b> Phase 1 assumes SSH to 34.125.36.235 works and the key file is at the expected path. The opaque server-mediated session (REG2) needs a pure-C auth service on the prime &mdash; separate open item after the button works.</li>
+    <li><b>genesis-cli.</b> Referenced in copy, not built. Not needed (wasm + paste work). Build only if you want the terminal warrant path.</li>
+  </ol>
+
+  <h2>When To Revisit (v2 triggers)</h2>
+  <ul data-cm="when-to-revisit-v2-triggers">
+    <li>Login works on adopt &rArr; open the <b>Keystone</b> genesis (bless sovereign-identity Phase 0) as the clean-successor arc.</li>
+    <li>First member onboards beyond you &rArr; exercise the Invite path + Shamir escrow distribution (REC2).</li>
+    <li>Any warrant refused in the wild &rArr; revisit device-rotation + revocation roster.</li>
+  </ul>
+
+  <h2>Proposed board &mdash; PURL (Purcius Login) &middot; 19 pts</h2>
+  <div data-cm="proposed-board-purl-purcius-login" class="mono">## Board PURL — complete Purcius login (19 pts)
+### Ready
+- {capture a61bdace pubkey: operator-key.sh adopt on LV prime -> k=/s=, verify seed32||pub32, add to, prime} · 3 · ~a~t
+- {set PURCIUS_OPERATOR_PUB + PURCIUS_ID_KEY (paste->Secret Manager->Cloud Run env) + /version reports status, add to, meraki-bridge} · 3 · ~a~t
+- {plant _key.<fqdn>=k=/s= via cloudflare-bridge + dig-back @1.1.1.1/8.8.8.8 from off-box, add to, cloudflare-bridge} · 3 · ~a~t
+- {warrant a device + live sign-in from a 2nd machine -> argus_session -> /auth/me authed; fix enroll copy (drop genesis-cli), update with, web} · 5 · ~u~t
+- {Sealed-Core pin round-trip: decide config-vs-compiled-in, one live challenge->sign->verify-vs-pin, add to, auth + core} · 5 · ~a~t</div>
+
+  <h2>DoD</h2>
+  <ul data-cm="dod">
+    <li class="ok">&#10003; A-D-D verified &mdash; adopt path blessed (a-d-d r78); Keystone divergence named, not assumed.</li>
+    <li class="ok">&#10003; Intent / Scope / Approach / Phases / Constraints / Unknowns / When-To-Revisit all present.</li>
+    <li class="ok">&#10003; Artifact saved &middot; status &ldquo;Awaiting Approval&rdquo; &middot; pub date top-right.</li>
+    <li class="warn">&#9633; Index / commit / push on save.</li>
+    <li class="muted">N/A production deploy &mdash; plan is a discovery artifact; execution ships on approval.</li>
+  </ul>
+</main>
+<footer>Be &middot; Argus &middot; v0 &middot; r450 &middot; 2026-07-07 &middot; <code>~P</code> Complete Purcius login &mdash; iterate to find the target.</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"35605571-d80d-4013-b62f-9275b0d9bbc2"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inspect - Purcius Genesis + Mesh-Signing Login</title>
+<style>
+  :root { --bg:#111; --surface:#1A1A1A; --accent:#6FC3DF; --edge:#2a2a2a;
+          --ok:#5FD08A; --warn:#E6C15A; --bad:#E86F6F; --mut:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:#eaeaea; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; margin:0; line-height:1.5; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent);
+        display:flex; align-items:center; justify-content:space-between; padding:10px 20px; }
+  nav .brand { font-weight:700; color:var(--accent); letter-spacing:1px; }
+  nav .pub { font-size:12px; color:var(--mut); }
+  main { max-width:800px; margin:0 auto; padding:24px 20px 80px; }
+  h1 { font-size:25px; margin:8px 0 2px; }
+  h2 { font-size:19px; margin:32px 0 10px; color:var(--accent); border-bottom:1px solid var(--edge); padding-bottom:6px; }
+  h3 { font-size:15px; margin:18px 0 6px; color:#cfefff; }
+  .sub { color:var(--mut); font-size:13px; margin-bottom:14px; }
+  .banner { background:#0f2a33; color:var(--accent); border:1px solid #1d4653; border-radius:6px; padding:8px 14px; font-weight:600; font-size:13px; display:inline-block; }
+  .card { background:var(--surface); border:1px solid var(--edge); border-radius:8px; padding:14px 18px; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; margin:10px 0; font-size:13px; }
+  th,td { text-align:left; padding:6px 9px; border-bottom:1px solid var(--edge); vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:3px; font-size:12px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .pill.done { background:#12321f; color:var(--ok); }
+  .pill.miss { background:#33140f; color:var(--bad); }
+  .pill.part { background:#2b2411; color:var(--warn); }
+  ul,ol { margin:6px 0 6px 2px; padding-left:20px; } li { margin:3px 0; }
+  .mono { font-family:Consolas,monospace; font-size:12px; color:#9fd; background:#000; border:1px solid var(--edge); border-radius:6px; padding:10px 12px; white-space:pre-wrap; }
+  .muted { color:var(--mut); }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  footer { max-width:800px; margin:0 auto; padding:20px; color:var(--mut); font-size:12px; border-top:1px solid var(--edge); }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be &middot; Argus</span>
+  <span class="pub">Published 2026-07-07 16:16 MST</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/4f334338-28b3-4e10-af08-9897e2a98e58/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+  <h1>Purcius Genesis &mdash; Login &amp; Mesh-Signing: full inspect</h1>
+  <div class="sub">v0 &middot; r450 &middot; <code>~i</code> &middot; every artifact touching &ldquo;Sign in with Purcius key&rdquo; + the op-key that signs the mesh</div>
+  <span class="banner">Finding: the login is <b>90% built and 0% activated</b>. Two secrets + one DNS record + one warrant stand between you and a working button.</span>
+
+  <h2>What It Is</h2>
+  <p><b>&ldquo;Sign in with Purcius key&rdquo;</b> is operator-identity auth, pure&#8209;C99, DNS-anchored, no third party.
+  Your <b>operator root key</b> (the same <code>a61bdace&hellip;</code> that already signs the mesh) <b>warrants</b> a
+  browser-minted device key into the console. The device signs a server challenge; the server checks the device sig
+  <i>and</i> your root&rsquo;s warrant over that device; if both hold it mints the same <code>argus_session</code> cookie the
+  Slack/Google logins use. &ldquo;Signing the mesh&rdquo; and &ldquo;signing you in&rdquo; are the <b>same ceremony</b> &mdash;
+  the root key certifies members, whether that member is a mesh node or your laptop.</p>
+
+  <h2>Structure &mdash; the trust chain &amp; the login flow</h2>
+  <div data-cm="what-it-is" class="card">
+  <b>Trust chain (v1, the blessed &ldquo;adopt&rdquo; path):</b><br>
+  <code>operator root a61bdace</code> &nbsp;&rarr; warrants &rarr;&nbsp; <code>browser device key</code> &nbsp;&rarr; signs &rarr;&nbsp; <code>server challenge</code> &nbsp;&rarr;&nbsp; <code>argus_session</code><br>
+  <span class="muted">The root is published at <code>_key.&lt;fqdn&gt;</code> so any third party can fetch it and verify. The domain is the identity.</span>
+  </div>
+  <div class="mono">login (web/index.html: keyLogin, ~line 4098)
+ 1. deviceKey()            non-extractable Ed25519, minted in-browser, private half never leaves (IndexedDB)
+ 2. GET  /auth/key/challenge   -> bridge spawns sidecar OP 0x01 CHALLENGE_NEW -> 72B challenge
+ 3. crypto.subtle.sign()   device signs the 72B challenge
+ 4. warrant                warrant.wasm (Shamir shares -> deterministic ed25519 sign of device_pub||"console")
+                           OR paste a 128-hex warrant  (button copy says: genesis-cli warrant root.key &lt;device-pub&gt;)
+ 5. POST /auth/key/verify  {challenge, devicePub, deviceSig, warrantSig}
+                           -> sidecar OP 0x02 CHALLENGE_VERIFY: MAC ok? unexpired? device signed? root warranted?
+                           -> on OK, mint argus_session (OP 0x03) -> same cookie as OIDC
+ 6. /auth/me               authed -> console unlocks</div>
+
+  <h2>Stack</h2>
+  <table data-cm="stack">
+    <tr><th>Layer</th><th>What</th><th>Where</th></tr>
+    <tr><td>Auth logic (pure C99)</td><td>challenge/verify + session mint/check; ed25519 RFC 8032 + HMAC-SHA-256, KAT-tested; holds no state</td><td><code>bridge/identity-skill/identity.{c,h}</code> (vendored from <code>kastil-systems/nous</code>)</td></tr>
+    <tr><td>Wire jacket (pure C99)</td><td>one process = one PIW1 exchange over stdin/stdout, 4 ops</td><td><code>bridge/identity-skill/identity_sidecar.c</code> &rarr; <code>identity-skill.exe</code></td></tr>
+    <tr><td>Bridge (C# jacket)</td><td><code>/auth/key/{status,challenge,verify}</code>, PIW1 framing, spawns sidecar, mints cookie</td><td><code>bridge/</code> Program.cs + KeyAuth.cs (Cloud Run: <code>meraki-bridge</code>, acmedev-platform-hq)</td></tr>
+    <tr><td>Browser</td><td>device keygen, challenge-sign, warrant.wasm, login + enroll UI</td><td><code>web/index.html</code> (+ <code>web/warrant.wasm</code>)</td></tr>
+    <tr><td>DNS anchor</td><td><code>_purcius.&lt;fqdn&gt;</code> presence, <code>_key.&lt;fqdn&gt;</code> = root pubkey</td><td>planted via <code>cloudflare-bridge</code> gated write</td></tr>
+    <tr><td>Root key</td><td><code>a61bdace</code>, 64B seed32&#8214;pub32, lives on the LV prime</td><td><code>~/.purcius/operator.key</code> on 34.125.36.235</td></tr>
+  </table>
+
+  <h2>Patterns Found</h2>
+  <ul data-cm="patterns-found">
+    <li><b>Membership, not PKI</b> (PRACTICES #6) &mdash; a warrant is a signed roster entry (<code>device_pub&#8214;"console"</code>), not an X.509 chain. Verifiers pin the root; they don&rsquo;t walk a chain.</li>
+    <li><b>Pure-C auth, C# only as a foreign jacket</b> (PRACTICES #12 / Language Boundary) &mdash; every crypto op is the C sidecar; the C# bridge only speaks the PIW1 wire. Red C test fails the Docker build.</li>
+    <li><b>Adopt, never mint</b> &mdash; Registration publishes <code>a61bdace</code>&rsquo;s pubkey; it never forks a second root. Minting is the net-new-operator branch only.</li>
+    <li><b>The domain is the identity</b> &mdash; <code>_key.&lt;fqdn&gt;</code> makes the root fetchable + auditable by anyone; recovery floor is FQDN re-proof.</li>
+    <li><b>Fail-closed activation</b> &mdash; no secrets &rArr; <code>/auth/key/*</code> returns 503 <code>key-login-not-configured</code> &rArr; the button&rsquo;s <code>keybar</code> stays hidden. Nothing half-open.</li>
+  </ul>
+
+  <h2>State of completion &mdash; the delta that matters</h2>
+  <table data-cm="state-of-completion-the-delta">
+    <tr><th>Piece</th><th>State</th><th>Evidence</th></tr>
+    <tr><td>C# <code>/auth/key/{status,challenge,verify}</code></td><td><span class="pill done">DONE</span></td><td>Program.cs 298&ndash;366; deployed (build stamp &ldquo;PI1 r431 &hellip; Overlord key-login seam&rdquo;)</td></tr>
+    <tr><td>Pure-C identity sidecar + PIW1</td><td><span class="pill done">DONE</span></td><td>compiled into container, red-test-gated (Dockerfile stage <code>skill</code>); wire tests pass</td></tr>
+    <tr><td>Browser login + enroll + <code>warrant.wasm</code></td><td><span class="pill done">DONE</span></td><td>web/index.html 4084&ndash;4168; <code>web/warrant.wasm</code> present (19KB)</td></tr>
+    <tr><td>Ceremony (device-bind, TOTP, receipts)</td><td><span class="pill done">DONE</span></td><td>LIVE at <code>joeycastillo.us/argus/register/</code> (Board REG2, r280)</td></tr>
+    <tr><td>Shamir 3-of-5 GF(256) primitive</td><td><span class="pill done">DONE</span></td><td>registration/shamir_gf256; math verified (r270)</td></tr>
+    <tr><td><code>_purcius.&lt;fqdn&gt;</code> DNS record</td><td><span class="pill done">DONE</span></td><td>LIVE, dig-back verified @1.1.1.1 + 8.8.8.8 (r276)</td></tr>
+    <tr><td><b>Operator pubkey off the prime</b> (<code>operator-key.sh adopt</code>)</td><td><span class="pill miss">NOT RUN</span></td><td>tool shipped (r269) but <code>k=&lt;hex&gt;</code> never captured &mdash; must run on 34.125.36.235</td></tr>
+    <tr><td><b><code>_key.&lt;fqdn&gt;</code> DNS record</b></td><td><span class="pill miss">MISSING</span></td><td>&ldquo;awaits full operator pubkey from the prime&rdquo; (board REG1 / CFB2 pending note)</td></tr>
+    <tr><td><b><code>PURCIUS_OPERATOR_PUB</code> on Cloud Run</b></td><td><span class="pill miss">UNSET</span></td><td>bridge reads it (Program.cs 292) but no deploy sets it &rArr; verify returns 503</td></tr>
+    <tr><td><b><code>PURCIUS_ID_KEY</code> on Cloud Run</b></td><td><span class="pill miss">UNSET</span></td><td>bridge reads it (Program.cs 291) but no deploy sets it &rArr; challenge returns 503</td></tr>
+    <tr><td>Sealed-Core pin round-trip (config vs compiled-in)</td><td><span class="pill part">OPEN</span></td><td>Board REG1 Ready, 5pts, <code>needs:operator-key-on-prime + pin-location (Unknown)</code></td></tr>
+    <tr><td>Opaque 256-bit sovereign session (server-mediated)</td><td><span class="pill part">OPEN</span></td><td>Board REG2 Ready, 3pts, <code>needs:prime pure-C auth service</code></td></tr>
+    <tr><td><code>genesis-cli</code> tool</td><td><span class="pill part">N/A-ish</span></td><td>not built; <code>warrant.wasm</code> + paste path already cover enrollment &mdash; button copy references a tool that doesn&rsquo;t exist</td></tr>
+  </table>
+
+  <div class="card">
+  <b>The linchpin.</b> One value unblocks three rows at once. <code>operator-key.sh adopt</code>, run on the prime where
+  <code>a61bdace</code> lives, prints <code>k=&lt;64-hex-pubkey&gt;</code> (public only &mdash; never transmits the private key).
+  That single hex string <i>is</i> <code>PURCIUS_OPERATOR_PUB</code> <b>and</b> the <code>_key.&lt;fqdn&gt;</code> content.
+  Get it once; it feeds the env var and the DNS record together.
+  </div>
+
+  <h2>Open Questions</h2>
+  <ol data-cm="open-questions">
+    <li><b>Keystone now, or later?</b> The <code>sovereign-identity</code> design (2026-07-01) says <i>stop</i> reusing the mesh key as your identity &mdash; mint a purpose-built cold, Shamir-split <b>Keystone</b> above <code>a61bdace</code>. Its Phase&nbsp;0 is an un-blessed <b>GATE</b>. Completing the login on the <i>adopted</i> <code>a61bdace</code> (blessed under REG1) ships now; the Keystone is a clean v2 that swaps the pubkey later without touching the wire. <b>Recommend: ship on adopt now, Keystone next.</b></li>
+    <li><b>Where does the pin live?</b> Config (signed roster the verifier loads) or compiled-in? The Sealed-Core item can&rsquo;t close until you pick. For the bridge, the pin <i>is</i> the <code>PURCIUS_OPERATOR_PUB</code> env var today &mdash; config-side. Good enough for v1.</li>
+    <li><b>Secret home.</b> <code>PURCIUS_ID_KEY</code> is a fresh 64-hex server MAC secret (you paste, Be sets via Secret Manager, never in git). <code>PURCIUS_OPERATOR_PUB</code> is public. Confirm both land as Cloud Run env on <code>meraki-bridge</code>.</li>
+    <li><b>Fix the button copy.</b> It says <code>genesis-cli warrant root.key</code> &mdash; a tool that isn&rsquo;t built. The working paths are warrant.wasm (drop shares) and the 128-hex paste. Either build <code>genesis-cli</code> or update the copy to the real paths.</li>
+  </ol>
+
+  <h2>DoD</h2>
+  <ul data-cm="dod">
+    <li class="ok">&#10003; A-D-D verified &mdash; auth canon (adopt-not-mint, ~/.purcius, pure-C, Registration) blessed at a-d-d r78; this inspect matches it. Keystone evolution flagged as un-blessed, not assumed.</li>
+    <li class="ok">&#10003; Artifact saved &mdash; be/plans/2026-07-07-1616-inspect-purcius-genesis-login.html</li>
+    <li class="ok">&#10003; Pub date top-right</li>
+    <li class="warn">&#9633; Index / commit / push &mdash; on save of the paired plan</li>
+    <li class="muted">N/A Production deploy &mdash; inspect is a discovery artifact (no deployable change)</li>
+  </ul>
+</main>
+<footer>Be &middot; Argus &middot; v0 &middot; r450 &middot; 2026-07-07 &middot; <code>~i</code> Purcius Genesis login &mdash; one signal in, full chain reaction out.</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"4f334338-28b3-4e10-af08-9897e2a98e58"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
