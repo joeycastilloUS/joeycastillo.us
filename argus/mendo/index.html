@@ -574,9 +574,9 @@ let APP = localStorage.getItem("argus_app") || "meraki";
 let APPSW_OPEN = false; // app-switcher dropdown open state
 const APPS = {
   meraki:  { label:"Meraki",  icon:"&#128225;", tag:"Network operations", tabs:["operations","network","audit"] },
-  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["focus","programs","comments","zdaudit","apibrowser"], source:"zendesk" },
+  zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["focus","programs","templates","comments","zdaudit","apibrowser"], source:"zendesk" },
   cloudflare: { label:"Cloudflare", icon:"&#9729;&#65039;", tag:"Edge · read-only", tabs:["apibrowser"], source:"cloudflare" },
-  airbyte: { label:"Airbyte", icon:"&#128260;", tag:"Philz migration", tabs:["helm","apibrowser"], source:"airbyte" },
+  airbyte: { label:"Airbyte", icon:"&#128260;", tag:"Airbyte migration", tabs:["helm","apibrowser"], source:"airbyte" },
   gcp: { label:"GCP", icon:"&#128176;", tag:"Cloud cost", tabs:["cost"] }
 };
 if(!APPS[APP]) APP="meraki";
@@ -1704,7 +1704,7 @@ const SOURCES = {
   zendesk: { label:"Zendesk", base:ZBRIDGE, tokenKey:null, note:"Mendocino Farms support — read-only" },
   meraki:  { label:"Meraki",  base:BRIDGE,  tokenKey:null, note:"Meraki network — read-only" },
   cloudflare: { label:"Cloudflare", base:CFBRIDGE, tokenKey:null, note:"your Cloudflare — zones/DNS/Pages, read-only" },
-  airbyte: { label:"Airbyte Migration", base:ABRIDGE, tokenKey:"argus_airbyte_token", note:"Philz clone-and-cutover — read-only observation" }
+  airbyte: { label:"Airbyte Migration", base:ABRIDGE, tokenKey:"argus_airbyte_token", note:"Airbyte clone-and-cutover — read-only observation" }
 };
 let AB = { source:"zendesk", cat:null, entry:"", params:{}, result:null, err:"", busy:false };
 function abToken(src){ const s=SOURCES[src]; if(!s) return ""; return s.tokenKey ? (localStorage.getItem(s.tokenKey)||"") : PW; }
@@ -1814,8 +1814,8 @@ var HELM = { busy:false, guard:null, guardErr:"", parity:null, parityErr:"", pla
              rbconfirm:"", rbapplying:false, rbresult:null, rbapplyErr:"", rbop:null, rbopId:null, rbopPolling:false };
 const HELM_PHRASE = "CLONE AIRBYTE_DB"; // mirror of MigrateGate.ConfirmPhraseFor("clone") — UX only, server-verified
 const HELM_PHRASE_CVT = "CONVERT AIRBYTE_CLONE"; // mirror of MigrateGate.ConfirmPhraseFor("convert") — UX only, server-verified
-const HELM_PHRASE_AWK = "AWAKEN PHILZ"; // mirror of MigrateGate.ConfirmPhraseFor("awaken") — UX only, server-verified
-const HELM_PHRASE_PARK = "PARK PHILZ"; // mirror of MigrateGate.ConfirmPhraseFor("park") — UX only, server-verified
+const HELM_PHRASE_AWK = "AWAKEN SOURCE"; // mirror of MigrateGate.ConfirmPhraseFor("awaken") — UX only, server-verified
+const HELM_PHRASE_PARK = "PARK SOURCE"; // mirror of MigrateGate.ConfirmPhraseFor("park") — UX only, server-verified
 const HELM_PHRASE_PROVE = "PROVE PARITY"; // mirror of MigrateGate.ConfirmPhraseFor("prove") — read-only L4 sweep; machine-sent, server-verified
 const HELM_PHRASE_CUT = "CUTOVER AIRBYTE_CLONE"; // mirror of MigrateGate.ConfirmPhraseFor("cutover") — UX only, server-verified
 const HELM_PHRASE_RB = "ROLLBACK CUTOVER"; // mirror of MigrateGate.ConfirmPhraseFor("rollback") — UX only, server-verified
@@ -1960,7 +1960,7 @@ async function helmCvtApply(){
 }
 // ---- Awaken card (Board AB4: the third gear) + Park (the safety inverse) ----
 async function helmAwkLockstep(){
-  if(HELM.busy) return; HELM.busy=true; helmLog("awaken: reading A=B schedule lockstep (philz live vs schedule.json)…"); renderHELM();
+  if(HELM.busy) return; HELM.busy=true; helmLog("awaken: reading A=B schedule lockstep (source live vs schedule.json)…"); renderHELM();
   try{ const d=await helmRead("schedule-lockstep"); HELM.awst=d.data; HELM.awstErr="";
        const s=HELM.awst||{};
        helmLog("schedule-lockstep: "+(s.lockstep?"LOCKSTEP — A=B":"match="+s.match+" drift="+s.drift+" missing="+s.missing)
@@ -1985,10 +1985,10 @@ async function helmAwkApply(){
     const d=await helmPost("apply",{ phase:"awaken", confirm:HELM.aconfirm });
     HELM.aresult=d;
     if(d.fired){
-      helmLog("AWAKEN FIRED — philz native schedules set · applied="+d.applied+" skipped="+d.skipped+" missing="+d.missing+" failed="+d.failed+" · re-reading lockstep…");
+      helmLog("AWAKEN FIRED — source native schedules set · applied="+d.applied+" skipped="+d.skipped+" missing="+d.missing+" failed="+d.failed+" · re-reading lockstep…");
       HELM.busy=false; helmAwkLockstep();
     }
-    else helmLog("DRY RESULT — every gate passed for real (incl. the phase-ordering gate); NO philz-config write happened (server seam AIRBYTE_FIRE_ENABLED is off). Per-connection diff below.");
+    else helmLog("DRY RESULT — every gate passed for real (incl. the phase-ordering gate); NO source-config write happened (server seam AIRBYTE_FIRE_ENABLED is off). Per-connection diff below.");
   }catch(e){ HELM.aapplyErr=String(e.message||e); helmLog("awaken apply REFUSED/FAILED: "+HELM.aapplyErr); }
   HELM.aapplying=false; renderHELM();
 }
@@ -1998,8 +1998,8 @@ async function helmParkApply(){
   try{
     const d=await helmPost("apply",{ phase:"park", confirm:HELM.pconfirm });
     HELM.presult=d;
-    if(d.fired){ helmLog("PARK FIRED — philz is quiet · parked="+d.applied+" already="+d.skipped+" failed="+d.failed+" · re-reading lockstep…"); HELM.busy=false; helmAwkLockstep(); }
-    else helmLog("DRY RESULT — gates passed for real; NO philz-config write happened (seam off). Would park the connections listed below.");
+    if(d.fired){ helmLog("PARK FIRED — source is quiet · parked="+d.applied+" already="+d.skipped+" failed="+d.failed+" · re-reading lockstep…"); HELM.busy=false; helmAwkLockstep(); }
+    else helmLog("DRY RESULT — gates passed for real; NO source-config write happened (seam off). Would park the connections listed below.");
   }catch(e){ HELM.papplyErr=String(e.message||e); helmLog("park apply REFUSED/FAILED: "+HELM.papplyErr); }
   HELM.papplying=false; renderHELM();
 }
@@ -2025,13 +2025,13 @@ async function helmProveL4(){
   }catch(e){ HELM.pvErr2=String(e.message||e); helmLog("L4 sweep REFUSED/FAILED: "+HELM.pvErr2); }
   HELM.pvRunning=false; renderHELM();
 }
-// The gate board: per stream, the 4 numbers — philz syncs, philz rows, L4, sweep — and the
-// honest verdict. Nothing reads proven until philz actually wrote (the tautology fix).
+// The gate board: per stream, the 4 numbers — source syncs, source rows, L4, sweep — and the
+// honest verdict. Nothing reads proven until source actually wrote (the tautology fix).
 function helmProveTable(){
   const p=HELM.pv; if(!p||!p.streams||!p.streams.length) return "";
   let h="<div style='max-height:38vh;overflow:auto'><table style='width:100%;border-collapse:collapse;font-size:12px;margin:8px 0'>"
     +"<tr style='color:#9aa3ad;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;text-align:left'>"
-    +"<th style='padding:4px 8px'>stream</th><th style='padding:4px 8px'>philz syncs</th><th style='padding:4px 8px'>philz rows</th>"
+    +"<th style='padding:4px 8px'>stream</th><th style='padding:4px 8px'>source syncs</th><th style='padding:4px 8px'>source rows</th>"
     +"<th style='padding:4px 8px'>L4 dedup</th><th style='padding:4px 8px'>L1–L3 sweep</th><th style='padding:4px 8px'>proven</th></tr>";
   p.streams.forEach(function(r){
     const pv=r.proven===true;
@@ -2120,13 +2120,13 @@ async function helmRbApply(){
   }catch(e){ HELM.rbapplyErr=String(e.message||e); helmLog("rollback apply REFUSED/FAILED: "+HELM.rbapplyErr); }
   HELM.rbapplying=false; renderHELM();
 }
-// The A-vs-B schedule table: target (schedule.json, prod's fire-times) vs current (philz live).
+// The A-vs-B schedule table: target (schedule.json, prod's fire-times) vs current (source live).
 // Wesley's Doordash 03:30 gets its flag; the two UTC pins say so; drift rows glow.
 function helmAwkTable(){
   const s=HELM.awst; if(!s||!s.rows) return "";
   let h="<table style='width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0'>"
     +"<tr style='color:#9aa3ad;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;text-align:left'>"
-    +"<th style='padding:4px 8px'>connection</th><th style='padding:4px 8px'>A · target (prod)</th><th style='padding:4px 8px'>B · philz current</th><th style='padding:4px 8px'>lockstep</th></tr>";
+    +"<th style='padding:4px 8px'>connection</th><th style='padding:4px 8px'>A · target (prod)</th><th style='padding:4px 8px'>B · source current</th><th style='padding:4px 8px'>lockstep</th></tr>";
   s.rows.forEach(function(r){
     const t=r.target||{}; const c=r.current||null;
     const cur=c?((c.scheduleType==="cron")?(abEsc(c.cron||"?")+" <span class='muted'>"+abEsc(c.timeZone||"")+"</span>"):("<i>"+abEsc(c.scheduleType||"?")+"</i>")):"<span class='muted'>—</span>";
@@ -2140,7 +2140,7 @@ function helmAwkTable(){
       +"<td style='padding:5px 8px'>"+st+"</td></tr>";
   });
   h+="</table>";
-  if(s.unmapped&&s.unmapped.length) h+="<div class='muted' style='font-size:11.5px'>Unmapped philz connections (never touched): "+s.unmapped.map(abEsc).join(", ")+"</div>";
+  if(s.unmapped&&s.unmapped.length) h+="<div class='muted' style='font-size:11.5px'>Unmapped source connections (never touched): "+s.unmapped.map(abEsc).join(", ")+"</div>";
   if(s.contention) h+="<div class='hdry' style='margin-top:6px'>&#9888; <b>03:30 single-box contention:</b> "+abEsc((s.contention.note||""))+"</div>";
   return h;
 }
@@ -2211,7 +2211,7 @@ function helmPane(){
 function helmInner(){
   const gv=helmGuardVerdict();
   let h="<div class='box'><div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'>"
-    +"<h2 style='margin:0'>Helm &mdash; Philz migration</h2><span class='hbadge'>FULL WHEEL &middot; CLONE &rarr; CONVERT &rarr; AWAKEN &rarr; PROVE &rarr; CUTOVER &middot; ROLLBACK ALWAYS ARMED</span></div>"
+    +"<h2 style='margin:0'>Helm &mdash; Airbyte migration</h2><span class='hbadge'>FULL WHEEL &middot; CLONE &rarr; CONVERT &rarr; AWAKEN &rarr; PROVE &rarr; CUTOVER &middot; ROLLBACK ALWAYS ARMED</span></div>"
     +"<div class='muted' style='margin-bottom:12px'>The wheel is complete: <b>Clone</b> &rarr; <b>Convert</b> &rarr; <b>Awaken</b> (with <b>Park</b>, its safety inverse) &rarr; <b>Prove</b> (the provenance-verified parity gate) &rarr; <b>Cutover</b> (the view-facade repoint), and <b>Rollback</b> &mdash; the master escape, reachable from any state. Prod (<span class='mono'>AIRBYTE_DB</span>) is un-writable by grant <i>absence</i> &mdash; proven on screen below, not promised; prod ingestion never stops.</div>";
   // scope token (per-source: unlocking Argus never unlocks migration data)
   const tv=localStorage.getItem("argus_airbyte_token")||"";
@@ -2291,7 +2291,7 @@ function helmInner(){
     if(HELM.cop){
       h+=helmOpTrail(HELM.cop);
       if(HELM.cop.status==="succeeded")
-        h+="<div class='hfired'>&#10003; <b>Convert succeeded.</b> AIRBYTE_CLONE now carries the 4 V2 columns &mdash; philz can sync into it. <b>Awaken is the next gear</b> &mdash; card 3 below.</div>";
+        h+="<div class='hfired'>&#10003; <b>Convert succeeded.</b> AIRBYTE_CLONE now carries the 4 V2 columns &mdash; source can sync into it. <b>Awaken is the next gear</b> &mdash; card 3 below.</div>";
       if(HELM.cop.status==="failed")
         h+="<div class='herr'>&#10007; <b>Convert op FAILED"+(HELM.cop.error?(":</b> "+abEsc(HELM.cop.error)):".</b> see the step trail above")+"</div>";
     }
@@ -2302,14 +2302,14 @@ function helmInner(){
   const ap=HELM.aplan||null; const apo=(ap&&ap.phaseOrder)||null;
   const convertDone=apo?(apo.convertDone===true):null;
   const aw=HELM.awst||null;
-  h+="<div class='hcard'><h3 style='color:#6FC3DF;margin:0 0 8px'>3 &middot; Awaken &mdash; philz fires at prod&rsquo;s exact moments (A=B lockstep)</h3>";
-  h+="<div class='muted' style='font-size:12px;margin:0 0 8px'>Sets each philz connection&rsquo;s <b>native</b> cron from <span class='mono'>schedule.json</span> (data in the repo &mdash; the lockstep reference, never memory), matched by connection name. <b>Wesley&rsquo;s Doordash 03:30 preserved exactly</b>; Comtrade/Cropster pinned UTC. Executes in <b>this service&rsquo;s own philz jacket</b> &mdash; a philz-API write, not a Snowflake write; the Snowflake key stays in cadence. Idempotent &mdash; already-lockstep connections skip.</div>";
+  h+="<div class='hcard'><h3 style='color:#6FC3DF;margin:0 0 8px'>3 &middot; Awaken &mdash; source fires at prod&rsquo;s exact moments (A=B lockstep)</h3>";
+  h+="<div class='muted' style='font-size:12px;margin:0 0 8px'>Sets each source connection&rsquo;s <b>native</b> cron from <span class='mono'>schedule.json</span> (data in the repo &mdash; the lockstep reference, never memory), matched by connection name. <b>Wesley&rsquo;s Doordash 03:30 preserved exactly</b>; Comtrade/Cropster pinned UTC. Executes in <b>this service&rsquo;s own source jacket</b> &mdash; a source-API write, not a Snowflake write; the Snowflake key stays in cadence. Idempotent &mdash; already-lockstep connections skip.</div>";
   h+=helmPreRow(HELM.aplanErr?"bad":(convertDone===null?"unk":(convertDone?"ok":"bad")), "Phase order — convert done in ARGUS_STATE",
       HELM.aplanErr?abEsc(HELM.aplanErr):(convertDone===null?"preview the plan to read it":(convertDone?"convert phase complete — awaken may run":"convert NOT done — apply will be refused (409 phase-order)")));
   h+=helmPreRow(HELM.awstErr?"bad":(aw?(aw.lockstep?"ok":"unk"):"unk"), "A=B schedule lockstep",
       HELM.awstErr?abEsc(HELM.awstErr):(aw?("match "+aw.match+" · drift "+aw.drift+" · missing "+aw.missing+(aw.lockstep?" — LOCKSTEP":"")):"not checked yet"));
   h+=helmPreRow(ap?(ap.fireArmed?"bad":"ok"):"unk", "Executor seam",
-      ap?(ap.fireArmed?"ARMED — Apply will really write philz config":"DISARMED — Apply returns the exact per-connection dry diff (AIRBYTE_FIRE_ENABLED off)"):"preview the plan to read it");
+      ap?(ap.fireArmed?"ARMED — Apply will really write source config":"DISARMED — Apply returns the exact per-connection dry diff (AIRBYTE_FIRE_ENABLED off)"):"preview the plan to read it");
   h+="<div style='margin:10px 0'>"
     +"<button class='hbtn' data-helm='awklock'"+(HELM.busy?" disabled":"")+">"+(HELM.busy?"Checking…":"&#8635; Check schedule lockstep")+"</button>"
     +"<button class='hbtn' data-helm='awkplan'"+(HELM.busy?" disabled":"")+">Preview plan (read-only)</button></div>";
@@ -2317,16 +2317,16 @@ function helmInner(){
   h+=helmAwkTable();
   if(HELM.aplanErr) h+="<div class='herr'>plan: "+abEsc(HELM.aplanErr)+"</div>";
   if(ap&&!aw&&ap.schedule){
-    h+="<div class='muted' style='font-size:12px;margin:6px 0'>The target book (schedule.json) — philz current unread (check lockstep for the live diff):</div>";
+    h+="<div class='muted' style='font-size:12px;margin:6px 0'>The target book (schedule.json) — source current unread (check lockstep for the live diff):</div>";
     (ap.schedule||[]).forEach(function(t){ h+="<div class='hprer'><span class='hunk'>&middot;</span> <span class='mono'>"+abEsc(t.name)+"</span> <span class='mono'>"+abEsc(t.cron)+" "+abEsc(t.timeZone)+"</span>"+(t.wesley?" <span class='hbadge'>WESLEY 03:30</span>":"")+"</div>"; });
   }
   h+="<div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px'>"
     +"<input class='hconf"+(HELM.aconfirm===HELM_PHRASE_AWK?" armed":"")+"' data-helm='awkconfirm' value='"+abEsc(HELM.aconfirm)+"' placeholder='type "+HELM_PHRASE_AWK+" to arm' autocomplete='off' spellcheck='false'>"
     +"<button class='hbtn happly' id='helm-aapply-btn' data-helm='awkapply'"+((HELM.aconfirm!==HELM_PHRASE_AWK||HELM.aapplying)?" disabled":"")+">"+(HELM.aapplying?"Applying…":"&#9654; Apply — Awaken")+"</button></div>"
-    +"<div class='muted' style='font-size:11.5px;margin-top:4px'>Server-verified: typed phrase (constant-time) + allow-list re-read + <b>phase-ordering gate</b> (convert must be done in ARGUS_STATE). philz calls are quick — the response is the per-connection result list, no polling.</div>";
+    +"<div class='muted' style='font-size:11.5px;margin-top:4px'>Server-verified: typed phrase (constant-time) + allow-list re-read + <b>phase-ordering gate</b> (convert must be done in ARGUS_STATE). source calls are quick — the response is the per-connection result list, no polling.</div>";
   if(HELM.aapplyErr) h+="<div class='herr'>apply: "+abEsc(HELM.aapplyErr)+"</div>";
   if(HELM.aresult && HELM.aresult.dryRun){
-    h+="<div class='hdry'>&#9888; <b>Dry result.</b> Scope, phase allow-list, operator allow-list, <b>phase-ordering</b> and the typed phrase all passed <i>on the server</i>; <b>no philz-config write happened</b> — the executor seam (<span class='mono'>AIRBYTE_FIRE_ENABLED</span>) is off. The exact diff it WOULD apply:</div>"
+    h+="<div class='hdry'>&#9888; <b>Dry result.</b> Scope, phase allow-list, operator allow-list, <b>phase-ordering</b> and the typed phrase all passed <i>on the server</i>; <b>no source-config write happened</b> — the executor seam (<span class='mono'>AIRBYTE_FIRE_ENABLED</span>) is off. The exact diff it WOULD apply:</div>"
       +helmAwkResults(HELM.aresult);
   }
   if(HELM.aresult && HELM.aresult.fired){
@@ -2335,25 +2335,25 @@ function helmInner(){
       +(HELM.aresult.stateRecorded?" · ARGUS_STATE recorded":" · <b>ARGUS_STATE NOT recorded</b>"+(HELM.aresult.stateNote?(" — "+abEsc(HELM.aresult.stateNote)):""))+"</div>"
       +helmAwkResults(HELM.aresult);
   }
-  // Park — the inverse control: all philz connections to manual (pre-clone quiet / panic brake)
+  // Park — the inverse control: all source connections to manual (pre-clone quiet / panic brake)
   h+="<div style='border-top:1px solid #2a3438;margin-top:14px;padding-top:10px'>"
     +"<div style='font-weight:700;color:#f0d9a8;margin-bottom:4px'>Park &mdash; the inverse</div>"
-    +"<div class='muted' style='font-size:12px;margin-bottom:8px'>Every philz connection &rarr; <span class='mono'>manual</span>. The pre-clone safety (philz must not sync into a clone about to be replaced) and the panic brake &mdash; no predecessor required. Same seam, same server-side gates.</div>"
+    +"<div class='muted' style='font-size:12px;margin-bottom:8px'>Every source connection &rarr; <span class='mono'>manual</span>. The pre-clone safety (source must not sync into a clone about to be replaced) and the panic brake &mdash; no predecessor required. Same seam, same server-side gates.</div>"
     +"<div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap'>"
     +"<input class='hconf"+(HELM.pconfirm===HELM_PHRASE_PARK?" armed":"")+"' data-helm='parkconfirm' value='"+abEsc(HELM.pconfirm)+"' placeholder='type "+HELM_PHRASE_PARK+" to arm' autocomplete='off' spellcheck='false'>"
     +"<button class='hbtn happly' id='helm-papply-btn' data-helm='parkapply'"+((HELM.pconfirm!==HELM_PHRASE_PARK||HELM.papplying)?" disabled":"")+">"+(HELM.papplying?"Applying…":"&#9654; Apply — Park")+"</button></div>";
   if(HELM.papplyErr) h+="<div class='herr'>park: "+abEsc(HELM.papplyErr)+"</div>";
   if(HELM.presult && HELM.presult.dryRun)
-    h+="<div class='hdry'>&#9888; <b>Dry result.</b> Gates passed on the server; <b>no philz-config write happened</b> (seam off). Would park:</div>"+helmAwkResults(HELM.presult);
+    h+="<div class='hdry'>&#9888; <b>Dry result.</b> Gates passed on the server; <b>no source-config write happened</b> (seam off). Would park:</div>"+helmAwkResults(HELM.presult);
   if(HELM.presult && HELM.presult.fired)
-    h+="<div class='"+(HELM.presult.ok?"hfired":"herr")+"'>"+(HELM.presult.ok?"&#10003; <b>Parked.</b> philz is quiet.":"&#10007; <b>Park finished with failures.</b>")
+    h+="<div class='"+(HELM.presult.ok?"hfired":"herr")+"'>"+(HELM.presult.ok?"&#10003; <b>Parked.</b> source is quiet.":"&#10007; <b>Park finished with failures.</b>")
       +" parked="+HELM.presult.applied+" · already="+HELM.presult.skipped+" · failed="+HELM.presult.failed+"</div>"+helmAwkResults(HELM.presult);
   h+="</div></div>";
 
   // ---- the Prove card (Board AB5: the provenance-verified parity gate — read-only) ----
   const pv=HELM.pv||null;
   h+="<div class='hcard'><h3 style='color:#6FC3DF;margin:0 0 8px'>4 &middot; Prove &mdash; provenance-verified parity (the gate Cutover reads)</h3>";
-  h+="<div class='muted' style='font-size:12px;margin:0 0 8px'>A stream is <b>proven</b> only when <b>philz actually wrote</b> post-Awaken (rows appended &gt; 0, syncs &ge; "+(pv&&pv.minSyncs!=null?pv.minSyncs:"N")+" &mdash; via <span class='mono'>_AIRBYTE_EXTRACTED_AT</span> after the awaken row + distinct <span class='mono'>_AIRBYTE_META:sync_id</span>) <b>AND</b> the <b>L4 PK-dedup diff</b> reconciled the overlap (dedup both sides by PK on latest extraction, HASH_AGG the deduped business rows, divergent PKs surfaced) <b>AND</b> the L1&ndash;L3 sweep is green. A clone-of-prod match alone is a <i>tautology</i> &mdash; a copy always equals its original. Entirely read-only: no seam, nothing to fire.</div>";
+  h+="<div class='muted' style='font-size:12px;margin:0 0 8px'>A stream is <b>proven</b> only when <b>source actually wrote</b> post-Awaken (rows appended &gt; 0, syncs &ge; "+(pv&&pv.minSyncs!=null?pv.minSyncs:"N")+" &mdash; via <span class='mono'>_AIRBYTE_EXTRACTED_AT</span> after the awaken row + distinct <span class='mono'>_AIRBYTE_META:sync_id</span>) <b>AND</b> the <b>L4 PK-dedup diff</b> reconciled the overlap (dedup both sides by PK on latest extraction, HASH_AGG the deduped business rows, divergent PKs surfaced) <b>AND</b> the L1&ndash;L3 sweep is green. A clone-of-prod match alone is a <i>tautology</i> &mdash; a copy always equals its original. Entirely read-only: no seam, nothing to fire.</div>";
   h+=helmPreRow(HELM.pvErr?"bad":(pv?(pv.green===true?"ok":"bad"):"unk"), "Prove gate",
       HELM.pvErr?abEsc(HELM.pvErr):(pv?abEsc(pv.gate||"?"):"not checked yet"));
   if(pv&&pv.l4) h+=helmPreRow(pv.l4.sweptAt?"ok":"unk", "L4 sweep",
@@ -2367,7 +2367,7 @@ function helmInner(){
   if(HELM.popId&&HELM.pop) h+=helmOpTrail(HELM.pop);
   h+=helmProveTable();
   if(pv&&pv.awakenDone===false)
-    h+="<div class='hdry'>&#9888; <b>Not yet proven &mdash; honestly.</b> Awaken hasn&rsquo;t run: philz has written nothing, so there is no provenance to verify. The board goes live the moment philz writes.</div>";
+    h+="<div class='hdry'>&#9888; <b>Not yet proven &mdash; honestly.</b> Awaken hasn&rsquo;t run: source has written nothing, so there is no provenance to verify. The board goes live the moment source writes.</div>";
   h+="</div>";
 
   // ---- the Cutover card (Board AB5: the view-facade repoint) ----
@@ -2724,6 +2724,7 @@ const FOCUS_SAMPLE = {
   illness: {
     id:"48213", store:"Marina del Rey", dov:"Maria", when:"9:47 PM · after hours",
     tags:["sick","food_illness","store_marina_del_rey"],
+    srcTpl:{t:"Foreign Object",usage:7,e:9,f:0.93},
     zora:"Hi Danielle — I'm so sorry to hear you're feeling unwell after eating with us. Your health is what matters most right now. I've flagged this to our Food Safety team and the manager at our Marina del Rey location directly, and someone will personally follow up with you today. Thank you for telling us — it genuinely helps us keep everyone safe.",
     rest:'PUT /api/v2/tickets/48213.json\n{\n  "ticket": {\n    "group_id": 28004417,          // FSQA\n    "additional_tags": ["sick", "food_illness", "store_marina_del_rey"],\n    "followers": [{ "group": "DO - Maria" }],\n    "priority": "urgent"\n  }\n}'
   }
@@ -2765,6 +2766,8 @@ function focusPane(){
    +"#pane-focus .fzora{background:#0f1410;border:1px solid #243024;border-radius:8px;padding:11px 13px;color:#dfe6df;font-size:13.5px;line-height:1.55;}"
    +"#pane-focus .fzlab{color:#7CFFB2;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;font-weight:700;}"
    +"#pane-focus .fsample{color:#8a93a0;font-size:11px;font-style:italic;margin-top:6px;}"
+   +"#pane-focus .fsrc{background:#0c1418;border:1px solid #14323e;border-radius:8px;padding:8px 12px;color:#9fd6e6;font-size:12px;margin-top:8px;}"
+   +"#pane-focus .fsrc b{color:#7CFFB2;}#pane-focus .fsrc .fx{font-family:Consolas,monospace;color:#ffce85;}"
    +"#pane-focus pre.frest{background:#08191f;border:1px solid #123;border-radius:8px;padding:11px 13px;color:#7fd6ea;font-size:12px;overflow:auto;margin:11px 0;font-family:ui-monospace,Consolas,monospace;}"
    +"#pane-focus .fbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}"
    +"#pane-focus .fbtn{border-radius:7px;padding:8px 16px;font-size:13px;font-weight:700;cursor:not-allowed;border:1px solid transparent;}"
@@ -2805,6 +2808,7 @@ function focusPane(){
   s+="<div class='fgate'><div class='hd'><b style='color:#cdd6da;font-size:13px'>Gated action &mdash; preview before anything fires</b>"
     +"<span class='fwait'>&#9679; WAITING FOR OPERATOR &mdash; NOTHING HAS BEEN SENT</span></div>";
   s+="<div class='fzora'><div class='fzlab'>Acknowledgement to the guest &middot; Zora voice</div>"+esc(il.zora)+"</div>";
+  if(il.srcTpl){ const st=il.srcTpl; s+="<div class='fsrc'>Starts from <b>"+esc(st.t)+"</b> &middot; used <b>"+st.usage+"&times;</b>/30d &middot; matched at <span class='fx'>"+(st.f?st.f.toFixed(2):"")+"</span> fidelity &middot; draft edits <span class='fx'>"+st.e+"%</span> &mdash; nous atom-diff over the .pi Template Library, $0.</div>"; }
   s+="<div class='fsample'>Sample voice &mdash; final tone trained on Zora's actual replies (corpus pull is an open action item).</div>";
   s+="<pre class='frest'>"+esc(il.rest)+"</pre>";
   s+="<div class='fbtns'><span class='fbtn fb-app'>Approve &amp; fire</span><span class='fbtn fb-edit'>Edit</span><span class='fbtn fb-rej'>Reject</span>"
@@ -2824,7 +2828,7 @@ const PROGRAMS_SAMPLE = {
         ["GUEST","disputes a US Foods invoice charge — tone escalates across 19 comments"],
         ["AGENT","separates the vendor billing dispute from the guest-facing thread"],
         ["SYSTEM","retrieves the order + payment proof (read-only)"],
-        ["AGENT","confirms the refund + timeline in a single reply"],
+        ["AGENT","confirms the refund + timeline in a single reply",{none:true,best:0.25}],
         ["SYSTEM","tags resolved · routes the vendor issue to accounting"]
       ],
       precedents:[
@@ -2832,13 +2836,14 @@ const PROGRAMS_SAMPLE = {
         {id:"251801",label:"double-charge dispute",out:"recovered"},
         {id:"261912",label:"invoice mismatch → credit",out:"recovered"}
       ],
-      worked:"Refund confirmed in ≤2 replies correlated with recovery in 9 of 12 precedents. The 17 comments of back-and-forth (the noise) did not — they were stripped." },
+      worked:"Refund confirmed in ≤2 replies correlated with recovery in 9 of 12 precedents. The 17 comments of back-and-forth (the noise) did not — they were stripped.",
+      workedTpl:"The winning reply matched NO template — it was hand-written for this vendor dispute (best score 0.25, below the 0.55 bar). This is a candidate for a new 'Vendor Billing — Refund Confirmed' template." },
     { id:"375102", label:"Missing items · Marina del Rey", raw:"6 comments · 2,140 chars", strip:61,
       steps:[
         ["GUEST","reports missing Not So Fried Chicken + sides — second time this month"],
-        ["AGENT","acknowledges + apologizes in Zora's voice"],
+        ["AGENT","acknowledges + apologizes in Zora's voice",{t:"General Apology — $10 Code",f:0.93,e:8}],
         ["SYSTEM","peeks the next I'm Sorry Code (read-only — never writes the sheet)"],
-        ["AGENT","sends the code + confirms the store was notified"],
+        ["AGENT","sends the code + confirms the store was notified",{t:"Digital I'm Sorry — One Code",f:0.90,e:14}],
         ["SYSTEM","routes to DO-Maria + store · tags resolved"]
       ],
       precedents:[
@@ -2846,7 +2851,8 @@ const PROGRAMS_SAMPLE = {
         {id:"374920",label:"wrong order → coupon",out:"recovered"},
         {id:"374811",label:"missing entrée (no reply sent)",out:"lost"}
       ],
-      worked:"Empathetic reply + code within the hour recovered 9 of 12. Silence lost the guest — #374811 got no reply and churned." }
+      worked:"Empathetic reply + code within the hour recovered 9 of 12. Silence lost the guest — #374811 got no reply and churned.",
+      workedTpl:"Replies built from General Apology — $10 Code + Digital I'm Sorry — One Code, sent within the hour, recovered 9 of 12 nearest precedents. #374811 churned — it matched NO template (it got no reply at all)." }
   ]
 };
 function programsPane(){
@@ -2878,6 +2884,11 @@ function programsPane(){
    +"#pane-programs .o-recovered{background:#06251a;color:#7CFFB2;}#pane-programs .o-lost{background:#2a1414;color:#ff9b9b;}"
    +"#pane-programs .pworked{background:#0f1410;border:1px solid #243024;border-radius:8px;padding:10px 13px;color:#cfe6d4;font-size:13px;line-height:1.5;margin-top:11px;}"
    +"#pane-programs .pworked b{color:#7CFFB2;}"
+   +"#pane-programs .pworked.tpl{background:#0c1418;border-color:#14323e;color:#cfe0e6;margin-top:7px;}"
+   +"#pane-programs .pworked.tpl b{color:#6FC3DF;}"
+   +"#pane-programs .pattr{display:inline-block;margin-top:5px;background:#0c1a12;border:1px solid #1f5c38;border-radius:6px;padding:2px 9px;font-size:11.5px;color:#7CFFB2;font-weight:700;}"
+   +"#pane-programs .pattr.none{background:#1a1408;border-color:#5a4a1a;color:#ffce85;}"
+   +"#pane-programs .pattr .fx{font-family:Consolas,monospace;}"
    +"#pane-programs .pinfer{background:#101c22;border:1px solid #14323e;border-radius:8px;padding:9px 13px;color:#9fd6e6;font-size:12px;margin-top:12px;}"
    +"</style>";
   s+="<div class='pwrap'>";
@@ -2889,18 +2900,131 @@ function programsPane(){
     s+="<div class='preduce'><div class='pbar'><span class='lbl'>"+t.strip+"% noise stripped</span><span class='keep' style='width:"+keep+"%'></span><span class='lbl2'>"+keep+"% signal</span></div></div>";
     // the program
     s+="<div class='psh'>The program &mdash; ordered action-units (.pi)</div>";
-    t.steps.forEach((st,i)=>{ s+="<div class='pstep'><span class='pnum'>"+(i+1)+"</span><span class='prole r-"+st[0]+"'>"+st[0]+"</span><span class='ptext'>"+esc(st[1])+"</span></div>"; });
+    t.steps.forEach((st,i)=>{ let attr=""; const a=st[2];
+      if(a){ attr = a.none
+        ? "<div class='pattr none'>&#9873; <b>NOT MATCHED</b> · hand-written · best score "+a.best.toFixed(2)+" (below 0.55)</div>"
+        : "<div class='pattr'>&#9873; template: <b>"+esc(a.t)+"</b> · fidelity <span class='fx'>"+a.f.toFixed(2)+"</span> · edited <span class='fx'>"+a.e+"%</span></div>"; }
+      s+="<div class='pstep'><span class='pnum'>"+(i+1)+"</span><span class='prole r-"+st[0]+"'>"+st[0]+"</span><span class='ptext'>"+esc(st[1])+attr+"</span></div>"; });
     // precedents = the moat
     s+="<div class='psh'>Nearest precedents &mdash; the retrieval moat</div><div class='pprec'>";
     t.precedents.forEach(p=>{ s+="<span class='ppc'>#"+p.id+" &middot; "+esc(p.label)+" <span class='pout o-"+p.out+"'>"+p.out.toUpperCase()+"</span></span>"; });
     s+="</div>";
     s+="<div class='pworked'><b>What worked:</b> "+esc(t.worked)+"</div>";
+    if(t.workedTpl) s+="<div class='pworked tpl'><b>What worked, by template:</b> "+esc(t.workedTpl)+"</div>";
     s+="</div>";
   });
   s+="<div class='pinfer'>&#9881; This is <b>INFER = reduce + classify + retrieve</b> &mdash; pure C first (deterministic decode + nearest-precedent lookup over the sealed IDS), the model last (only to voice the final reply). The past becomes an operational codebase you can query.</div>";
+  s+="<div class='pinfer' style='margin-top:8px'>&#9873; <b>Template attribution</b> &mdash; each agent reply is scored against the <b>.pi Template Library</b> (all 285 comms templates atomized via nous <code>understand()</code>) by role-aware atom-diff. Proven on the real templates: <b>93% top-1</b> recovery of the source template from an agent-edited reply, <b>precision 1.00</b> @ threshold 0.55 (0 false-positives across 250 guest messages), <b>$0</b>, deterministic. No model in the attribution path.</div>";
   s+="</div>";
   return s;
 }
+// ── Templates tab — the live face of the reply-template inventory. Reads Mendo's macros straight
+// from zendesk-bridge (/read?entry=macros, usage_30d sideload) — read-only, no backend change.
+// Grouped by the macro's own Zendesk category (the real family), sorted by 30-day usage, dead flagged.
+// The ".pi Template Library" attribution (which mined program used which template) is the follow-on
+// board; here we ship what's live today: usage you can see.
+let ZTPL = { run:null, busy:false, err:"", prog:"" };
+function ztplTier(u, med){ u=+u||0; if(u===0) return "dead"; return u>=med ? "hot" : "warm"; }
+function ztplClassify(macros){
+  // comms templates = a macro that carries a message body. Workflow-only macros (tag/route, empty body) are excluded.
+  const items = macros.filter(m=>((m.body||"").trim().length>0)).map(m=>({
+    id:m.id, title:(m.title||"("+m.id+")"), cat:((m.category||m.cat||"").trim()||"(uncategorized)"),
+    active:m.active!==false, usage:(+m.usage_30d||0), body:(m.body||"").replace(/\s+/g," ").trim()
+  }));
+  const used = items.filter(i=>i.usage>0).map(i=>i.usage).sort((a,b)=>a-b);
+  const med = used.length ? used[Math.floor(used.length/2)] : 1; // median of USED templates
+  items.forEach(i=>{ i.tier = ztplTier(i.usage, med); });
+  // group by the real Zendesk category = the family
+  const fam={};
+  items.forEach(i=>{ (fam[i.cat]=fam[i.cat]||{name:i.cat,items:[],usage:0}).items.push(i); fam[i.cat].usage+=i.usage; });
+  const families = Object.values(fam).map(f=>{ f.items.sort((a,b)=>b.usage-a.usage||a.title.localeCompare(b.title)); return f; })
+    .sort((a,b)=>b.usage-a.usage || b.items.length-a.items.length);
+  return {
+    total: macros.length, comms: items.length,
+    hot: items.filter(i=>i.tier==="hot").length,
+    warm: items.filter(i=>i.tier==="warm").length,
+    dead: items.filter(i=>i.tier==="dead").length,
+    med, families
+  };
+}
+async function ztplLoad(){
+  ZTPL.busy=true; ZTPL.err=""; ZTPL.prog="macros"; renderZTPL();
+  try{
+    const macros = await zdAll("macros","macros-page","macros");
+    ZTPL.run = ztplClassify(macros);
+  }catch(e){ ZTPL.err = (e&&e.code)? ("HTTP "+e.code+(e.code===401?" — unlock the console first":"")) : ((e&&e.message)||"load failed"); }
+  ZTPL.busy=false; ZTPL.prog=""; if(TAB==="templates") renderZTPL(); render();
+}
+function ztplBar(i){
+  const pct = i.usage<=0 ? 0 : Math.max(6, Math.min(100, Math.round(100*i.usage/Math.max(ZTPL.run.med*2,1))));
+  return "<span class='tubar "+i.tier+"'><span class='fill' style='width:"+pct+"%'></span></span>";
+}
+function ztplInner(){
+  if(ZTPL.busy) return "<div class='tld'><span class='spin'></span> reading templates &middot; "+esc(ZTPL.prog||"")+"&hellip;</div>";
+  if(ZTPL.err) return "<div class='terr'>"+esc(ZTPL.err)+"</div><button class='tload' data-ztplload>Retry</button>";
+  if(!ZTPL.run){
+    return "<div class='tlead'><b>Mendo's reply templates &mdash; live.</b> Every macro that carries a message body, grouped by family, ranked by how often it fired in the last 30 days. Read straight from zendesk-bridge &mdash; today's count, not a snapshot.</div>"
+      +"<button class='tload' data-ztplload>&#128221; Load templates</button>"
+      +"<div class='tnote'>Read-only. The &ldquo;used in N programs&rdquo; attribution rides the .pi Template Library &mdash; the next board.</div>";
+  }
+  const R=ZTPL.run;
+  let s="<div class='thead'>";
+  s+="<div class='tchips'>"
+    +"<span class='tchip'><b>"+R.total+"</b> templates</span>"
+    +"<span class='tchip'><b>"+R.comms+"</b> with a message body</span>"
+    +"<span class='tchip hot'><b>"+R.hot+"</b> hot (30d)</span>"
+    +"<span class='tchip warm'><b>"+R.warm+"</b> warm</span>"
+    +"<span class='tchip dead'><b>"+R.dead+"</b> dead (0 in 30d)</span>"
+    +"<button class='tref' data-ztplload>&#8635; Refresh</button></div></div>";
+  R.families.forEach(f=>{
+    s+="<div class='tfam'>"+esc(f.name)+" <span class='tfamn'>&middot; "+f.items.length+" &middot; "+f.usage+"&times;/30d</span></div>";
+    f.items.forEach(i=>{
+      s+="<div class='trow "+i.tier+"'>"
+        +"<span class='tt'>"+esc(i.title)+(i.active?"":" <span class='tinact'>inactive</span>")+"</span>"
+        +"<span class='tbody'>"+esc(i.body.slice(0,110))+(i.body.length>110?"&hellip;":"")+"</span>"
+        +ztplBar(i)
+        +"<span class='tuv'>"+i.usage+"<span class='lab'>&times;/30d</span></span>"
+        +(i.tier==="dead"?"<span class='tdead'>DEAD</span>":"")
+        +"</div>";
+    });
+  });
+  return s;
+}
+function renderZTPL(){ const w=document.getElementById("ztpl-wrap"); if(w) w.innerHTML=ztplInner(); }
+function templatesPane(){
+  return "<style>"
+    +"#pane-templates .tlead{color:#8a93a0;font-size:13px;line-height:1.55;margin-bottom:14px;max-width:720px;}"
+    +"#pane-templates .tlead b{color:#e6edf2;}"
+    +"#pane-templates .tload{background:#16242b;color:#9fd6e6;border:1px solid #2c4a55;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .tload:hover{background:#1a2f38;color:#6FC3DF;}"
+    +"#pane-templates .tnote{color:#6b7a82;font-size:11.5px;margin-top:10px;}"
+    +"#pane-templates .tld{color:#8a93a0;font-size:13px;padding:14px 0;}"
+    +"#pane-templates .terr{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:10px 13px;font-size:12.5px;margin-bottom:10px;}"
+    +"#pane-templates .thead{margin-bottom:6px;}"
+    +"#pane-templates .tchips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}"
+    +"#pane-templates .tchip{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 10px;border:1px solid #262626;background:#0e0e0e;color:#8a93a0;}"
+    +"#pane-templates .tchip b{color:#e8e8e8;font-weight:800;}"
+    +"#pane-templates .tchip.hot b{color:#7CFFB2;}#pane-templates .tchip.warm b{color:#ffce85;}#pane-templates .tchip.dead b{color:#ff9b9b;}"
+    +"#pane-templates .tref{margin-left:auto;background:#12181d;color:#8fb7c4;border:1px solid #2a343b;border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .tfam{color:#6FC3DF;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 7px;}"
+    +"#pane-templates .tfamn{color:#6b7a82;font-weight:600;letter-spacing:0;text-transform:none;}"
+    +"#pane-templates .trow{background:#141414;border:1px solid #262626;border-left:4px solid #262626;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;}"
+    +"#pane-templates .trow.hot{border-left-color:#7CFFB2;}#pane-templates .trow.warm{border-left-color:#ffce85;}#pane-templates .trow.dead{border-left-color:#ff6b6b;opacity:.7;}"
+    +"#pane-templates .tt{font-weight:800;font-size:13px;flex:0 0 auto;color:#e8e8e8;}"
+    +"#pane-templates .tinact{color:#8a93a0;font-weight:600;font-size:10.5px;border:1px solid #333;border-radius:4px;padding:0 5px;}"
+    +"#pane-templates .tbody{color:#9aa7b0;font-size:12px;flex:1 1 220px;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
+    +"#pane-templates .tubar{flex:0 0 120px;height:16px;border-radius:5px;background:#0e0e0e;border:1px solid #262626;position:relative;overflow:hidden;}"
+    +"#pane-templates .tubar .fill{position:absolute;left:0;top:0;bottom:0;background:#12402c;border-right:2px solid #7CFFB2;}"
+    +"#pane-templates .tubar.warm .fill{background:#2a2008;border-right-color:#ffce85;}"
+    +"#pane-templates .tubar.dead .fill{background:#2a1111;border-right-color:#ff6b6b;width:2px;}"
+    +"#pane-templates .tuv{flex:0 0 80px;text-align:right;font-size:12.5px;font-weight:800;color:#e8e8e8;font-family:Consolas,monospace;}"
+    +"#pane-templates .tuv .lab{color:#6b7a82;font-weight:400;font-size:10.5px;}"
+    +"#pane-templates .tdead{flex:0 0 auto;color:#ff9b9b;font-size:10px;font-weight:800;letter-spacing:.04em;}"
+    +"</style><div id='ztpl-wrap'>"+ztplInner()+"</div>";
+}
+document.addEventListener("click", function(e){
+  if(e.target && e.target.closest && e.target.closest("[data-ztplload]")){ ztplLoad(); return; }
+});
 function commentsPane(){
   return "<style>"
     +"#pane-comments .cmwrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}"
@@ -3062,13 +3186,14 @@ function render(){
   // The chosen application drives the source for the API Browser + which tabs appear.
   if(APPS[APP].source) AB.source=APPS[APP].source;
   // No auto-fetch on render/switch. Every data tool loads only when the operator clicks Load/Refresh.
-  const nsb=document.querySelector(".navsub"); if(nsb) nsb.innerHTML="<b>"+APPS[APP].label+"</b> &mdash; "+(APP==="zendesk"?"Support · read-only":APP==="cloudflare"?"Edge · read-only":APP==="airbyte"?"Philz clone-and-cutover &middot; gated writes":APP==="gcp"?"Cloud cost &middot; read-only":"Operationally Driven, Network Operations Center");
+  const nsb=document.querySelector(".navsub"); if(nsb) nsb.innerHTML="<b>"+APPS[APP].label+"</b> &mdash; "+(APP==="zendesk"?"Support · read-only":APP==="cloudflare"?"Edge · read-only":APP==="airbyte"?"Airbyte clone-and-cutover &middot; gated writes":APP==="gcp"?"Cloud cost &middot; read-only":"Operationally Driven, Network Operations Center");
   const tabHtml={
     operations:"<button class='tabv"+(TAB==="operations"?" on":"")+"' data-tab='operations'><span class='ti'>&#9776;</span><span class='tl'>Operations</span></button>",
     network:"<button class='tabv"+(TAB==="network"?" on":"")+"' data-tab='network'><span class='ti'>"+WIFI+"</span><span class='tl'>Network"+(NETV.net?" &middot; "+ssidCount+" SSID"+(ssidCount===1?"":"s"):"")+"</span></button>",
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
     focus:"<button class='tabv"+(TAB==="focus"?" on":"")+"' data-tab='focus'><span class='ti'>&#127919;</span><span class='tl'>Focus"+(FOCUS_SAMPLE?" &middot; <b class='bad'>"+FOCUS_SAMPLE.detractors.filter(d=>d.status!=='resolved').length+"</b>":"")+"</span></button>",
     programs:"<button class='tabv"+(TAB==="programs"?" on":"")+"' data-tab='programs'><span class='ti'>&#129513;</span><span class='tl'>Conversations</span></button>",
+    templates:"<button class='tabv"+(TAB==="templates"?" on":"")+"' data-tab='templates'><span class='ti'>&#128221;</span><span class='tl'>Templates"+((ZTPL.run&&ZTPL.run.hot)?" &middot; <b class='ok'>"+ZTPL.run.hot+"</b>":"")+"</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Tickets</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
     zdaudit:"<button class='tabv"+(TAB==="zdaudit"?" on":"")+"' data-tab='zdaudit'><span class='ti'>&#128203;</span><span class='tl'>Audit"+((ZAUD.run&&ZAUD.run.findings.length)?" &middot; <b class='bad'>"+ZAUD.run.findings.length+"</b>":"")+"</span></button>",
@@ -3109,6 +3234,7 @@ function render(){
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
   h+="<div id='pane-focus' class='"+paneCls("focus")+"'>"+realBadge("demo")+focusPane()+cmBar("focus","Focus tab")+"</div>";
   h+="<div id='pane-programs' class='"+paneCls("programs")+"'>"+realBadge("demo")+programsPane()+cmBar("conversations","Conversations tab")+"</div>";
+  h+="<div id='pane-templates' class='"+paneCls("templates")+"'>"+realBadge("live")+templatesPane()+cmBar("templates","Templates tab")+"</div>";
   h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+realBadge("live")+commentsPane()+cmBar("tickets","Tickets tab")+"</div>";
   h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+realBadge("live")+apiBrowserPane()+cmBar("apibrowser","API Browser tab")+"</div>";
   h+="<div id='pane-zdaudit' class='"+paneCls("zdaudit")+"'>"+realBadge("live")+zdAuditPane()+cmBar("audit","Audit tab")+"</div>";
@@ -4383,7 +4509,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r444 . c1ff587 . 2026-07-07</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r460 . ca05295 . 2026-07-08</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
