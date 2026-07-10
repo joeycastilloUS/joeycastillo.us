@@ -3221,7 +3221,10 @@ function programsPane(){
 // clustered into macro candidates (draftBody = the medoid reply, ready to paste into a new macro);
 // (2) OFF-SCRIPT -- every hand-written guest reply with its closest template + fidelity (coaching).
 // Read-only end to end: "Copy drafted macro" only copies text; the operator creates it in Zendesk.
-let OSG = { run:null, busy:false, err:"", scope:"guest", ts:0, pend:false };
+let OSG = { run:null, busy:false, err:"", scope:"guest", ts:0, pend:false,
+  // per-scope open-row set (ticketId:commentId keys) for the expandable diff;
+  // and the AI "what was different" summary cache (keyed by scope so it survives tab switches).
+  open:{}, sum:{ guest:null, all:null }, sumBusy:false, sumErr:"" };
 // The bridge scans the last OSG_DAYS days, at most OSG_MAX tickets, and says so honestly
 // (scanned/inScope/candidates/capped in the header) -- never silent truncation.
 const OSG_DAYS=45, OSG_MAX=100;
@@ -3273,20 +3276,115 @@ function osgGaps(){
   });
   return s;
 }
+// Word-level diff: tokenize on whitespace (keeping the whitespace runs so we can
+// rejoin faithfully), run a classic LCS over the word tokens, and mark each token
+// as common / removed (was in template a, gone from agent b) / added (new in b).
+// Returns an array of {t:"same"|"del"|"add", w:"<token>"}. Self-contained, no lib.
+function wordDiff(a,b){
+  const tok=function(s){ return String(s==null?"":s).split(/(\s+)/).filter(function(x){return x.length;}); };
+  const A=tok(a), B=tok(b);
+  // Only diff the non-whitespace words via LCS; whitespace is carried along on each word.
+  const wa=[], wb=[], ia=[], ib=[];
+  A.forEach(function(x,i){ if(!/^\s+$/.test(x)){ wa.push(x); ia.push(i); } });
+  B.forEach(function(x,i){ if(!/^\s+$/.test(x)){ wb.push(x); ib.push(i); } });
+  const n=wa.length, m=wb.length;
+  // LCS table (word equality is case-insensitive so a re-capitalized word isn't "changed").
+  const eq=function(x,y){ return x.toLowerCase()===y.toLowerCase(); };
+  const dp=[]; for(let i=0;i<=n;i++){ dp.push(new Array(m+1).fill(0)); }
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
+    dp[i][j]= eq(wa[i],wb[j]) ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j],dp[i][j+1]);
+  // Walk the LCS, emitting del (template-only) and add (agent-only) as we go.
+  const out=[]; let i=0,j=0;
+  const pushSame=function(w){ out.push({t:"same",w:w}); };
+  const pushDel =function(w){ out.push({t:"del", w:w}); };
+  const pushAdd =function(w){ out.push({t:"add", w:w}); };
+  while(i<n && j<m){
+    if(eq(wa[i],wb[j])){ pushSame(wb[j]); i++; j++; }
+    else if(dp[i+1][j]>=dp[i][j+1]){ pushDel(wa[i]); i++; }
+    else { pushAdd(wb[j]); j++; }
+  }
+  while(i<n){ pushDel(wa[i]); i++; }
+  while(j<m){ pushAdd(wb[j]); j++; }
+  return out;
+}
+// Render the diff array to HTML: removed template words struck/red, agent-added words
+// green, common words neutral. Everything escaped; single spaces between words.
+function osgDiffHtml(a,b){
+  const parts=wordDiff(a,b);
+  if(!parts.length) return "<span class='osdnone'>(no content to compare)</span>";
+  return parts.map(function(p){
+    const w=esc(p.w);
+    if(p.t==="del") return "<span class='osd-del'>"+w+"</span>";
+    if(p.t==="add") return "<span class='osd-add'>"+w+"</span>";
+    return "<span class='osd-same'>"+w+"</span>";
+  }).join(" ");
+}
+function osgRowKey(o){ return esc(String(o.ticketId))+":"+esc(String(o.commentId!=null?o.commentId:"")); }
 function osgOffscript(){
   const rows=(OSG.run&&OSG.run.offscript)||[];
   if(!rows.length) return "";
   let s="<div class='ossect'>Off-script replies <span class='ossectn'>&middot; each hand-written guest reply + its closest template &mdash; the coaching list</span></div>";
-  rows.forEach(function(o){
+  s+=osgSummaryBlock();
+  rows.forEach(function(o,idx){
     const n=o.nearest;
-    s+="<div class='osrow'>"
+    const key=o.ticketId+":"+(o.commentId!=null?o.commentId:"");
+    const open=!!OSG.open[OSG.scope+"|"+key];
+    // A row only expands if we have both bodies to diff against.
+    const canDiff = n && (o.agentBody!=null) && (n.templateBody!=null);
+    s+="<div class='osrow"+(open?" open":"")+"'>"
+      +"<div class='osrowhead'"+(canDiff?" data-osgtoggle='"+idx+"'":"")+">"
+      +(canDiff?"<span class='ostwist'>"+(open?"&#9662;":"&#9656;")+"</span>":"<span class='ostwist off'>&nbsp;</span>")
       +"<a class='oslink' href='"+esc(o.url||"#")+"' target='_blank' rel='noopener'>#"+esc(o.ticketId)+"</a>"
       +"<span class='osbody'>"+esc(o.snippet||"")+"</span>"
       +(o.group&&o.group.name?"<span class='osgrp'>"+esc(o.group.name)+"</span>":"")
       +(n&&n.title?"<span class='osnear'>closest template: <b>"+esc(n.title)+"</b> @"+(+n.fidelity||0).toFixed(2)+"</span>":"<span class='osnear none'>no near match</span>")
+      +(canDiff?"<span class='osdiffaff'>&#9656; diff</span>":"")
       +"</div>";
+    if(canDiff && open){
+      s+="<div class='osdiffwrap'>"
+        +"<div class='osdmetrics'>edited <b>"+(+n.editPct||0)+"%</b> &middot; covered <b>"+(+n.coverPct||0)+"%</b> &middot; fidelity <b>"+(+n.fidelity||0).toFixed(2)+"</b>"
+          +(n.margin!=null?" &middot; margin <b>"+(+n.margin).toFixed(2)+"</b>":"")
+          +(n.title?" &middot; closest template: <b>"+esc(n.title)+"</b>":"")+"</div>"
+        +"<div class='osdlegend'><span class='osd-del'>template removed</span> <span class='osd-add'>agent added</span> <span class='osd-same'>kept</span></div>"
+        +"<div class='osdiff'>"+osgDiffHtml(n.templateBody, o.agentBody)+"</div>"
+        +"</div>";
+    }
+    s+="</div>";
   });
   return s;
+}
+// AI "what was different" summary: button + panel above the rows. Cached per-scope in
+// OSG.sum so a tab switch doesn't re-run it; honest spinner + error states.
+function osgSummaryBlock(){
+  const cached=OSG.sum[OSG.scope];
+  let s="<div class='ossumbar'>"
+    +"<button class='ossumbtn"+(OSG.sumBusy?" busy":"")+"' data-osgsum"+(OSG.sumBusy?" disabled":"")+">"
+      +(OSG.sumBusy?"<span class='spin'></span> Summarizing&hellip;":"&#10022; Summarize what was different (AI)")+"</button>"
+    +(cached?"<button class='ossumre' data-osgsum title='Re-run'>&#8635;</button>":"")
+    +"</div>";
+  if(OSG.sumErr) s+="<div class='oserr'>"+esc(OSG.sumErr)+" <button class='osref' data-osgsum>&#8635; Retry</button></div>";
+  if(cached){
+    s+="<div class='ossumpanel'>"
+      +"<div class='ossumhead'><span class='ossumtag'>Gemini</span>"
+        +(cached.model?"<span class='ossummodel'>"+esc(cached.model)+"</span>":"")
+        +"<span class='ossumcount'>"+(+cached.instances||0)+" instance"+((+cached.instances||0)===1?"":"s")+"</span></div>"
+      +"<div class='ossumbody'>"+esc(cached.summary||"").replace(/\n/g,"<br>")+"</div>"
+      +"</div>";
+  }
+  return s;
+}
+// POST /offscript/summary via the same bridge-fetch idiom; same window/scope/max as osgLoad.
+async function osgSummarize(){
+  if(OSG.sumBusy) return;
+  OSG.sumBusy=true; OSG.sumErr=""; renderOSG();
+  try{
+    const start = Math.floor(Date.now()/1000) - OSG_DAYS*86400;
+    const r = await zdFetch("/offscript/summary?start="+start+"&scope="+encodeURIComponent(OSG.scope)+"&max="+OSG_MAX);
+    if(!r.ok) throw { code:r.status };
+    const d = await r.json();
+    OSG.sum[OSG.scope] = { instances:(+d.instances||0), summary:(d.summary||""), model:(d.model||"") };
+  }catch(e){ OSG.sumErr = (e&&e.code) ? ("HTTP "+e.code+(e.code===401?" - unlock the console first":"")) : ((e&&e.message)||"bridge unreachable"); }
+  OSG.sumBusy=false; if(TAB==="templates") renderOSG();
 }
 function osgByGroup(){
   const bg=(OSG.run&&OSG.run.byGroup)||[];
@@ -3347,10 +3445,49 @@ function offscriptPane(){
     +"#pane-templates .osnear b{color:#9fd6e6;}"
     +"#pane-templates .osnear.none{color:#4a5258;background:none;border-color:#262626;}"
     +"#pane-templates .osempty{color:#6b7a82;font-size:13px;padding:14px 0;}"
+    // expandable off-script row: head is clickable, body reveals the diff
+    +"#pane-templates .osrow{display:block;padding:0;overflow:hidden;}"
+    +"#pane-templates .osrow.open{border-left-color:#6FC3DF;}"
+    +"#pane-templates .osrowhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 12px;}"
+    +"#pane-templates .osrowhead[data-osgtoggle]{cursor:pointer;}"
+    +"#pane-templates .osrowhead[data-osgtoggle]:hover{background:#161d21;}"
+    +"#pane-templates .ostwist{color:#6FC3DF;font-size:11px;width:12px;flex:0 0 12px;text-align:center;}"
+    +"#pane-templates .ostwist.off{color:#333;}"
+    +"#pane-templates .osdiffaff{color:#8fb7c4;font-size:10.5px;font-weight:700;background:#0c1418;border:1px solid #14323e;border-radius:5px;padding:1px 7px;white-space:nowrap;}"
+    +"#pane-templates .osdiffwrap{border-top:1px solid #222;background:#0d0d0d;padding:11px 14px 13px;}"
+    +"#pane-templates .osdmetrics{font-size:11.5px;color:#8a93a0;margin-bottom:8px;}"
+    +"#pane-templates .osdmetrics b{color:#cfe9f2;font-weight:800;}"
+    +"#pane-templates .osdlegend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:10px;}"
+    +"#pane-templates .osdlegend span{border-radius:4px;padding:1px 7px;font-weight:700;}"
+    +"#pane-templates .osdiff{font-size:13px;line-height:1.7;color:#c8d2da;white-space:pre-wrap;word-break:break-word;}"
+    +"#pane-templates .osd-same{color:#9aa7b0;}"
+    +"#pane-templates .osd-del{color:#ff9b9b;background:#2a1414;text-decoration:line-through;border-radius:3px;padding:0 2px;}"
+    +"#pane-templates .osd-add{color:#7fd08a;background:#0d2416;border-radius:3px;padding:0 2px;}"
+    +"#pane-templates .osdnone{color:#6b7a82;font-style:italic;}"
+    // AI "what was different" summary bar + panel
+    +"#pane-templates .ossumbar{display:flex;gap:8px;align-items:center;margin:0 0 10px;}"
+    +"#pane-templates .ossumbtn{background:#16242b;color:#9fd6e6;border:1px solid #2c4a55;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .ossumbtn:hover{background:#1a2f38;color:#6FC3DF;}"
+    +"#pane-templates .ossumbtn.busy{cursor:default;opacity:.75;}"
+    +"#pane-templates .ossumre{background:#12181d;color:#8fb7c4;border:1px solid #2a343b;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .ossumpanel{background:#0f141a;border:1px solid #1d2a31;border-left:4px solid #6FC3DF;border-radius:8px;padding:11px 14px;margin-bottom:12px;}"
+    +"#pane-templates .ossumhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px;}"
+    +"#pane-templates .ossumtag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#06222c;background:#6FC3DF;border-radius:5px;padding:1px 8px;}"
+    +"#pane-templates .ossummodel{font-size:10.5px;color:#6b7a82;font-family:Consolas,monospace;}"
+    +"#pane-templates .ossumcount{font-size:10.5px;color:#8a93a0;margin-left:auto;}"
+    +"#pane-templates .ossumbody{color:#dfe4e9;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}"
     +"</style><div id='osg-wrap'>"+osgInner()+"</div>";
 }
 document.addEventListener("click", function(e){
   if(e.target && e.target.closest && e.target.closest("[data-osgload]")){ osgLoad(); return; }
+  if(e.target && e.target.closest && e.target.closest("[data-osgsum]")){ osgSummarize(); return; }
+  const tg = e.target && e.target.closest && e.target.closest("[data-osgtoggle]");
+  if(tg){
+    const idx=+tg.getAttribute("data-osgtoggle");
+    const o=OSG.run && OSG.run.offscript && OSG.run.offscript[idx];
+    if(o){ const key=OSG.scope+"|"+o.ticketId+":"+(o.commentId!=null?o.commentId:""); OSG.open[key]=!OSG.open[key]; renderOSG(); }
+    return;
+  }
   const sc = e.target && e.target.closest && e.target.closest("[data-osgscope]");
   if(sc){ const v=sc.getAttribute("data-osgscope"); if(v!==OSG.scope && !OSG.busy){ OSG.scope=v; OSG.run=null; OSG.err=""; osgLoad(); } return; }
   const cp = e.target && e.target.closest && e.target.closest("[data-osgcopy]");
@@ -5241,7 +5378,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r525 . 03f457e . 2026-07-09</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r528 . c84ac4a . 2026-07-09</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
