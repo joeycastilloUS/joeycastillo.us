@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design &mdash; Full raw &rarr; cheapest GCS + mesh residency</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 27px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 15px; margin: 18px 0 6px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:14px 16px; overflow-x:auto; color:#bcd; font-size:12.5px; font-family:Consolas,monospace; margin:12px 0; line-height:1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; } .fail { color:#ff6b6b; font-weight:600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~d — Full raw → cheapest GCS + mesh residency</span><span class="pub">Published 2026-07-09 16:39 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/39a7f8ae-8a5a-49f8-9878-6ae91f3bab8f/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Full raw &rarr; cheapest GCS + mesh residency</h1>
+<p>The GCP-home + mesh-residency layer under
+<code>be/designs/2026-07-09-1509-design-raw-ids-out-of-llm-zone-v2-fable5.html</code> (the
+pure-C pipeline + the Argus eye). That design gets the raw sealed; this one gives the sealed
+raw a home the mesh can reach — for pennies.</p>
+
+<!-- ============================================================ 1. NEED -->
+<div class="section">
+<h2>1. Need</h2>
+<blockquote data-cm="1-need">Joey: "where can I put this in GCP, cheapest cost&hellip; I need the mesh to use
+this for replays, decode to atoms, and all kinds of things&hellip; it was supposed to import
+to the mesh; no idea why it's local."</blockquote>
+<p><strong>Why it's local — the plain answer:</strong> the pull ran in the LLM zone on Joey's
+box, and the seal &rarr; tar &rarr; upload &rarr; announce tail <strong>only ever ran for the
+Jul-4 1,000-ticket sample</strong>. The bucket exists; the steps that fill it never ran at
+full scale. Not a mystery — an unexecuted tail.</p>
+<p>Measured state, verified live this session:</p>
+<table>
+  <tr><th>Thing</th><th>Ground truth</th><th>State</th></tr>
+  <tr>
+    <td>Full raw pull</td>
+    <td><code>C:\mendo-zendesk-ai\data\full\ticket_events.jsonl</code> = <strong>7.6 GB</strong>,
+      <strong>431,260 tickets &middot; 988,345 comments</strong>, pull <code>done:true</code>,
+      eos reached.</td>
+    <td><span class="pass">COMPLETE, local</span></td>
+  </tr>
+  <tr>
+    <td>Raw &rarr; GCS</td>
+    <td>Gzipping (~1.3 GB expected) + uploading to GCS in the background right now.</td>
+    <td><span class="warn">in flight this session</span></td>
+  </tr>
+  <tr>
+    <td>GCP home</td>
+    <td><code>gs://acmedev-mendo-tickets-ids</code> (US-WEST1) EXISTS — but holds only the
+      1,000-ticket sample: <code>raw-ids.tgz</code> 227 KB, <code>derived-ids.tgz</code> 164 KB,
+      <code>manifest.json</code> (with <code>raw_store.sha256</code> +
+      <code>derived_store.sha256</code>).</td>
+    <td><span class="warn">sample only</span></td>
+  </tr>
+  <tr>
+    <td>Mesh residency</td>
+    <td>The regional pattern exists (<code>nous-kb-&lt;region&gt;</code> hot +
+      <code>nous-kb-cold-&lt;region&gt;</code> Coldline, 6 regions) — no Mendo <code>.ids</code>
+      in it, no manifest signal published.</td>
+    <td><span class="fail">not resident</span></td>
+  </tr>
+</table>
+<p>The need: the full raw off Joey's drive into GCP at the <strong>cheapest cost that
+works</strong>, and the sealed <code>.ids</code> <strong>mesh-resident</strong> so any
+authorized node replays / decodes-to-atoms on demand — §7's "replay forever" realized off-box.</p>
+</div>
+
+<!-- ============================================================ 2. RAW USER STORIES -->
+<div class="section">
+<h2>2. Raw User Stories</h2>
+<ul data-cm="2-raw-user-stories">
+  <li>As the operator, I want the full raw off my drive and into GCP cheaply, so that a laptop
+    disk is never the single copy of 431K tickets.</li>
+  <li>As the operator, I want the sealed IDS resident in the mesh, so that any node replays or
+    decodes to atoms without ever re-pulling Zendesk.</li>
+  <li>As the operator, I want the cheapest storage tier that still lets the mesh mount it fast
+    — cold for the archive, hot for the working set.</li>
+  <li>As the operator, I want to see residency status in Argus — is it in GCS, which handle,
+    which regions, when refreshed.</li>
+  <li>As the operator, I want regional copies where the compute is, so that no node pays
+    egress to read its own truth.</li>
+</ul>
+</div>
+
+<!-- ============================================================ 3. SOURCED SOLUTION -->
+<div class="section">
+<h2>3. Sourced Solution</h2>
+<p>Mined in order before inventing:</p>
+<table>
+  <tr><th>Source</th><th>What it gives</th><th>Verdict</th></tr>
+  <tr>
+    <td><code>gs://acmedev-mendo-tickets-ids</code> (us-west1)</td>
+    <td>The GCP home ALREADY EXISTS, and its <code>manifest.json</code> already
+      content-addresses by SHA-256 (<code>raw_store.sha256</code>,
+      <code>derived_store.sha256</code>). The IDS-handle-is-the-hash convention is already
+      the house convention here — we fill it, we don't invent it.</td>
+    <td><strong>REUSE</strong> — fill with the full corpus; keep the manifest shape.</td>
+  </tr>
+  <tr>
+    <td><code>nous-kb-&lt;region&gt;</code> / <code>nous-kb-cold-&lt;region&gt;</code></td>
+    <td>The mesh's residency storage pattern, already regional: hot buckets in us-west1,
+      us-east4, europe-west1, asia-east1, australia-southeast1, southamerica-east1 + Coldline
+      twins. Nodes read their local-region copy. This IS mesh residency storage.</td>
+    <td><strong>REUSE</strong> — the <code>.ids</code> goes in the hot tier per region;
+      raw.gz in cold.</td>
+  </tr>
+  <tr>
+    <td>nous (kastil-systems, C99)</td>
+    <td>Sealed <code>triple_store</code> (mmap, append-only), <code>understand()</code>
+      decoder + atomizer, <code>mesh.c</code>, wire/NTRP0001, the prime.</td>
+    <td><strong>REUSE</strong> — load-bearing, ours.</td>
+  </tr>
+  <tr>
+    <td>v2 design (2026-07-09-1509)</td>
+    <td>The pure-C pipeline (compile <code>raw_import.c</code> + the C99 shaper) + the Argus
+      eye. Produces the sealed raw this design ships.</td>
+    <td><strong>REUSE</strong> — this pair adds the residency/publish tail + a residency
+      panel in the eye.</td>
+  </tr>
+  <tr>
+    <td>a-d-d §7 / §9</td>
+    <td>Import once &rarr; derive many &rarr; replay forever; rebuildable / versioned / cheap.
+      Prime = deterministic, reached over wire; the mesh is a signal plane, not a data plane.</td>
+    <td><strong>EXECUTE</strong> — content-address + regional residency is §7 realized on GCS.</td>
+  </tr>
+</table>
+
+<h3>The cost math — the question, answered</h3>
+<table>
+  <tr><th>What</th><th>Where</th><th>Math</th><th>$/mo</th></tr>
+  <tr>
+    <td>Raw JSONL.gz (cold source-of-truth; re-read only on re-shape)</td>
+    <td>Coldline, us-west1</td>
+    <td>$0.004/GB/mo &times; ~1.3 GB</td>
+    <td><strong>~$0.005</strong></td>
+  </tr>
+  <tr>
+    <td>Sealed <code>.ids</code> tgz (hot; nodes fetch to mount — the 1K sample was 227 KB;
+      full 431K plausibly ~100&ndash;300 MB)</td>
+    <td>Standard, us-west1 (<code>nous-kb-us-west1</code>)</td>
+    <td>$0.02/GB/mo &times; ~0.3 GB</td>
+    <td><strong>~$0.01</strong></td>
+  </tr>
+  <tr>
+    <td>Egress</td>
+    <td>—</td>
+    <td>FREE to any us-west1 consumer (every bridge runs there). A us-west4 nous-api fetch of
+      a ~200 MB <code>.ids</code>: one-time &lt;$0.01 — zeroed entirely by dropping a copy in
+      <code>nous-kb-us-west4</code>, exactly what the regional pattern is for.</td>
+    <td><strong>~$0.00</strong></td>
+  </tr>
+</table>
+<p><strong>Bottom line: well under $1/month — effectively free.</strong> The cost was never
+storage; it's that the seal + publish never ran. Storage is a rounding error; the whole
+question dissolves once the tail executes.</p>
+
+<pre>
+local 7.6GB ── gzip ──▶ Coldline us-west1 (cold archive, ~$0.005/mo)
+      │
+      └─ seal (C99, v2 pipeline) ──▶ .ids ── SHA-256 ──▶ IDS handle
+                                       │
+                                       ▼
+                          nous-kb-&lt;region&gt; hot (Standard, ~$0.01/mo)
+                                       │
+                          manifest signal (NTRP0001) ──▶ prime
+                                       │
+     node: resolve handle ──▶ fetch (local region, FREE) ──▶ verify SHA-256
+           ──▶ mmap-mount read-only ──▶ replay / decode / atomize
+</pre>
+
+<p><strong>REUSE vs NEW, honestly.</strong> REUSE: the bucket, the SHA-256 manifest
+convention, the <code>nous-kb-&lt;region&gt;</code> pattern, the nous store/decoder/wire/mesh,
+the v2 pipeline. NEW is small: run the seal at full scale, tar + hash &rarr; handle, upload to
+the regional hot bucket + write the full manifest, publish the manifest signal, prove a node
+mounts + decodes. No new architecture, no new service, no new auth surface.</p>
+</div>
+
+<!-- ============================================================ 4. NAMING -->
+<div class="section">
+<h2>4. Naming</h2>
+<table data-cm="3-sourced-solution">
+  <tr><th>Thing</th><th>Name</th><th>Why</th></tr>
+  <tr><td>The content address</td><td><strong>IDS handle</strong> (SHA-256 of the sealed tgz)</td>
+    <td>Already the in-bucket manifest convention; the handle IS the hash — verification free.</td></tr>
+  <tr><td>The wire announcement</td><td><strong>manifest signal</strong> (NTRP0001: handle +
+    cursor + decoder-version + count + gs:// locator)</td>
+    <td>Signals-canon word for "this handle now exists / resolves here."</td></tr>
+  <tr><td>The hot tier</td><td><code>nous-kb-&lt;region&gt;</code> (Standard)</td>
+    <td>Existing bucket names, unchanged.</td></tr>
+  <tr><td>The cold archive</td><td><code>nous-kb-cold-&lt;region&gt;</code> / Coldline</td>
+    <td>Existing pattern; Coldline is the tier, cold is the name.</td></tr>
+  <tr><td>The incremental refresh</td><td><strong>get-latest</strong></td>
+    <td>§7's own term: cursor &rarr; incremental export &rarr; append &rarr; re-seal &rarr;
+      new handle.</td></tr>
+  <tr><td>The Argus view</td><td><strong>residency panel</strong> (in the Raw IDS eye)</td>
+    <td>Literal: shows where the sealed raw resides.</td></tr>
+</table>
+<p>No cute names. No collisions found — every name is either already in production
+(<code>nous-kb-*</code>, manifest SHA fields) or a §7 term.</p>
+</div>
+
+<!-- ============================================================ 5. SHAPE -->
+<div class="section">
+<h2>5. Shape</h2>
+<p>Minimum viable — six steps, four of them one-command:</p>
+<ol>
+  <li><strong>Raw &rarr; Coldline (in flight now):</strong> the 7.6 GB gzips to ~1.3 GB and
+    lands in Coldline, us-west1. The cold source-of-truth — re-read only on re-shape.</li>
+  <li><strong>Full seal:</strong> the v2 pipeline (C99 shaper + <code>raw_import.c</code>)
+    runs over all 431,260 tickets &rarr; the full sealed <code>.ids</code>.</li>
+  <li><strong>Tar + hash &rarr; handle + manifest:</strong> tar the sealed store, SHA-256 it —
+    that hash is the IDS handle. Write the full <code>manifest.json</code> in the existing
+    shape (sha256, count, cursor, decoder version, gs:// locator).</li>
+  <li><strong>Upload to the hot tier:</strong> <code>nous-kb-us-west1</code> (Standard) +
+    manifest to <code>gs://acmedev-mendo-tickets-ids</code>. Egress to every bridge: free.</li>
+  <li><strong>Manifest signal &rarr; prime:</strong> NTRP0001 frame over the wire — handle,
+    cursor, decoder-version, count, locator. The mesh stays a 240 B signal/control plane; the
+    <code>.ids</code> moves as one immutable, hash-verified unit. Content-address + signal,
+    never data-over-wire.</li>
+  <li><strong>Node mount + decode proof:</strong> one node resolves the handle &rarr; fetches
+    from its local-region bucket (free) &rarr; verifies SHA-256 &rarr; mmap-mounts read-only
+    &rarr; replays / <code>understand()</code>-decodes / atomizes locally on the mount.</li>
+</ol>
+<p>Plus the <strong>residency panel</strong> in the Argus eye: handle, regions holding a copy,
+manifest timestamp, cursor, last get-latest — read from the manifest, never from an LLM.</p>
+<h3>Invariants</h3>
+<ul>
+  <li><strong>Language law:</strong> C# only at the zendesk-bridge boundary (long since done —
+    the raw is already pulled). Seal / shape / hash / publish / mount / decode are C99, ours.</li>
+  <li><strong>Read-only:</strong> this whole layer only ever reads Zendesk's already-pulled
+    output. No write-back path exists.</li>
+  <li><strong>Immutable by handle:</strong> a sealed <code>.ids</code> never changes under its
+    handle; get-latest produces a NEW handle. Old handles keep resolving (append, don't mutate).</li>
+</ul>
+<h3>Out of scope (YAGNI)</h3>
+<ul>
+  <li><span class="fail">✗</span> All-6-region replication on day one — start us-west1, add
+    us-west4 for nous-api next (Board GCP2). Copies cost pennies; add on demand.</li>
+  <li><span class="fail">✗</span> derive-nps and other decoder passes — their own boards, off
+    the resident raw.</li>
+  <li><span class="fail">✗</span> Write-back to Zendesk — read-only holds.</li>
+</ul>
+</div>
+
+<!-- ============================================================ 6. FIRST MOVE -->
+<div class="section">
+<h2>6. First Move</h2>
+<p><strong>Finish the tail that never ran — once, end to end.</strong> The raw.gz lands in
+Coldline (in flight now) AND the first full sealed <code>.ids</code> is built from the 7.6 GB,
+tarred + hashed to its IDS handle, uploaded to <code>nous-kb-us-west1</code>, and ONE node
+resolves the handle &rarr; fetches &rarr; verifies &rarr; mounts &rarr; decodes one real ticket
+to atoms.</p>
+<p>That single round-trip proves "mesh-resident, replayable, decodable" end to end for
+pennies. Everything after it — the manifest signal path, the us-west4 copy, get-latest, the
+residency panel — is watching or repeating a loop that already closed once.</p>
+</div>
+
+<!-- ============================================================ CHOICES -->
+<div class="section">
+<h2>Choices + Consequences <span class="tag">earned — the storage fork</span></h2>
+<h3>Fork 1 — which tier holds the raw JSONL.gz?</h3>
+<table>
+  <tr><th></th><th>Nearline</th><th>Coldline</th><th>Archive</th></tr>
+  <tr><td>Storage</td><td>$0.01/GB/mo → ~$0.013/mo</td><td>$0.004/GB/mo → ~$0.005/mo</td>
+    <td>$0.0012/GB/mo → ~$0.002/mo</td></tr>
+  <tr><td>Min duration</td><td>30 days</td><td>90 days</td><td><span class="warn">365 days</span></td></tr>
+  <tr><td>Retrieval</td><td>$0.01/GB</td><td>$0.02/GB (~$0.03 per full re-shape read)</td>
+    <td>$0.05/GB + the year lock</td></tr>
+  <tr><td>Fit</td><td>Overpaying for something read ~never</td>
+    <td>Cheap, and a re-shape read costs three cents</td>
+    <td>Saves $0.003/mo, adds a 365-day min + retrieval fees on a corpus we may re-shape</td></tr>
+</table>
+<p><strong>Pick: Coldline.</strong> The raw is re-read only on re-shape; Coldline's 90-day min
+fits a thing we may still re-shape this quarter. Archive optimizes a rounding error into a
+constraint.</p>
+<h3>Fork 2 — where does the .ids live?</h3>
+<table>
+  <tr><th></th><th>Single us-west1</th><th>us-west1 + us-west4</th><th>All 6 regions day one</th></tr>
+  <tr><td>1st order</td><td>~$0.01/mo; free egress to every bridge (all us-west1)</td>
+    <td>+~$0.01/mo; nous-api (us-west4) also reads free</td>
+    <td>+~$0.05/mo; every node everywhere reads free</td></tr>
+  <tr><td>2nd order</td><td>nous-api pays &lt;$0.01 one-time cross-region — or waits</td>
+    <td>Both live compute planes covered; matches where consumers actually are</td>
+    <td>Replicating to regions with zero current consumers = ceremony</td></tr>
+</table>
+<p><strong>Pick: us-west1 now, us-west4 next (GCP2).</strong> Put copies where consumers are,
+not where the pattern permits. The regional pattern makes adding a region one
+<code>gsutil cp</code> — the option costs nothing to defer.</p>
+</div>
+
+<!-- ============================================================ ESCAPE ROUTES -->
+<div class="section">
+<h2>Escape Routes <span class="tag">earned</span></h2>
+<ul data-cm="5-shape">
+  <li><strong>Re-seal.</strong> §7: derived is rebuildable, the raw is never migrated. A bad
+    seal = re-run the C over the Coldline raw.gz (~$0.03 retrieval), new handle, re-signal.
+    Nothing precious.</li>
+  <li><strong>Move the bytes.</strong> The handle is the hash — it cannot lie and never
+    changes. Only the gs:// locator can change: copy the tgz anywhere, update the manifest
+    locator, re-signal. GCS itself is swappable for any blob store.</li>
+  <li><strong>Wrong tier.</strong> One command:
+    <code>gsutil objects update --storage-class</code> (or a rewrite). Tiering mistakes cost
+    cents and minutes, not migrations.</li>
+</ul>
+</div>
+
+<!-- ============================================================ PURE METAL TEST -->
+<div class="section">
+<h2>Pure Metal Test <span class="tag">earned</span></h2>
+<ul data-cm="pure-metal-test-earned">
+  <li><span class="pass">✓</span> Every load-bearing piece is ours: the sealed store, the
+    decoder, the wire, the mesh, the seal/hash/publish C99. No frameworks, no managed
+    runtimes, no LLM in the loop.</li>
+  <li><span class="pass">✓</span> Zendesk is jacketed at the boundary and replaceable — and
+    for this layer it's already behind us; the raw is on disk.</li>
+  <li><span class="pass">✓</span> GCS is content-addressed and therefore swappable: the
+    handle verifies the bytes wherever they live — bucket, node disk, any blob store. GCS is
+    a locator, not a dependency.</li>
+</ul>
+</div>
+
+<!-- ============================================================ DOD -->
+<div class="section">
+<h2>Definition of Done — this design</h2>
+<ul data-cm="definition-of-done-this-design">
+  <li><span class="pass">✓</span> Six spine sections present, in order, sized to the work.</li>
+  <li><span class="pass">✓</span> Sourced before invented — the existing bucket + SHA-256
+    manifest convention, <code>nous-kb-&lt;region&gt;</code>, nous C99, the v2 design, a-d-d
+    §7/§9 all mined and named; NEW is only the full-scale tail.</li>
+  <li><span class="pass">✓</span> The cost question answered with real numbers — ~$0.005/mo
+    Coldline + ~$0.01/mo hot + ~$0 egress = <strong>well under $1/month</strong>.</li>
+  <li><span class="pass">✓</span> The "why is it local" question answered plainly — the
+    seal&rarr;upload&rarr;announce tail only ever ran for the 1K sample.</li>
+  <li><span class="pass">✓</span> Names literal — IDS handle, manifest signal, hot tier /
+    cold archive, get-latest, residency panel; no collisions.</li>
+  <li><span class="pass">✓</span> Earned tools present — Choices+Consequences (both storage
+    forks, picked with cost + egress consequences), Escape Routes, Pure Metal Test.</li>
+  <li><span class="pass">✓</span> Language law respected — everything in this layer is C99;
+    C# stays at the (already-done) zendesk-bridge boundary.</li>
+  <li><span class="pass">✓</span> Flows WITH a-d-d §7/§9 and proposes without writing a-d-d
+    (Rule 10) — approval lands via ~p.</li>
+  <li><span class="pass">✓</span> Evidence-based Need — 7.6 GB / 431,260 / 988,345 /
+    <code>done:true</code> / 227 KB sample / us-west1 buckets, all verified live this session.</li>
+  <li><span class="fail">✗</span> Plan (~p) — written as this design's pair:
+    <code>be/plans/2026-07-09-1639-plan-mesh-residency-cheapest-gcp-fable5.html</code>. Next:
+    operator approval, then Board GCP1.</li>
+</ul>
+</div>
+
+</div>
+<footer>v0 &middot; r474 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"39a7f8ae-8a5a-49f8-9878-6ae91f3bab8f"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
