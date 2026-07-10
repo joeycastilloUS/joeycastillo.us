@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be ~p &mdash; Gemini-on-Vertex + .ids grounding: the build</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111111; color:#d5d5d5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.62; padding-bottom:70px; font-size:15px; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 20px; display:flex; justify-content:space-between; align-items:baseline; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; letter-spacing:1px; }
+  nav .pub { color:#666; font-size:11px; }
+  .wrap { max-width:800px; margin:0 auto; padding:0 20px; }
+  h1 { color:#fff; font-size:25px; margin:30px 0 4px; font-weight:600; }
+  .lede { color:#9aa; font-size:15px; margin:8px 0 4px; }
+  .muted { color:#777; }
+  h2 { color:#6FC3DF; font-size:14px; text-transform:uppercase; letter-spacing:1.4px; margin:34px 0 10px; border-bottom:1px solid #262626; padding-bottom:6px; }
+  h2 .k { float:right; color:#555; font-size:10px; letter-spacing:0; text-transform:none; }
+  p { margin:10px 0; } b.hl{color:#9fd8ec;} b.g{color:#7fd08a;} b.a{color:#e0a246;}
+  ul{margin:8px 0 8px 20px;} li{margin:5px 0;}
+  code { background:#000; padding:1px 5px; border-radius:3px; color:#8fd; font-size:12px; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:8px; padding:12px 14px; font-family:Consolas,monospace; font-size:12.5px; color:#bcd; overflow:auto; line-height:1.5; }
+  .card { background:#1A1A1A; border:1px solid #242424; border-radius:6px; padding:12px 16px; margin:12px 0; }
+  .p1{border-left:3px solid #7fd08a;} .p2{border-left:3px solid #6FC3DF;} .p3{border-left:3px solid #e0a246;} .p4{border-left:3px solid #b07fd0;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;}
+  td,th{text-align:left;padding:5px 8px;border-bottom:1px solid #202020;} th{color:#777;font-weight:500;font-size:11px;text-transform:uppercase;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:44px;border-top:1px solid #242424;padding-top:16px;}
+  .dod li{list-style:none;} .dod .ok::before{content:"\2713 ";color:#7fd08a;}
+  .pts{color:#e0a246;font-weight:600;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-09 19:22 PST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/8a75d54f-c47e-43a0-8e56-64e89b4da734/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+  <h1>Gemini-on-Vertex + .ids grounding: the build</h1>
+  <p class="lede">The build plan behind <code>2026-07-09-1922-design-gemini-vertex-ids-brain-fable5</code>. Take Argus off Anthropic onto <b class="hl">Gemini/Vertex</b>, and give the brain a read-only door into the <b class="hl">431K-ticket .ids</b> so it finds tickets and surfaces trends from real data. Two lanes, four phases, <span class="pts">21 pts</span>.</p>
+
+  <h2>Intent</h2>
+  <p>Make Argus-the-voice run on Gemini in your own Vertex (ADC, no key) and answer <b>from the corpus, not from imagination</b>. Success is one live sentence: DM Argus <em>&#34;find refund-declined tickets this month&#34;</em> &rarr; it returns <b>real Mendo case IDs + a grounded summary</b>, produced by Gemini, with <b>zero Anthropic traffic</b>. Then we look at where it&#39;s sharp and where it whiffs &mdash; that&#39;s the &#34;how good are we&#34; readout you asked for.</p>
+
+  <h2>Scope</h2>
+  <p><b>In:</b> the Anthropic&rarr;Vertex brain swap in <code>argus-slack</code>; two new read-only C99 endpoints on <code>onedine-raw</code> (<code>/search</code>, <code>/facets</code>); one new grounded-answer route on <code>gcp-bridge</code> (<code>/ask</code>); routing Argus DMs to the right lane. <b>Out:</b> vector/embedding search, Gemini function-calling, BI dashboards, any write-back, and Argus thread-memory (all fast-follows once the floor is proven). <code>api.3-nous.net</code> stays a v2 escalation, unused here.</p>
+
+  <h2>Approach</h2>
+  <p>Reuse-first &mdash; the recon says 5 of 8 capabilities are already live. Lane A (brain swap) is independent and trivial; land it first so &#34;no Anthropic&#34; is true within the hour. Lane B is the value: expose the search matcher we already wrote, add a bounded facet count, then a deterministic retrieve-then-read loop in the C# jacket. Every task is a verify loop (<code>~a~t</code>) and every service change is proven live (Rule&nbsp;9 &mdash; external <code>/version</code> + a real curl), not just compiled.</p>
+
+  <h2>Phases</h2>
+
+  <div data-cm="intent" class="card p1"><b class="g">Phase 1 &mdash; Brain swap: Anthropic &rarr; Gemini/Vertex.</b> <span class="pts">5 pts</span>
+  <ul>
+    <li>{ArgusBrain.Respond points at <code>gcp-bridge /vertex/gemini</code> (X-Bridge-Token) instead of <code>api.anthropic.com</code>; persona rides in the messages body; graceful fallback preserved, add to, argus-slack} &middot; 3 &middot; ~a~t</li>
+    <li>{drop <code>ANTHROPIC_API_KEY</code> + <code>ANTHROPIC_MODEL</code>, seed <code>GCP_BRIDGE_URL</code> + bridge token, redeploy, external <code>/health</code> + live DM proves Gemini answered (0 Anthropic), update with, argus-slack} &middot; 2 &middot; ~u~t</li>
+  </ul>
+  <span class="muted">Ends: you DM Argus, it replies, and the log shows a Vertex call &mdash; no <code>api.anthropic.com</code>. The &#34;no Anthropic&#34; requirement is done here.</span></div>
+
+  <div class="card p2"><b class="hl">Phase 2 &mdash; Open the door: search over the .ids.</b> <span class="pts">6 pts</span> &mdash; the First Move
+  <ul>
+    <li>{<code>GET /search?q=&amp;field=&amp;limit=</code> on onedine-raw &mdash; wrap the existing <code>rawq</code> substring matcher; JSON hits (s,p,o); passphrase-gated; deploy + curl "refund" &rarr; real case IDs, add to, onedine-raw} &middot; 3 &middot; ~a~t</li>
+    <li>{<code>GET /facets?p=&amp;limit=</code> on onedine-raw &mdash; count objects per value for a predicate (Status, store, &hellip;); bounded scan; deploy + curl <code>p=Status</code> &rarr; real distribution, add to, onedine-raw} &middot; 3 &middot; ~a~t</li>
+  </ul>
+  <span class="muted">Ends: the corpus is reachable by a question over HTTP. Everything downstream stands on this.</span></div>
+
+  <div class="card p3"><b class="a">Phase 3 &mdash; Ground the brain: retrieve-then-read.</b> <span class="pts">8 pts</span> &mdash; the value
+  <ul>
+    <li>{<code>POST /ask { question }</code> on gcp-bridge &mdash; terms &rarr; <code>/search</code> &rarr; top-K <code>/replay</code> (real threads + restated program) &rarr; Gemini answers WITH cited case IDs; no hits &rarr; honest &#34;no matching tickets&#34;, add to, gcp-bridge} &middot; 5 &middot; ~a~t</li>
+    <li>{Argus routes DMs &mdash; find/count/trend questions &rarr; <code>/ask</code>; chit-chat &rarr; <code>/vertex/gemini</code>; the reply cites the tickets it read, update with, argus-slack} &middot; 3 &middot; ~u~t</li>
+  </ul>
+  <span class="muted">Ends: DM &#34;find refund-declined tickets&#34; &rarr; real IDs + grounded summary, Gemini, zero Anthropic. The design, proven in one sentence.</span></div>
+
+  <div class="card p4"><b style="color:#b07fd0">Phase 4 &mdash; See how good we are.</b> <span class="pts">2 pts</span>
+  <ul>
+    <li>{run 10 real operator questions (find + trend) against <code>/ask</code>, record hit/miss/whiff vs eyeballed truth, write the honest scorecard &mdash; where substring wins, where it needs BM25/vector, test, argus} &middot; 2 &middot; ~t</li>
+  </ul>
+  <span class="muted">Ends: a one-page readout of the floor &mdash; the evidence that decides whether Phase 5 is inverted-index, embeddings, or function-calling. This is the &#34;When To Revisit&#34; trigger made concrete.</span></div>
+
+  <h2>Constraints</h2>
+  <ul data-cm="constraints">
+    <li><b>Language law:</b> C99 for search/facets (onedine-raw); C# jacket only for the Vertex plumbing (gcp-bridge); vanilla for the Slack surface.</li>
+    <li><b>Read-only:</b> no lane writes the sealed raw. Source-of-record is immutable here.</li>
+    <li><b>No key at the edge:</b> Vertex via ADC; Argus presents only the bridge token; Anthropic key is removed, not left dormant.</li>
+    <li><b>Done = live (Rule 9):</b> each service task proven by external <code>/version</code> + a real curl / real DM, not a green build.</li>
+    <li><b>Cost honesty:</b> <code>/ask</code> reads top-K tickets into the prompt &mdash; cap K, log tokens/cost per call (the ledger already exists in gcp-bridge).</li>
+  </ul>
+
+  <h2>Unknowns <span class="k">named, not hidden</span></h2>
+  <ul data-cm="unknowns-named-not-hidden">
+    <li><b>Does substring find what operators mean?</b> &#34;refund&#34; won&#39;t catch &#34;money back / comp&#39;d / credited.&#34; Phase 4 measures the miss rate &mdash; we don&#39;t know it yet.</li>
+    <li><b>Top-K sizing.</b> How many tickets does Gemini need in-context to answer well without blowing tokens/latency? Unknown until we watch real questions. Start K=8, tune.</li>
+    <li><b>Trend shape.</b> <code>/facets</code> counts by an existing predicate; &#34;complaints this week&#34; needs a category + a date filter that may not be a single clean predicate on the raw. May need a small derived pass. Flagged, not solved.</li>
+    <li><b>onedine-raw is the OneDine seed, not the full Mendo NPS corpus.</b> The 431K/977K full pull is sealed in <code>gs://acmedev-mendo-tickets-ids</code>; confirm which store the live <code>onedine-raw</code> serves before claiming corpus-wide answers. (Recon flag &mdash; verify at Phase 2.)</li>
+    <li><b>Term extraction.</b> Literal keyword split vs a cheap Gemini pass to pull query terms &mdash; unknown which gives better recall; try the free one first.</li>
+  </ul>
+
+  <h2>When to revisit <span class="k">the v2 trigger</span></h2>
+  <p>Phase 4&#39;s scorecard is the signal. <b>If substring recall is &ge; ~80% on the 10 real questions</b> &rarr; ship it, memory + more sources next. <b>If it whiffs on paraphrase</b> (the likely case) &rarr; v2 is an inverted index or embeddings, and the specific misses are the spec. <b>If operators ask multi-hop questions</b> &#40;&#34;compare this month to last&#34;&#41; &rarr; that&#39;s when Gemini function-calling earns its keep and <code>api.3-nous.net</code> comes in for corpus-wide reach. We revise when the evidence says so &mdash; not before (Rule 6).</p>
+
+  <h2>Definition of Done</h2>
+  <ul data-cm="when-to-revisit-the-v2" class="dod">
+    <li class="ok">A-D-D verified &mdash; read <code>ARCHITECTURE.md</code>; read-only endpoints + brain blood-swap, no drift.</li>
+    <li class="ok">Informed by design <code>2026-07-09-1922-design-gemini-vertex-ids-brain-fable5</code>.</li>
+    <li class="ok">Every work item is a verify loop (<code>~a~t</code> / <code>~u~t</code>); Phase 4 is a dedicated <code>~t</code>.</li>
+    <li class="ok">Rule 6 sections present &mdash; Unknowns + When To Revisit, named explicitly.</li>
+    <li class="ok">Rule 9 baked into constraints &mdash; live proof, not green builds.</li>
+    <li>Plan published to its cap-URL (Latchkey) + board seeded &mdash; pending.</li>
+  </ul>
+  <footer>Be &middot; v0 &middot; r502 &middot; 2026-07-09 &middot; ~p (Fable 5) &middot; 21 pts &middot; supersedes nothing &mdash; new track</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"8a75d54f-c47e-43a0-8e56-64e89b4da734"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>

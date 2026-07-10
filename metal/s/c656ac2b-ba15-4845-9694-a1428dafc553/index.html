@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be ~d &mdash; Gemini-on-Vertex, grounded on the .ids: Argus answers true</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111111; color:#d5d5d5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.62; padding-bottom:70px; font-size:15px; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 20px; display:flex; justify-content:space-between; align-items:baseline; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; letter-spacing:1px; }
+  nav .pub { color:#666; font-size:11px; }
+  .wrap { max-width:800px; margin:0 auto; padding:0 20px; }
+  h1 { color:#fff; font-size:25px; margin:30px 0 4px; font-weight:600; }
+  .lede { color:#9aa; font-size:15px; margin:8px 0 4px; }
+  .muted { color:#777; }
+  h2 { color:#6FC3DF; font-size:14px; text-transform:uppercase; letter-spacing:1.4px; margin:34px 0 10px; border-bottom:1px solid #262626; padding-bottom:6px; }
+  h2 .k { float:right; color:#555; font-size:10px; letter-spacing:0; text-transform:none; }
+  p { margin:10px 0; } b.hl{color:#9fd8ec;} b.g{color:#7fd08a;} b.a{color:#e0a246;}
+  ul{margin:8px 0 8px 20px;} li{margin:5px 0;}
+  code { background:#000; padding:1px 5px; border-radius:3px; color:#8fd; font-size:12px; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:8px; padding:12px 14px; font-family:Consolas,monospace; font-size:12.5px; color:#bcd; overflow:auto; line-height:1.5; }
+  .card { background:#1A1A1A; border:1px solid #242424; border-radius:6px; padding:12px 16px; margin:12px 0; }
+  .card.done { border-left:3px solid #7fd08a; } .card.fork { border-left:3px solid #e0a246; }
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;}
+  td,th{text-align:left;padding:5px 8px;border-bottom:1px solid #202020;} th{color:#777;font-weight:500;font-size:11px;text-transform:uppercase;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:44px;border-top:1px solid #242424;padding-top:16px;}
+  .dod li{list-style:none;} .dod .ok::before{content:"\2713 ";color:#7fd08a;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-09 19:22 PST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/c656ac2b-ba15-4845-9694-a1428dafc553/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+  <h1>Gemini-on-Vertex, grounded on the .ids: Argus answers true</h1>
+  <p class="lede">Two moves. Take Argus off the Anthropic API and run its brain on <b class="hl">Gemini in Vertex</b> &mdash; in your own GCP, over ADC, no key. Then hand that brain a <b class="hl">door into the sealed .ids</b> so when you ask it to find a ticket or spot a trend, it reads the real corpus and cites it &mdash; instead of making it up.</p>
+  <p class="muted">Grounded on tonight&#39;s recon of <code>gcp-bridge</code> (Gemini/Vertex via ADC, already live) + <code>onedine-raw</code> (the C99 IDS query service, already live). The only genuinely new code is a search endpoint that wraps a matcher we already wrote, and a retrieve-then-read loop. Model: Fable&nbsp;5.</p>
+
+  <h2>1. Need</h2>
+  <p>You proved it yourself an hour ago: you DM Argus, and Argus-the-voice is a <b class="a">stateless, blindfolded Claude</b>. Ask it "how many detractors today?" and it answers with confidence and invents the number. Two wrongs to fix, and you named both:</p>
+  <ul>
+    <li><b class="hl">Wrong brain.</b> Argus calls <code>api.anthropic.com</code> with a key in Secret Manager. You already run <b>Gemini on Vertex inside <code>acmedev-platform-hq</code></b> &mdash; ADC identity, no key, data never leaves the project. Paying a second vendor for a worse-governed path when the good one is already wired is backwards.</li>
+    <li><b class="hl">Blind brain.</b> <b>431,260 tickets / 977,029 comments</b> are sealed, hash-verified, mesh-resident, and <em>queryable today</em> &mdash; and the chat brain cannot see a single one of them. The data is there. The voice just isn&#39;t plugged into it.</li>
+  </ul>
+  <p><b>Why now:</b> the raw landed and the reader (<code>/replay</code>) works; the Gemini jacket is deployed and tested; Argus chat went live tonight. Every part exists in isolation. This design is <em>wiring</em>, not building &mdash; the cheapest it will ever be, and the moment it&#39;s worth doing is the moment all three are simultaneously live, which is now.</p>
+
+  <h2>2. Raw user stories <span class="k">operator voice</span></h2>
+  <ul data-cm="1-need">
+    <li>&#34;As the operator, when I ask Argus <em>&#39;find tickets about a refund that got declined at checkout&#39;</em>, I want <b>real Mendo ticket IDs with one-line summaries</b> &mdash; not a plausible fiction.&#34;</li>
+    <li>&#34;I want Argus running on <b>Gemini in my own Vertex</b>, ADC, no Anthropic key &mdash; my data, my project, my bill.&#34;</li>
+    <li>&#34;I want to ask <em>&#39;what are guests complaining about this week&#39;</em> and get <b>patterns grounded in the corpus</b> &mdash; ranked, with counts, with example tickets.&#34;</li>
+    <li>&#34;When it answers, I want it to have <b>read the real thread</b> (atomized or restated, I don&#39;t care which) so the answer traces to a source I can open.&#34;</li>
+    <li>&#34;If it can&#39;t find anything, I want it to <b>say so</b> &mdash; &#39;no matching tickets&#39; beats a confident hallucination every time.&#34;</li>
+    <li>&#34;Let&#39;s just <b>see how good we are</b> &mdash; point it at the data and find out where it&#39;s strong and where it whiffs.&#34;</li>
+  </ul>
+
+  <h2>3. Sourced solution <span class="k">mine, don&#39;t invent</span></h2>
+  <table data-cm="3-sourced-solution-mine-don">
+    <tr><th>Need</th><th>Sourced from &mdash; already exists unless marked NEW</th></tr>
+    <tr><td>Gemini on Vertex, ADC, no key</td><td><code>gcp-bridge</code> &mdash; <code>GeminiClient.GenerateAsync()</code> + <code>GoogleAdc.TokenAsync()</code> (metadata-server token, in-project). <b>Live.</b></td></tr>
+    <tr><td>A drop-in chat call for the brain</td><td><code>gcp-bridge POST /vertex/gemini</code> &mdash; already speaks the Anthropic-messages shape in, Gemini out, multi-turn <code>contents</code> supported. Argus points here instead of Anthropic. <b>Live.</b></td></tr>
+    <tr><td>Read one ticket (fields + atoms + restated program)</td><td><code>onedine-raw /replay?case=</code> &mdash; returns raw fields AND <code>understand()</code> atoms AND the de-atomized <code>program</code>. The &#34;atomized or not&#34; you asked for &mdash; both, in one call. <b>Live.</b></td></tr>
+    <tr><td>Walk the corpus</td><td><code>onedine-raw /cases</code> (paged) + <code>/query?s=</code> + <code>/children?parent=</code>. <b>Live.</b></td></tr>
+    <tr><td>Find tickets by text</td><td><code>rawq.c</code> &mdash; case-insensitive substring matcher over the sealed dict, O(1) dict-map, field-scopable. <b class="a">Exists as a CLI; NEW = expose it as one HTTP endpoint.</b></td></tr>
+    <tr><td>Trends / &#34;what&#39;s spiking&#34;</td><td>Bounded count-by-value over triples. <b class="a">NEW</b> &mdash; small C99 pass on <code>onedine-raw</code>, same store, same idiom.</td></tr>
+    <tr><td>The grounded answer loop</td><td>Retrieve&rarr;read&rarr;answer (classic RAG). <b class="a">NEW</b> &mdash; ~one method in <code>gcp-bridge</code>: keywords &rarr; <code>/search</code> &rarr; top-K <code>/replay</code> &rarr; Gemini with the real threads as context.</td></tr>
+    <tr><td>Heavier mesh reach (later)</td><td><code>api.3-nous.net</code> (root 200 tonight). Escalation path for corpus-wide work the single-node search can&#39;t hold. <b>v2 &mdash; not needed for the first proof.</b></td></tr>
+    <tr><td>The Slack surface</td><td><code>argus-slack ArgusBrain.cs</code> &mdash; keep it; just change the URL it calls. <b>Live.</b></td></tr>
+  </table>
+  <p class="muted">Score: of eight capabilities, <b class="g">five are already live</b>, two are small C99 additions to an existing service, one is a single orchestration method. This is a wiring job.</p>
+
+  <h2>4. Name it true <span class="k">literal</span></h2>
+  <table data-cm="4-name-it-true-literal">
+    <tr><th>Thing</th><th>Literal name &mdash; what it actually does</th></tr>
+    <tr><td>Search endpoint (NEW, on <code>onedine-raw</code>)</td><td><code>GET /search?q=&amp;field=&amp;limit=</code> &mdash; substring hits &rarr; subject IDs + the matching triple. It searches; it&#39;s called search.</td></tr>
+    <tr><td>Trends endpoint (NEW, on <code>onedine-raw</code>)</td><td><code>GET /facets?p=&lt;predicate&gt;&amp;limit=</code> &mdash; count objects per value for a predicate (e.g. <code>p=Status</code>, <code>p=store</code>). A facet count; called facets.</td></tr>
+    <tr><td>The grounded Q&amp;A route (NEW, on <code>gcp-bridge</code>)</td><td><code>POST /ask</code> &mdash; a question about the tickets in, a cited answer out. It asks the corpus. <b class="a">Collision flagged:</b> <code>/nps/draft</code> WRITES a recovery email; <code>/ask</code> only READS and answers. Different verbs, kept apart.</td></tr>
+    <tr><td>The brain (NOT renamed)</td><td>Still <code>ArgusBrain</code>. It&#39;s still the brain; only its blood supply changes (Anthropic&rarr;Vertex). Renaming it would be cosmetic &mdash; skip.</td></tr>
+    <tr><td>The method (retrieval style)</td><td><b>retrieve-then-read</b> &mdash; not &#34;function-calling,&#34; not &#34;agentic,&#34; because v1 isn&#39;t. Deterministic: extract terms, one search, read top-K, answer. Name the thing we built, not the thing we might.</td></tr>
+  </table>
+
+  <h2>5. Shape <span class="k">two lanes, read-only, language-law-clean</span></h2>
+  <p>Two independent lanes. Lane A stands alone (kills Anthropic today). Lane B makes the brain <em>useful</em>. Ship A first because it&#39;s trivial and unblocks the &#34;no Anthropic&#34; requirement immediately; B is the value.</p>
+
+  <div class="card done"><b class="g">Lane A &mdash; Brain swap (Anthropic &rarr; Gemini/Vertex).</b>
+  <pre>argus-slack  ArgusBrain.Respond(text)
+    was:  POST api.anthropic.com/v1/messages   (x-api-key)
+    now:  POST {GCP_BRIDGE_URL}/vertex/gemini   (X-Bridge-Token, ADC on the far side)
+  &mdash; drop ANTHROPIC_API_KEY + ANTHROPIC_MODEL from the service
+  &mdash; add GCP_BRIDGE_URL + reuse the bridge token already in the mesh
+  &mdash; persona system-prompt rides along in the messages body, unchanged</pre>
+  Nothing else in argus-slack moves. Approval Cards, the gated Zendesk write &mdash; untouched.</div>
+
+  <div class="card done"><b class="g">Lane B &mdash; Ground it in the .ids.</b>
+  <pre>onedine-raw (C99):   + GET /search?q=&amp;field=&amp;limit=     (wrap rawq matcher)
+                     + GET /facets?p=&amp;limit=            (count-by-value)
+
+gcp-bridge (C# jacket):
+   POST /ask { question }
+     1. extract query terms      (cheap: Gemini one-shot OR literal keyword split)
+     2. GET onedine-raw/search   -> candidate case IDs
+     3. GET onedine-raw/replay   -> top-K real threads (fields + restated program)
+     4. Gemini generateContent   -> answer + cite the case IDs it used
+     5. no hits -> "no matching tickets" (never invent)
+
+argus-slack: "find/how many/trend" style DM -> POST /ask ; chit-chat -> /vertex/gemini</pre></div>
+
+  <p><b>Boundaries.</b> Read-only over the IDS &mdash; the raw is never written by this path. <b>Language law honored:</b> intelligence (search, facets) stays <b>C99</b> in <code>onedine-raw</code>; the Gemini/Vertex plumbing is the <b>C# jacket</b> in <code>gcp-bridge</code>; the Slack surface is vanilla. <b>Out of scope (v1):</b> vector/embedding search, Gemini function-calling multi-hop, real BI analytics, any write-back, thread memory (Argus stays single-turn until the grounding proves out &mdash; memory is a fast follow).</p>
+
+  <h2>6. Choices + consequences <span class="k">the forks that matter</span></h2>
+  <div data-cm="5-shape-two-lanes-read" class="card fork"><b class="a">Fork 1 &mdash; How Gemini reaches the data.</b>
+  <b>(A) retrieve-then-read</b> [PICK]: bridge extracts terms, one deterministic search, reads top-K, Gemini answers. Cheap, predictable, ships this week, easy to judge. <b>(B) function-calling</b>: give Gemini tools and let it drive multi-hop queries. More powerful, but the tool loop is <em>unbuilt</em> in <code>GeminiClient</code> and adds latency + non-determinism. <b>2nd-order:</b> A gives a clean baseline to measure "how good are we" against &mdash; exactly your ask. B is v2 once A shows where the ceiling is. Rule&nbsp;6: ship A, learn, then decide if B earns its keep.</div>
+  <div class="card fork"><b class="a">Fork 2 &mdash; Search quality.</b>
+  <b>(A) substring</b> [PICK for v1]: <code>rawq</code> exists, $0, ~200ms over 431K. Misses synonyms ("refund" won&#39;t catch "money back"). <b>(B) inverted index / BM25</b>: one more decoder pass, real relevance. <b>(C) embeddings/vector</b>: semantic, catches paraphrase, but new infra + cost. <b>Consequence:</b> substring is honest and instant and tells us the <em>floor</em>. When it whiffs on a real question, that whiff is the spec for B or C &mdash; we&#39;ll know which by watching it miss, not by guessing now.</div>
+  <div class="card fork"><b class="a">Fork 3 &mdash; Where the brain lives.</b> Keep <code>ArgusBrain</code> in argus-slack pointing at gcp-bridge [PICK], vs. move all chat into gcp-bridge. <b>Consequence:</b> keeping the thin caller in argus-slack means Vertex + ADC + the data reads all stay behind <em>one</em> door (gcp-bridge), which already holds them. One place for the key-free identity, one place for the corpus. Don&#39;t spread it.</div>
+
+  <h2>7. Escape routes <span class="k">every load-bearing choice reverses</span></h2>
+  <ul data-cm="7-escape-routes-every-load">
+    <li><b>Brain swap:</b> a one-line URL revert + re-add the secret puts Anthropic back. The persona and Slack plumbing never changed. <b class="g">Fully reversible.</b></li>
+    <li><b><code>/search</code> + <code>/facets</code>:</b> additive endpoints on a read-only service &mdash; if wrong, delete them; nothing else depends on them being right. <b class="g">Fully reversible.</b></li>
+    <li><b><code>/ask</code>:</b> additive route; if the grounded answers are bad, Argus falls back to plain <code>/vertex/gemini</code> chat. <b class="g">Reversible.</b></li>
+    <li><b>No irreversible choices.</b> The raw .ids is never mutated by any lane here &mdash; the source of record is untouched, so there is nothing to roll back on the data side. ⚠ none.</li>
+  </ul>
+
+  <h2>8. First move <span class="k">smallest proof it&#39;s real</span></h2>
+  <p>Expose <b class="hl"><code>GET /search?q=</code> on <code>onedine-raw</code></b> &mdash; wrap the <code>rawq</code> matcher that already exists &mdash; deploy, and curl it live:</p>
+  <pre>GET onedine-raw/search?q=refund&amp;limit=10
+  -> [ { "s":"case:500...", "p":"Description", "o":"...refund was declined..." }, ... real Mendo IDs ]</pre>
+  <p>Why this first: retrieval-over-HTTP is the keystone &mdash; <code>/ask</code>, grounding, trends all stand on it, and nothing proves "the data is reachable by a question" faster. It&#39;s ~50 lines around code we&#39;ve already written and tested as a CLI. <b>The brain swap (Lane A) runs in parallel</b> &mdash; independent, trivial, and it satisfies your "no Anthropic" line the same afternoon. When both land: DM Argus "find refund-declined tickets," watch it return real IDs, answered by Gemini, zero Anthropic. That&#39;s the whole design in one sentence, proven.</p>
+
+  <h2>Definition of Done</h2>
+  <ul data-cm="8-first-move-smallest-proof" class="dod">
+    <li class="ok">A-D-D verified &mdash; read <code>C:\argus\ARCHITECTURE.md</code> (read-only multi-source console, ISource seam); this design adds read-only endpoints + a chat blood-supply swap, no architectural drift; <code>a-d-d/patterns/</code> checked.</li>
+    <li class="ok">Sourced before invented &mdash; 5 of 8 capabilities already live; recon quoted with file:line.</li>
+    <li class="ok">Names literal &mdash; <code>/search</code>, <code>/facets</code>, <code>/ask</code>, retrieve-then-read; one collision flagged (<code>/ask</code> reads vs <code>/nps/draft</code> writes).</li>
+    <li class="ok">First Move is the smallest real proof &mdash; one endpoint wrapping existing code, curlable live.</li>
+    <li class="ok">Language law &mdash; C99 intelligence (onedine-raw), C# jacket (gcp-bridge Vertex), vanilla surface.</li>
+    <li class="ok">Escape routes named &mdash; every choice reverses; no mutation of the source-of-record raw.</li>
+    <li>Design artifact published to its cap-URL (Latchkey) &mdash; pending publish.</li>
+  </ul>
+  <footer>Be &middot; v0 &middot; r502 &middot; 2026-07-09 &middot; ~d (Fable 5) &middot; Argus &mdash; Gemini-on-Vertex grounded on the .ids</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"c656ac2b-ba15-4845-9694-a1428dafc553"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
