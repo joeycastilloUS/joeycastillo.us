@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be ~p &mdash; Stage the Mendo Zendesk raw: full decode + BM25 index</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111111; color:#d5d5d5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.62; padding-bottom:70px; font-size:15px; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 20px; display:flex; justify-content:space-between; align-items:baseline; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; letter-spacing:1px; }
+  nav .pub { color:#666; font-size:11px; }
+  .wrap { max-width:800px; margin:0 auto; padding:0 20px; }
+  h1 { color:#fff; font-size:23px; margin:30px 0 4px; font-weight:600; }
+  .lede { color:#9aa; font-size:15px; margin:8px 0 4px; }
+  .muted { color:#777; }
+  h2 { color:#6FC3DF; font-size:14px; text-transform:uppercase; letter-spacing:1.4px; margin:32px 0 10px; border-bottom:1px solid #262626; padding-bottom:6px; }
+  p { margin:10px 0; } b.hl{color:#9fd8ec;} b.g{color:#7fd08a;} b.a{color:#e0a246;}
+  ul{margin:8px 0 8px 20px;} li{margin:5px 0;}
+  code { background:#000; padding:1px 5px; border-radius:3px; color:#8fd; font-size:12px; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:8px; padding:12px 14px; font-family:Consolas,monospace; font-size:12px; color:#bcd; overflow:auto; line-height:1.5; }
+  .card { background:#1A1A1A; border:1px solid #242424; border-radius:6px; padding:12px 16px; margin:12px 0; }
+  .p1{border-left:3px solid #7fd08a;} .p2{border-left:3px solid #6FC3DF;} .p3{border-left:3px solid #e0a246;} .p4{border-left:3px solid #b07fd0;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:44px;border-top:1px solid #242424;padding-top:16px;}
+  .dod li{list-style:none;} .dod .ok::before{content:"\2713 ";color:#7fd08a;}
+  .pts{color:#e0a246;font-weight:600;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-09 20:25 PST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/23a48822-aba3-4090-a604-120b88947763/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+  <h1>Stage the Mendo Zendesk raw: full decode + BM25 index</h1>
+  <p class="lede">Turn the 431K-ticket raw into a <b class="hl">staged working set</b> &mdash; de-noised, fully decoded to <code>.pi</code> programs across every comment, and indexed for fast ranked search &mdash; while the raw stays the untouchable source-of-record you can reconstruct anything from. Operator decisions locked: <b>full thread</b>, <b>C99 inverted index + BM25</b>, <b>Cloud Run Job (us-west1)</b>. <span class="pts">18 pts</span>.</p>
+
+  <h2>Intent</h2>
+  <p>Stage once, serve fast forever. Precompute what&#39;s expensive (decode + index) so <code>zendesk-raw</code> answers <em>find / program / matches / patterns / shape</em> instantly and with real ranking &mdash; and prove the raw still reconstructs any ticket exactly. Deterministic, model-free, $0/decode.</p>
+
+  <h2>Scope</h2>
+  <p><b>In:</b> a C99 stager over the full sealed raw (<code>gs://acmedev-mendo-tickets-ids/full/raw-ids-full.tgz</code>): de-noise (scrub) &rarr; full-thread decode (every comment) &rarr; <code>.pi</code> program + content-atom bag per ticket &rarr; BM25 inverted index &rarr; sealed <code>derived-full</code> store + index, uploaded + hash-verified; a reconstruction + search proof. Runs as a Cloud Run Job in us-west1. <b>Out:</b> the serving service (<code>zendesk-raw</code>, next), embeddings/vector (BM25 first), live incremental refresh (frozen snapshot; refresh is a follow).</p>
+
+  <h2>Approach</h2>
+  <p>Reuse the proven C99: <code>scrub_derive.c</code> (de-noise: HTML/CSS/URL to side-channel, clean prose to <code>understand()</code>), <code>derive_prog.c</code> (multi-unit <code>.pi</code> program), <code>seal_triples.c</code> (seal), nous <code>understand/wire/store</code>. New = a full-<em>thread</em> driver (walk <code>has_comment</code> for every ticket, decode each comment) + a <b>BM25 inverted index builder</b> (term&rarr;postings+tf, doc-length table, sealed alongside). Package as a Cloud Run Job so it runs next to the data (no 1.45&nbsp;GB local pull) and re-runs on refresh.</p>
+
+  <h2>Why this exists: it feeds <code>zendesk-raw</code> <span class="k">stage &rarr; serve, one arc</span></h2>
+  <p>This staging pass is the <b>substrate for the serving design</b> (<code>design-argus-zendesk-mendo-corpus-fable5</code>). Staging is not a side quest &mdash; it produces the exact store <code>zendesk-raw</code> mounts, and each staged artifact powers a specific endpoint/view. Build the fuel here; the service just serves it.</p>
+  <table>
+    <tr><th>Staged artifact (this plan)</th><th>Powers (the zendesk-raw design)</th></tr>
+    <tr><td><b>BM25 inverted index</b></td><td><code>/search</code> &mdash; ranked find, the recall win that replaces the substring scan (the standing Kaizen, closed here)</td></tr>
+    <tr><td><b>.pi program per ticket/comment</b> (full thread)</td><td><code>/replay?ticket=</code> &mdash; the underlying program view; precomputed, so it&#39;s instant not per-request</td></tr>
+    <tr><td><b>content-atom bag per ticket</b></td><td><code>/similar?ticket=</code> (retrieve.c overlap) + <code>/spine?cluster=</code> (deatomize_poc patterns) &mdash; matches + patterns</td></tr>
+    <tr><td><b>friction/marker signal + field facets</b></td><td><code>/shape</code> &mdash; the distribution of what support IS, corpus-wide</td></tr>
+    <tr><td><b>raw backlink (ticket: subject)</b></td><td>every endpoint&#39;s reconstruction path + source-aware <code>gcp-bridge /ask?source=zendesk</code></td></tr>
+  </table>
+  <p class="muted">Sequence: <b>stage (this ~p) &rarr; serve (<code>zendesk-raw</code>, the design) &rarr; the five Argus views</b>. Doing the full decode + index now is what makes the service fast, ranked, and corpus-wide instead of a thin substring scan over 5 tickets.</p>
+
+  <h2>Phases</h2>
+  <div data-cm="intent" class="card p1"><b class="g">Phase ST1 &mdash; The stager (full-thread de-noise + decode).</b> <span class="pts">6 pts</span>
+  <ul>
+    <li>{stage.c (C99): mount raw store, for every ticket walk has_comment → each comment body → scrub_derive de-noise → understand() → .pi program + content-atom bag + marker counts; write derived triples (program/atoms/entities per comment + ticket rollup), backlinked to ticket: subject, add to, mendo-zendesk-ai} · 5 · ~a~t</li>
+    <li>{reconstruction contract — derived never replaces raw; every derived subject backlinks to raw ticket:; a sample ticket round-trips raw→atoms→de-atomized readable, test, mendo-zendesk-ai} · 1 · ~t</li>
+  </ul></div>
+  <div class="card p2"><b class="hl">Phase ST2 &mdash; BM25 inverted index (C99).</b> <span class="pts">5 pts</span>
+  <ul>
+    <li>{bm25.c: build term→postings(ticket,tf) inverted index over the decoded content atoms + key fields (subject/group/status); doc-length table + avgdl + df for BM25 scoring; serialize sealed alongside derived-full, add to, mendo-zendesk-ai} · 5 · ~a~t</li>
+  </ul></div>
+  <div class="card p3"><b class="a">Phase ST3 &mdash; Cloud Run Job + run the full corpus.</b> <span class="pts">5 pts</span>
+  <ul>
+    <li>{Dockerfile + Cloud Run Job (us-west1): fetch raw-ids-full.tgz from GCS → run stage.c + bm25.c over all 431K → seal derived-full-ids.tgz + index → upload to gs://…/full/ + update manifest (sha256, counts), add to, mendo-zendesk-ai + acmedev-platform-hq} · 3 · ~a~t</li>
+    <li>{execute the job over the full corpus; capture decode count, index size, timing; hash-verify the uploaded staged store, test, acmedev-platform-hq} · 2 · ~t</li>
+  </ul></div>
+  <div class="card p4"><b style="color:#b07fd0">Phase ST4 &mdash; Prove the stage.</b> <span class="pts">2 pts</span>
+  <ul>
+    <li>{proof: (a) 5 sample tickets reconstruct exactly from raw; (b) a BM25 query ("refund declined") returns ranked real tickets that a substring scan missed — the recall win, on paper, test, mendo-zendesk-ai} · 2 · ~t</li>
+  </ul></div>
+
+  <h2>Constraints</h2>
+  <ul data-cm="constraints">
+    <li><b>Raw is immutable source-of-record.</b> The stager only reads it; derived is additive, same format, subject-keyed back to raw.</li>
+    <li><b>Language law:</b> all C99 (stager, index, seal) + nous; no model in the decode path ($0).</li>
+    <li><b>In-region:</b> job runs in us-west1 next to the bucket; no cross-region egress, no local 1.45 GB pull.</li>
+    <li><b>Deterministic + re-runnable:</b> same raw + same decoder version = byte-identical staged output; manifest pins decoder + sha256.</li>
+    <li><b>Done = the staged store is live in GCS, hash-verified, and a third party can pull + reconstruct a ticket (Rule 9).</b></li>
+  </ul>
+
+  <h2>Unknowns <span class="k">named</span></h2>
+  <ul data-cm="unknowns-named">
+    <li><b>Decode wall-clock.</b> 977K <code>understand()</code> calls over 1.45 GB mmap &mdash; minutes? tens of minutes? Sets the Job timeout + memory (start 4 GB / 1 hr, measure, tune).</li>
+    <li><b>Index size.</b> Inverted index over ~4.6M unique strings &mdash; how big sealed? Affects the serving service&#39;s memory. Measure at ST2.</li>
+    <li><b>Scrub aggressiveness.</b> How much Zendesk boilerplate (signatures, quoted replies, footers) survives scrub and pollutes programs/index &mdash; may need a second de-fluff rule set. Watch at ST4.</li>
+    <li><b>Wordnet in the container.</b> <code>understand()</code> needs the wordnet dir at runtime (all tools call <code>lang_init(wordnet)</code>); confirm it ships in the image or mounts from GCS.</li>
+    <li><b>Nous API + header source.</b> The mendo tools <code>#include "../skill/store/store.h"</code> against a nous tree NOT vendored in the repo, and use the <code>triple_store_*</code> API &mdash; while the proven <code>raw2</code>/onedine build compiled against <code>C:\metal\src\sdk\nous</code> using the lower-level <code>ids_*</code>/<code>ts_*</code> API. <b>Step 0 of the build reconciles these:</b> pick one nous tree + API layer that compiles both the scrub/derive tools AND the store walk, before writing stage.c. (zendesk-bridge already vendors a working nous under <code>attrib/</code> &mdash; a candidate source.)</li>
+  </ul>
+
+  <h2>When to revisit <span class="k">v2 trigger</span></h2>
+  <p>ST4&#39;s proof decides the next layer. <b>If BM25 ranking lands the right tickets</b> where substring missed &rarr; wire <code>zendesk-raw</code> to the staged store and ship the five views. <b>If paraphrase still slips</b> (BM25 is lexical) &rarr; embeddings become the justified v2, layered on the same staged atoms. <b>If scrub leaves fluff in the programs</b> &rarr; a de-fluff pass is the next stage before serving.</p>
+
+  <h2>Definition of Done</h2>
+  <ul data-cm="when-to-revisit-v2-trigger" class="dod">
+    <li class="ok">Informed by <code>design-argus-zendesk-mendo-corpus-fable5</code> + <code>design-gemini-vertex-ids-brain</code>.</li>
+    <li class="ok">Every work item a verify loop; ST1/ST3 paired with tests, ST4 a dedicated proof.</li>
+    <li class="ok">Rule 6 sections &mdash; Unknowns + When To Revisit, named.</li>
+    <li class="ok">Rule 9 &mdash; Done = staged store live in GCS, hash-verified, externally reconstructable.</li>
+    <li class="ok">Reuse-first &mdash; scrub_derive / derive_prog / seal_triples / nous reused; new = full-thread driver + BM25.</li>
+    <li>Plan published to its cap-URL (Latchkey) + board seeded &mdash; on publish.</li>
+  </ul>
+  <footer>Be &middot; v0 &middot; r515 &middot; 2026-07-09 &middot; ~p (Fable 5) &middot; 18 pts &middot; stage once, serve fast forever</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"23a48822-aba3-4090-a604-120b88947763"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
