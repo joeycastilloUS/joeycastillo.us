@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be ~i &mdash; What is the issue: stage-mendo-zendesk (STAGE3) failure</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111111; color:#d5d5d5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.62; padding-bottom:70px; font-size:15px; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 20px; display:flex; justify-content:space-between; align-items:baseline; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; letter-spacing:1px; }
+  nav .pub { color:#666; font-size:11px; }
+  .wrap { max-width:860px; margin:0 auto; padding:0 20px; }
+  h1 { color:#fff; font-size:24px; margin:30px 0 4px; font-weight:600; }
+  .lede { color:#9aa; font-size:15px; margin:8px 0 4px; }
+  .muted { color:#777; }
+  h2 { color:#6FC3DF; font-size:14px; text-transform:uppercase; letter-spacing:1.4px; margin:34px 0 10px; border-bottom:1px solid #262626; padding-bottom:6px; }
+  p { margin:10px 0; } b.hl{color:#9fd8ec;} b.g{color:#7fd08a;} b.a{color:#e0a246;} b.r{color:#ff9aa2;}
+  ul{margin:8px 0 8px 20px;} li{margin:6px 0;}
+  code { background:#000; padding:1px 5px; border-radius:3px; color:#8fd; font-size:12px; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:8px; padding:11px 13px; font-family:Consolas,monospace; font-size:12px; color:#bcd; overflow:auto; line-height:1.5; }
+  .card { background:#1A1A1A; border:1px solid #242424; border-radius:6px; padding:12px 16px; margin:12px 0; }
+  .bad{border-left:3px solid #d0555f;} .warn{border-left:3px solid #e0a246;} .ok{border-left:3px solid #7fd08a;} .info{border-left:3px solid #6FC3DF;}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px;}
+  th,td{border:1px solid #262626;padding:6px 9px;text-align:left;vertical-align:top;}
+  th{color:#6FC3DF;background:#161616;font-size:12px;text-transform:uppercase;letter-spacing:.6px;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:44px;border-top:1px solid #242424;padding-top:16px;}
+  .dod li{list-style:none;} .dod .ok2::before{content:"\2713 ";color:#7fd08a;}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;}
+  .t-bad{background:#2a0d10;color:#ff9aa2;border:1px solid #5f1f27;} .t-ok{background:#06251a;color:#7CFFB2;border:1px solid #1f5f47;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-10 16:08 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/ccb530bd-7b33-44d1-bbbc-8e15e94b1b75/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+<h1>~i &mdash; What is the issue: the STAGE3 corpus job</h1>
+<p class="lede">Fable&nbsp;5 inspection of why <code>stage-mendo-zendesk</code> has failed 3&times; and never produced the 431K derived corpus. It pulled the <b>actually-deployed</b> source from Cloud Build (not just the local tree) and did the byte math. <b class="a">The earlier "tmpfs exhaustion" call was wrong</b> &mdash; corrected here with evidence.</p>
+
+<div class="card bad">
+<p><b class="r">Root cause &mdash; <span class="tag t-bad">ENOENT, not ENOSPC</span></b></p>
+<p>The <b>deployed</b> <code>run.sh</code> never creates <code>/work/derived-full</code>, so <code>seal_tsv</code>'s <code>fopen("/work/derived-full/facts.bin","wb")</code> fails on a <b>missing parent directory</b>. <code>fopen(3)</code> does not create directories. The failure is deterministic, at the very first output write, at <b>6% memory utilization</b> &mdash; not memory.</p>
+<p class="muted">The fix already exists on disk: local <code>C:\argus\.stage3-job\run.sh</code> (mtime Jul&nbsp;9 22:47) has <code>mkdir -p /work/derived-full</code> + raw-store rm relief &mdash; but that is <b>38 minutes newer than the last deploy</b> (22:09). <b>The fix was written and never redeployed.</b> The deployed image still runs the old script (its log banner reads <code>(O(1) intern)</code>, matching the old source).</p>
+</div>
+
+<h2>The second bug &mdash; equally load-bearing</h2>
+<div data-cm="the-second-bug-equally-load" class="card bad">
+<p>Even with the directory fixed, the deployed <code>stage.c</code> <b class="r">decodes nothing</b>. Its execution log:</p>
+<pre>stage: tickets=431260 comments=431260 total_atoms=0 avg_atombag=0.0 triples_written=6037640</pre>
+<p>The deployed <code>stage.c</code> probes <code>kind=ticket</code> <b>first</b> &rarr; the full raw has <code>kind=ticket</code> facts &rarr; it takes the "synth" path &rarr; reads a <code>description</code> field <b>that does not exist in the full raw</b> (the real bodies live under <code>has_comment &rarr; comment:&lt;cid&gt; &rarr; body</code>, 977,029 comments). Result: every atombag empty, <b>total_atoms=0</b>, a garbage store. (<code>6,037,640 = 14 near-empty triples &times; 431,260 tickets</code>.)</p>
+<p>The <b>corrected</b> <code>stage.c</code> already exists at <code>C:\mendo-zendesk-ai\be\tools\stage.c</code> (probes <code>has_comment</code> FIRST; comment header even says the prior version "had this inverted... producing total_atoms=0"), verified working locally this morning. <b>The job dir still holds the old, inverted one.</b></p>
+</div>
+
+<h2>Alternatives ruled out <span class="muted">(with evidence)</span></h2>
+<table data-cm="alternatives-ruled-out-with-evidence">
+<tr><th>Hypothesis</th><th>Verdict</th><th>Why</th></tr>
+<tr><td>tmpfs / 32Gi exhaustion <span class="muted">(the earlier call)</span></td><td><span class="tag t-bad">DEAD</span></td><td>Logs at failure: strings arena <b>14 MB</b>, facts 145 MB, dict 21 MB, hix 34 MB &rarr; heap ~280 MB; tmpfs ~2.0 GiB of 32 (<b>6%</b>). ENOSPC impossible; stage wrote the TSV to the same fs seconds earlier.</td></tr>
+<tr><td>uint32 string-offset overflow (&gt;4 GB)</td><td><span class="tag t-bad">not this</span></td><td><code>g_sused</code> = 14 MB at death; the 4 GB cap has its own explicit guard (<code>seal_tsv.c:65</code>) that never printed.</td></tr>
+<tr><td>OOM-kill</td><td><span class="tag t-bad">not this</span></td><td>Would be a memory-limit kill event, not a NULL <code>fopen</code> + orderly <code>exit(1)</code>.</td></tr>
+</table>
+
+<h2>Size math &mdash; memory was never the wall</h2>
+<p>Calibrated from a local 985-ticket thread-mode sample + the raw TSV (body avg 609 B). At the real 431,260 tickets / 977,029 comments, thread mode:</p>
+<ul>
+<li><code>derived.tsv</code> &asymp; <b>1.2 GB</b>; seal heap (strings ~0.9&ndash;1.5 GB transient + facts 263 MB + dict/hix ~130 MB) &asymp; <b>1.6&ndash;2 GB</b>; tmpfs at seal (tsv + output + index + tgz) &asymp; <b>3.7 GB</b>.</li>
+<li><b>Peak &asymp; 6 GB of 32 GiB &mdash; ~5&times; headroom. Confidence: high.</b> The uint32 offset (~0.9 GB) is 4.4&times; under its cap and dies cleanly if the corpus ever grows ~4&times;.</li>
+</ul>
+
+<h2>Latent bugs surfaced</h2>
+<ul data-cm="size-math-memory-was-never">
+<li><b class="r">stage.c mode inversion</b> (<code>.stage3-job\stage.c:186</code>) &mdash; the ship-stopper; fixed version exists in mendo tools, not yet in the job dir.</li>
+<li><b class="a">write_file hides errno</b> (<code>seal_tsv.c:89</code>) &mdash; "cannot write" with no <code>strerror(errno)</code> is exactly what turned a 5-second ENOENT into a 32Gi wild-goose chase. One-line fix.</li>
+<li><b class="a">No garbage gate</b> &mdash; run.sh happily seals + uploads a <code>total_atoms=0</code> corpus. Stage should exit nonzero when thread-capable raw yields zero atoms.</li>
+<li><b class="a">O(n&sup2;) ticket seen-set</b> (stage.c:216) &mdash; 431K linear scan; caused the 1200&rarr;600 t/s decay. Tolerable, but confirm the job <b>task timeout</b> is set for hours before the real thread-mode run.</li>
+</ul>
+
+<h2>Fixes &mdash; ranked</h2>
+<div data-cm="fixes-ranked" class="card ok"><b class="g">D &mdash; Redeploy the two fixes that already exist on disk. SHIP THIS.</b>
+<ul>
+<li>Copy the fixed <code>stage.c</code> from <code>mendo-zendesk-ai\be\tools</code> into <code>.stage3-job\</code>; keep the current <code>run.sh</code> (has <code>mkdir -p</code> + raw rm).</li>
+<li>Add <code>strerror(errno)</code> to <code>write_file</code> + a <code>total_atoms&gt;0</code> gate; bump job task timeout; rebuild + execute.</li>
+<li><b>Effort ~15 min, cost one job run. Robust</b> &mdash; fixes both proven causes; 32Gi/8CPU has 5&times; headroom.</li>
+</ul></div>
+<div class="card info"><b>C &mdash; stream-and-free / seal incrementally.</b> Unnecessary (peak ~6 GB). Skip.</div>
+<div class="card info"><b>B &mdash; chunk/shard + merge.</b> Unnecessary complexity at this scale; revisit only if the corpus grows ~4&times;.</div>
+<div class="card info"><b>A &mdash; GCE VM + data disk.</b> <b class="a">Not needed</b> &mdash; this was the earlier (wrong) plan when the cause looked like memory. Only worth it for persistent scratch across repeated reruns.</div>
+
+<h2>Recommendation</h2>
+<p><b class="g">Redeploy with the fixed <code>stage.c</code> (has_comment-first) and the current <code>run.sh</code> (mkdir + tmpfs relief), plus errno in <code>write_file</code> and a zero-atoms gate.</b> The failure was a missing directory and an inverted mode probe &mdash; never memory. 32Gi/8CPU already has 5&times; headroom.</p>
+
+<h2>Definition of Done</h2>
+<ul data-cm="recommendation" class="dod">
+<li class="ok2">A-D-D verified &mdash; inspected the <b>actually-deployed</b> Cloud Build source + container logs + GCS state + byte math, not assumptions.</li>
+<li class="ok2">Root cause named with evidence (file:line + logs), earlier tmpfs hypothesis explicitly overturned (Rule 13).</li>
+<li class="ok2">Fixes ranked with effort/cost/robustness; a one-sentence recommendation.</li>
+<li>Published to its cap-URL (Latchkey) + board updated &mdash; on publish.</li>
+</ul>
+<footer>Be &middot; v0 &middot; r537 &middot; 2026-07-10 &middot; ~i (Fable 5) &middot; STAGE3 = missing mkdir + inverted stage mode, not memory</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"ccb530bd-7b33-44d1-bbbc-8e15e94b1b75"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
