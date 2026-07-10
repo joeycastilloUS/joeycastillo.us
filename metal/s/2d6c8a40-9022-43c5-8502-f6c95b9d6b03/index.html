@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report — Argus Slack: state, review, and what to do next</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111; color:#e0e0e0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.65; }
+  nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 24px; display:flex; align-items:center; gap:16px; z-index:10; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; } nav .title { color:#999; font-size:14px; } nav .pub { margin-left:auto; color:#555; font-size:12px; }
+  .container { max-width:820px; margin:0 auto; padding:24px 16px; }
+  h1 { color:#6FC3DF; font-size:26px; margin-bottom:8px; }
+  h2 { color:#6FC3DF; font-size:19px; margin:30px 0 12px; border-bottom:1px solid #333; padding-bottom:8px; }
+  h3 { color:#6FC3DF; font-size:14.5px; margin:16px 0 6px; }
+  .section { background:#1A1A1A; border-radius:8px; padding:20px; margin:16px 0; }
+  .blu { background:#0c1a22; border:1px solid #14323e; }
+  ul,ol { margin:8px 0 8px 22px; } li { margin:6px 0; } p { margin:8px 0; }
+  code { background:#222; padding:2px 6px; border-radius:4px; font-size:12.5px; color:#6FC3DF; }
+  a { color:#6FC3DF; } pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:12px 14px; overflow-x:auto; color:#bcd; font-size:12px; font-family:Consolas,monospace; margin:10px 0; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid #2a2a2a; font-size:12.8px; vertical-align:top; }
+  th { color:#6FC3DF; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .sev-c { color:#ff6b6b; font-weight:700; } .sev-m { color:#f59e0b; font-weight:700; } .sev-r { color:#7fb7cc; font-weight:700; } .sev-q { color:#8a93a0; font-weight:700; }
+  .pass { color:#22c55e; font-weight:600; } .warn { color:#f59e0b; font-weight:600; } .v { color:#22c55e; font-size:11px; }
+  .num { display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; border-radius:50%; background:#06251a; color:#7CFFB2; font-weight:700; font-size:12px; margin-right:8px; }
+  footer { text-align:center; color:#555; font-size:12px; margin-top:40px; padding:24px; border-top:1px solid #222; }
+</style></head><body>
+<nav><span class="brand">Be</span><span class="title">Report — Argus Slack: state, review, advice</span><span class="pub">Published 2026-07-09 20:55 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/2d6c8a40-9022-43c5-8502-f6c95b9d6b03/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Argus Slack &mdash; where it stands, what's wrong, and what to do</h1>
+<p>Two sessions are on Argus right now: one building the Slack app (<code>argus-slack</code>), one (this one) that
+just sealed the full Zendesk corpus and made the console tabs real. This is the synthesis and the call.</p>
+
+<div class="section blu">
+<h2>The bottom line (do this, in this order)</h2>
+<ol data-cm="the-bottom-line-do-this">
+<li><b>Ground the ticket-search &mdash; this is #1.</b> Argus currently tells operators about tickets it never verified exist. The fix is sitting on the shelf: the sealed IDS of all 431,260 real Mendo tickets. Make <code>/ask</code> answer from the store, and have <code>argus-slack</code> verify every cited ID against it before showing it. This is the single highest-trust, lowest-cost change, and it <i>is</i> the source-scoped design's First Move.</li>
+<li><b>Ship the three small correctness/security fixes</b> (event dedup, timestamp skew, brain timeout) before any new feature. Each is a few lines; each is verified real below.</li>
+<li><b>One Argus, source-scoped &mdash; do not fork the app.</b> Add the slot registry + scope resolver now (cheap), bind the Zendesk slot on the live Mendo channel, and defer the Salesforce slot until it's actually needed. Design: <a href="https://joeycastillo.us/metal/s/2d993e9a-4748-4dd7-afc8-7efd2121792a/">One Argus, source-scoped by rights</a>.</li>
+<li><b>Split the work so the two sessions don't collide:</b> the Slack session owns the C# edits; this session owns the grounding substrate (the sealed IDS + a "real tickets" read/verify capability the bridge or app calls). Clean seam, no clobber.</li>
+</ol>
+</div>
+
+<div class="section">
+<h2>State of play</h2>
+<table data-cm="state-of-play">
+<tr><th>Piece</th><th>Status</th></tr>
+<tr><td><b>Zendesk raw corpus</b></td><td><span class="pass">real</span> &mdash; 431,260 tickets / 8.2M facts sealed into a nous TripleStore, mesh-resident at <code>gs://acmedev-mendo-tickets-ids/full/</code> (handle <code>8963900c…</code>). Replay + decode proven.</td></tr>
+<tr><td><b>Argus console tabs</b></td><td><span class="pass">real, live</span> &mdash; Conversations + Focus read the sealed store; demoware deleted; deployed to <code>joeycastillo.us/argus/mendo/</code>.</td></tr>
+<tr><td><b>Argus Slack app</b></td><td><span class="warn">works, but ungrounded</span> &mdash; GR recovery Approval Cards (gated, disarmed) + a Gemini/Vertex conversational responder. Ticket-search answers are <b>not verified against real data</b> (see below).</td></tr>
+<tr><td><b>Per-source isolation</b></td><td><span class="pass">already real</span> &mdash; <code>zendesk-bridge</code> + <code>salesforce-bridge</code> both live; each source has its own sealed IDS (<code>mendo-tickets-ids</code>, <code>onedine-cases-ids</code>).</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>The one that matters: ungrounded ticket-search <span class="v">&#10003; verified in source</span></h2>
+<p>When an operator asks Argus "how many tickets about refunds this week", the message is keyword-routed to the
+bridge's <code>/ask</code>, which returns <code>{ answer, cited:[caseIds] }</code>. Then:</p>
+<pre>// ArgusBrain.cs:184
+return cited.Count > 0
+    ? $"{answer}\n\nCited: {string.Join(", ", cited)}"   // &lt;-- appended with ZERO verification
+    : answer;</pre>
+<p><code>argus-slack</code> never checks those case IDs against any store. If the model behind <code>/ask</code>
+invents "Ticket #999999", Argus posts it to the operator as fact. <b>This is the trust-killer</b> &mdash; an ops
+tool that confidently cites tickets that don't exist is worse than one that says "I don't know."</p>
+<h3>The fix (two layers, both use the sealed IDS you now have)</h3>
+<ul>
+<li><b>Ground the source:</b> <code>/ask</code> should answer <i>from</i> the sealed IDS (the deterministic store), not a bare model. The store holds every real ticket + comment; grounding = read, not guess.</li>
+<li><b>Verify at the edge:</b> <code>argus-slack</code> checks each <code>cited</code> ID exists in the scoped source's IDS before rendering it; unverifiable IDs are dropped or flagged, never shown as fact.</li>
+</ul>
+<p>This is exactly the source-scoped design's First Move &mdash; grounding is per-source, so it lands with the Zendesk slot.</p>
+</div>
+
+<div class="section">
+<h2>Full review &mdash; 16 findings (read-only pass over <code>argus-slack</code>)</h2>
+<p>Ranked by severity. <span class="v">&#10003;</span> = confirmed against source this session; the rest are from the
+review pass &mdash; verify the exact line before acting.</p>
+<table>
+<tr><th>#</th><th>Sev</th><th>Finding</th><th>Where</th><th>Why it matters</th></tr>
+<tr><td>1</td><td class="sev-c">CRIT</td><td>Ticket-search cites unverified IDs <span class="v">&#10003;</span></td><td><code>ArgusBrain.cs:184</code></td><td>Argus reports tickets that may not exist &mdash; erodes operator trust.</td></tr>
+<tr><td>2</td><td class="sev-c">CRIT</td><td>Event dedup falls back to <code>Ts</code>, which isn't unique <span class="v">&#10003;</span></td><td><code>SlackEventsController.cs:46</code></td><td>Under Slack retries, distinct events collide &amp; get dropped &mdash; missed questions/approvals. Use <code>event_id</code> only.</td></tr>
+<tr><td>3</td><td class="sev-m">MED</td><td>Timestamp check uses <code>Math.Abs</code> &mdash; accepts future-dated requests <span class="v">&#10003;</span></td><td><code>SlackSignatureVerifier.cs</code></td><td>Weakens replay window; Slack's spec rejects future timestamps. Reject <code>ts &gt; now</code>.</td></tr>
+<tr><td>4</td><td class="sev-r">ROBUST</td><td>No timeout on the brain's bridge calls <span class="v">&#10003;</span></td><td><code>ArgusBrain.cs:118,160</code> (vs 30s on <code>Program.cs:24</code>)</td><td>A hung bridge starves the thread pool; the named client has a timeout, the brain's <code>CreateClient()</code> doesn't.</td></tr>
+<tr><td>5</td><td class="sev-r">ROBUST</td><td>Retry on <code>/reply-send</code> without an idempotency key</td><td><code>BridgeClient.cs:70</code></td><td>A network timeout after a successful send could email the guest twice unless the bridge dedupes perfectly.</td></tr>
+<tr><td>6</td><td class="sev-r">ROBUST</td><td>Regulator not run on chat/ask responses</td><td><code>RegulatorService.cs</code></td><td>A model reply with leaked PII/secret posts to Slack unscanned (the draft path is scanned; the chat path isn't).</td></tr>
+<tr><td>7</td><td class="sev-q">QUAL</td><td>Keyword substring routing is brittle</td><td><code>ArgusBrain.cs:41</code></td><td>"I find this confusing" mis-routes to search; "how was your week" misses. Intent should decide, not substrings.</td></tr>
+<tr><td>8</td><td class="sev-r">ROBUST</td><td>No retry/backoff on Slack API calls</td><td><code>ArgusSlackService.cs</code></td><td>A transient Slack 5xx silently drops the card/modal/status update.</td></tr>
+<tr><td>9</td><td class="sev-r">ROBUST</td><td>Edit body has no size cap on the write path</td><td><code>ArgusSlackService.cs</code></td><td>Display truncates at ~2900 chars; the body sent to the bridge is unbounded &rarr; 413/timeout risk.</td></tr>
+<tr><td>10</td><td class="sev-q">QUAL</td><td>Approval CAS is single-field (status only)</td><td><code>ApprovalGateService.cs</code></td><td>Exactly-once holds on status, but a concurrent edit can leave other fields inconsistent.</td></tr>
+<tr><td>11</td><td class="sev-q">QUAL</td><td>Edit doesn't guard terminal drafts</td><td><code>ApprovalGateService.Edit</code></td><td>Editing a sent/aborted draft still writes &mdash; confusing state.</td></tr>
+<tr><td>12</td><td class="sev-r">ROBUST</td><td>Bridge error logs echo full response body</td><td><code>ArgusBrain.cs:132,173</code></td><td>If the bridge echoes the question, PII could land in logs.</td></tr>
+<tr><td>13</td><td class="sev-r">ROBUST</td><td>Dedup cache has no hard size cap</td><td><code>SlackEventsController.cs:26</code></td><td>Low-risk on ephemeral Cloud Run, but the prune is time-only, not bounded.</td></tr>
+<tr><td>14</td><td class="sev-m">MED</td><td>Internal token compare not length-normalized</td><td><code>SlackSignatureMiddleware.cs</code></td><td>Theoretical length oracle on the <code>/slack/post-card</code> header; hash before compare.</td></tr>
+<tr><td>15</td><td class="sev-q">QUAL</td><td>Missing null guards on Slack event fields</td><td><code>SlackEventsController.cs:73</code></td><td>Silent failures on incomplete events; unclear logs.</td></tr>
+<tr><td>16</td><td class="sev-q">QUAL</td><td>UTF-8 encode before compare not constant-time</td><td><code>SlackSignatureMiddleware.cs</code></td><td>Violates the stated constant-time intent for non-ASCII tokens (not a practical risk).</td></tr>
+</table>
+<p style="color:#7d8891;font-size:12px">What's already <b>good</b>: fail-closed signature verify (rejects when no secret), the disarmed gated write lane, capture-before-write, exactly-once on status, and a Regulator on the draft path. The bones are solid &mdash; these are refinements, not a rebuild.</p>
+</div>
+
+<div class="section">
+<h2>The architecture answer: one Argus, source-scoped by rights</h2>
+<p>Your instinct was right &mdash; it's a rights thing, not a second app. <b>One Argus shell</b>; each channel/DM is bound
+to one <b>source slot</b> = <code>{ bridge + sealed IDS (grounding) + persona + write lane }</code>, gated by the
+operator's entitled sources. The Mendo channel talks only Zendesk and grounds on <code>mendo-tickets-ids</code>; a
+Salesforce-only teammate's Argus never touches Zendesk. One bot, one install; a new source is a mounted slot,
+not a forked app. Nearly all reuse (&sect;3 bridges, the Slot pattern, Operator-Identity rights, both live IDS
+buckets). Full design: <a href="https://joeycastillo.us/metal/s/2d993e9a-4748-4dd7-afc8-7efd2121792a/">the source-scoped design</a>.</p>
+<p><b>Why not separate apps:</b> N bots, N installs, N secrets, and every shell fix lands N times. <b>Why not per-message
+inference:</b> a guessed scope reopens the blur, makes rights unenforceable, and leaves grounding non-deterministic.
+The channel-scoped rights slot is the only option that gives focus <i>and</i> unity &mdash; and the slot boundary is
+exactly the app-fork seam, so it keeps the "separate app" option open if a source ever outgrows the shell.</p>
+</div>
+
+<div class="section">
+<h2>Sequenced plan + who does what</h2>
+<table data-cm="the-one-that-matters-ungrounded">
+<tr><th>Step</th><th>Owner</th><th>What</th></tr>
+<tr><td><span class="num">1</span>Ground</td><td>this session (substrate) + Slack session (edge)</td><td>Bind the Zendesk slot; <code>/ask</code> answers from the sealed IDS; <code>argus-slack</code> verifies cited IDs against it. Closes finding #1.</td></tr>
+<tr><td><span class="num">2</span>Fix</td><td>Slack session</td><td>Findings #2, #3, #4 &mdash; event_id dedup, reject future timestamps, brain HTTP timeout. Small, ship first.</td></tr>
+<tr><td><span class="num">3</span>Scope</td><td>Slack session</td><td>Slot registry + channel&rarr;source resolver (rights = static config to start). No Salesforce slot yet.</td></tr>
+<tr><td><span class="num">4</span>Harden</td><td>Slack session</td><td>Findings #5, #6, #8 &mdash; idempotency key, regulate chat responses, Slack API retry.</td></tr>
+<tr><td><span class="num">5</span>Extend</td><td>later</td><td>Mount the Salesforce slot (its bridge + <code>onedine-cases-ids</code> + voice) once it's wanted.</td></tr>
+</table>
+<p><b>The seam that prevents collision:</b> this session doesn't touch <code>argus-slack</code> C#. It owns the grounding
+data + a read/verify capability (the sealed IDS and, if wanted, a small read service the bridge/app calls). The Slack
+session owns the app. They meet at a contract (verify-this-ID / answer-from-store), not in the same files.</p>
+</div>
+
+<div class="section">
+<h2>Definition of Done (this report)</h2>
+<ul data-cm="definition-of-done-this-report">
+<li><span class="pass">&#10003;</span> State, review (16 findings), and architecture synthesized into one call</li>
+<li><span class="pass">&#10003;</span> The 4 highest-severity findings verified against real source (not asserted)</li>
+<li><span class="pass">&#10003;</span> Decisive, sequenced advice &mdash; not a menu of options</li>
+<li><span class="pass">&#10003;</span> A collision-free two-session division of labor</li>
+<li><span class="pass">&#10003;</span> Read-only on <code>argus-slack</code> throughout &mdash; no edits to the active session's files</li>
+</ul>
+</div>
+</div>
+<footer>v0 &middot; r520 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"2d6c8a40-9022-43c5-8502-f6c95b9d6b03"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body></html>
