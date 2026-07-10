@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — The generic source slot</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 27px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 15px; margin: 18px 0 6px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:14px 16px; overflow-x:auto; color:#bcd; font-size:12.5px; font-family:Consolas,monospace; margin:12px 0; line-height:1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; } .fail { color:#ff6b6b; font-weight:600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~d — The generic source slot (any source, not just Zendesk)</span><span class="pub">Published 2026-07-09 21:31 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/bf5a640c-49e3-4935-9cf1-ccc375686df2/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>~d — The generic source slot (any source, not just Zendesk)</h1>
+<p><span class="tag">design</span><span class="tag">argus</span><span class="tag">slot pattern</span><span class="tag">source-as-data</span></p>
+
+<!-- 1. NEED -->
+<div class="section">
+<h2>1. Need</h2>
+<blockquote data-cm="1-need">"~d that slot again because it should not only work for Zendesk, right?" — Joey</blockquote>
+<p>Right. The prior design (<code>2026-07-09-2039-design-one-argus-source-scoped-fable5.html</code>) locked the shape — one Argus, one bot, per-conversation source slots — but every worked example was Zendesk. A slot whose fields only make sense for a ticket system is a Zendesk class with a generic name. The moment Salesforce wants a Slack surface, that slot forks, and the fork is the exact "Argus-for-X" split the prior design exists to kill.</p>
+<p><strong>The ground truth says the generic case is already the real case.</strong> Six source bridges are live (a-d-d §3, one Cloud Run service each, us-west1): <code>zendesk-bridge</code>, <code>salesforce-bridge</code>, <code>gcp-bridge</code>, <code>airbyte-bridge</code>, <code>meraki-bridge</code>, <code>cloudflare-bridge</code>. Only two have sealed IDS (<code>acmedev-mendo-tickets-ids</code>, <code>acmedev-onedine-cases-ids</code>). Only some have a write lane. Only one has a persona. The sources genuinely differ — so the slot must carry those differences <em>as data</em>, and the shell must read what a slot can do instead of assuming what Zendesk does.</p>
+<p><strong>Why now:</strong> Salesforce is next in line for a surface, and the console (<code>web/index.html</code>) already half-models this with its <code>APPS</code> registry — six sources, each a record with label/tabs/source. Two half-registries (console <code>APPS</code>, Slack's Zendesk wiring) are one refactor away from being one registry, or one fork away from being permanent duplicates. Unify before the fork.</p>
+</div>
+
+<!-- 2. RAW USER STORIES -->
+<div class="section">
+<h2>2. Raw User Stories</h2>
+<ul data-cm="2-raw-user-stories">
+<li>As the builder, I want to add a source by writing a <strong>slot record</strong> — data, not a class, not an app, not a branch in the shell.</li>
+<li>As the builder, I want a read-only source (GCP cost, Meraki) to simply have <strong>no write lane</strong>, and the shell to know that from the slot — never to discover it by a failed call.</li>
+<li>As the operator, I want a source with <strong>no IDS yet</strong> to still answer — ungrounded and honest about it ("no sealed store for this source; answers are unverified"), not silently pretending.</li>
+<li>As the builder, I want <strong>one shell definition</strong> to serve both the console and the Slack app — same slot record, two surfaces reading it.</li>
+<li>As a Salesforce-only operator, I want my <strong>rights</strong> to scope which slots exist for me — the others aren't hidden, they're not mine.</li>
+<li>As the operator, when Argus drafts in a slot with a <strong>persona</strong>, I want that voice; in a slot without one, the plain default — never Zora quoting cloud invoices.</li>
+</ul>
+</div>
+
+<!-- 3. SOURCED SOLUTION -->
+<div class="section">
+<h2>3. Sourced Solution</h2>
+<p>Mined in order, before inventing anything:</p>
+<table>
+<tr><th>Source</th><th>What it gives us</th><th>Status</th></tr>
+<tr><td><strong>Slot pattern</strong> — <code>kastil-systems/a-d-d/patterns/</code></td><td>A source is a self-contained slot; the shell mounts it. This design is that pattern applied to sources, nothing more — the pattern already says the shell never knows what's inside the slot.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>a-d-d §3</strong> — one bridge per source</td><td>Vendor isolation is already built: six live bridges, each holding exactly one vendor secret. The bridge is one slot field, not a design problem.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>a-d-d §8</strong> — skills generic; vendor knowledge is data</td><td>The governing principle of this whole design: <em>if it's vendor-specific it's data; if it's a capability it's the shell.</em> The slot record is §8 written down as a schema.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>Per-source sealed IDS</strong> — live GCS</td><td><code>gs://acmedev-mendo-tickets-ids/</code> (431,260 tickets, sealed) and <code>gs://acmedev-onedine-cases-ids/</code>. Grounding is per-slot by construction; four sources have none, so <code>ids: null</code> is a first-class state, not an error.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>Operator-Identity / rights canon</strong></td><td>The <code>rights</code> field. Who may mount a slot is an identity question, already answered by canon — the slot just carries the reference.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>Console <code>APPS</code> registry</strong> — <code>web/index.html</code></td><td>Six sources already sit in a registry: <code>{ meraki, zendesk, cloudflare, airbyte, salesforce, gcp }</code>, each <code>{ label, icon, tag, tabs[], source }</code>. This is the proto-slot-registry. Don't reinvent it — promote it: the slot record is the superset <code>APPS</code> becomes, shared by console and Slack.</td><td><span class="pass">REUSE</span></td></tr>
+</table>
+
+<h3>The slot contract</h3>
+<p>One record shape every source fills. No vendor name appears in shell code — a source differs only by its slot data plus its already-isolated bridge jacket.</p>
+<table>
+<tr><th>Field</th><th>Means exactly</th><th>Null means</th></tr>
+<tr><td><code>id</code></td><td>The source key: <code>zendesk</code>, <code>salesforce</code>, <code>gcp</code>, …</td><td>never null</td></tr>
+<tr><td><code>bridge</code></td><td>The read surface: URL + auth of the §3 C# jacket. Every source has one.</td><td>never null</td></tr>
+<tr><td><code>ids</code></td><td>The grounding store: <code>{ bucket, handle }</code> of the sealed IDS.</td><td>no IDS yet — answers ship unverified, and say so</td></tr>
+<tr><td><code>persona</code></td><td>The drafting/chat voice (Zora for guest relations; a sales voice for OneDine).</td><td>default plain voice</td></tr>
+<tr><td><code>writeLane</code></td><td>The gated action path: <code>{ endpoint, disarmed:true }</code>. Born disarmed, always.</td><td>read-only source — the shell never offers an action</td></tr>
+<tr><td><code>rights</code></td><td>Who's entitled: operators/channels, per the Operator-Identity boundary.</td><td>never null — no rights, no slot</td></tr>
+<tr><td><code>capabilities</code></td><td>What the source declares it supports: <code>{ search, ground, draft, act }</code>. The shell reads this set and never assumes past it.</td><td>never null</td></tr>
+<tr><td><code>bindings</code></td><td>Which channels (Slack) / tabs (console) scope to this slot.</td><td>registered but not yet surfaced</td></tr>
+</table>
+
+<h3>Three real sources, one shape</h3>
+<p>Same record, different data. This is the proof of genericity — read down any column and the shell's behavior falls out of the data, not out of an <code>if (source == "zendesk")</code>.</p>
+<table>
+<tr><th>Field</th><th>zendesk</th><th>salesforce</th><th>gcp (cost)</th></tr>
+<tr><td><code>bridge</code></td><td><code>zendesk-bridge</code></td><td><code>salesforce-bridge</code></td><td><code>gcp-bridge</code></td></tr>
+<tr><td><code>ids</code></td><td><code>acmedev-mendo-tickets-ids</code> (431,260 sealed)</td><td><code>acmedev-onedine-cases-ids</code></td><td><span class="warn">null</span> — no IDS yet</td></tr>
+<tr><td><code>persona</code></td><td>Zora (guest relations)</td><td>OneDine sales voice</td><td><span class="warn">null</span> — plain voice</td></tr>
+<tr><td><code>writeLane</code></td><td>gated <code>/reply-send</code>, disarmed</td><td>Salesforce action, disarmed</td><td><span class="warn">null</span> — read-only</td></tr>
+<tr><td><code>capabilities</code></td><td>search · ground · draft · act</td><td>search · ground · act</td><td>search · ground*</td></tr>
+<tr><td><code>bindings</code></td><td>Mendo GR channel; console <code>zendesk</code> tabs</td><td>console <code>salesforce</code> tabs</td><td>console <code>cost</code> tab</td></tr>
+</table>
+<p>*GCP declares <code>ground</code> as an intent but <code>ids</code> is null — the shell resolves the pair honestly: it searches, and labels answers unverified until an IDS exists. Capability says what the source <em>wants</em> to do; the null says what it <em>can</em> do today.</p>
+
+<pre>
+conversation / tab
+      │ resolve (bindings + rights)
+      ▼
+slot { id · bridge · ids · persona · writeLane · rights · capabilities · bindings }
+      │
+      ▼
+generic shell ── console (web/index.html) + Slack (argus-slack)
+   read  ─ slot.bridge          ground ─ slot.ids   (null → say "unverified")
+   voice ─ slot.persona (null → default)
+   act   ─ slot.writeLane (null → never offered; present → gated, disarmed)
+</pre>
+
+<h3>REUSE vs NEW</h3>
+<ul>
+<li><span class="pass">REUSE</span> — all six bridges, both IDS buckets, the Slot pattern, §3, §8, the Operator-Identity canon, the console <code>APPS</code> registry, the <code>argus-slack</code> shell.</li>
+<li><span class="warn">NEW</span> — the <strong>shared slot record</strong> (the schema above), replacing per-surface half-registries.</li>
+<li><span class="warn">NEW</span> — the <strong>capability-driven shell behavior</strong>: the shell reads <code>capabilities</code> + nulls and degrades gracefully instead of assuming Zendesk's full set.</li>
+</ul>
+</div>
+
+<!-- 4. NAMING -->
+<div class="section">
+<h2>4. Naming</h2>
+<table data-cm="3-sourced-solution">
+<tr><th>Name</th><th>Means exactly</th></tr>
+<tr><td><strong>source slot</strong></td><td>One source's complete record: bridge, grounding store, persona, write lane, rights, capabilities, bindings. Data, mounted as a unit.</td></tr>
+<tr><td><strong>slot registry</strong></td><td>The one file/config holding every slot record. Both surfaces read it.</td></tr>
+<tr><td><strong>capabilities</strong></td><td>The set a source declares: search / ground / draft / act. The shell's contract for what to offer.</td></tr>
+<tr><td><strong>grounding store</strong></td><td>The slot's sealed IDS (<code>ids</code> field). Null = no grounding claims made.</td></tr>
+<tr><td><strong>write lane</strong></td><td>The slot's single gated action path. Born disarmed. Null = read-only source.</td></tr>
+<tr><td><strong>rights</strong></td><td>Who may resolve the slot. Operator-Identity boundary, not a UI filter.</td></tr>
+<tr><td><strong>the shell</strong></td><td>The generic code (console + Slack) that mounts whichever slot the conversation resolves to. Vendor-blind by law.</td></tr>
+</table>
+<p><strong>Collision flagged:</strong> the console's <code>APPS</code> entry and the source slot are the same idea at two maturities. <code>APPS</code> is the UI sliver (label, icon, tabs); the slot is the superset it becomes. During transition, an <code>APPS</code> entry is the console-bindings face of a slot — one record, and <code>APPS</code> keys stay the slot <code>id</code>s so nothing renames. Also re-flagged from the prior design: there is no "Argus-for-X"; there is the X slot mounted in Argus.</p>
+</div>
+
+<!-- 5. SHAPE -->
+<div class="section">
+<h2>5. Shape</h2>
+<p>Minimum viable:</p>
+<ol>
+<li><strong>The slot record schema</strong> — the eight fields above, with the three nullable ones (<code>ids</code>, <code>persona</code>, <code>writeLane</code>) explicitly legal.</li>
+<li><strong>The slot registry</strong> — one static config file, all sources as records. The console's <code>APPS</code> keys become slot <code>id</code>s; <code>APPS</code> UI fields fold in as console bindings. Adding a source = adding a record.</li>
+<li><strong>The capability-driven resolver</strong> — shared logic both surfaces run: conversation/tab → binding → rights check → slot. The shell then offers exactly <code>capabilities ∩ non-null fields</code>: no <code>ids</code> → answers labeled unverified; no <code>writeLane</code> → action UI never rendered; no <code>persona</code> → default voice. Degradation is declared, never discovered.</li>
+<li><strong>Zero vendor branching in the shell</strong> — the lint rule that keeps it honest: no vendor name in shell code paths. Vendor shape lives in the slot data and behind its §3 jacket, nowhere else.</li>
+</ol>
+<h3>Out of scope (YAGNI)</h3>
+<ul>
+<li>Per-message source switching — scope stays per surface (prior design's law).</li>
+<li>Cross-source joins ("compare Zendesk volume to GCP cost") — a different product.</li>
+<li>A rights admin UI — rights are a static config map first.</li>
+<li>Auto-provisioning IDS for the four sources that lack one — <code>ids: null</code> is the design, not a gap to rush-fill.</li>
+</ul>
+<p><strong>Language law:</strong> each bridge stays its own C# jacket (foreign API, §3 / Language Boundary canon). The shell, the slot registry, the resolver, and the grounding check are ours. <strong>Read-only by default:</strong> every <code>writeLane</code> is born <code>disarmed:true</code>; absence of one means the shell never even offers the action.</p>
+
+<h3>Choices + Consequences</h3>
+<p>The core fork: how is a slot defined and discovered?</p>
+<table>
+<tr><th>Option</th><th>2nd/3rd-order consequences</th><th>Verdict</th></tr>
+<tr><td><strong>A — per-source classes in the shell</strong></td><td>Fast for source #1. Second order: every shell improvement is edited N times or drifts; the "generic" shell accretes <code>if vendor</code> scar tissue. Third order: the classes <em>are</em> the fork — "Argus-for-X" ships itself, and Joey's question gets answered wrong permanently.</td><td><span class="fail">✗</span></td></tr>
+<tr><td><strong>B — central slot registry (config the shell reads)</strong></td><td>One file is the whole truth: every source, every capability, every null, reviewable in one diff. Second order: adding a source is a record + a bridge deploy; a bad slot is a one-line revert; rights live where an auditor can read them. Third order: the registry is a single point of coordination — a source team can't self-serve a slot without touching the central file. Acceptable: today one operator owns all six sources.</td><td><span class="pass">✓ PICK</span></td></tr>
+<tr><td><strong>C — self-describing bridges (<code>GET /slot</code> manifest per bridge)</strong></td><td>Most §8-pure: the source declares itself, adding one is zero-touch. Second order: every bridge grows an endpoint + version skew between manifest and reality; the shell must cache and re-fetch. Third order: <em>trust moves outward</em> — a bridge now asserts its own capabilities, persona, and (worst) rights; a compromised or sloppy jacket can widen its own lane. Rights self-declared by the thing being ridden is the wrong direction.</td><td><span class="fail">✗ (for now)</span></td></tr>
+</table>
+<p><strong>Pick B.</strong> With six sources and one operator, central-and-visible beats distributed-and-clever. The decisive line: <code>rights</code> and <code>writeLane</code> must never be declared by the bridge they govern. And B doesn't foreclose C — see Escape Routes.</p>
+
+<h3>Escape Routes</h3>
+<ul>
+<li><strong>Bad slot</strong> — it's data. Revert the record; no vendor code, no shell deploy.</li>
+<li><strong>B → C is a walk, not a rewrite</strong> — the registry can later <em>hydrate</em> from each bridge's self-description (bridge proposes <code>capabilities</code>/<code>ids</code>; registry stays the arbiter of <code>rights</code>/<code>writeLane</code>). Same record shape either way; the shell never notices.</li>
+<li><strong>Source outgrows the shell</strong> — the slot boundary is the fork seam. Lift the record and its bridge out whole into a standalone app; the other slots don't move.</li>
+<li><strong>Schema too thin</strong> — new optional field, null everywhere it doesn't apply. The null discipline is the extension mechanism.</li>
+</ul>
+
+<h3>Pure Metal Test</h3>
+<p><span class="pass">✓</span> The shell, the slot registry, the resolver, and the grounding check are ours — vanilla, no frameworks, vendor-blind. The one foreign piece per source is its bridge jacket (C#, §3), swappable by editing one slot's <code>bridge</code> field. Replace any vendor tomorrow and nothing we own changes shape.</p>
+</div>
+
+<!-- 6. FIRST MOVE -->
+<div class="section">
+<h2>6. First Move</h2>
+<p><strong>Mount two maximally different sources through the identical slot shape, with zero vendor-named branching in the shell.</strong></p>
+<ol>
+<li>Define the slot record + registry with exactly two entries: <code>zendesk</code> (full capabilities, <code>acmedev-mendo-tickets-ids</code>, Zora, disarmed <code>/reply-send</code>) and <code>gcp</code> (search+ground, <code>ids: null</code>, <code>persona: null</code>, <code>writeLane: null</code>).</li>
+<li>The generic resolver serves both: Zendesk answers grounded and can offer its gated draft/act; GCP answers, labels itself unverified, offers no action, speaks plain.</li>
+<li>Acceptance = a grep: no vendor name in any shell code path. Both behaviors fall out of slot data alone.</li>
+</ol>
+<p>Zendesk grounding is the prior design's first move; this one proves the <em>shape generalizes</em> — the richest source and the barest source, one record schema, no fork. Slot #3 (Salesforce) then lands as a data entry on a proven rail.</p>
+</div>
+
+<!-- DOD -->
+<div class="section">
+<h2>DoD</h2>
+<ul data-cm="5-shape">
+<li><span class="pass">✓</span> A-D-D verified — flows with §3 (bridge per source) and §8 (vendor knowledge is data); proposes the slot record, writes nothing to a-d-d (Rule 10).</li>
+<li><span class="pass">✓</span> Six-section spine present — Need, Raw User Stories, Sourced Solution, Naming, Shape, First Move.</li>
+<li><span class="pass">✓</span> Sourced before invented — Slot pattern, §3, §8, both sealed IDS, Operator-Identity canon, console <code>APPS</code> registry all mined; only the shared record + capability-driven shell are new.</li>
+<li><span class="pass">✓</span> Genericity proven — three real sources in one table, same shape, different data; nulls first-class.</li>
+<li><span class="pass">✓</span> Names literal — source slot, slot registry, capabilities, grounding store, write lane, rights, the shell; <code>APPS</code>-vs-slot collision flagged and resolved (slot is the superset).</li>
+<li><span class="pass">✓</span> Choices + Consequences earned — the definition/discovery fork (A/B/C), 2nd/3rd-order consequences, B picked on the trust line, C kept reachable.</li>
+<li><span class="pass">✓</span> Escape Routes named — data revert, B→C hydration path, slot-as-fork-seam, null-driven schema growth.</li>
+<li><span class="pass">✓</span> Pure Metal Test — everything we own is ours and vendor-blind; C# jackets are the only foreign pieces, one per source, swappable (Language Boundary law).</li>
+<li><span class="pass">✓</span> Capability-driven graceful degradation — <code>ids</code>/<code>persona</code>/<code>writeLane</code> nulls each have defined, honest shell behavior.</li>
+<li><span class="pass">✓</span> Read-only by default — write lanes born disarmed; absent lane = action never offered.</li>
+<li><span class="pass">✓</span> YAGNI fence explicit — no per-message switching, no cross-source joins, no rights UI, no IDS auto-provisioning.</li>
+</ul>
+<p><strong>Next:</strong> <code>~p</code> the First Move (slot record + registry + two-source resolver), then <code>~b</code>.</p>
+</div>
+
+</div>
+<footer>v0 &middot; r525 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"bf5a640c-49e3-4935-9cf1-ccc375686df2"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
