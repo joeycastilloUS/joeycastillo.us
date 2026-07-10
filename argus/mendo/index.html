@@ -1999,7 +1999,8 @@ function sfProgPane(){
     +"#pane-sfprog .prow.clk{cursor:pointer}#pane-sfprog .prow.clk:hover{background:#141d21}"
     +"#pane-sfprog .rbtn{background:#16242b;color:#9aa3ad;border:1px solid #2a3f47;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer}"
     +"#pane-sfprog .rxhead{display:flex;align-items:center;gap:12px;margin:10px 0 8px}#pane-sfprog .rxsub{color:#eec089;font-family:Consolas,monospace}"
-    +"#pane-sfprog .crow{display:flex;gap:12px;padding:6px 8px;border-bottom:1px solid #1c1c1c;cursor:pointer;font-size:13px}#pane-sfprog .crow:hover{background:#141d21}#pane-sfprog .cid{color:#6FC3DF;font-family:Consolas,monospace}#pane-sfprog .cgo{color:#888;margin-left:auto}</style>";
+    +"#pane-sfprog .crow{display:flex;gap:12px;padding:6px 8px;border-bottom:1px solid #1c1c1c;cursor:pointer;font-size:13px}#pane-sfprog .crow:hover{background:#141d21}#pane-sfprog .cid{color:#6FC3DF;font-family:Consolas,monospace}#pane-sfprog .cgo{color:#888;margin-left:auto}"
+    +"#pane-sfprog .prez{background:#0b1417;border:1px solid #1f3a42;border-radius:8px;padding:10px 14px;margin:8px 0;line-height:1.9}#pane-sfprog .rxkh{color:#777;font-size:12px;text-transform:uppercase;letter-spacing:.5px}#pane-sfprog .ok{color:#7fd08a}</style>";
   if(!d) return h+"<div class='box'><div class='muted'>loading programs…</div></div>";
   h+="<div class='box'><div style='display:flex;align-items:center;gap:12px'><h2 style='margin:0'>Programs</h2><span class='rb rb-live'>&#9679; every conversation is a program</span></div>"
     +"<div class='muted' style='margin:6px 0'>Every OneDine case, decoded via understand() then scrubbed, collapses into an <b>action + entities</b> program. Recurring conversations share a program &mdash; deterministic, $0, no model. The model is reserved for the novel tail.</div>";
@@ -2012,7 +2013,12 @@ function sfProgPane(){
     var p=d.programs[PJ.sel];
     var ids=(PJ.pcases&&PJ.pcases[p.key])||[];
     h+="<div class='rxhead'><button class='rbtn' onclick='pjBack()'>&#8592; programs</button><span class='rxsub'>"+abEsc(p.action||"-")+" · "+p.entities.map(abEsc).join(" · ")+"</span></div>";
-    h+="<div class='muted' style='margin-bottom:6px'>"+pjn(p.count)+" cases ("+p.pct+"%) share this program &middot; showing "+ids.length+" &mdash; click to open in Raw IDS</div>";
+    if(p.resolution){ var rs=p.resolution;
+      h+="<div class='prez'><div class='rxkh' style='margin-bottom:4px'>how this program resolves &mdash; the deterministic answer</div>"
+        +"<b class='ok'>"+rs.closed_pct+"% closed</b> &middot; "
+        +(rs.reasons||[]).map(function(x){return "<span class='pe'>"+abEsc(x[0])+" <b>"+pjn(x[1])+"</b></span>";}).join(" ")+"</div>";
+    }
+    h+="<div class='muted' style='margin:8px 0 6px'>"+pjn(p.count)+" cases ("+p.pct+"%) share this program &middot; showing "+ids.length+" &mdash; click to open in Raw IDS</div>";
     h+=ids.map(function(id){return "<div class='crow' onclick=\"pjCase('"+abEsc(id)+"')\"><span class='cid'>case:"+abEsc(id)+"</span><span class='cgo'>open in Raw IDS &#8599;</span></div>";}).join("");
     return h+"</div>";
   }
@@ -3209,155 +3215,157 @@ function programsPane(){
   s+="</div>";
   return s;
 }
-// ── Templates tab — the live face of the reply-template inventory. Reads Mendo's macros straight
-// from zendesk-bridge (/read?entry=macros, usage_30d sideload) — read-only, no backend change.
-// Grouped by the macro's own Zendesk category (the real family), sorted by 30-day usage, dead flagged.
-// The ".pi Template Library" attribution (which mined program used which template) is the follow-on
-// board; here we ship what's live today: usage you can see.
-let ZTPL = { run:null, busy:false, err:"", prog:"", roll:null, rollErr:"" };
-// How far back the attribution rollup looks. The bridge scans at most `max` tickets of this window
-// (default 60, hard cap 200) and says so honestly (candidates/scanned/capped — never silent truncation).
-const ZTPL_ROLL_DAYS=30, ZTPL_ROLL_MAX=60;
-function ztplTier(u, med){ u=+u||0; if(u===0) return "dead"; return u>=med ? "hot" : "warm"; }
-function ztplClassify(macros){
-  // comms templates = a macro that carries a message body. Workflow-only macros (tag/route, empty body) are excluded.
-  const items = macros.filter(m=>((m.body||"").trim().length>0)).map(m=>({
-    id:m.id, title:(m.title||"("+m.id+")"), cat:((m.category||m.cat||"").trim()||"(uncategorized)"),
-    active:m.active!==false, usage:(+m.usage_30d||0), body:(m.body||"").replace(/\s+/g," ").trim()
-  }));
-  const used = items.filter(i=>i.usage>0).map(i=>i.usage).sort((a,b)=>a-b);
-  const med = used.length ? used[Math.floor(used.length/2)] : 1; // median of USED templates
-  items.forEach(i=>{ i.tier = ztplTier(i.usage, med); });
-  // group by the real Zendesk category = the family
-  const fam={};
-  items.forEach(i=>{ (fam[i.cat]=fam[i.cat]||{name:i.cat,items:[],usage:0}).items.push(i); fam[i.cat].usage+=i.usage; });
-  const families = Object.values(fam).map(f=>{ f.items.sort((a,b)=>b.usage-a.usage||a.title.localeCompare(b.title)); return f; })
-    .sort((a,b)=>b.usage-a.usage || b.items.length-a.items.length);
-  return {
-    total: macros.length, comms: items.length,
-    hot: items.filter(i=>i.tier==="hot").length,
-    warm: items.filter(i=>i.tier==="warm").length,
-    dead: items.filter(i=>i.tier==="dead").length,
-    med, families
-  };
-}
-async function ztplLoad(){
-  ZTPL.busy=true; ZTPL.err=""; ZTPL.prog="macros"; renderZTPL();
+// -- Off-Script & Gaps tab -- REPLACES the passive Templates list (operator retro: the macro
+// inventory already lives in the Audit tab; a read-only list of macros earned nothing). This is the
+// live face of zendesk-bridge GET /offscript: (1) GAPS -- recurring hand-written guest replies
+// clustered into macro candidates (draftBody = the medoid reply, ready to paste into a new macro);
+// (2) OFF-SCRIPT -- every hand-written guest reply with its closest template + fidelity (coaching).
+// Read-only end to end: "Copy drafted macro" only copies text; the operator creates it in Zendesk.
+let OSG = { run:null, busy:false, err:"", scope:"guest", ts:0, pend:false };
+// The bridge scans the last OSG_DAYS days, at most OSG_MAX tickets, and says so honestly
+// (scanned/inScope/candidates/capped in the header) -- never silent truncation.
+const OSG_DAYS=45, OSG_MAX=100;
+async function osgLoad(){
+  OSG.busy=true; OSG.err=""; renderOSG();
   try{
-    const macros = await zdAll("macros","macros-page","macros");
-    ZTPL.run = ztplClassify(macros);
-    // .pi attribution rollup — the "attributed in N tickets" backlinks. Zendesk exposes NO macro_id per
-    // comment, so the .pi engine match IS the only grounding. Fail-soft: templates render without it.
-    ZTPL.roll=null; ZTPL.rollErr="";
-    try{
-      ZTPL.prog="attribution rollup"; renderZTPL();
-      const start = Math.floor(Date.now()/1000) - ZTPL_ROLL_DAYS*86400;
-      const rr = await zdFetch("/templates/rollup?start="+start+"&max="+ZTPL_ROLL_MAX);
-      if(rr.ok){
-        const rd = await rr.json(); const by={};
-        (rd.rollup||[]).forEach(x=>{ by[String(x.templateId)]={count:+x.count||0,tickets:x.tickets||[]}; });
-        ZTPL.roll={byId:by,window:rd.window||{}};
-      } else ZTPL.rollErr="HTTP "+rr.status;
-    }catch(_){ ZTPL.rollErr="bridge unreachable"; }
-  }catch(e){ ZTPL.err = (e&&e.code)? ("HTTP "+e.code+(e.code===401?" — unlock the console first":"")) : ((e&&e.message)||"load failed"); }
-  ZTPL.busy=false; ZTPL.prog=""; if(TAB==="templates") renderZTPL(); render();
+    const start = Math.floor(Date.now()/1000) - OSG_DAYS*86400;
+    const r = await zdFetch("/offscript?start="+start+"&scope="+encodeURIComponent(OSG.scope)+"&max="+OSG_MAX);
+    if(!r.ok) throw { code:r.status };
+    const d = await r.json();
+    // Rank gaps by size desc ONCE at load -- data-osgcopy indexes into this order.
+    if(d && d.gaps) d.gaps.sort(function(a,b){ return (+b.size||0)-(+a.size||0); });
+    OSG.run=d; OSG.ts=Date.now();
+  }catch(e){ OSG.err = (e&&e.code) ? ("HTTP "+e.code+(e.code===401?" - unlock the console first":"")) : ((e&&e.message)||"bridge unreachable"); }
+  OSG.busy=false; if(TAB==="templates") renderOSG(); render();
 }
-function ztplBar(i){
-  const pct = i.usage<=0 ? 0 : Math.max(6, Math.min(100, Math.round(100*i.usage/Math.max(ZTPL.run.med*2,1))));
-  return "<span class='tubar "+i.tier+"'><span class='fill' style='width:"+pct+"%'></span></span>";
+function osgTicketLinks(list){
+  return (list||[]).map(function(t){ return "<a class='oslink' href='"+esc(t.url||"#")+"' target='_blank' rel='noopener'>#"+esc(t.ticketId)+"</a>"; }).join(" ");
 }
-function ztplInner(){
-  if(ZTPL.busy) return "<div class='tld'><span class='spin'></span> reading templates &middot; "+esc(ZTPL.prog||"")+"&hellip;</div>";
-  if(ZTPL.err) return "<div class='terr'>"+esc(ZTPL.err)+"</div><button class='tload' data-ztplload>Retry</button>";
-  if(!ZTPL.run){
-    return "<div class='tlead'><b>Mendo's reply templates &mdash; live.</b> Every macro that carries a message body, grouped by family, ranked by how often it fired in the last 30 days. Read straight from zendesk-bridge &mdash; today's count, not a snapshot.</div>"
-      +"<button class='tload' data-ztplload>&#128221; Load templates</button>"
-      +"<div class='tnote'>Read-only. Loading also runs the .pi attribution rollup &mdash; &ldquo;attributed in N tickets&rdquo; backlinks per template, inferred by the .pi engine (Zendesk exposes no macro_id).</div>";
-  }
-  const R=ZTPL.run;
-  let s="<div class='thead'>";
-  s+="<div class='tchips'>"
-    +"<span class='tchip'><b>"+R.total+"</b> templates</span>"
-    +"<span class='tchip'><b>"+R.comms+"</b> with a message body</span>"
-    +"<span class='tchip hot'><b>"+R.hot+"</b> hot (30d)</span>"
-    +"<span class='tchip warm'><b>"+R.warm+"</b> warm</span>"
-    +"<span class='tchip dead'><b>"+R.dead+"</b> dead (0 in 30d)</span>"
-    +"<button class='tref' data-ztplload>&#8635; Refresh</button></div></div>";
-  // HONEST LABEL — these counts are .pi engine inferences over a bounded, announced window.
-  if(ZTPL.roll){ const w=ZTPL.roll.window||{};
-    s+="<div class='tattrnote'>&#9873; attribution counts = <b>.pi engine</b> matches across the last "+ZTPL_ROLL_DAYS+" days of recent tickets (scanned "+(w.scanned||0)+" of "+(w.candidates||0)+", "+(w.capped?"capped":"full window")+"); Zendesk exposes no macro_id, so these are <b>inferred</b>, not Zendesk-reported.</div>";
-  } else if(ZTPL.rollErr){
-    s+="<div class='tattrnote'>.pi attribution rollup unavailable ("+esc(ZTPL.rollErr)+") &mdash; showing usage only.</div>";
-  }
-  R.families.forEach(f=>{
-    s+="<div class='tfam'>"+esc(f.name)+" <span class='tfamn'>&middot; "+f.items.length+" &middot; "+f.usage+"&times;/30d</span></div>";
-    f.items.forEach(i=>{
-      // ".pi attributed in N tickets" backlink — only when the rollup found real matches; 0 shows a muted
-      // dash, NEVER a fake number. Click expands the sample ticket ids (same toggle pattern as data-hist).
-      let bk="", bkx="";
-      if(ZTPL.roll){ const a=ZTPL.roll.byId[String(i.id)];
-        if(a && a.count>0){
-          bk="<span class='tbk' data-ztplbk='"+i.id+"'>&#9873; attributed in "+a.count+" &rarr;</span>";
-          bkx="<div class='tbkx' id='ztplbk-"+i.id+"' style='display:none'>.pi-attributed tickets (sample): "+a.tickets.map(t=>"#"+t).join(", ")+"</div>";
-        } else bk="<span class='tbk none'>&mdash;</span>";
-      }
-      s+="<div class='trow "+i.tier+"'>"
-        +"<span class='tt'>"+esc(i.title)+(i.active?"":" <span class='tinact'>inactive</span>")+"</span>"
-        +"<span class='tbody'>"+esc(i.body.slice(0,110))+(i.body.length>110?"&hellip;":"")+"</span>"
-        +ztplBar(i)
-        +"<span class='tuv'>"+i.usage+"<span class='lab'>&times;/30d</span></span>"
-        +bk
-        +(i.tier==="dead"?"<span class='tdead'>DEAD</span>":"")
-        +bkx
-        +"</div>";
-    });
+function osgHeader(){
+  const w=(OSG.run&&OSG.run.window)||{};
+  const guest=(OSG.scope==="guest");
+  let s="<div class='oslead'><b>Off-Script &amp; Gaps</b> &mdash; where agents hand-wrote a guest reply instead of using a template, and recurring hand-writes that need a macro.</div>";
+  s+="<div class='oschips'>"
+    +"<span class='oschip'>scanned <b>"+(+w.scanned||0)+"</b> of <b>"+(guest?(+w.inScope||0):(+w.candidates||0))+"</b> "+(guest?"guest-recovery":"candidate")+" tickets &middot; last "+OSG_DAYS+"d</span>"
+    +(guest?"<span class='oschip'><b>"+((w.guestGroups||[]).length)+"</b> guest groups</span>":"")
+    +"<span class='oschip'>"+(w.capped?"<b class='warn'>capped</b> at "+OSG_MAX:"full window")+"</span>"
+    +"<span class='oschip'><b>"+(OSG.run?(+OSG.run.matched||0):0)+"</b> off-script &middot; <b>"+(((OSG.run&&OSG.run.gaps)||[]).length)+"</b> gap"+((((OSG.run&&OSG.run.gaps)||[]).length)===1?"":"s")+"</span>"
+    +"<span class='osscope' title='Guest = guest-recovery groups only (Guest Relations / GR Escalation / DO)'>"
+      +"<button class='osseg"+(guest?" on":"")+"' data-osgscope='guest'>Guest</button>"
+      +"<button class='osseg"+(guest?"":" on")+"' data-osgscope='all'>All</button>"
+    +"</span>"
+    +"<button class='osref' data-osgload>&#8635; Refresh</button>"
+    +"</div>";
+  return s;
+}
+function osgGaps(){
+  const gaps=(OSG.run&&OSG.run.gaps)||[];
+  if(!gaps.length) return "";
+  let s="<div class='ossect'>Gaps &mdash; macro candidates <span class='ossectn'>&middot; the same reply written by hand again and again, no template covers it</span></div>";
+  gaps.forEach(function(g,i){
+    const rep=g.representative||{};
+    s+="<div class='oscard'>"
+      +"<div class='oscount'>answered by hand <b>"+(+g.size||0)+"&times;</b>"+(rep.group&&rep.group.name?"<span class='osgrp'>"+esc(rep.group.name)+"</span>":"")+"</div>"
+      +"<div class='ossnip'>&ldquo;"+esc(rep.snippet||"")+"&rdquo;</div>"
+      +"<div class='osfoot'><span class='ostix'>tickets: "+osgTicketLinks(g.tickets)+"</span>"
+      +"<button class='oscopy' data-osgcopy='"+i+"'>&#128203; Copy drafted macro</button></div>"
+      +"</div>";
   });
   return s;
 }
-function renderZTPL(){ const w=document.getElementById("ztpl-wrap"); if(w) w.innerHTML=ztplInner(); }
-function templatesPane(){
+function osgOffscript(){
+  const rows=(OSG.run&&OSG.run.offscript)||[];
+  if(!rows.length) return "";
+  let s="<div class='ossect'>Off-script replies <span class='ossectn'>&middot; each hand-written guest reply + its closest template &mdash; the coaching list</span></div>";
+  rows.forEach(function(o){
+    const n=o.nearest;
+    s+="<div class='osrow'>"
+      +"<a class='oslink' href='"+esc(o.url||"#")+"' target='_blank' rel='noopener'>#"+esc(o.ticketId)+"</a>"
+      +"<span class='osbody'>"+esc(o.snippet||"")+"</span>"
+      +(o.group&&o.group.name?"<span class='osgrp'>"+esc(o.group.name)+"</span>":"")
+      +(n&&n.title?"<span class='osnear'>closest template: <b>"+esc(n.title)+"</b> @"+(+n.fidelity||0).toFixed(2)+"</span>":"<span class='osnear none'>no near match</span>")
+      +"</div>";
+  });
+  return s;
+}
+function osgByGroup(){
+  const bg=(OSG.run&&OSG.run.byGroup)||[];
+  if(!bg.length) return "";
+  return "<div class='ossect'>By group</div><div class='oschips'>"
+    +bg.map(function(g){ return "<span class='oschip'><b>"+esc(g.name)+"</b> &middot; "+(+g.offscript||0)+" off-script &middot; "+(+g.gaps||0)+" gap"+((+g.gaps||0)===1?"":"s")+"</span>"; }).join("")
+    +"</div>";
+}
+function osgInner(){
+  if(OSG.busy && !OSG.run) return "<div class='osld'><span class='spin'></span> scanning guest replies (last "+OSG_DAYS+"d, up to "+OSG_MAX+" tickets)&hellip;</div>";
+  let s="";
+  // Fetch error keeps the last-known results on screen -- the error bar says so.
+  if(OSG.err) s+="<div class='oserr'>"+esc(OSG.err)+(OSG.run?" &mdash; showing last-known results":"")+" <button class='osref' data-osgload>&#8635; Retry</button></div>";
+  if(!OSG.run) return s;
+  s+=osgHeader();
+  const gaps=(OSG.run.gaps||[]), off=(OSG.run.offscript||[]);
+  if(!gaps.length && !off.length)
+    return s+"<div class='osempty'>Nothing off-script in this window &mdash; every scanned guest reply matched a template, and no macro gaps were found.</div>";
+  return s+osgGaps()+osgOffscript()+osgByGroup();
+}
+function renderOSG(){ const w=document.getElementById("osg-wrap"); if(w) w.innerHTML=osgInner(); }
+function offscriptPane(){
+  // Fetch on first show (same pend-guard pattern as the Watch tab); errors wait for Retry. No polling.
+  if(TAB==="templates" && !OSG.run && !OSG.busy && !OSG.pend && !OSG.err){
+    OSG.pend=true; setTimeout(function(){ OSG.pend=false; osgLoad(); },0);
+  }
   return "<style>"
-    +"#pane-templates .tlead{color:#8a93a0;font-size:13px;line-height:1.55;margin-bottom:14px;max-width:720px;}"
-    +"#pane-templates .tlead b{color:#e6edf2;}"
-    +"#pane-templates .tload{background:#16242b;color:#9fd6e6;border:1px solid #2c4a55;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}"
-    +"#pane-templates .tload:hover{background:#1a2f38;color:#6FC3DF;}"
-    +"#pane-templates .tnote{color:#6b7a82;font-size:11.5px;margin-top:10px;}"
-    +"#pane-templates .tld{color:#8a93a0;font-size:13px;padding:14px 0;}"
-    +"#pane-templates .terr{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:10px 13px;font-size:12.5px;margin-bottom:10px;}"
-    +"#pane-templates .thead{margin-bottom:6px;}"
-    +"#pane-templates .tchips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}"
-    +"#pane-templates .tchip{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 10px;border:1px solid #262626;background:#0e0e0e;color:#8a93a0;}"
-    +"#pane-templates .tchip b{color:#e8e8e8;font-weight:800;}"
-    +"#pane-templates .tchip.hot b{color:#7CFFB2;}#pane-templates .tchip.warm b{color:#ffce85;}#pane-templates .tchip.dead b{color:#ff9b9b;}"
-    +"#pane-templates .tref{margin-left:auto;background:#12181d;color:#8fb7c4;border:1px solid #2a343b;border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}"
-    +"#pane-templates .tfam{color:#6FC3DF;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 7px;}"
-    +"#pane-templates .tfamn{color:#6b7a82;font-weight:600;letter-spacing:0;text-transform:none;}"
-    +"#pane-templates .trow{background:#141414;border:1px solid #262626;border-left:4px solid #262626;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;}"
-    +"#pane-templates .trow.hot{border-left-color:#7CFFB2;}#pane-templates .trow.warm{border-left-color:#ffce85;}#pane-templates .trow.dead{border-left-color:#ff6b6b;opacity:.7;}"
-    +"#pane-templates .tt{font-weight:800;font-size:13px;flex:0 0 auto;color:#e8e8e8;}"
-    +"#pane-templates .tinact{color:#8a93a0;font-weight:600;font-size:10.5px;border:1px solid #333;border-radius:4px;padding:0 5px;}"
-    +"#pane-templates .tbody{color:#9aa7b0;font-size:12px;flex:1 1 220px;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
-    +"#pane-templates .tubar{flex:0 0 120px;height:16px;border-radius:5px;background:#0e0e0e;border:1px solid #262626;position:relative;overflow:hidden;}"
-    +"#pane-templates .tubar .fill{position:absolute;left:0;top:0;bottom:0;background:#12402c;border-right:2px solid #7CFFB2;}"
-    +"#pane-templates .tubar.warm .fill{background:#2a2008;border-right-color:#ffce85;}"
-    +"#pane-templates .tubar.dead .fill{background:#2a1111;border-right-color:#ff6b6b;width:2px;}"
-    +"#pane-templates .tuv{flex:0 0 80px;text-align:right;font-size:12.5px;font-weight:800;color:#e8e8e8;font-family:Consolas,monospace;}"
-    +"#pane-templates .tuv .lab{color:#6b7a82;font-weight:400;font-size:10.5px;}"
-    +"#pane-templates .tdead{flex:0 0 auto;color:#ff9b9b;font-size:10px;font-weight:800;letter-spacing:.04em;}"
-    +"#pane-templates .tattrnote{color:#8fb7c4;font-size:11.5px;line-height:1.5;background:#0c1418;border:1px solid #14323e;border-radius:8px;padding:8px 12px;margin:8px 0 4px;max-width:720px;}"
-    +"#pane-templates .tattrnote b{color:#6FC3DF;}"
-    +"#pane-templates .tbk{flex:0 0 auto;color:#6FC3DF;font-size:11px;font-weight:700;cursor:pointer;background:#0c1418;border:1px solid #14323e;border-radius:6px;padding:2px 8px;white-space:nowrap;}"
-    +"#pane-templates .tbk:hover{border-color:#6FC3DF;}"
-    +"#pane-templates .tbk.open{background:#6FC3DF;color:#06222c;border-color:#6FC3DF;}"
-    +"#pane-templates .tbk.none{color:#4a5258;background:none;border:0;cursor:default;font-weight:400;}"
-    +"#pane-templates .tbkx{flex:1 1 100%;color:#9fd6e6;font-size:11.5px;font-family:Consolas,monospace;background:#0c1418;border:1px solid #14323e;border-radius:6px;padding:6px 10px;margin-top:2px;}"
-    +"</style><div id='ztpl-wrap'>"+ztplInner()+"</div>";
+    +"#pane-templates .oslead{color:#8a93a0;font-size:13px;line-height:1.55;margin-bottom:10px;max-width:720px;}"
+    +"#pane-templates .oslead b{color:#e6edf2;}"
+    +"#pane-templates .osld{color:#8a93a0;font-size:13px;padding:14px 0;}"
+    +"#pane-templates .oserr{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:10px 13px;font-size:12.5px;margin-bottom:10px;}"
+    +"#pane-templates .oserr .osref{margin-left:8px;padding:2px 8px;}"
+    +"#pane-templates .oschips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}"
+    +"#pane-templates .oschip{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 10px;border:1px solid #262626;background:#0e0e0e;color:#8a93a0;}"
+    +"#pane-templates .oschip b{color:#e8e8e8;font-weight:800;}"
+    +"#pane-templates .oschip .warn{color:#ffd479;}"
+    +"#pane-templates .osscope{display:inline-flex;border:1px solid #2a343b;border-radius:6px;overflow:hidden;}"
+    +"#pane-templates .osseg{background:#12181d;color:#8fb7c4;border:0;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .osseg.on{background:#6FC3DF;color:#06222c;}"
+    +"#pane-templates .osref{margin-left:auto;background:#12181d;color:#8fb7c4;border:1px solid #2a343b;border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .ossect{color:#6FC3DF;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 7px;}"
+    +"#pane-templates .ossectn{color:#6b7a82;font-weight:600;letter-spacing:0;text-transform:none;}"
+    +"#pane-templates .oscard{background:#141414;border:1px solid #262626;border-left:4px solid #ffce85;border-radius:8px;padding:10px 14px;margin-bottom:8px;}"
+    +"#pane-templates .oscount{font-size:13px;color:#e8e8e8;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}"
+    +"#pane-templates .oscount b{font-size:17px;font-weight:800;color:#ffce85;}"
+    +"#pane-templates .osgrp{color:#6FC3DF;font-size:11px;font-weight:700;background:#0c1418;border:1px solid #14323e;border-radius:5px;padding:0 7px;white-space:nowrap;}"
+    +"#pane-templates .ossnip{color:#cfe9f2;font-size:12.5px;line-height:1.5;margin:7px 0;}"
+    +"#pane-templates .osfoot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}"
+    +"#pane-templates .ostix{color:#8a93a0;font-size:11.5px;}"
+    +"#pane-templates .oslink{color:#6FC3DF;font-size:11.5px;font-weight:700;text-decoration:none;font-family:Consolas,monospace;}"
+    +"#pane-templates .oslink:hover{text-decoration:underline;}"
+    +"#pane-templates .oscopy{margin-left:auto;background:#16242b;color:#9fd6e6;border:1px solid #2c4a55;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .oscopy:hover{background:#1a2f38;color:#6FC3DF;}"
+    +"#pane-templates .oscopy.done{background:#06251a;color:#7CFFB2;border-color:#1f7a4d;}"
+    +"#pane-templates .osrow{background:#141414;border:1px solid #262626;border-left:4px solid #262626;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;}"
+    +"#pane-templates .osbody{color:#9aa7b0;font-size:12px;flex:1 1 220px;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
+    +"#pane-templates .osnear{flex:0 0 auto;color:#8fb7c4;font-size:11px;background:#0c1418;border:1px solid #14323e;border-radius:6px;padding:2px 8px;white-space:nowrap;}"
+    +"#pane-templates .osnear b{color:#9fd6e6;}"
+    +"#pane-templates .osnear.none{color:#4a5258;background:none;border-color:#262626;}"
+    +"#pane-templates .osempty{color:#6b7a82;font-size:13px;padding:14px 0;}"
+    +"</style><div id='osg-wrap'>"+osgInner()+"</div>";
 }
 document.addEventListener("click", function(e){
-  if(e.target && e.target.closest && e.target.closest("[data-ztplload]")){ ztplLoad(); return; }
-  // "attributed in N →" backlink — expand/collapse the sample ticket ids (same pattern as data-hist).
-  const bk = e.target && e.target.closest && e.target.closest("[data-ztplbk]");
-  if(bk){ const r=document.getElementById("ztplbk-"+bk.getAttribute("data-ztplbk")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"block"; bk.classList.toggle("open",!open); } return; }
+  if(e.target && e.target.closest && e.target.closest("[data-osgload]")){ osgLoad(); return; }
+  const sc = e.target && e.target.closest && e.target.closest("[data-osgscope]");
+  if(sc){ const v=sc.getAttribute("data-osgscope"); if(v!==OSG.scope && !OSG.busy){ OSG.scope=v; OSG.run=null; OSG.err=""; osgLoad(); } return; }
+  const cp = e.target && e.target.closest && e.target.closest("[data-osgcopy]");
+  if(cp){
+    const i=+cp.getAttribute("data-osgcopy"); const g=OSG.run&&OSG.run.gaps&&OSG.run.gaps[i];
+    if(g && g.draftBody!=null){
+      // Same in-gesture synchronous copy as the Latchkey Share button (_clipSync) -- the async
+      // clipboard API can lose the user-gesture window; execCommand inside the click never does.
+      const ok=_clipSync(String(g.draftBody));
+      cp.innerHTML = ok ? "&#10003; Copied" : "copy failed";
+      cp.classList.toggle("done", ok);
+      setTimeout(function(){ cp.innerHTML="&#128203; Copy drafted macro"; cp.classList.remove("done"); }, 2200);
+    }
+    return;
+  }
 });
 function commentsPane(){
   return "<style>"
@@ -3777,7 +3785,7 @@ function render(){
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
     focus:"<button class='tabv"+(TAB==="focus"?" on":"")+"' data-tab='focus'><span class='ti'>&#127919;</span><span class='tl'>Focus"+(FOCUS_SAMPLE?" &middot; <b class='bad'>"+FOCUS_SAMPLE.detractors.filter(d=>d.status!=='resolved').length+"</b>":"")+"</span></button>",
     programs:"<button class='tabv"+(TAB==="programs"?" on":"")+"' data-tab='programs'><span class='ti'>&#129513;</span><span class='tl'>Conversations</span></button>",
-    templates:"<button class='tabv"+(TAB==="templates"?" on":"")+"' data-tab='templates'><span class='ti'>&#128221;</span><span class='tl'>Templates"+((ZTPL.run&&ZTPL.run.hot)?" &middot; <b class='ok'>"+ZTPL.run.hot+"</b>":"")+"</span></button>",
+    templates:"<button class='tabv"+(TAB==="templates"?" on":"")+"' data-tab='templates'><span class='ti'>&#128221;</span><span class='tl'>Off-Script &amp; Gaps"+((OSG.run&&OSG.run.gaps&&OSG.run.gaps.length)?" &middot; <b class='bad'>"+OSG.run.gaps.length+"</b>":"")+"</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Tickets</span></button>",
     rawids:"<button class='tabv"+(TAB==="rawids"?" on":"")+"' data-tab='rawids'><span class='ti'>&#128190;</span><span class='tl'>Raw IDS"+(RAWIDS.seed?" &middot; <b class='ok'>"+(RAWIDS.seed.cases>=1000?Math.round(RAWIDS.seed.cases/1000)+'k':RAWIDS.seed.cases)+"</b>":"")+"</span></button>",
     sfprog:"<button class='tabv"+(TAB==="sfprog"?" on":"")+"' data-tab='sfprog'><span class='ti'>&#129513;</span><span class='tl'>Programs"+(PJ.data?" &middot; <b class='ok'>"+Math.round(PJ.data.scrubbed.distinct/1000)+"k</b>":"")+"</span></button>",
@@ -3828,7 +3836,7 @@ function render(){
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
   h+="<div id='pane-focus' class='"+paneCls("focus")+"'>"+realBadge("demo")+focusPane()+cmBar("focus","Focus tab")+"</div>";
   h+="<div id='pane-programs' class='"+paneCls("programs")+"'>"+realBadge("demo")+programsPane()+cmBar("conversations","Conversations tab")+"</div>";
-  h+="<div id='pane-templates' class='"+paneCls("templates")+"'>"+realBadge("live")+templatesPane()+cmBar("templates","Templates tab")+"</div>";
+  h+="<div id='pane-templates' class='"+paneCls("templates")+"'>"+realBadge("live")+offscriptPane()+cmBar("templates","Off-Script & Gaps tab")+"</div>";
   h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+realBadge("live")+commentsPane()+cmBar("tickets","Tickets tab")+"</div>";
   h+="<div id='pane-rawids' class='"+paneCls("rawids")+"'>"+realBadge("live")+rawIdsPane()+cmBar("rawids","Raw IDS tab")+"</div>";
   h+="<div id='pane-sfprog' class='"+paneCls("sfprog")+"'>"+realBadge("live")+sfProgPane()+cmBar("sfprograms","Programs tab")+"</div>";
@@ -5233,7 +5241,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r522 . cd91bc6 . 2026-07-09</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r525 . 03f457e . 2026-07-09</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
