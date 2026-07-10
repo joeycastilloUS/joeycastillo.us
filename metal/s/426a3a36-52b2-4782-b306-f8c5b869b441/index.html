@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be ~r &mdash; Argus Gemini/Vertex + .ids: retro</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111111; color:#d5d5d5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.62; padding-bottom:70px; font-size:15px; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 20px; display:flex; justify-content:space-between; align-items:baseline; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; letter-spacing:1px; }
+  nav .pub { color:#666; font-size:11px; }
+  .wrap { max-width:800px; margin:0 auto; padding:0 20px; }
+  h1 { color:#fff; font-size:24px; margin:30px 0 4px; font-weight:600; }
+  .lede { color:#9aa; font-size:15px; margin:8px 0 4px; }
+  .muted { color:#777; }
+  h2 { color:#6FC3DF; font-size:14px; text-transform:uppercase; letter-spacing:1.4px; margin:32px 0 10px; border-bottom:1px solid #262626; padding-bottom:6px; }
+  p { margin:10px 0; } b.hl{color:#9fd8ec;} b.g{color:#7fd08a;} b.a{color:#e0a246;}
+  ul{margin:8px 0 8px 20px;} li{margin:6px 0;}
+  code { background:#000; padding:1px 5px; border-radius:3px; color:#8fd; font-size:12px; }
+  .well li::marker{color:#7fd08a;} .bad li::marker{color:#e0a246;}
+  .kz{background:#1A1A1A;border:1px solid #242424;border-left:3px solid #b07fd0;border-radius:6px;padding:10px 14px;margin:8px 0;}
+  .badge{display:inline-block;background:#5a1f1f;color:#ffb3b3;font-size:10px;padding:1px 6px;border-radius:3px;letter-spacing:.5px;margin-right:6px;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:44px;border-top:1px solid #242424;padding-top:16px;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-09 20:10 PST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/426a3a36-52b2-4782-b306-f8c5b869b441/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+  <h1>Retro &mdash; Argus on Gemini/Vertex, grounded on the .ids</h1>
+  <p class="lede">One <code>~d~p~e~b~t~s~r</code> run, three services, 21 pts, all shipped live. Argus is off Anthropic and answering from the real corpus. Here&#39;s what held, what didn&#39;t, and what becomes next work.</p>
+
+  <h2>What went well</h2>
+  <ul data-cm="what-went-well" class="well">
+    <li><b class="g">Reuse-first was the whole game.</b> The recon (Gemini/Vertex already live in gcp-bridge; IDS already queryable via onedine-raw) turned a &#34;build an AI-over-tickets system&#34; into a wiring job. 5 of 8 capabilities were already in production. Reading before building saved reinventing two hard things.</li>
+    <li><b class="g">Parallel build across independent repos.</b> Three agents, three repos, zero file conflicts &mdash; argus-slack + onedine-raw + gcp-bridge built concurrently, all clean (dotnet 0/0 ×2, C99 binary).</li>
+    <li><b class="g">The verify loop earned its keep (Rule 7).</b> Testing <code>/ask</code> live caught <em>two</em> real bugs the compilers never would: a multi-word query hitting a substring matcher (0 hits), and a <code>case:</code>-prefixed id breaking <code>/replay</code> (empty bodies). Both fixed and re-tested green before Done. &#34;It compiles&#34; would have shipped a silent liar.</li>
+    <li><b class="g">It never hallucinated.</b> Under 8 real questions, every miss was an honest &#34;not in these tickets&#34; &mdash; the no-invent design held. That was the one non-negotiable.</li>
+    <li><b class="g">Safe deploy order protected the operator.</b> Data + bridge went live and were proven <em>before</em> the Anthropic cord was pulled, so Argus never went mute during the swap.</li>
+    <li><b class="g">Third-party-verifiable proof without the Slack UI.</b> A properly-signed <code>message.im</code> event exercised the entire wired path and posted a real DM &mdash; provable from logs, not vibes (Rule 9).</li>
+  </ul>
+
+  <h2>What could be better</h2>
+  <ul data-cm="what-could-be-better" class="bad">
+    <li><b class="a">Recall floor.</b> ~5/8 find-questions retrieved tickets that didn&#39;t match the <em>meaning</em>. Substring + term-hit ranking finds words, not intent. Known, and the v2 spec.</li>
+    <li><b class="a">Three Cloud Builds for one service.</b> gcp-bridge deployed 3× (initial + 2 bug fixes) because the bugs surfaced only against live onedine-raw. A local integration harness would have caught both before the first deploy.</li>
+    <li><b class="a">onedine-raw redeploy was fragile.</b> Its deploy context (<code>nous/</code> + <code>raw-ids.tgz</code>) isn&#39;t committed &mdash; I had to reconstruct it from GCS + the metal nous tree by hand. One typo = an empty-store ship.</li>
+    <li><b class="a">Naive term extraction.</b> Keyword-split loses intent; a cheap Gemini term-extract or query-rewrite pass would likely lift recall a lot for near-zero cost.</li>
+    <li><b class="a">/ask cited all K, not the relevant ones.</b> It grounds on 5 tickets even when only 2 are on-topic &mdash; a re-rank or a &#34;drop irrelevant&#34; pass would tighten citations.</li>
+  </ul>
+
+  <h2>Kaizen &mdash; becomes board GVB-K</h2>
+  <div data-cm="kaizen-becomes-board-gvb-k" class="kz"><span class="badge">KNOWN ISSUE</span> Substring recall misses meaning &mdash; add BM25/inverted-index or embeddings over the corpus so <code>/ask</code> finds intent, not just words. <span class="muted">· source:2026-07-09-retro-gemini-vertex-ids-brain</span></div>
+  <div class="kz">Stand up a local <code>/ask</code> integration harness (onedine-raw local + fixture) so retrieve-then-read bugs are caught before any Cloud Build. <span class="muted">· source:2026-07-09-retro</span></div>
+  <div class="kz">Commit a onedine-raw deploy script / Cloud Build config that assembles the context (nous + raw-ids.tgz from GCS) &mdash; kill the hand-staging fragility. <span class="muted">· source:2026-07-09-retro</span></div>
+  <div class="kz">Add a cheap Gemini term-extract / query-rewrite pass in <code>/ask</code> before search; measure recall lift vs the keyword split. <span class="muted">· source:2026-07-09-retro</span></div>
+  <div class="kz">Re-rank / relevance-filter retrieved tickets so citations name only the on-topic cases. <span class="muted">· source:2026-07-09-retro</span></div>
+  <div class="kz">Point onedine-raw (or a sibling service) at the FULL Mendo NPS corpus (<code>gs://acmedev-mendo-tickets-ids</code>) &mdash; today it&#39;s the OneDine seed only. <span class="muted">· source:2026-07-09-retro</span></div>
+  <div class="kz">Give Argus thread memory (multi-turn) &mdash; it&#39;s still single-turn per message. <span class="muted">· source:2026-07-09-retro</span></div>
+
+  <h2>Checkpoint</h2>
+  <p>All four boards Done, live in production, source committed across argus / argus-slack / gcp-bridge. Known-good: <code>argus-slack-00005-ck5</code> · <code>onedine-raw-00004-cz4</code> · <code>gcp-bridge-00030-txt</code>. Next unblocked work is GVB-K (recall) or the broader Argus tracks.</p>
+  <footer>Be &middot; v0 &middot; r504 &middot; 2026-07-09 &middot; ~r (Fable 5) &middot; 7 Kaizen items &rarr; GVB-K</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"426a3a36-52b2-4782-b306-f8c5b869b441"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
