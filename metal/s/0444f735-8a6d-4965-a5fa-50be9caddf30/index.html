@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be ~d — Salesforce → Raw IDS: the OneDine seed</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111; color:#d5d5d5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.62; padding-bottom:70px; font-size:15px; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 20px; display:flex; justify-content:space-between; align-items:baseline; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; letter-spacing:1px; }
+  nav .pub { color:#666; font-size:11px; }
+  .wrap { max-width:820px; margin:0 auto; padding:0 20px; }
+  h1 { color:#fff; font-size:25px; margin:30px 0 4px; font-weight:600; }
+  .lede { color:#9aa; font-size:15px; margin:8px 0 4px; }
+  .muted { color:#777; }
+  h2 { color:#6FC3DF; font-size:14px; text-transform:uppercase; letter-spacing:1.4px; margin:34px 0 10px; border-bottom:1px solid #262626; padding-bottom:6px; }
+  h2 .k { float:right; color:#555; font-size:10px; letter-spacing:0; text-transform:none; }
+  p { margin:10px 0; } b.hl{color:#9fd8ec;} b.g{color:#7fd08a;} b.a{color:#e0a246;}
+  ul{margin:8px 0 8px 20px;} li{margin:5px 0;}
+  code { background:#000; padding:1px 5px; border-radius:3px; color:#8fd; font-size:12px; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:8px; padding:12px 14px; font-family:Consolas,monospace; font-size:12.5px; color:#bcd; overflow:auto; line-height:1.5; }
+  .card { background:#1A1A1A; border:1px solid #242424; border-radius:6px; padding:12px 16px; margin:12px 0; }
+  .card.done { border-left:3px solid #7fd08a; } .card.fork { border-left:3px solid #e0a246; }
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;}
+  td,th{text-align:left;padding:5px 8px;border-bottom:1px solid #202020;} th{color:#777;font-weight:500;font-size:11px;text-transform:uppercase;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:44px;border-top:1px solid #242424;padding-top:16px;}
+  .dod li{list-style:none;} .dod .ok::before{content:"\2713 ";color:#7fd08a;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be ~d</span><span class="pub">Published 2026-07-09 · Fable5 model</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/0444f735-8a6d-4965-a5fa-50be9caddf30/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+  <h1>Salesforce → Raw IDS: the OneDine seed</h1>
+  <p class="lede">Model the blessed Zendesk raw-IDS import for the Salesforce source. Land ALL of OneDine's cases in a sealed Raw IDS — then replay and decode forever as code or intentions change. Salesforce untouched after the seed.</p>
+  <p class="muted">Mirrors <code>2026-07-09-1443-design-zendesk-raw-ids-import-tool-fable5</code>. Difference that matters: the Zendesk import kept not landing — <b class="g">the Salesforce seed is already landed and proven</b> (below). This design gives it the same operational home.</p>
+
+  <h2>1. Need</h2>
+  <p>The operator wants <b class="hl">all of OneDine's Salesforce cases in a sealed Raw IDS</b> so the system can replay from it forever — the same blessed pattern as Zendesk (ARCHITECTURE §7, operator-directed 2026-07-04: <em>"import once to raw sealed IDS… then replay on the raw and always refresh/get-latest"</em>).</p>
+  <p>Unlike Zendesk, the Salesforce seed <b class="g">has landed</b>, proven live 2026-07-09:</p>
+  <div class="card done">
+    <b>42,402 cases + 16,385 comments → 634,907 triples → sealed nous Raw IDS</b>, 182 rate-safe API calls, round-trip + <code>understand()</code> decode clean.
+    Raw at <code>gs://acmedev-onedine-cases-ids/full/</code> (JSONL source-of-record + sealed <code>raw-ids.tgz</code>, 50 MB). Tools at <code>argus/src/import/salesforce/</code>.
+  </div>
+  <p>What's still missing is exactly what stalled Zendesk: <b>no operational home</b> (it's a mesh job, not a console tab — no button, no progress, no resume surface), <b>no refresh loop</b> (get-latest since the cursor), and <b>no in-console replay</b> (proof by eyes for one real case).</p>
+
+  <h2>2. Raw user stories <span class="k">operator voice</span></h2>
+  <ul data-cm="1-need">
+    <li>"Seed all of OneDine's case history into raw triples — I don't want to re-pull from Salesforce every time."</li>
+    <li>"When I change the decoder or the intentions, replay the raw — don't touch the live org."</li>
+    <li>"Refresh: pull only what's new since the last seed."</li>
+    <li>"Show me one real case replayed from the raw — proof by eyes, not a claim."</li>
+    <li>"Do it from the Argus console, watchable and resumable — not a hand-run job in a side directory."</li>
+  </ul>
+
+  <h2>3. Sourced solution <span class="k">mine, don't invent</span></h2>
+  <table data-cm="3-sourced-solution-mine-don">
+    <tr><th>Need</th><th>Sourced from</th></tr>
+    <tr><td>The whole pattern (land raw, seal, replay)</td><td>Fable5 zendesk-raw-ids-import design/plan + <code>mendo-zendesk-ai</code> v0 tools</td></tr>
+    <tr><td>Sealed TripleStore + decode</td><td>nous <code>store.c</code> (IDS) + <code>understand.c</code> (already used in the landed seed)</td></tr>
+    <tr><td>Read-only source access</td><td><code>salesforce-bridge</code> (C# jacket, OAuth client-credentials, daily-passphrase gate)</td></tr>
+    <tr><td>Full-history walk</td><td><b>new:</b> adaptive <code>CreatedDate</code> windows — Salesforce has no incremental-events firehose (the one real divergence from Zendesk)</td></tr>
+    <tr><td>Operational home</td><td>the Argus APPS/tab pattern + the one-service-per-source bridge pattern</td></tr>
+  </table>
+
+  <h2>4. Naming <span class="k">literal</span></h2>
+  <p><code>src/import/salesforce/</code> · <code>pull_full.py</code> (the walk) · <code>sf_ids.c</code> (seal) · <code>sf_replay.c</code> (replay+decode) · the <code>/import/start | /import/status | /import/refresh | /import/replay?case=</code> contract · a <b>"Raw IDS"</b> tab. No cleverness — it imports Salesforce into a Raw IDS.</p>
+
+  <h2>5. Shape <span class="k">the pipe</span></h2>
+<pre data-cm="4-naming-literal">Salesforce (foreign, READ-ONLY)
+   |  OAuth client-credentials · daily passphrase yyyyMMdd~go
+   v
+salesforce-bridge  ·· C# jacket (Cloud Run) — the ONLY C# in the chain
+   |  /read?entry=query   SELECT ... FROM Case / CaseComment
+   |  adaptive CreatedDate windows (bridge caps ~1000/page; split-on-cap)
+   v
+pull_full.py  ->  cases.jsonl + comments.jsonl   (append-only RAW source of record, gzipped)
+   |
+   v
+emit -> triples  ->  sf_ids (C99 + nous store.c)  ->  sealed Raw IDS  (cursor + provenance IN the raw)
+   |                                                        |
+   v                                                        v
+GCS gs://acmedev-onedine-cases-ids/full/            sf_replay -> understand() -> PI atoms  (proof by eyes)</pre>
+  <p>Two raw forms, both sealed to GCS: the <b class="hl">JSONL</b> (re-derivable source of record) and the <b class="hl">sealed nous TripleStore</b> (queryable/replayable). One writer, append-only, provenance per batch — the a-d-d §7 Raw-IDS contract.</p>
+
+  <h2>6. First move <span class="k">what ships first</span></h2>
+  <p><b class="g">Already shipped:</b> the full seed landed + proven (§1). <b class="a">Next First Move:</b> the <b>Raw IDS tab</b> — a first tab in the Argus Salesforce app that binds only the <code>/import/*</code> contract: <em>Seed / Refresh / Replay</em>, live counts (cases · comments · triples · elapsed), and a one-case replay rendered in the console. Ship the boring, watchable thing; decode-to-<code>.pi</code> is a later board off the landed raw.</p>
+
+  <h2>Choices + consequences <span class="k">earned — the fork</span></h2>
+  <div data-cm="6-first-move-what-ships" class="card fork">
+    <p><b>Fork: date-windows vs Bulk API 2.0.</b> Salesforce recommends Bulk API 2.0 for 50k+ records — but Bulk is <b>CSV-only, async/polling</b>, and mangles rich-text bodies (newlines/commas). We chose <b class="hl">REST + adaptive CreatedDate windows → JSON</b>: lossless (bodies preserved), maps 1:1 to triples, no polling. Consequence: at true millions this would strain; at OneDine's 42k it lands in 182 calls. <b>Verified the right call — the seed is landed.</b></p>
+  </div>
+  <p><b>Fork: JSONL vs IDS as "the raw".</b> Kept both. JSONL = human/re-derivable source of record; sealed IDS = the queryable replay form. Consequence: 2× storage (trivial at 50 MB), but the raw survives a store-format change.</p>
+
+  <h2>Escape routes <span class="k">earned</span></h2>
+  <ul data-cm="escape-routes-earned">
+    <li>If the org ever outgrows date-windows → a server-side paginating <code>extract</code> on the bridge (nextRecordsUrl relay). The tab's <code>/import/*</code> seam is unchanged.</li>
+    <li>If Salesforce adds Change-Data-Capture / Pub-Sub → swap the refresh source; the raw contract is identical.</li>
+    <li>If decode changes → re-derive from JSONL; never re-pull the org.</li>
+  </ul>
+
+  <h2>Pure metal test <span class="k">earned</span></h2>
+  <p>C99 + nous store + <code>understand()</code> for the seal/replay (pure metal). The one C# is the bridge jacket (foreign-API law). Python is transport/orchestration only (the pull), never the substrate. <b>Passes.</b></p>
+
+  <h2>Definition of Done — this design</h2>
+  <ul data-cm="pure-metal-test-earned" class="dod">
+    <li class="ok">Need grounded in a landed, proven seed (not a hypothesis)</li>
+    <li class="ok">Modeled on the blessed Zendesk raw-IDS design; the one divergence (date-windows) named + justified</li>
+    <li class="ok">Shape + naming + first move concrete; forks earned and resolved by evidence</li>
+    <li class="ok">Operationalized by the paired <code>~p</code> plan</li>
+  </ul>
+  <footer>v0 · 2026-07-09 · Salesforce → Raw IDS design (Fable5 model of the Zendesk import)<br><span class="muted">Beryllium — one signal in, full chain reaction out.</span></footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"0444f735-8a6d-4965-a5fa-50be9caddf30"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
