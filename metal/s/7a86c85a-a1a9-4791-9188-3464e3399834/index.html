@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build — De-atomize POC: conversation from programs</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 27px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 15px; margin: 18px 0 6px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:14px 16px; overflow-x:auto; color:#bcd; font-size:12px; font-family:Consolas,monospace; margin:12px 0; line-height:1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; } .fail { color:#ff6b6b; font-weight:600; }
+  .hl { color:#7CFFB2; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~b — De-atomize POC: conversation from programs</span><span class="pub">Published 2026-07-09 18:46 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/7a86c85a-a1a9-4791-9188-3464e3399834/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>De-atomize POC — conversation &#8596; program &#8596; conversation</h1>
+<p>Built from <code>be/designs/2026-07-09-1755-design-deatomize-poc-fable5.html</code>. Pure C99, read-only,
+no model, no network. Mounts the sealed raw IDS (all 8.2M facts mmap'd in memory) and proves the decoder
+runs <b>both directions</b> on real Mendocino Farms threads.</p>
+
+<div class="section">
+<h2>What was built</h2>
+<ul data-cm="what-was-built">
+<li><code>mendo-zendesk-ai/be/tools/deatomize_poc.c</code> (committed <code>54aca81</code>) — mounts
+<code>data/full/raw-ids-full</code> (the 431,260-ticket sealed store), and for each real comment runs
+<b>ORIGINAL &rarr; <code>understand()</code> &rarr; PROGRAM (.pi) &rarr; <code>restate_with(english)</code> &rarr; DE-ATOMIZED</b>.</li>
+<li>Two datamaps: <code>PI_DATAMAP</code> (atoms &rarr; .pi operators, the program view) and a new
+<code>EN_DATAMAP</code> (atoms &rarr; plain-English connectives, the VOICE / de-atomize stage).</li>
+<li>Move 2 — <b>conversation FROM programs</b>: the vocabulary spine that recurs across a cluster of
+same-situation threads, mined from their real programs.</li>
+<li>Everything reuse: <code>restate_with</code>, <code>understand</code>, the mmap'd store, the <code>derive.c</code>
+mount pattern. New code is only the ~140-line harness + the English datamap.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>Live output — real Mendo thread #121 + an LRS/tablet cluster</h2>
+<p>Run: <code>deatomize_poc raw-ids-full &lt;wordnet&gt; 121  121 209 227 962</code>. Verbatim stdout:</p>
+<pre>=== DE-ATOMIZE POC — conversation &lt;-&gt; program &lt;-&gt; conversation ===
+store: data/full/raw-ids-full  (facts=8247494, strings=4610372, all mmap'd in memory)
+thread: ticket:121   (5 comments)
+
+--- comment 1  (internal note)  atoms=43 entities=13 actions=6 ---
+  ORIGINAL   : Restored iPad via Itunes Connected to apple@mendocinofarms.com reinstalled "Table tracker" app from LRS had to press the button on the LRS gateway in the rack to pair working well LRS doc found here:  ...
+  PROGRAM .pi: restored ipad VIA itunes connected DIRECTIONAL apple mendocinofarms com reinstalled table tracker app SOURCE lrs had DIRECTIONAL press SPECIFIER button LOCATIVE SPECIFIER lrs gateway LOCATIVE SPECIFIE ...
+  DE-ATOMIZED: restored ipad via itunes connected to apple mendocinofarms com reinstalled table tracker app from lrs had to press the button at the lrs gateway at the rack to pair working well lrs doc found here htt ...
+
+--- comment 2  (public reply)  atoms=39 entities=12 actions=7 ---
+  ORIGINAL   : Ibrahim was able to walk through this morning and restore iPad. We reinstalled tracker software, he tested &amp; working well again. Also set passcode to something they'll be able to keep track of! Thank  ...
+  PROGRAM .pi: ibrahim COPULA able DIRECTIONAL walk VIA SPECIFIER morning CONJUNCTION restore ipad we reinstalled tracker software CONJUNCTION he tested working well again CONJUNCTION set passcode DIRECTIONAL someth ...
+  DE-ATOMIZED: ibrahim is able to walk via the morning and restore ipad we reinstalled tracker software and he tested working well again and set passcode to something they'll is able to keep track of thank you all f ...
+
+--- comment 3  (internal note)  atoms=48 entities=13 actions=8 ---
+  ORIGINAL   : Spoke to Ibrahim, they do not have the key for the LRS case so we cannot remove. We can't fix without key because the buttons are covered. He will continue to look. Rice Village also does not have key ...
+  PROGRAM .pi: spoke DIRECTIONAL ibrahim CONJUNCTION they AUXILIARY NEGATION have SPECIFIER key PURPOSIVE SPECIFIER lrs CONDITIONAL CONSEQUENT we cannot remove we can't fix EXCLUSION key CAUSAL SPECIFIER buttons COP ...
+  DE-ATOMIZED: spoke to ibrahim and they  not have the key for the lrs if then we cannot remove we can't fix except key because the buttons is covered he  continue to look rice village and  not have key we may need  ...
+
+--- comment 4  (internal note)  atoms=5 entities=1 actions=1 ---
+  ORIGINAL   : Working with Ibrahim in AM
+  PROGRAM .pi: working ASSOCIATIVE ibrahim LOCATIVE COPULA
+  DE-ATOMIZED: working with ibrahim at is
+
+round-trip: 4 utterances decoded to programs and de-atomized back, 135 atoms total.
+
+=== CONVERSATION FROM PROGRAMS — spine across 4 threads ===
+words recurring in &gt;= 2 of 4 threads (the situation spine):
+  mendocinofarms(2), com(2), lrs(2), gateway(2), pair(2), well(2), had(2), working(2), support(2), able(2), morning(2), thank(2), cannot(2), spoke(2), have(2), need(2), feb(2), nick(2), don't(2), way(2), today(2), wrote(2), believe(2), thanks(2), let(2), team(3)
+(recurs across the cluster's real programs = the canonical situation shape)</pre>
+<p><span class="hl">"Restored iPad via iTunes&hellip;"</span> &rarr; program &rarr; back to
+<span class="hl">"restored ipad via itunes connected to apple&hellip; had to press the button at the lrs gateway&hellip;"</span>
+&mdash; a real thread, decoded and de-atomized, straight off the in-memory sealed store.</p>
+</div>
+
+<div class="section">
+<h2>Honest edges</h2>
+<ul data-cm="live-output-real-mendo-thread">
+<li>De-atomize is <b>lossy on grammar</b> (WordNet Phase-2 not loaded here; hardcoded grammar only): "they'll is able", "working with ibrahim at is". The <i>intent</i> reconstitutes; the surface polish needs the datamap + WordNet enrichment.</li>
+<li>Move 2's spine carries common-word noise (com, had, well) alongside the real domain spine (<b>lrs, gateway, pair, support, team</b>); a stopword pass + real situation-typing sharpens it. That's next, not POC scope.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>Definition of Done</h2>
+<ul data-cm="definition-of-done">
+<li><span class="pass">&#10003;</span> A-D-D verified — flows WITH §6 (conversation-as-program) + the de-atomize design; no a-d-d written (Rule 10)</li>
+<li><span class="pass">&#10003;</span> Built + compiles clean (gcc -std=c11 -O2, links nous store + understand + language)</li>
+<li><span class="pass">&#10003;</span> Runs on the REAL sealed store (8,247,494 facts) — not a sample</li>
+<li><span class="pass">&#10003;</span> Round-trip proven: real thread &rarr; program &rarr; de-atomized conversation (thread 121, 4 utterances, 135 atoms)</li>
+<li><span class="pass">&#10003;</span> Conversation-from-programs proven: vocabulary spine across a real LRS cluster</li>
+<li><span class="pass">&#10003;</span> Read-only, no model, no network, no writes (language law + read-only invariant held)</li>
+<li><span class="pass">&#10003;</span> Committed + pushed (<code>mendo-zendesk-ai 54aca81</code>)</li>
+<li><span class="warn">&#9888;</span> Production = local proof on the sealed store; wiring into the Argus tabs is the next design (make-focus-conversations-real)</li>
+</ul>
+</div>
+
+</div>
+<footer>v0 &middot; r494 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"7a86c85a-a1a9-4791-9188-3464e3399834"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
