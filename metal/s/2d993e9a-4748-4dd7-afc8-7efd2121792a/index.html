@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — One Argus, source-scoped by rights</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 27px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 15px; margin: 18px 0 6px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:14px 16px; overflow-x:auto; color:#bcd; font-size:12.5px; font-family:Consolas,monospace; margin:12px 0; line-height:1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; } .fail { color:#ff6b6b; font-weight:600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~d — One Argus, source-scoped by rights (Zendesk vs Salesforce)</span><span class="pub">Published 2026-07-09 20:39 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/2d993e9a-4748-4dd7-afc8-7efd2121792a/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>~d — One Argus, source-scoped by rights (Zendesk vs Salesforce)</h1>
+<p><span class="tag">design</span><span class="tag">argus</span><span class="tag">slot pattern</span><span class="tag">rights</span></p>
+
+<!-- 1. NEED -->
+<div class="section">
+<h2>1. Need</h2>
+<blockquote data-cm="1-need">"We need to maybe make a specific app for Argus-for-Zendesk as opposed to Argus-for-Salesforce — because when chatting with each concern they should be focused. But having said that it would be good to use one Argus for all. Maybe this is a rights thing." — Joey</blockquote>
+<p>Two pulls in opposite directions. <strong>Focus:</strong> a Zendesk invoice thread (US Foods, Mendo) and a Salesforce opportunity (OneDine) must never blur in one chat — different data, different voice, different write lane. <strong>Unity:</strong> one bot, one install, one Argus brand. Joey's instinct — "maybe this is a rights thing" — is the resolution: focus is a <em>scope</em>, not a separate app.</p>
+<p><strong>The concrete driver underneath:</strong> the DM ticket-search route ("find", "how many", "trending") sends the question to the bridge's <code>/ask</code> and trusts the model's cited ticket IDs — it never checks them against the real sealed IDS. Argus can confidently report tickets that don't exist. The fix (ground on the per-source sealed IDS) <em>requires</em> knowing which source the conversation is about. Source scope isn't just organizational hygiene — it's the precondition for grounded answers.</p>
+<p><strong>Why now:</strong> Salesforce is about to want a Slack surface. Decide the shape before someone forks <code>argus-slack</code> into a second bot and the split becomes permanent plumbing.</p>
+</div>
+
+<!-- 2. RAW USER STORIES -->
+<div class="section">
+<h2>2. Raw User Stories</h2>
+<ul data-cm="2-raw-user-stories">
+<li>As the operator, when I'm in the Mendo GR channel, I want Argus to talk <em>only</em> Zendesk — Mendo tickets, Zora's voice, the Zendesk write lane — with zero Salesforce bleed.</li>
+<li>As a Salesforce-only teammate, I want my Argus to never touch Zendesk — not see it, not search it, not mention it. Rights, not politeness.</li>
+<li>As the operator, I want ONE bot named <code>argus</code>, one install, one place to @mention — not a zoo of per-source bots.</li>
+<li>As the operator, when I add a third source, I want to register it — not build and install a new Slack app.</li>
+<li>As the operator, when Argus cites ticket IDs, I want every ID checked against the real sealed store before it reaches me. No invented tickets. Ever.</li>
+</ul>
+</div>
+
+<!-- 3. SOURCED SOLUTION -->
+<div class="section">
+<h2>3. Sourced Solution</h2>
+<p>Mined in order, before inventing anything:</p>
+<table>
+<tr><th>Source</th><th>What it gives us</th><th>Status</th></tr>
+<tr><td><strong>a-d-d §3</strong> — multi-source, one bridge per source</td><td>Sources are ALREADY isolated at the data + bridge layer: <code>zendesk-bridge</code> and <code>salesforce-bridge</code> both live (us-west1), each holding exactly one vendor's secret. The Slack surface just mounts the right one.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>Slot pattern</strong> — <code>kastil-systems/a-d-d/patterns/</code></td><td>Each source is a self-contained capability slot; Argus is the shell that mounts the slot. This design IS an application of Slot — nothing pattern-shaped is invented here.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>Operator-Identity / rights canon</strong> — <code>be/docs/conventions.md</code></td><td>FQDN = identity; rights scope what an operator can reach. The channel↔source binding is a rights boundary, not a UI preference.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>Per-source sealed IDS</strong> — live GCS</td><td><code>gs://acmedev-mendo-tickets-ids/</code> (431,260 real tickets, sealed + mesh-resident, handle <code>8963900c…</code>) and <code>gs://acmedev-onedine-cases-ids/</code>. Grounding is per-source by construction; scoping the chat to a source scopes its grounding — and closes the ticket-search hallucination gap.</td><td><span class="pass">REUSE</span></td></tr>
+<tr><td><strong>The existing app</strong> — <code>argus-slack</code> (C# Cloud Run, bot <code>argus</code>)</td><td>Approval Cards → gated <code>zendesk-bridge /reply-send</code> (disarmed), DM/@mention responder on the Gemini brain. It's the shell. Do NOT fork it per source.</td><td><span class="pass">REUSE</span></td></tr>
+</table>
+
+<pre>
+channel/DM ──rights──&gt; active source slot ──&gt; one Argus shell (argus-slack)
+                          │
+                          ├─ bridge       zendesk-bridge | salesforce-bridge
+                          ├─ sealed IDS   acmedev-mendo-tickets-ids | acmedev-onedine-cases-ids
+                          ├─ persona      Zora (GR) | OneDine sales voice
+                          └─ write lane   gated /reply-send (disarmed) | Salesforce action
+</pre>
+
+<h3>REUSE vs NEW</h3>
+<ul>
+<li><span class="pass">REUSE</span> — both bridges, both sealed IDS buckets, the <code>argus-slack</code> shell, the Slot pattern, the Operator-Identity canon.</li>
+<li><span class="warn">NEW</span> — the <strong>source-scope resolver</strong>: channel/DM → source binding + operator rights check.</li>
+<li><span class="warn">NEW</span> — the <strong>slot registry</strong>: <code>{source → bridge URL, IDS bucket/handle, persona, write-lane}</code>.</li>
+<li><span class="warn">NEW</span> — <strong>grounded ticket-search</strong>: cited IDs verified against the scoped slot's sealed IDS before the answer ships.</li>
+</ul>
+<p>Everything new is glue between things that already exist. The isolation Joey wants was built at the bridge and data layers months ago — this design surfaces it in the chat layer instead of re-creating it as separate apps.</p>
+</div>
+
+<!-- 4. NAMING -->
+<div class="section">
+<h2>4. Naming</h2>
+<table data-cm="3-sourced-solution">
+<tr><th>Name</th><th>Means exactly</th></tr>
+<tr><td><strong>source slot</strong></td><td>One source's complete kit: bridge + sealed IDS + persona + write lane. Self-contained; mounted as a unit.</td></tr>
+<tr><td><strong>source scope</strong></td><td>The one source a conversation surface is bound to. Explicit, never inferred per message.</td></tr>
+<tr><td><strong>channel↔source binding</strong></td><td>The map entry that sets a channel's (or DM context's) source scope.</td></tr>
+<tr><td><strong>rights</strong></td><td>The set of sources an operator is entitled to. Gates every binding and every resolution.</td></tr>
+<tr><td><strong>Argus shell</strong></td><td>The one Slack app (<code>argus-slack</code>, bot <code>argus</code>) that mounts whichever slot the scope selects.</td></tr>
+</table>
+<p><strong>Collision flagged:</strong> "Argus" is the product and the shell — never a per-source thing. There is no "Argus-for-Zendesk"; there is the <em>Zendesk slot</em> mounted in Argus. Saying it wrong is how the fork happens.</p>
+</div>
+
+<!-- 5. SHAPE -->
+<div class="section">
+<h2>5. Shape</h2>
+<p>Minimum viable, in the existing <code>argus-slack</code> shell:</p>
+<ol>
+<li><strong>Slot registry</strong> — static config: <code>{ "zendesk": { bridge, ids_bucket, ids_handle, persona: "zora", write_lane }, "salesforce": { … } }</code>. Adding a source = adding an entry.</li>
+<li><strong>Scope resolver</strong> — on every event: channel/DM → bound source; then operator rights check (starts as a static config map: operator → entitled sources). No binding or no right → Argus says so and stops. Nothing is inferred.</li>
+<li><strong>Grounded ticket-search</strong> — the brain's DM search route reads the <em>scoped</em> slot's sealed IDS; every ticket ID the model cites is checked against that store before the answer posts. Uncheckable ID → dropped or flagged, never asserted.</li>
+<li><strong>One app, unchanged install</strong> — same bot, same workspace install, same Approval Card flow. The write lanes stay each source's own gated/disarmed path; grounding is read-only.</li>
+</ol>
+<h3>Out of scope (YAGNI)</h3>
+<ul>
+<li>Per-message source switching — scope is per surface, period.</li>
+<li>Cross-source queries in one thread.</li>
+<li>A rights admin UI — rights start as a static config map.</li>
+<li>Multi-workspace.</li>
+</ul>
+
+<h3>Choices + Consequences</h3>
+<table>
+<tr><th>Option</th><th>2nd/3rd-order consequences</th><th>Verdict</th></tr>
+<tr><td><strong>A — separate app per source</strong> ("Argus-for-Zendesk", "Argus-for-Salesforce")</td><td>Hard focus, yes. But: N bots, N installs, N token sets, N deploy pipelines. Second order: every shell fix (Approval Cards, brain wiring, auth) lands N times or drifts. Third order: "one Argus for all" is dead as a brand and as an architecture — the fork is the org chart forever, and source #3 costs a whole app.</td><td><span class="fail">✗</span></td></tr>
+<tr><td><strong>B — one app + channel-scoped rights slots</strong></td><td>Focus comes from the explicit binding; unity from the one shell. Second order: adding a source is a registry entry; every shell improvement reaches all sources at once. Third order: the slot boundary doubles as the app-fork seam if a source ever genuinely outgrows the shell — B keeps option A open; A forecloses B.</td><td><span class="pass">✓ PICK</span></td></tr>
+<tr><td><strong>C — one app + per-message source inference</strong></td><td>Keeps one app but the scope is a guess. Second order: a US Foods invoice question bleeds into a OneDine opportunity on a bad classification — exactly the blur Joey named. Third order: rights become unenforceable (the model decides what you can see), and grounding can't pick an IDS deterministically — the hallucination gap stays open.</td><td><span class="fail">✗</span></td></tr>
+</table>
+<p><strong>Pick B.</strong> It's the only option that delivers both of Joey's pulls: focus is a rights-gated, explicit scope; unity is the one shell. And it's the only option where the grounding fix is deterministic — the scope names the IDS.</p>
+
+<h3>Escape Routes</h3>
+<ul>
+<li><strong>Bad binding</strong> — slots are config-mounted; reverting a channel↔source binding is a one-line change, no deploy of vendor code.</li>
+<li><strong>Slot outgrows the shell</strong> — the slot boundary is exactly the app-fork seam. If Salesforce ever needs its own app, lift the slot out whole: its bridge, IDS, persona, and write lane already travel as a unit.</li>
+<li><strong>Rights model too thin</strong> — the static operator→sources map upgrades to real entitlement (Operator-Identity, FQDN-keyed) without touching the resolver's interface.</li>
+</ul>
+
+<h3>Pure Metal Test</h3>
+<p><span class="pass">✓</span> The shell, the slot registry, the scope resolver, and the grounding check are ours. The two foreign APIs stay jacketed per-source behind <code>zendesk-bridge</code> and <code>salesforce-bridge</code> (C# jackets per the Language Boundary law) — either vendor is swappable by replacing one slot's bridge, and nothing we own knows a vendor's shape.</p>
+</div>
+
+<!-- 6. FIRST MOVE -->
+<div class="section">
+<h2>6. First Move</h2>
+<p><strong>Bind the Zendesk slot explicitly on the live Mendo GR channel, and ground the DM ticket-search on it.</strong></p>
+<ol>
+<li>Registry gets one entry: <code>zendesk → { zendesk-bridge, acmedev-mendo-tickets-ids (handle 8963900c…), Zora, gated /reply-send }</code>.</li>
+<li>The Mendo GR channel gets an explicit binding to that slot — the first channel↔source binding in existence.</li>
+<li>The DM ticket-search route checks every cited ticket ID against the slot's sealed IDS (431,260 real tickets) before answering.</li>
+</ol>
+<p>One channel, one grounded source, one Argus. This proves the slot mechanism <em>and</em> closes the hallucination gap on the only source that's live — before the Salesforce slot exists, so slot #2 lands on a proven rail instead of a theory.</p>
+</div>
+
+<!-- DOD -->
+<div class="section">
+<h2>DoD</h2>
+<ul data-cm="5-shape">
+<li><span class="pass">✓</span> A-D-D verified — flows with a-d-d §3 (one bridge per source); proposes the chat-layer scope, writes nothing to a-d-d (Rule 10).</li>
+<li><span class="pass">✓</span> Six-section spine present — Need, Raw User Stories, Sourced Solution, Naming, Shape, First Move.</li>
+<li><span class="pass">✓</span> Sourced before invented — §3, Slot pattern, Operator-Identity canon, per-source sealed IDS, existing argus-slack all mined and reused; only the resolver, registry, and grounding check are new.</li>
+<li><span class="pass">✓</span> Names literal — source slot, source scope, channel↔source binding, rights, Argus shell; the "Argus-for-X" collision flagged and killed.</li>
+<li><span class="pass">✓</span> Choices + Consequences earned — the core fork (A/B/C) with 2nd/3rd-order consequences; B picked with reason.</li>
+<li><span class="pass">✓</span> Escape Routes named — config revert, slot-as-fork-seam, rights upgrade path.</li>
+<li><span class="pass">✓</span> Pure Metal Test — shell + slots + grounding ours; foreign APIs jacketed per-source, swappable; Language Boundary respected (C# jackets only, C99 for what we own).</li>
+<li><span class="pass">✓</span> Read-only grounding — write lanes stay each source's own gated/disarmed path; no live writes designed in.</li>
+<li><span class="pass">✓</span> YAGNI fence explicit — no per-message switching, no cross-source threads, no rights UI, no multi-workspace.</li>
+</ul>
+<p><strong>Next:</strong> <code>~p</code> the First Move (Zendesk slot binding + grounded ticket-search), then <code>~b</code>.</p>
+</div>
+
+</div>
+<footer>v0 &middot; r517 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"2d993e9a-4748-4dd7-afc8-7efd2121792a"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
