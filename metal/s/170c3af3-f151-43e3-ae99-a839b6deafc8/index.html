@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be ~d &mdash; Raw IDS Explorer: drill into the triples</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111111; color:#d5d5d5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.62; padding-bottom:70px; font-size:15px; }
+  nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 20px; display:flex; justify-content:space-between; align-items:baseline; }
+  nav .brand { color:#6FC3DF; font-weight:700; font-size:18px; letter-spacing:1px; }
+  nav .pub { color:#666; font-size:11px; }
+  .wrap { max-width:800px; margin:0 auto; padding:0 20px; }
+  h1 { color:#fff; font-size:25px; margin:30px 0 4px; font-weight:600; }
+  .lede { color:#9aa; font-size:15px; margin:8px 0 4px; }
+  .muted { color:#777; }
+  h2 { color:#6FC3DF; font-size:14px; text-transform:uppercase; letter-spacing:1.4px; margin:34px 0 10px; border-bottom:1px solid #262626; padding-bottom:6px; }
+  h2 .k { float:right; color:#555; font-size:10px; letter-spacing:0; text-transform:none; }
+  p { margin:10px 0; } b.hl{color:#9fd8ec;} b.g{color:#7fd08a;} b.a{color:#e0a246;}
+  ul{margin:8px 0 8px 20px;} li{margin:5px 0;}
+  code { background:#000; padding:1px 5px; border-radius:3px; color:#8fd; font-size:12px; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:8px; padding:12px 14px; font-family:Consolas,monospace; font-size:12.5px; color:#bcd; overflow:auto; line-height:1.5; }
+  .card { background:#1A1A1A; border:1px solid #242424; border-radius:6px; padding:12px 16px; margin:12px 0; }
+  .card.done { border-left:3px solid #7fd08a; } .card.fork { border-left:3px solid #e0a246; }
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;}
+  td,th{text-align:left;padding:5px 8px;border-bottom:1px solid #202020;} th{color:#777;font-weight:500;font-size:11px;text-transform:uppercase;}
+  footer{text-align:center;color:#555;font-size:12px;margin-top:44px;border-top:1px solid #242424;padding-top:16px;}
+  .dod li{list-style:none;} .dod .ok::before{content:"\2713 ";color:#7fd08a;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-09 17:59 PST</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/170c3af3-f151-43e3-ae99-a839b6deafc8/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+  <h1>Raw IDS Explorer: drill into the triples</h1>
+  <p class="lede">A cool little data explorer for the raw. Pick a thing &mdash; a case, a ticket &mdash; see its triples, follow the links. Source-agnostic, keyboard-drillable, read-only. A triple browser, not a BI dashboard.</p>
+  <p class="muted">The EXPLORE half of the <b>Raw IDS</b> tab. The IMPORT half (Seed / Refresh / Replay, the <code>/import/*</code> contract) is being built concurrently per <code>2026-07-09-design-salesforce-raw-ids-seed-fable5</code> &mdash; that design is untouched here. See the split, &sect;5.</p>
+
+  <h2>1. Need</h2>
+  <p>The operator has <b class="hl">634,907 triples sealed</b> in the Raw IDS &mdash; 42,402 OneDine cases + 16,385 comments, landed and proven &mdash; and <b>cannot see any of them</b>. The raw is the source of record the whole system replays from, and today it is a 50&nbsp;MB opaque blob in GCS. Trust-by-replay exists; <b class="hl">trust-by-eye does not</b>. Why now: the seed landed, the import tab is going up in a sibling session, and the Zendesk/NPS raw follows the same a-d-d &sect;7 contract &mdash; the moment there are two sealed raws, an explorer that serves both is the difference between &#39;sealed&#39; and &#39;visible&#39;. The operator&#39;s words: <em>&#34;make the raw more viewable, let me drill in.&#34;</em></p>
+
+  <h2>2. Raw user stories <span class="k">operator voice</span></h2>
+  <ul data-cm="1-need">
+    <li>&#34;As the operator, I want to open one real case and see its triples &mdash; predicate, object, grouped &mdash; so that I trust the raw by eye, not by claim.&#34;</li>
+    <li>&#34;As the operator, I want to click an object that is itself a subject (a case&#39;s comment, a comment&#39;s case) and hop to it, so drilling feels like browsing a graph, not grepping a file.&#34;</li>
+    <li>&#34;As the operator, I want to search for a value &mdash; a case number, a store name, a word in a body &mdash; and land on the subjects that carry it.&#34;</li>
+    <li>&#34;As the operator, I want to see provenance on every triple &mdash; source, batch, time &mdash; so I know which import wrote it.&#34;</li>
+    <li>&#34;As the operator, I want the same explorer to work on the Zendesk/NPS raw the day it lands, so I never build a second viewer.&#34;</li>
+    <li>&#34;As the operator, I want to drive it from the keyboard &mdash; move, drill, pop, search &mdash; because fast beats pretty.&#34;</li>
+  </ul>
+
+  <h2>3. Sourced solution <span class="k">mine, don&#39;t invent</span></h2>
+  <table data-cm="3-sourced-solution-mine-don">
+    <tr><th>Need</th><th>Sourced from</th></tr>
+    <tr><td>Triple query (subject / predicate / object, wildcarded)</td><td>nous <code>store.c</code> &mdash; <code>ids_query()</code> / <code>ids_query_strings()</code>, subject-indexed, 0/NULL = wildcard. Already exists; the explorer invents no query engine.</td></tr>
+    <tr><td>Decode reference (what the triples mean)</td><td>nous <code>understand.c</code> &mdash; NOT called by the explorer (raw stays raw); linked from the drill view to the import tab&#39;s <code>/import/replay</code> for the decoded form.</td></tr>
+    <tr><td>Serving surface + auth</td><td><code>salesforce-bridge</code> C# jacket (Cloud Run, OAuth, daily passphrase <code>yyyyMMdd~go</code>) &mdash; the explorer adds read endpoints to the bridge that already fronts this source.</td></tr>
+    <tr><td>The sealed raw itself</td><td><code>gs://acmedev-onedine-cases-ids/full/</code> &mdash; sealed TripleStore + JSONL, provenance per batch (a-d-d &sect;7 Raw-IDS contract). Zendesk raw: same shape.</td></tr>
+    <tr><td>Tab + console idioms</td><td>Argus <code>web/index.html</code> APPS pattern &mdash; salesforce app already declares <code>tabs:[&#34;rawids&#34;, ...]</code>; the sibling session owns the import strip in that tab. Vanilla JS, existing bridge-read fetch idiom.</td></tr>
+    <tr><td><b>The only new thing</b></td><td><b class="a">rawq</b> &mdash; a read-only C99 triple-query skill over the sealed store + three <code>/raw/*</code> endpoints + the drill-in UI zone.</td></tr>
+  </table>
+
+  <h2>4. Name it true <span class="k">literal</span></h2>
+  <p>The skill: <code>rawq.c</code> (C99, nous store, read-only &mdash; it queries the raw, so it&#39;s rawq). The endpoints on the bridge:</p>
+  <table>
+    <tr><th>Endpoint</th><th>Does</th></tr>
+    <tr><td><code>GET /raw/subjects?source=&amp;type=&amp;after=&amp;limit=</code></td><td>Paged subject list (id, type, one label triple). Cursor paging via <code>after</code>.</td></tr>
+    <tr><td><code>GET /raw/subject?id=&amp;source=</code></td><td>All triples for one subject, grouped by predicate, provenance per triple, and a <code>links</code> flag on objects that are themselves subjects.</td></tr>
+    <tr><td><code>GET /raw/search?q=&amp;field=&amp;source=&amp;limit=</code></td><td>Substring match across subjects / predicates / objects &rarr; list of hit subjects with the matching triple.</td></tr>
+  </table>
+  <p>The views: <b class="hl">Subjects</b> &middot; <b class="hl">Subject</b> (the drill card) &middot; <b class="hl">Search</b>. <b class="a">Collision flagged:</b> the import half owns <code>/import/replay?case=</code> &mdash; replay means <em>decode to PI atoms, proof by eyes</em>. The drill card is NOT replay and is never called replay: it shows triples <em>as sealed</em>, no decode. Two words, two meanings, kept apart on purpose &mdash; the drill card links out to replay for the decoded view.</p>
+
+  <h2>5. Shape <span class="k">the minimum</span></h2>
+<pre data-cm="4-name-it-true-literal">Raw IDS tab (ONE tab, two zones)
+&#9484;&#9472; IMPORT strip (theirs: session 8cbac5f0) &#9472; Seed / Refresh / Replay &middot; live counts &middot; /import/*
+&#9492;&#9472; EXPLORER (this design) &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472; /raw/*
+     [source: salesforce | zendesk]  [ / search box ]
+     Subjects list &rarr; Enter &rarr; Subject drill card &rarr; click/Enter a linked object &rarr; hop
+           &#9650; j/k move &middot; Enter drill &middot; Backspace pop &middot; breadcrumb of hops
+
+     Subject drill card:
+       case:5003x0000... &middot; OneDine &middot; batch 2026-07-09/full &middot; seeded 14:02
+       status    &rarr; Closed
+       subject   &rarr; &#34;POS offline at store 214&#34;
+       comment   &rarr; comment:00a7... &#9656; (hop)     &larr; linked object = follow-link
+       ...grouped by predicate, provenance on hover/expand
+       [view decoded &rarr; /import/replay]           &larr; hand-off, not duplication</pre>
+  <p><b>The split, stated so two sessions converge on one tab:</b> the import half <b class="a">writes</b> the raw and owns <code>/import/*</code> (Seed / Refresh / Replay + counts). The explorer half <b class="g">reads</b> the raw and owns <code>/raw/*</code> (Subjects / Subject / Search). Same tab because they&#39;re two verbs on the same sealed store &mdash; one place to trust the raw. Neither touches the other&#39;s contract; the only seam is the drill card&#39;s &#34;view decoded&#34; link into their replay.</p>
+  <p><b>Source-agnostic boundary:</b> <code>rawq</code> opens <em>a sealed store</em>, not <em>the Salesforce store</em> &mdash; <code>source=</code> picks which sealed raw (salesforce today, zendesk the day it lands). One explorer, N raws; the a-d-d &sect;7 shape is the contract that makes this free.</p>
+  <p><b>Language law:</b> query layer is <b class="hl">C99</b> (<code>rawq.c</code> on nous <code>store.c</code>), served through the existing <b class="hl">C# bridge jacket</b>, rendered in <b class="hl">vanilla JS</b> in the console. <b>Python appears nowhere.</b></p>
+  <p><b>Out of scope, v1:</b> no editing the raw (read-only, ever &mdash; the raw is sealed); no re-decode inside the explorer (replay owns decode); no charts, counts-over-time, or BI; no cross-source joins.</p>
+
+  <h2>6. First move <span class="k">what ships first</span></h2>
+  <p><b class="a">One endpoint, one card, one hop.</b> <code>GET /raw/subject?id=&lt;a real OneDine case&gt;</code> &mdash; <code>rawq</code> opens the sealed store, <code>ids_query(subject, 0, 0)</code>, returns that case&#39;s triples grouped by predicate with provenance &mdash; rendered as the drill card in the Raw IDS tab, with <b>one working follow-link</b> (case &rarr; one of its comments, and back). That single vertical proves the whole thing: C99 query, jacket serving, console drill, graph hop. <b>These go into the plan:</b> <code>/raw/subjects</code> paging, <code>/raw/search</code>, the zendesk source, the provenance expand, full keyboard nav.</p>
+
+  <h2>Choices + consequences <span class="k">earned &mdash; the fork</span></h2>
+  <div data-cm="6-first-move-what-ships" class="card fork">
+    <p><b>Fork: query the sealed IDS live server-side vs pre-index a static browse manifest.</b> A manifest (pre-baked JSON per subject, served static) needs no runtime &mdash; but it is a <em>second derived artifact</em> that goes stale on every Refresh and re-plants the exact drift the sealed-raw contract kills. Chose <b class="hl">live server-side</b>: <code>rawq</code> behind the bridge, store kept warm (50&nbsp;MB in memory &mdash; trivial), always current the instant an import batch seals. Consequence: the bridge must host and call a C99 binary; that seam already exists in the jacket-over-metal pattern, and it&#39;s the same seam the zendesk source reuses for free.</p>
+  </div>
+  <p><b>Placement, resolved by the same logic:</b> explorer-in-the-Raw-IDS-tab, not a standalone tab &mdash; write and read on one store belong on one screen. If the explorer outgrows the tab (multi-source browsing as its own activity), it lifts out along the <code>/raw/*</code> seam untouched; that&#39;s the escape route, and the only one this design has earned.</p>
+
+  <h2>Definition of Done &mdash; this design</h2>
+  <ul data-cm="definition-of-done-this-design" class="dod">
+    <li class="ok">Need grounded in landed fact: 634,907 sealed triples, zero of them visible</li>
+    <li class="ok">Coordinated with the concurrent import-half design (8cbac5f0) &mdash; split stated, contracts disjoint (<code>/import/*</code> theirs, <code>/raw/*</code> ours), replay-vs-drill collision named</li>
+    <li class="ok">Sourced from owned metal: nous <code>store.c</code> query, bridge jacket, tab pattern &mdash; only <code>rawq</code> + <code>/raw/*</code> + the drill UI are new</li>
+    <li class="ok">Language law holds: C99 query, C# jacket only, vanilla JS surface, no Python anywhere</li>
+    <li class="ok">Source-agnostic by contract (a-d-d &sect;7 shape), read-only by law</li>
+    <li class="ok">First move is one provable vertical: one endpoint, one card, one hop</li>
+  </ul>
+  <footer>v0 &middot; r485 &middot; 2026-07-09 &middot; Be &middot; argus &middot; Fable 5<br><span class="muted">Beryllium &mdash; one signal in, full chain reaction out.</span></footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"170c3af3-f151-43e3-ae99-a839b6deafc8"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
