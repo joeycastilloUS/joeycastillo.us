@@ -1894,7 +1894,7 @@ function rawExplorer(){
     else h+="<div class='trip'>"+rawTripleRows(RAWIDS.sel, RAWIDS.detail)+"</div>";
     if(RAWIDS.replay){
       if(RAWIDS.replay.loading) h+="<div class='rxkids'><span class='spin'></span> decoding via understand()…</div>";
-      else if(RAWIDS.replay.atoms) h+="<div class='rxkids'><div class='rxkh'>understand() decode &middot; "+RAWIDS.replay.atom_count+" atoms</div><div class='ratoms'>"+RAWIDS.replay.atoms.slice(0,60).map(function(a){return "<span class='ratom r-"+abEsc(a.r)+"'>"+abEsc(a.w)+"</span>";}).join("")+"</div></div>";
+      else if(RAWIDS.replay.atoms){ h+="<div class='rxkids'><div class='rxkh'>understand() decode &middot; "+RAWIDS.replay.atom_count+" atoms</div><div class='ratoms'>"+RAWIDS.replay.atoms.slice(0,60).map(function(a){return "<span class='ratom r-"+abEsc(a.r)+"'>"+abEsc(a.w)+"</span>";}).join("")+"</div></div>"; h+=rawProgram(RAWIDS.replay.program); }
       else if(RAWIDS.replay.err) h+="<div class='muted' style='margin-top:8px'>replay: "+abEsc(RAWIDS.replay.err)+"</div>";
     }
     if(RAWIDS.sel.indexOf("case:")===0 && RAWIDS.kids){
@@ -1927,6 +1927,24 @@ async function rawMore(){
   try{ var r=await rawR2("/cases?offset="+(RAWIDS.list?RAWIDS.list.length:0)+"&limit=200"); if(r.ok){ var d=await r.json(); RAWIDS.total=d.total; RAWIDS.list=(RAWIDS.list||[]).concat(d.cases||[]); } }catch(e){}
   renderRawIds();
 }
+function rawProgram(p){
+  if(!p) return "";
+  var ents=(p.entities||[]);
+  var sig=(p.action||"?")+" · "+ents.slice(0,5).slice().sort().join(" · ");
+  var con="";
+  if(p["in"]) con+="<span class='pcon'>where <b>"+abEsc(p["in"])+"</b></span>";
+  if(p["for"]) con+="<span class='pcon'>for <b>"+abEsc(p["for"])+"</b></span>";
+  if(p["with"]) con+="<span class='pcon'>with <b>"+abEsc(p["with"])+"</b></span>";
+  if(p.when) con+="<span class='pcon'>when <b>"+abEsc(p.when)+"</b></span>";
+  if(p.negations) con+="<span class='pcon neg'>"+p.negations+" negation"+(p.negations>1?"s":"")+"</span>";
+  return "<div class='rxkids'><div class='rxkh'>&#9656; as a program &mdash; every conversation is a program</div>"
+    +"<div class='prog'>"
+    +"<div class='prow'><span class='pk'>action</span><span class='pact'>"+abEsc(p.action||"—")+"</span></div>"
+    +"<div class='prow'><span class='pk'>entities</span><span class='pents'>"+ents.map(function(e){return "<span class='pe'>"+abEsc(e)+"</span>";}).join("")+"</span></div>"
+    +(con?"<div class='prow'><span class='pk'>constraints</span><span class='pents'>"+con+"</span></div>":"")
+    +"<div class='psig'>signature &nbsp;<code>"+abEsc(sig)+"</code> <span class='muted'>— conversations sharing this route the same, $0, no model</span></div>"
+    +"</div></div>";
+}
 function rawIdsPane(){
   if(!RAWIDS.loaded && !RAWIDS.busy) loadRawIds();
   return "<style>#pane-rawids .ric{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}"
@@ -1957,6 +1975,14 @@ function rawIdsPane(){
     +"#pane-rawids .ratom.r-action{border-color:#e0a24644;background:#e0a24614;color:#eec089}"
     +"#pane-rawids .ratom.r-structure{border-color:#55555544;color:#8f8f8f}"
     +"#pane-rawids .ratom.r-property{border-color:#b07ad044;background:#b07ad014;color:#cba7e0}"
+    +"#pane-rawids .prog{background:#0b1417;border:1px solid #1f3a42;border-radius:8px;padding:12px 14px}"
+    +"#pane-rawids .prow{display:flex;gap:14px;padding:4px 0;align-items:baseline}"
+    +"#pane-rawids .pk{color:#6FC3DF;min-width:96px;font-size:11px;text-transform:uppercase;letter-spacing:.5px}"
+    +"#pane-rawids .pact{color:#eec089;font-weight:700;font-family:Consolas,monospace}"
+    +"#pane-rawids .pents{display:flex;flex-wrap:wrap;gap:5px}"
+    +"#pane-rawids .pe{background:#6FC3DF14;border:1px solid #6FC3DF44;color:#9fd8ec;border-radius:4px;padding:1px 7px;font-size:12px}"
+    +"#pane-rawids .pcon{background:#141414;border:1px solid #333;border-radius:4px;padding:1px 8px;font-size:12px;color:#bbb}.pcon b{color:#eec089}.pcon.neg{border-color:#6b2b2b;color:#e88}"
+    +"#pane-rawids .psig{margin-top:8px;border-top:1px solid #1c1c1c;padding-top:8px;font-size:12px;color:#9aa3ad}.psig code{background:#000;color:#7fd08a;padding:1px 6px;border-radius:3px}"
     +"</style><div id='rawids-wrap'>"+rawIdsInner()+"</div>";
 }
 
@@ -2870,157 +2896,466 @@ function drillStages(id){
 // visible slice (real-looking, shaped like the live payloads). Everything read-only;
 // the one write (food-illness) is gated + severe-never-auto. See the v2 plan.
 const FOCUS_SAMPLE = {
-  nps: 61, responses: 418, medianEyes: "0:47",
-  detractors: [
-    { id:"375102", store:"Marina del Rey", dov:"Maria", score:2, when:"3 min ago", status:"open",
-      read:"Online order was missing the Not So Fried Chicken and half the sides — guest says it's the second time this month.",
-      verdict:"grounded", issue:"Missing items",
-      notified:[{who:"GM · Marina del Rey",ch:"email"},{who:"DO · Maria",ch:"SMS"}],
-      precedent:"12 similar detractors → apology + I'm Sorry Code recovered 9" },
-    { id:"375088", store:"Cherry Creek", dov:"Devin", score:3, when:"18 min ago", status:"open",
-      read:"A US Foods invoice dispute bled into the guest thread — 19 comments; the guest just wants the refund confirmed.",
-      verdict:"grounded", issue:"Billing / refund",
-      notified:[{who:"GM · Cherry Creek",ch:"email"}],
-      precedent:"nearest program #341562 — 5 steps, resolved in 2 replies" },
-    { id:"375061", store:"El Segundo", dov:"Maria", score:1, when:"41 min ago", status:"open",
-      read:"Rude counter experience; guest named the shift. Tone reads hot — recommend a manager callback, not a coupon.",
-      verdict:"unverified", issue:"Service / staff",
-      notified:[{who:"GM · El Segundo",ch:"email"},{who:"DO · Maria",ch:"SMS"}],
-      precedent:"named-staff complaints: escalate to GM, hold the auto-reply" }
-  ],
-  illness: {
-    id:"48213", store:"Marina del Rey", dov:"Maria", when:"9:47 PM · after hours",
-    tags:["sick","food_illness","store_marina_del_rey"],
-    srcTpl:{t:"Foreign Object",usage:7,e:9,f:0.93},
-    zora:"Hi Danielle — I'm so sorry to hear you're feeling unwell after eating with us. Your health is what matters most right now. I've flagged this to our Food Safety team and the manager at our Marina del Rey location directly, and someone will personally follow up with you today. Thank you for telling us — it genuinely helps us keep everyone safe.",
-    rest:'PUT /api/v2/tickets/48213.json\n{\n  "ticket": {\n    "group_id": 28004417,          // FSQA\n    "additional_tags": ["sick", "food_illness", "store_marina_del_rey"],\n    "followers": [{ "group": "DO - Maria" }],\n    "priority": "urgent"\n  }\n}'
-  }
+"generated": "flagged conversations by friction signal off the sealed raw IDS (no CSAT invented)",
+"scanned": 2500,
+"flagged": 506,
+"cards": [
+{
+"id": "453159",
+"issue": "friction signal",
+"friction": 15,
+"verdict": "grounded",
+"read": "Erin sleboda is not explicitly added to the ticket by the requester or the agent learn more good morning and when further review i have submitted the credit request for the and sr 35053789 thank you and https mendocinofarms zendesk com attachments token 4ocxalpj7o8ig6imup78ojeyf name image003 png erin sleboda us foods national sales at sales rep 9399 w higgins rd and suite 800"
+},
+{
+"id": "450948",
+"issue": "charge",
+"friction": 13,
+"verdict": "grounded",
+"read": "Fyi and by the sound of it the guest believes they is charged when the order is voided and if it is charged and reflects at there bank i recommend the guest speaks with their bank to review the charge and show them the receipt at our end there is not but to victoria"
+},
+{
+"id": "449408",
+"issue": "friction signal",
+"friction": 12,
+"verdict": "grounded",
+"read": "Us foods customer contact is not explicitly added to the ticket by the requester or the agent learn more the is the automated response confirming the close of your request please not reply directly to the message and EQUIVALENCE your request has is closed 44501880 mf73 davis service request 34907981 your credit requisition has is approved and is reflected at your account"
+},
+{
+"id": "454382",
+"issue": "friction signal",
+"friction": 12,
+"verdict": "grounded",
+"read": "Us foods customer contact is not explicitly added to the ticket by the requester or the agent learn more the is the automated response confirming the close of your request please not reply directly to the message and EQUIVALENCE your request has is closed 74526880 mf95 university village your request has is resolved service request 35031735 from your email has is processed and"
+},
+{
+"id": "454410",
+"issue": "friction signal",
+"friction": 11,
+"verdict": "grounded",
+"read": "Thanks tyler for getting back to me - i still don't see it you think you send the gift card to jeswtsai gmail com instead i checked the spam of the jtsai chla usc edu email and it's not there - jess"
+},
+{
+"id": "451123",
+"issue": "friction signal",
+"friction": 10,
+"verdict": "grounded",
+"read": "Hi alex and i see the the drawer is not locked to anyone and then the issue have is the printer is offline not registering the transactions to the cash drawer i have not seen the issue when the day and but please reach out if the cash drawer not open when you take the cash transaction thanks"
+}
+]
 };
 function focusPane(){
-  if(FOCUS_SEL) return drillStages(FOCUS_SEL);
-  const F=FOCUS_SAMPLE;
-  let s="<style>"
-   +"#pane-focus .fwrap{max-width:900px;}"
-   +"#pane-focus .fhead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;}"
-   +"#pane-focus .flive{display:flex;align-items:center;gap:7px;color:#7CFFB2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}"
-   +"#pane-focus .fdot{width:9px;height:9px;border-radius:50%;background:#7CFFB2;box-shadow:0 0 0 0 rgba(124,255,178,.6);animation:fpulse 1.8s infinite;}"
-   +"@keyframes fpulse{0%{box-shadow:0 0 0 0 rgba(124,255,178,.55);}70%{box-shadow:0 0 0 8px rgba(124,255,178,0);}100%{box-shadow:0 0 0 0 rgba(124,255,178,0);}}"
-   +"#pane-focus .foff{background:#2a1414;color:#ff9b9b;border:1px solid #6b2035;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;}"
-   +"#pane-focus .fkpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 16px;}"
-   +"#pane-focus .fkpi{background:#101c22;border:1px solid #14323e;border-radius:10px;padding:10px 15px;}"
-   +"#pane-focus .fkpi .n{color:#6FC3DF;font-size:22px;font-weight:700;line-height:1;}"
-   +"#pane-focus .fkpi .l{color:#8a93a0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-top:4px;}"
-   +"#pane-focus .fsh{color:#6FC3DF;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;}"
-   +"#pane-focus .fcard{background:#0f1519;border:1px solid #223038;border-radius:10px;padding:13px 15px;margin-bottom:10px;}"
-   +"#pane-focus .fcard.sev{border-color:#6b2035;background:#160e10;}"
-   +"#pane-focus .frow{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}"
-   +"#pane-focus .fwho{color:#e6edf2;font-weight:600;font-size:14px;}"
-   +"#pane-focus .fmeta{color:#8a93a0;font-size:12px;}"
-   +"#pane-focus .fscore{background:#2a1414;color:#ff9b9b;border-radius:6px;padding:2px 8px;font-weight:700;font-size:12px;}"
-   +"#pane-focus .fread{color:#dfe4e9;font-size:13.5px;margin:8px 0;line-height:1.5;}"
-   +"#pane-focus .fchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}"
-   +"#pane-focus .fchip{border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;}"
-   +"#pane-focus .c-issue{background:#101c22;color:#6FC3DF;}"
-   +"#pane-focus .c-grounded{background:#06251a;color:#7CFFB2;}"
-   +"#pane-focus .c-unverified{background:#2a2206;color:#ffd479;}"
-   +"#pane-focus .c-tag{background:#161d21;color:#9aa3ad;font-family:ui-monospace,Consolas,monospace;}"
-   +"#pane-focus .fnote{color:#8a93a0;font-size:12px;margin-top:7px;}"
-   +"#pane-focus .fnote b{color:#cdd6da;}"
-   +"#pane-focus .fsev{background:#6b2035;color:#ffd0d8;border-radius:6px;padding:2px 9px;font-size:11px;font-weight:800;letter-spacing:.04em;}"
-   +"#pane-focus .fgate{background:#0b0f12;border:1px solid #2c4a55;border-radius:10px;padding:14px 16px;margin-top:12px;}"
-   +"#pane-focus .fgate .hd{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;}"
-   +"#pane-focus .fwait{color:#ffd479;font-size:11px;font-weight:800;letter-spacing:.04em;}"
-   +"#pane-focus .fzora{background:#0f1410;border:1px solid #243024;border-radius:8px;padding:11px 13px;color:#dfe6df;font-size:13.5px;line-height:1.55;}"
-   +"#pane-focus .fzlab{color:#7CFFB2;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;font-weight:700;}"
-   +"#pane-focus .fsample{color:#8a93a0;font-size:11px;font-style:italic;margin-top:6px;}"
-   +"#pane-focus .fsrc{background:#0c1418;border:1px solid #14323e;border-radius:8px;padding:8px 12px;color:#9fd6e6;font-size:12px;margin-top:8px;}"
-   +"#pane-focus .fsrc b{color:#7CFFB2;}#pane-focus .fsrc .fx{font-family:Consolas,monospace;color:#ffce85;}"
-   +"#pane-focus pre.frest{background:#08191f;border:1px solid #123;border-radius:8px;padding:11px 13px;color:#7fd6ea;font-size:12px;overflow:auto;margin:11px 0;font-family:ui-monospace,Consolas,monospace;}"
-   +"#pane-focus .fbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}"
-   +"#pane-focus .fbtn{border-radius:7px;padding:8px 16px;font-size:13px;font-weight:700;cursor:not-allowed;border:1px solid transparent;}"
-   +"#pane-focus .fb-app{background:#1f3a2a;color:#5a7a68;border-color:#2a4a38;}"
-   +"#pane-focus .fb-edit{background:#16242b;color:#9aa3ad;border-color:#2c4a55;}"
-   +"#pane-focus .fb-rej{background:#241417;color:#a06b72;border-color:#4a2a30;}"
-   +"#pane-focus .frule{background:#160e10;border:1px solid #6b2035;border-radius:8px;padding:9px 13px;color:#ffb3bd;font-size:12px;margin-top:11px;display:flex;gap:8px;align-items:flex-start;}"
-   +"#pane-focus .frecv{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}"
-   +"#pane-focus .frecpt{background:#101c22;border:1px solid #14323e;border-radius:6px;padding:2px 8px;font-size:11px;color:#9fd6e6;}"
-   +"</style>";
-  s+="<div class='fwrap'>";
-  // header + KPIs
-  s+="<div class='fhead'><div class='flive'><span class='fdot'></span> Live &middot; as it happens</div>"
-    +"<span class='foff'>&#9679; WRITE MODE OFF</span></div>";
-  s+="<div class='fkpis'>"
-    +"<div class='fkpi'><div class='n'>"+F.nps+"</div><div class='l'>NPS</div></div>"
-    +"<div class='fkpi'><div class='n'>"+F.responses+"</div><div class='l'>responses (30d)</div></div>"
-    +"<div class='fkpi'><div class='n'>"+F.detractors.filter(d=>d.status!=='resolved').length+"</div><div class='l'>open detractors</div></div>"
-    +"<div class='fkpi'><div class='n'>"+F.medianEyes+"</div><div class='l'>median time-to-eyes</div></div></div>";
-  // live detractor feed
-  s+="<div class='fsh'>Detractor feed &mdash; routed &amp; notified the moment it lands</div>";
-  F.detractors.forEach(d=>{
-    s+="<div class='fcard' data-focusdrill='"+d.id+"' style='cursor:pointer'><div class='frow'><span class='fwho'>#"+d.id+" &middot; "+esc(d.store)+" <span style='color:#6FC3DF;font-size:11px;font-weight:600'>drill in &rarr;</span></span>"
-      +"<span class='fmeta'>DO &middot; "+esc(d.dov)+" &nbsp;|&nbsp; "+esc(d.when)+" &nbsp; <span class='fscore'>NPS "+d.score+"</span></span></div>";
-    s+="<div class='fread'>"+esc(d.read)+"</div>";
-    s+="<div class='fchips'><span class='fchip c-issue'>"+esc(d.issue)+"</span>"
-      +"<span class='fchip c-"+d.verdict+"'>"+(d.verdict==="grounded"?"&#10003; GROUNDED":"&#9888; UNVERIFIED")+"</span></div>";
-    s+="<div class='frecv'>"+d.notified.map(n=>"<span class='frecpt'>&#128233; "+esc(n.who)+" &middot; "+esc(n.ch)+"</span>").join("")+"</div>";
-    s+="<div class='fnote'><b>Precedent:</b> "+esc(d.precedent)+"</div></div>";
-  });
-  // food-illness gated panel
-  const il=F.illness;
-  s+="<div class='fsh'>Food-illness &mdash; after-hours routing, human-gated</div>";
-  s+="<div class='fcard sev' data-focusdrill='"+il.id+"' style='cursor:pointer'><div class='frow'><span class='fwho'>#"+il.id+" &middot; "+esc(il.store)+" <span style='color:#6FC3DF;font-size:11px;font-weight:600'>drill in &rarr;</span></span>"
-    +"<span class='fmeta'>DO &middot; "+esc(il.dov)+" &nbsp;|&nbsp; "+esc(il.when)+" &nbsp; <span class='fsev'>SEVERE</span></span></div>";
-  s+="<div class='fchips' style='margin-top:8px'>"+il.tags.map(t=>"<span class='fchip c-tag'>"+esc(t)+"</span>").join("")
-    +"<span class='fchip c-issue'>route &rarr; "+esc(il.store)+" &rarr; DO-"+esc(il.dov)+" &rarr; FSQA</span></div>";
-  s+="<div class='fgate'><div class='hd'><b style='color:#cdd6da;font-size:13px'>Gated action &mdash; preview before anything fires</b>"
-    +"<span class='fwait'>&#9679; WAITING FOR OPERATOR &mdash; NOTHING HAS BEEN SENT</span></div>";
-  s+="<div class='fzora'><div class='fzlab'>Acknowledgement to the guest &middot; Zora voice</div>"+esc(il.zora)+"</div>";
-  if(il.srcTpl){ const st=il.srcTpl; s+="<div class='fsrc'>Starts from <b>"+esc(st.t)+"</b> &middot; used <b>"+st.usage+"&times;</b>/30d &middot; matched at <span class='fx'>"+(st.f?st.f.toFixed(2):"")+"</span> fidelity &middot; draft edits <span class='fx'>"+st.e+"%</span> &mdash; nous atom-diff over the .pi Template Library, $0.</div>"; }
-  s+="<div class='fsample'>Sample voice &mdash; final tone trained on Zora's actual replies (corpus pull is an open action item).</div>";
-  s+="<pre class='frest'>"+esc(il.rest)+"</pre>";
-  s+="<div class='fbtns'><span class='fbtn fb-app'>Approve &amp; fire</span><span class='fbtn fb-edit'>Edit</span><span class='fbtn fb-rej'>Reject</span>"
-    +"<span class='fmeta' style='margin-left:6px'>This is the exact call that will run &mdash; nothing more.</span></div>";
-  s+="<div class='frule'><span>&#9940;</span><span><b>Severe branch never auto-fires.</b> A human approves every food-illness action. This rule does not relax &mdash; not after hours, not at volume, not ever.</span></div>";
-  s+="</div></div>";
-  s+="</div>";
-  return s;
+   const F=FOCUS_SAMPLE;
+   let s="<style>"
+    +"#pane-focus .fwrap{max-width:900px;}"
+    +"#pane-focus .flive{display:flex;align-items:center;gap:7px;color:#7CFFB2;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}"
+    +"#pane-focus .fdot{width:9px;height:9px;border-radius:50%;background:#7CFFB2;box-shadow:0 0 0 0 rgba(124,255,178,.6);animation:fpulse 1.8s infinite;}"
+    +"@keyframes fpulse{0%{box-shadow:0 0 0 0 rgba(124,255,178,.55);}70%{box-shadow:0 0 0 8px rgba(124,255,178,0);}100%{box-shadow:0 0 0 0 rgba(124,255,178,0);}}"
+    +"#pane-focus .flead{color:#8a93a0;font-size:13px;margin:6px 0 12px;line-height:1.5;}#pane-focus .flead b{color:#e6edf2;}"
+    +"#pane-focus .fkpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 16px;}"
+    +"#pane-focus .fkpi{background:#101c22;border:1px solid #14323e;border-radius:10px;padding:10px 15px;}"
+    +"#pane-focus .fkpi .n{color:#6FC3DF;font-size:22px;font-weight:700;line-height:1;}#pane-focus .fkpi .l{color:#7d8891;font-size:11px;margin-top:4px;text-transform:uppercase;letter-spacing:.04em;}"
+    +"#pane-focus .fsh{color:#6FC3DF;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;}"
+    +"#pane-focus .fcard{background:#160e10;border:1px solid #3a2530;border-radius:12px;padding:14px 16px;margin-bottom:13px;}"
+    +"#pane-focus .frow{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}"
+    +"#pane-focus .fwho{color:#e6edf2;font-weight:600;font-size:14px;}#pane-focus .fwho b{color:#6FC3DF;}"
+    +"#pane-focus .ffr{color:#ff9b9b;font-size:12px;font-weight:700;}"
+    +"#pane-focus .fread{color:#cdd6da;font-size:13.5px;margin:9px 0;line-height:1.5;font-style:italic;}"
+    +"#pane-focus .fchips{display:flex;gap:7px;flex-wrap:wrap;}"
+    +"#pane-focus .fchip{font-size:11px;font-weight:700;border-radius:5px;padding:2px 8px;}"
+    +"#pane-focus .c-issue{background:#2a1414;color:#ffb3b3;border:1px solid #6b2035;}"
+    +"#pane-focus .c-grounded{background:#06251a;color:#7CFFB2;border:1px solid #1f5c3f;}"
+    +"#pane-focus .fnote{background:#101c22;border:1px solid #14323e;border-radius:8px;padding:9px 13px;color:#9fd6e6;font-size:12px;margin-top:14px;line-height:1.5;}"
+    +"</style>";
+   s+="<div class='fwrap'>";
+   s+="<div class='flive'><span class='fdot'></span>real &middot; off the sealed raw IDS</div>";
+   s+="<div class='flead'><b>Flagged conversations.</b> No SAMPLE, no invented NPS. These are real Mendo threads surfaced by a <b>deterministic friction signal</b> &mdash; negation atoms + complaint words in the actual comments. The read is <b>de-atomized</b> from the thread; the verdict is the grounding check. CSAT-scored detractors are the next source (satisfaction_ratings), not faked here.</div>";
+   s+="<div class='fkpis'>"
+    +"<div class='fkpi'><div class='n'>"+F.flagged+"</div><div class='l'>flagged (friction &ge; 2)</div></div>"
+    +"<div class='fkpi'><div class='n'>"+F.scanned.toLocaleString()+"</div><div class='l'>threads scanned</div></div>"
+    +"<div class='fkpi'><div class='n'>"+F.cards.length+"</div><div class='l'>shown (top friction)</div></div></div>";
+   s+="<div class='fsh'>Flagged feed &mdash; highest friction first</div>";
+   F.cards.forEach(function(d){
+     s+="<div class='fcard'><div class='frow'><span class='fwho'>#<b>"+esc(d.id)+"</b></span>"
+       +"<span class='ffr'>friction "+d.friction+"</span></div>";
+     s+="<div class='fread'>"+esc(d.read)+"</div>";
+     s+="<div class='fchips'><span class='fchip c-issue'>"+esc(d.issue)+"</span>"
+       +"<span class='fchip c-grounded'>&#10003; GROUNDED</span></div></div>";
+   });
+   s+="<div class='fnote'>&#9881; Friction = NEGATION atoms + complaint words, counted deterministically over the real thread (pure C, no model). Next: join <b>satisfaction_ratings</b> (real CSAT) for true detractor scoring, and the gated recovery draft &mdash; both real, neither faked.</div>";
+   s+="</div>";
+   return s;
 }
 // ── Programs tab — "every conversation is a program." Decode a real ticket's thread
 // into an ordered .pi program, show the nearest precedents (the retrieval moat), and
 // what worked. Grounded in the real atomized tickets (#341562 etc). Read-only.
 const PROGRAMS_SAMPLE = {
-  tickets: [
-    { id:"341562", label:"US Foods invoice · Cherry Creek", raw:"19 comments · 8,520 chars", strip:74,
-      steps:[
-        ["GUEST","disputes a US Foods invoice charge — tone escalates across 19 comments"],
-        ["AGENT","separates the vendor billing dispute from the guest-facing thread"],
-        ["SYSTEM","retrieves the order + payment proof (read-only)"],
-        ["AGENT","confirms the refund + timeline in a single reply",{none:true,best:0.25}],
-        ["SYSTEM","tags resolved · routes the vendor issue to accounting"]
-      ],
-      precedents:[
-        {id:"228640",label:"expired noodles → vendor credit",out:"recovered"},
-        {id:"251801",label:"double-charge dispute",out:"recovered"},
-        {id:"261912",label:"invoice mismatch → credit",out:"recovered"}
-      ],
-      worked:"Refund confirmed in ≤2 replies correlated with recovery in 9 of 12 precedents. The 17 comments of back-and-forth (the noise) did not — they were stripped.",
-      workedTpl:"The winning reply matched NO template — it was hand-written for this vendor dispute (best score 0.25, below the 0.55 bar). This is a candidate for a new 'Vendor Billing — Refund Confirmed' template." },
-    { id:"375102", label:"Missing items · Marina del Rey", raw:"6 comments · 2,140 chars", strip:61,
-      steps:[
-        ["GUEST","reports missing Not So Fried Chicken + sides — second time this month"],
-        ["AGENT","acknowledges + apologizes in Zora's voice",{t:"General Apology — $10 Code",f:0.93,e:8}],
-        ["SYSTEM","peeks the next I'm Sorry Code (read-only — never writes the sheet)"],
-        ["AGENT","sends the code + confirms the store was notified",{t:"Digital I'm Sorry — One Code",f:0.90,e:14}],
-        ["SYSTEM","routes to DO-Maria + store · tags resolved"]
-      ],
-      precedents:[
-        {id:"375061",label:"missing sides → coupon",out:"recovered"},
-        {id:"374920",label:"wrong order → coupon",out:"recovered"},
-        {id:"374811",label:"missing entrée (no reply sent)",out:"lost"}
-      ],
-      worked:"Empathetic reply + code within the hour recovered 9 of 12. Silence lost the guest — #374811 got no reply and churned.",
-      workedTpl:"Replies built from General Apology — $10 Code + Digital I'm Sorry — One Code, sent within the hour, recovered 9 of 12 nearest precedents. #374811 churned — it matched NO template (it got no reply at all)." }
-  ]
+"tickets": [
+{
+"id": "121",
+"label": "ipad",
+"raw": "5 comments · 8,436 chars",
+"strip": 0,
+"steps": [
+[
+"INTERNAL",
+"restored ipad via itunes connected to apple mendocinofarms com reinstalled table tracker app from lrs had to press the button at the lrs gateway at the rack to pair working well lrs doc found here htt"
+],
+[
+"PUBLIC",
+"ibrahim is able to walk via the morning and restore ipad we reinstalled tracker software and he tested working well again and set passcode to something they'll is able to keep track of thank you all f"
+],
+[
+"INTERNAL",
+"spoke to ibrahim and they  not have the key for the lrs if then we cannot remove we can't fix except key because the buttons is covered he  continue to look rice village and  not have key we may need "
+],
+[
+"INTERNAL",
+"working with ibrahim at is"
+],
+[
+"PUBLIC",
+"ibrahim  is here at the morning the thing here is i cannot locate the key for the to get it out i  continue to search for the at sat and 20 feb 2021 at 2 25 pm nick salessi nsalessi mendocinofarms com"
+]
+],
+"precedents": [
+{
+"id": "455168",
+"label": "shared-entity overlap 5",
+"out": ""
+},
+{
+"id": "455077",
+"label": "shared-entity overlap 5",
+"out": ""
+},
+{
+"id": "455204",
+"label": "shared-entity overlap 4",
+"out": ""
+}
+],
+"worked": "Decoded from 5 real comments off the sealed raw IDS (8,247,494 facts, in memory). Nearest programs by deterministic shared-entity overlap over a 900-ticket pool. Outcome + template attribution are the next pass (CSAT + the .pi template library)."
+},
+{
+"id": "132",
+"label": "hot schedules resolved",
+"raw": "5 comments · 20,666 chars",
+"strip": 0,
+"steps": [
+[
+"INTERNAL",
+"hot schedules resolved"
+],
+[
+"INTERNAL",
+"- please type your reply in the line - you is registered EQUIVALENCE the cc at the support request https help hotschedules com hc requests 2501583 reply to the email to add the comment to the request "
+],
+[
+"INTERNAL",
+"reworked then external doesn't open ticket"
+],
+[
+"PUBLIC",
+"- please type your reply in the line - you is registered EQUIVALENCE the cc at the support request https help hotschedules com hc requests 2501583 reply to the email to add the comment to the request "
+],
+[
+"PUBLIC",
+"- please type your reply in the line - you is registered EQUIVALENCE the cc at the support request https help hotschedules com hc requests 2501583 reply to the email to add the comment to the request "
+]
+],
+"precedents": [
+{
+"id": "455354",
+"label": "shared-entity overlap 8",
+"out": ""
+},
+{
+"id": "455087",
+"label": "shared-entity overlap 7",
+"out": ""
+},
+{
+"id": "455288",
+"label": "shared-entity overlap 7",
+"out": ""
+}
+],
+"worked": "Decoded from 5 real comments off the sealed raw IDS (8,247,494 facts, in memory). Nearest programs by deterministic shared-entity overlap over a 900-ticket pool. Outcome + template attribution are the next pass (CSAT + the .pi template library)."
+},
+{
+"id": "135",
+"label": "has",
+"raw": "4 comments · 2,522 chars",
+"strip": 0,
+"steps": [
+[
+"PUBLIC",
+"the has is completed effective immediately please let me know if you need anything but thanks"
+],
+[
+"INTERNAL",
+"hi there and the transfer has is processed at our end effective 2 22 la jolla carlsbad carlsbad and please ensure vanessa s employee id is entered EQUIVALENCE 000017407 at the export id field of aloha"
+],
+[
+"INTERNAL",
+"the request  come at from hr when appropriate closing the ticket"
+],
+[
+"PUBLIC",
+"hi team- i submitted the transfer at ceridian of mit vanessa to manager at carlsbad  we please process accordingly let me know if anything but is needed thanks -- https lh5 googleusercontent com 1rjcb"
+]
+],
+"precedents": [
+{
+"id": "446031",
+"label": "shared-entity overlap 7",
+"out": ""
+},
+{
+"id": "455105",
+"label": "shared-entity overlap 7",
+"out": ""
+},
+{
+"id": "454338",
+"label": "shared-entity overlap 7",
+"out": ""
+}
+],
+"worked": "Decoded from 4 real comments off the sealed raw IDS (8,247,494 facts, in memory). Nearest programs by deterministic shared-entity overlap over a 900-ticket pool. Outcome + template attribution are the next pass (CSAT + the .pi template library)."
+},
+{
+"id": "139",
+"label": "awesome",
+"raw": "4 comments · 6,111 chars",
+"strip": 0,
+"steps": [
+[
+"PUBLIC",
+"awesome and thank you the same guest coincidentally wrote at the morning and said the side of the basil pesto shells  not add to his basket when ordering via the app i confirmed and tested the via our"
+],
+[
+"PUBLIC",
+"hey kristin and we is able to 68 the items for the restaurants remind them to keep it updated at olo we'll keep the eye at them to make sure they don't get forgotten again thanks"
+],
+[
+"PUBLIC",
+"hey kristin and i'll follow up with the restaurants they keep 86ing the side not putting it back when they're set we're working at the better solution for 86ing then they don't have to remember to fix"
+],
+[
+"PUBLIC",
+"good morning just following up to see if we is able to resolve fix the issue with the potato deli side it's still missing EQUIVALENCE the option at santana row and is and missing at campbell in the me"
+]
+],
+"precedents": [
+{
+"id": "453191",
+"label": "shared-entity overlap 5",
+"out": ""
+},
+{
+"id": "454104",
+"label": "shared-entity overlap 5",
+"out": ""
+},
+{
+"id": "449437",
+"label": "shared-entity overlap 5",
+"out": ""
+}
+],
+"worked": "Decoded from 4 real comments off the sealed raw IDS (8,247,494 facts, in memory). Nearest programs by deterministic shared-entity overlap over a 900-ticket pool. Outcome + template attribution are the next pass (CSAT + the .pi template library)."
+},
+{
+"id": "141",
+"label": "thanks justin sounds",
+"raw": "5 comments · 2,799 chars",
+"strip": 0,
+"steps": [
+[
+"PUBLIC",
+"thanks justin sounds EQUIVALENCE the plan"
+],
+[
+"PUBLIC",
+"got it thanks and riki i'm going to go ahead and close the ticket i updated the phone message earlier today go ahead and reopen it if you need further assistance and and when the files is ready and ju"
+],
+[
+"PUBLIC",
+"hey guys and the generic pre-opening messaging we used for culver city is the same one we  use here when 3 10 and and then we'll is delivering the full phone recording and the one to is used when trai"
+],
+[
+"PUBLIC",
+"oh and that's less than idea i'll set the pre-open messaging we have from another location and but i'll need updating messaging both go-live and pre-open from marketing whenever available thanks"
+],
+[
+"PUBLIC",
+"hi nick and justin and riki - just called addison phone number the wrong message is up it's the standard greeting message for brentwood - directing the guest to press 2 to place the order the message "
+]
+],
+"precedents": [
+{
+"id": "449861",
+"label": "shared-entity overlap 6",
+"out": ""
+},
+{
+"id": "452958",
+"label": "shared-entity overlap 5",
+"out": ""
+},
+{
+"id": "455549",
+"label": "shared-entity overlap 5",
+"out": ""
+}
+],
+"worked": "Decoded from 5 real comments off the sealed raw IDS (8,247,494 facts, in memory). Nearest programs by deterministic shared-entity overlap over a 900-ticket pool. Outcome + template attribution are the next pass (CSAT + the .pi template library)."
+},
+{
+"id": "146",
+"label": "printer",
+"raw": "4 comments · 2,232 chars",
+"strip": 0,
+"steps": [
+[
+"INTERNAL",
+"printer had dropped off network earlier today is dhcp'd it seems got reconnected with jeff's help and reinstalled with hp smart software at manager laptop need to confirm the is correct ip config - it"
+],
+[
+"INTERNAL",
+"printer had dropped off network earlier today is dhcp'd it seems got reconnected with jeff's help and reinstalled with hp smart software at manager laptop need to confirm the is correct ip config - it"
+],
+[
+"INTERNAL",
+"calling jeff"
+],
+[
+"PUBLIC",
+"hello it and we have is logged out of our hp smart account at both laptops and i is unable to locate the username or password i have not way to scan documents at the moment  you please assist me with "
+]
+],
+"precedents": [
+{
+"id": "455362",
+"label": "shared-entity overlap 6",
+"out": ""
+},
+{
+"id": "451123",
+"label": "shared-entity overlap 5",
+"out": ""
+},
+{
+"id": "455348",
+"label": "shared-entity overlap 5",
+"out": ""
+}
+],
+"worked": "Decoded from 4 real comments off the sealed raw IDS (8,247,494 facts, in memory). Nearest programs by deterministic shared-entity overlap over a 900-ticket pool. Outcome + template attribution are the next pass (CSAT + the .pi template library)."
+},
+{
+"id": "148",
+"label": "uber eats has",
+"raw": "6 comments · 4,273 chars",
+"strip": 0,
+"steps": [
+[
+"INTERNAL",
+"uber eats has is working well when re-enabling by uber"
+],
+[
+"PUBLIC",
+"hey nick then far and we have gotten the few uber eats orders and they all went out except the hitch we  keep the eye out the weekend to see if anything comes up thank you"
+],
+[
+"PUBLIC",
+"hey alex and it looks uber has is re-enabled the last couple days have you seen any issues looks EQUIVALENCE the order volume is low but i wanted to check at today to see if there's is any opportuniti"
+],
+[
+"INTERNAL",
+" keep open when uber confirms"
+],
+[
+"PUBLIC",
+"hey alex and thanks for letting us know riki has talking to uber about the today they're digging at at where the disconnect is with driver availability for now and your uber eats has is disabled when "
+],
+[
+"PUBLIC",
+"hello it i wanted to loop you to the email to see if the is possibly something you  assist with let me know if you have any questions thank you ---------- forwarded message --------- from alex herrera"
+]
+],
+"precedents": [
+{
+"id": "455466",
+"label": "shared-entity overlap 6",
+"out": ""
+},
+{
+"id": "449753",
+"label": "shared-entity overlap 5",
+"out": ""
+},
+{
+"id": "455571",
+"label": "shared-entity overlap 4",
+"out": ""
+}
+],
+"worked": "Decoded from 6 real comments off the sealed raw IDS (8,247,494 facts, in memory). Nearest programs by deterministic shared-entity overlap over a 900-ticket pool. Outcome + template attribution are the next pass (CSAT + the .pi template library)."
+},
+{
+"id": "150",
+"label": "justin",
+"raw": "6 comments · 3,787 chars",
+"strip": 0,
+"steps": [
+[
+"INTERNAL",
+"justin if extra context"
+],
+[
+"PUBLIC",
+"thank you justin i had not idea about the traffic factor and thank you for your help"
+],
+[
+"PUBLIC",
+"i just wanted to chime at here we recently EQUIVALENCE at the in 6 months implemented the function the the system chooses the service provider based at total cost to the end user and transparently and"
+],
+[
+"PUBLIC",
+"thank you nick i  direct them to door dash directly and just wanted to bring it to your attention to see if there is something we   with the third party vendors appreciate your hasty help"
+],
+[
+"PUBLIC",
+"hey kristin and thanks for reaching out we  take the look what happens is when the guest puts their delivery address and it gets sent out to our third party partners to see who  accommodate the order "
+],
+[
+"PUBLIC",
+"hello team and i had the guest the called at about not is able to place the delivery order and the guest stated the he has ordered delivery at the in from our location and even tried two other locatio"
+]
+],
+"precedents": [
+{
+"id": "453912",
+"label": "shared-entity overlap 5",
+"out": ""
+},
+{
+"id": "454391",
+"label": "shared-entity overlap 4",
+"out": ""
+},
+{
+"id": "446837",
+"label": "shared-entity overlap 4",
+"out": ""
+}
+],
+"worked": "Decoded from 6 real comments off the sealed raw IDS (8,247,494 facts, in memory). Nearest programs by deterministic shared-entity overlap over a 900-ticket pool. Outcome + template attribution are the next pass (CSAT + the .pi template library)."
+}
+]
 };
 function programsPane(){
   if(PROG_SEL) return drillStages(PROG_SEL);
@@ -3043,7 +3378,7 @@ function programsPane(){
    +"#pane-programs .pstep{display:flex;gap:11px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #17222899;}"
    +"#pane-programs .pnum{flex:0 0 22px;height:22px;border-radius:50%;background:#101c22;border:1px solid #2c4a55;color:#6FC3DF;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}"
    +"#pane-programs .prole{flex:0 0 66px;font-size:10.5px;font-weight:800;letter-spacing:.04em;padding-top:3px;}"
-   +"#pane-programs .r-GUEST{color:#ffd479;}#pane-programs .r-AGENT{color:#7CFFB2;}#pane-programs .r-SYSTEM{color:#6FC3DF;}"
+   +"#pane-programs .r-GUEST{color:#ffd479;}#pane-programs .r-AGENT{color:#7CFFB2;}#pane-programs .r-SYSTEM{color:#6FC3DF;}"+"#pane-programs .r-PUBLIC{color:#7CFFB2;}#pane-programs .r-INTERNAL{color:#ffd479;}"
    +"#pane-programs .ptext{color:#dfe4e9;font-size:13.5px;line-height:1.45;}"
    +"#pane-programs .pprec{display:flex;gap:8px;flex-wrap:wrap;}"
    +"#pane-programs .ppc{background:#101c22;border:1px solid #14323e;border-radius:8px;padding:7px 11px;font-size:12px;color:#cdd6da;display:flex;gap:7px;align-items:center;}"
@@ -3061,7 +3396,7 @@ function programsPane(){
   s+="<div class='pwrap'>";
   s+="<div class='plead'><b>Every conversation is a program.</b> A support thread isn't prose — it's an ordered set of actions. Reduce it (strip the noise), and what's left is a reusable program: <b>decode the past to guide the next reply.</b> Below are real Mendo tickets, decoded.</div>";
   P.tickets.forEach(t=>{
-    s+="<div class='pt' data-progdrill='"+t.id+"' style='cursor:pointer'><div class='pth'><span class='ptid'>#<b>"+t.id+"</b> &middot; "+esc(t.label)+" <span style='color:#6FC3DF;font-size:11px;font-weight:600'>drill in &rarr;</span></span><span class='ptraw'>"+esc(t.raw)+"</span></div>";
+    s+="<div class='pt'><div class='pth'><span class='ptid'>#<b>"+t.id+"</b> &middot; "+esc(t.label)+"</span><span class='ptraw'>"+esc(t.raw)+"</span></div>";
     // reduce bar
     const keep=100-t.strip;
     s+="<div class='preduce'><div class='pbar'><span class='lbl'>"+t.strip+"% noise stripped</span><span class='keep' style='width:"+keep+"%'></span><span class='lbl2'>"+keep+"% signal</span></div></div>";
@@ -3074,7 +3409,7 @@ function programsPane(){
       s+="<div class='pstep'><span class='pnum'>"+(i+1)+"</span><span class='prole r-"+st[0]+"'>"+st[0]+"</span><span class='ptext'>"+esc(st[1])+attr+"</span></div>"; });
     // precedents = the moat
     s+="<div class='psh'>Nearest precedents &mdash; the retrieval moat</div><div class='pprec'>";
-    t.precedents.forEach(p=>{ s+="<span class='ppc'>#"+p.id+" &middot; "+esc(p.label)+" <span class='pout o-"+p.out+"'>"+p.out.toUpperCase()+"</span></span>"; });
+    t.precedents.forEach(p=>{ s+="<span class='ppc'>#"+p.id+" &middot; "+esc(p.label)+(p.out?" <span class='pout o-"+p.out+"'>"+p.out.toUpperCase()+"</span>":"")+"</span>"; });
     s+="</div>";
     s+="<div class='pworked'><b>What worked:</b> "+esc(t.worked)+"</div>";
     if(t.workedTpl) s+="<div class='pworked tpl'><b>What worked, by template:</b> "+esc(t.workedTpl)+"</div>";
@@ -3085,157 +3420,155 @@ function programsPane(){
   s+="</div>";
   return s;
 }
-// -- Off-Script & Gaps tab -- REPLACES the passive Templates list (operator retro: the macro
-// inventory already lives in the Audit tab; a read-only list of macros earned nothing). This is the
-// live face of zendesk-bridge GET /offscript: (1) GAPS -- recurring hand-written guest replies
-// clustered into macro candidates (draftBody = the medoid reply, ready to paste into a new macro);
-// (2) OFF-SCRIPT -- every hand-written guest reply with its closest template + fidelity (coaching).
-// Read-only end to end: "Copy drafted macro" only copies text; the operator creates it in Zendesk.
-let OSG = { run:null, busy:false, err:"", scope:"guest", ts:0, pend:false };
-// The bridge scans the last OSG_DAYS days, at most OSG_MAX tickets, and says so honestly
-// (scanned/inScope/candidates/capped in the header) -- never silent truncation.
-const OSG_DAYS=45, OSG_MAX=100;
-async function osgLoad(){
-  OSG.busy=true; OSG.err=""; renderOSG();
+// ── Templates tab — the live face of the reply-template inventory. Reads Mendo's macros straight
+// from zendesk-bridge (/read?entry=macros, usage_30d sideload) — read-only, no backend change.
+// Grouped by the macro's own Zendesk category (the real family), sorted by 30-day usage, dead flagged.
+// The ".pi Template Library" attribution (which mined program used which template) is the follow-on
+// board; here we ship what's live today: usage you can see.
+let ZTPL = { run:null, busy:false, err:"", prog:"", roll:null, rollErr:"" };
+// How far back the attribution rollup looks. The bridge scans at most `max` tickets of this window
+// (default 60, hard cap 200) and says so honestly (candidates/scanned/capped — never silent truncation).
+const ZTPL_ROLL_DAYS=30, ZTPL_ROLL_MAX=60;
+function ztplTier(u, med){ u=+u||0; if(u===0) return "dead"; return u>=med ? "hot" : "warm"; }
+function ztplClassify(macros){
+  // comms templates = a macro that carries a message body. Workflow-only macros (tag/route, empty body) are excluded.
+  const items = macros.filter(m=>((m.body||"").trim().length>0)).map(m=>({
+    id:m.id, title:(m.title||"("+m.id+")"), cat:((m.category||m.cat||"").trim()||"(uncategorized)"),
+    active:m.active!==false, usage:(+m.usage_30d||0), body:(m.body||"").replace(/\s+/g," ").trim()
+  }));
+  const used = items.filter(i=>i.usage>0).map(i=>i.usage).sort((a,b)=>a-b);
+  const med = used.length ? used[Math.floor(used.length/2)] : 1; // median of USED templates
+  items.forEach(i=>{ i.tier = ztplTier(i.usage, med); });
+  // group by the real Zendesk category = the family
+  const fam={};
+  items.forEach(i=>{ (fam[i.cat]=fam[i.cat]||{name:i.cat,items:[],usage:0}).items.push(i); fam[i.cat].usage+=i.usage; });
+  const families = Object.values(fam).map(f=>{ f.items.sort((a,b)=>b.usage-a.usage||a.title.localeCompare(b.title)); return f; })
+    .sort((a,b)=>b.usage-a.usage || b.items.length-a.items.length);
+  return {
+    total: macros.length, comms: items.length,
+    hot: items.filter(i=>i.tier==="hot").length,
+    warm: items.filter(i=>i.tier==="warm").length,
+    dead: items.filter(i=>i.tier==="dead").length,
+    med, families
+  };
+}
+async function ztplLoad(){
+  ZTPL.busy=true; ZTPL.err=""; ZTPL.prog="macros"; renderZTPL();
   try{
-    const start = Math.floor(Date.now()/1000) - OSG_DAYS*86400;
-    const r = await zdFetch("/offscript?start="+start+"&scope="+encodeURIComponent(OSG.scope)+"&max="+OSG_MAX);
-    if(!r.ok) throw { code:r.status };
-    const d = await r.json();
-    // Rank gaps by size desc ONCE at load -- data-osgcopy indexes into this order.
-    if(d && d.gaps) d.gaps.sort(function(a,b){ return (+b.size||0)-(+a.size||0); });
-    OSG.run=d; OSG.ts=Date.now();
-  }catch(e){ OSG.err = (e&&e.code) ? ("HTTP "+e.code+(e.code===401?" - unlock the console first":"")) : ((e&&e.message)||"bridge unreachable"); }
-  OSG.busy=false; if(TAB==="templates") renderOSG(); render();
+    const macros = await zdAll("macros","macros-page","macros");
+    ZTPL.run = ztplClassify(macros);
+    // .pi attribution rollup — the "attributed in N tickets" backlinks. Zendesk exposes NO macro_id per
+    // comment, so the .pi engine match IS the only grounding. Fail-soft: templates render without it.
+    ZTPL.roll=null; ZTPL.rollErr="";
+    try{
+      ZTPL.prog="attribution rollup"; renderZTPL();
+      const start = Math.floor(Date.now()/1000) - ZTPL_ROLL_DAYS*86400;
+      const rr = await zdFetch("/templates/rollup?start="+start+"&max="+ZTPL_ROLL_MAX);
+      if(rr.ok){
+        const rd = await rr.json(); const by={};
+        (rd.rollup||[]).forEach(x=>{ by[String(x.templateId)]={count:+x.count||0,tickets:x.tickets||[]}; });
+        ZTPL.roll={byId:by,window:rd.window||{}};
+      } else ZTPL.rollErr="HTTP "+rr.status;
+    }catch(_){ ZTPL.rollErr="bridge unreachable"; }
+  }catch(e){ ZTPL.err = (e&&e.code)? ("HTTP "+e.code+(e.code===401?" — unlock the console first":"")) : ((e&&e.message)||"load failed"); }
+  ZTPL.busy=false; ZTPL.prog=""; if(TAB==="templates") renderZTPL(); render();
 }
-function osgTicketLinks(list){
-  return (list||[]).map(function(t){ return "<a class='oslink' href='"+esc(t.url||"#")+"' target='_blank' rel='noopener'>#"+esc(t.ticketId)+"</a>"; }).join(" ");
+function ztplBar(i){
+  const pct = i.usage<=0 ? 0 : Math.max(6, Math.min(100, Math.round(100*i.usage/Math.max(ZTPL.run.med*2,1))));
+  return "<span class='tubar "+i.tier+"'><span class='fill' style='width:"+pct+"%'></span></span>";
 }
-function osgHeader(){
-  const w=(OSG.run&&OSG.run.window)||{};
-  const guest=(OSG.scope==="guest");
-  let s="<div class='oslead'><b>Off-Script &amp; Gaps</b> &mdash; where agents hand-wrote a guest reply instead of using a template, and recurring hand-writes that need a macro.</div>";
-  s+="<div class='oschips'>"
-    +"<span class='oschip'>scanned <b>"+(+w.scanned||0)+"</b> of <b>"+(guest?(+w.inScope||0):(+w.candidates||0))+"</b> "+(guest?"guest-recovery":"candidate")+" tickets &middot; last "+OSG_DAYS+"d</span>"
-    +(guest?"<span class='oschip'><b>"+((w.guestGroups||[]).length)+"</b> guest groups</span>":"")
-    +"<span class='oschip'>"+(w.capped?"<b class='warn'>capped</b> at "+OSG_MAX:"full window")+"</span>"
-    +"<span class='oschip'><b>"+(OSG.run?(+OSG.run.matched||0):0)+"</b> off-script &middot; <b>"+(((OSG.run&&OSG.run.gaps)||[]).length)+"</b> gap"+((((OSG.run&&OSG.run.gaps)||[]).length)===1?"":"s")+"</span>"
-    +"<span class='osscope' title='Guest = guest-recovery groups only (Guest Relations / GR Escalation / DO)'>"
-      +"<button class='osseg"+(guest?" on":"")+"' data-osgscope='guest'>Guest</button>"
-      +"<button class='osseg"+(guest?"":" on")+"' data-osgscope='all'>All</button>"
-    +"</span>"
-    +"<button class='osref' data-osgload>&#8635; Refresh</button>"
-    +"</div>";
-  return s;
-}
-function osgGaps(){
-  const gaps=(OSG.run&&OSG.run.gaps)||[];
-  if(!gaps.length) return "";
-  let s="<div class='ossect'>Gaps &mdash; macro candidates <span class='ossectn'>&middot; the same reply written by hand again and again, no template covers it</span></div>";
-  gaps.forEach(function(g,i){
-    const rep=g.representative||{};
-    s+="<div class='oscard'>"
-      +"<div class='oscount'>answered by hand <b>"+(+g.size||0)+"&times;</b>"+(rep.group&&rep.group.name?"<span class='osgrp'>"+esc(rep.group.name)+"</span>":"")+"</div>"
-      +"<div class='ossnip'>&ldquo;"+esc(rep.snippet||"")+"&rdquo;</div>"
-      +"<div class='osfoot'><span class='ostix'>tickets: "+osgTicketLinks(g.tickets)+"</span>"
-      +"<button class='oscopy' data-osgcopy='"+i+"'>&#128203; Copy drafted macro</button></div>"
-      +"</div>";
-  });
-  return s;
-}
-function osgOffscript(){
-  const rows=(OSG.run&&OSG.run.offscript)||[];
-  if(!rows.length) return "";
-  let s="<div class='ossect'>Off-script replies <span class='ossectn'>&middot; each hand-written guest reply + its closest template &mdash; the coaching list</span></div>";
-  rows.forEach(function(o){
-    const n=o.nearest;
-    s+="<div class='osrow'>"
-      +"<a class='oslink' href='"+esc(o.url||"#")+"' target='_blank' rel='noopener'>#"+esc(o.ticketId)+"</a>"
-      +"<span class='osbody'>"+esc(o.snippet||"")+"</span>"
-      +(o.group&&o.group.name?"<span class='osgrp'>"+esc(o.group.name)+"</span>":"")
-      +(n&&n.title?"<span class='osnear'>closest template: <b>"+esc(n.title)+"</b> @"+(+n.fidelity||0).toFixed(2)+"</span>":"<span class='osnear none'>no near match</span>")
-      +"</div>";
-  });
-  return s;
-}
-function osgByGroup(){
-  const bg=(OSG.run&&OSG.run.byGroup)||[];
-  if(!bg.length) return "";
-  return "<div class='ossect'>By group</div><div class='oschips'>"
-    +bg.map(function(g){ return "<span class='oschip'><b>"+esc(g.name)+"</b> &middot; "+(+g.offscript||0)+" off-script &middot; "+(+g.gaps||0)+" gap"+((+g.gaps||0)===1?"":"s")+"</span>"; }).join("")
-    +"</div>";
-}
-function osgInner(){
-  if(OSG.busy && !OSG.run) return "<div class='osld'><span class='spin'></span> scanning guest replies (last "+OSG_DAYS+"d, up to "+OSG_MAX+" tickets)&hellip;</div>";
-  let s="";
-  // Fetch error keeps the last-known results on screen -- the error bar says so.
-  if(OSG.err) s+="<div class='oserr'>"+esc(OSG.err)+(OSG.run?" &mdash; showing last-known results":"")+" <button class='osref' data-osgload>&#8635; Retry</button></div>";
-  if(!OSG.run) return s;
-  s+=osgHeader();
-  const gaps=(OSG.run.gaps||[]), off=(OSG.run.offscript||[]);
-  if(!gaps.length && !off.length)
-    return s+"<div class='osempty'>Nothing off-script in this window &mdash; every scanned guest reply matched a template, and no macro gaps were found.</div>";
-  return s+osgGaps()+osgOffscript()+osgByGroup();
-}
-function renderOSG(){ const w=document.getElementById("osg-wrap"); if(w) w.innerHTML=osgInner(); }
-function offscriptPane(){
-  // Fetch on first show (same pend-guard pattern as the Watch tab); errors wait for Retry. No polling.
-  if(TAB==="templates" && !OSG.run && !OSG.busy && !OSG.pend && !OSG.err){
-    OSG.pend=true; setTimeout(function(){ OSG.pend=false; osgLoad(); },0);
+function ztplInner(){
+  if(ZTPL.busy) return "<div class='tld'><span class='spin'></span> reading templates &middot; "+esc(ZTPL.prog||"")+"&hellip;</div>";
+  if(ZTPL.err) return "<div class='terr'>"+esc(ZTPL.err)+"</div><button class='tload' data-ztplload>Retry</button>";
+  if(!ZTPL.run){
+    return "<div class='tlead'><b>Mendo's reply templates &mdash; live.</b> Every macro that carries a message body, grouped by family, ranked by how often it fired in the last 30 days. Read straight from zendesk-bridge &mdash; today's count, not a snapshot.</div>"
+      +"<button class='tload' data-ztplload>&#128221; Load templates</button>"
+      +"<div class='tnote'>Read-only. Loading also runs the .pi attribution rollup &mdash; &ldquo;attributed in N tickets&rdquo; backlinks per template, inferred by the .pi engine (Zendesk exposes no macro_id).</div>";
   }
+  const R=ZTPL.run;
+  let s="<div class='thead'>";
+  s+="<div class='tchips'>"
+    +"<span class='tchip'><b>"+R.total+"</b> templates</span>"
+    +"<span class='tchip'><b>"+R.comms+"</b> with a message body</span>"
+    +"<span class='tchip hot'><b>"+R.hot+"</b> hot (30d)</span>"
+    +"<span class='tchip warm'><b>"+R.warm+"</b> warm</span>"
+    +"<span class='tchip dead'><b>"+R.dead+"</b> dead (0 in 30d)</span>"
+    +"<button class='tref' data-ztplload>&#8635; Refresh</button></div></div>";
+  // HONEST LABEL — these counts are .pi engine inferences over a bounded, announced window.
+  if(ZTPL.roll){ const w=ZTPL.roll.window||{};
+    s+="<div class='tattrnote'>&#9873; attribution counts = <b>.pi engine</b> matches across the last "+ZTPL_ROLL_DAYS+" days of recent tickets (scanned "+(w.scanned||0)+" of "+(w.candidates||0)+", "+(w.capped?"capped":"full window")+"); Zendesk exposes no macro_id, so these are <b>inferred</b>, not Zendesk-reported.</div>";
+  } else if(ZTPL.rollErr){
+    s+="<div class='tattrnote'>.pi attribution rollup unavailable ("+esc(ZTPL.rollErr)+") &mdash; showing usage only.</div>";
+  }
+  R.families.forEach(f=>{
+    s+="<div class='tfam'>"+esc(f.name)+" <span class='tfamn'>&middot; "+f.items.length+" &middot; "+f.usage+"&times;/30d</span></div>";
+    f.items.forEach(i=>{
+      // ".pi attributed in N tickets" backlink — only when the rollup found real matches; 0 shows a muted
+      // dash, NEVER a fake number. Click expands the sample ticket ids (same toggle pattern as data-hist).
+      let bk="", bkx="";
+      if(ZTPL.roll){ const a=ZTPL.roll.byId[String(i.id)];
+        if(a && a.count>0){
+          bk="<span class='tbk' data-ztplbk='"+i.id+"'>&#9873; attributed in "+a.count+" &rarr;</span>";
+          bkx="<div class='tbkx' id='ztplbk-"+i.id+"' style='display:none'>.pi-attributed tickets (sample): "+a.tickets.map(t=>"#"+t).join(", ")+"</div>";
+        } else bk="<span class='tbk none'>&mdash;</span>";
+      }
+      s+="<div class='trow "+i.tier+"'>"
+        +"<span class='tt'>"+esc(i.title)+(i.active?"":" <span class='tinact'>inactive</span>")+"</span>"
+        +"<span class='tbody'>"+esc(i.body.slice(0,110))+(i.body.length>110?"&hellip;":"")+"</span>"
+        +ztplBar(i)
+        +"<span class='tuv'>"+i.usage+"<span class='lab'>&times;/30d</span></span>"
+        +bk
+        +(i.tier==="dead"?"<span class='tdead'>DEAD</span>":"")
+        +bkx
+        +"</div>";
+    });
+  });
+  return s;
+}
+function renderZTPL(){ const w=document.getElementById("ztpl-wrap"); if(w) w.innerHTML=ztplInner(); }
+function templatesPane(){
   return "<style>"
-    +"#pane-templates .oslead{color:#8a93a0;font-size:13px;line-height:1.55;margin-bottom:10px;max-width:720px;}"
-    +"#pane-templates .oslead b{color:#e6edf2;}"
-    +"#pane-templates .osld{color:#8a93a0;font-size:13px;padding:14px 0;}"
-    +"#pane-templates .oserr{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:10px 13px;font-size:12.5px;margin-bottom:10px;}"
-    +"#pane-templates .oserr .osref{margin-left:8px;padding:2px 8px;}"
-    +"#pane-templates .oschips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}"
-    +"#pane-templates .oschip{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 10px;border:1px solid #262626;background:#0e0e0e;color:#8a93a0;}"
-    +"#pane-templates .oschip b{color:#e8e8e8;font-weight:800;}"
-    +"#pane-templates .oschip .warn{color:#ffd479;}"
-    +"#pane-templates .osscope{display:inline-flex;border:1px solid #2a343b;border-radius:6px;overflow:hidden;}"
-    +"#pane-templates .osseg{background:#12181d;color:#8fb7c4;border:0;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}"
-    +"#pane-templates .osseg.on{background:#6FC3DF;color:#06222c;}"
-    +"#pane-templates .osref{margin-left:auto;background:#12181d;color:#8fb7c4;border:1px solid #2a343b;border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}"
-    +"#pane-templates .ossect{color:#6FC3DF;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 7px;}"
-    +"#pane-templates .ossectn{color:#6b7a82;font-weight:600;letter-spacing:0;text-transform:none;}"
-    +"#pane-templates .oscard{background:#141414;border:1px solid #262626;border-left:4px solid #ffce85;border-radius:8px;padding:10px 14px;margin-bottom:8px;}"
-    +"#pane-templates .oscount{font-size:13px;color:#e8e8e8;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}"
-    +"#pane-templates .oscount b{font-size:17px;font-weight:800;color:#ffce85;}"
-    +"#pane-templates .osgrp{color:#6FC3DF;font-size:11px;font-weight:700;background:#0c1418;border:1px solid #14323e;border-radius:5px;padding:0 7px;white-space:nowrap;}"
-    +"#pane-templates .ossnip{color:#cfe9f2;font-size:12.5px;line-height:1.5;margin:7px 0;}"
-    +"#pane-templates .osfoot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}"
-    +"#pane-templates .ostix{color:#8a93a0;font-size:11.5px;}"
-    +"#pane-templates .oslink{color:#6FC3DF;font-size:11.5px;font-weight:700;text-decoration:none;font-family:Consolas,monospace;}"
-    +"#pane-templates .oslink:hover{text-decoration:underline;}"
-    +"#pane-templates .oscopy{margin-left:auto;background:#16242b;color:#9fd6e6;border:1px solid #2c4a55;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}"
-    +"#pane-templates .oscopy:hover{background:#1a2f38;color:#6FC3DF;}"
-    +"#pane-templates .oscopy.done{background:#06251a;color:#7CFFB2;border-color:#1f7a4d;}"
-    +"#pane-templates .osrow{background:#141414;border:1px solid #262626;border-left:4px solid #262626;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;}"
-    +"#pane-templates .osbody{color:#9aa7b0;font-size:12px;flex:1 1 220px;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
-    +"#pane-templates .osnear{flex:0 0 auto;color:#8fb7c4;font-size:11px;background:#0c1418;border:1px solid #14323e;border-radius:6px;padding:2px 8px;white-space:nowrap;}"
-    +"#pane-templates .osnear b{color:#9fd6e6;}"
-    +"#pane-templates .osnear.none{color:#4a5258;background:none;border-color:#262626;}"
-    +"#pane-templates .osempty{color:#6b7a82;font-size:13px;padding:14px 0;}"
-    +"</style><div id='osg-wrap'>"+osgInner()+"</div>";
+    +"#pane-templates .tlead{color:#8a93a0;font-size:13px;line-height:1.55;margin-bottom:14px;max-width:720px;}"
+    +"#pane-templates .tlead b{color:#e6edf2;}"
+    +"#pane-templates .tload{background:#16242b;color:#9fd6e6;border:1px solid #2c4a55;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .tload:hover{background:#1a2f38;color:#6FC3DF;}"
+    +"#pane-templates .tnote{color:#6b7a82;font-size:11.5px;margin-top:10px;}"
+    +"#pane-templates .tld{color:#8a93a0;font-size:13px;padding:14px 0;}"
+    +"#pane-templates .terr{background:#2a1414;border:1px solid #6b2b2b;color:#ffb4b4;border-radius:8px;padding:10px 13px;font-size:12.5px;margin-bottom:10px;}"
+    +"#pane-templates .thead{margin-bottom:6px;}"
+    +"#pane-templates .tchips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}"
+    +"#pane-templates .tchip{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 10px;border:1px solid #262626;background:#0e0e0e;color:#8a93a0;}"
+    +"#pane-templates .tchip b{color:#e8e8e8;font-weight:800;}"
+    +"#pane-templates .tchip.hot b{color:#7CFFB2;}#pane-templates .tchip.warm b{color:#ffce85;}#pane-templates .tchip.dead b{color:#ff9b9b;}"
+    +"#pane-templates .tref{margin-left:auto;background:#12181d;color:#8fb7c4;border:1px solid #2a343b;border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}"
+    +"#pane-templates .tfam{color:#6FC3DF;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 7px;}"
+    +"#pane-templates .tfamn{color:#6b7a82;font-weight:600;letter-spacing:0;text-transform:none;}"
+    +"#pane-templates .trow{background:#141414;border:1px solid #262626;border-left:4px solid #262626;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;}"
+    +"#pane-templates .trow.hot{border-left-color:#7CFFB2;}#pane-templates .trow.warm{border-left-color:#ffce85;}#pane-templates .trow.dead{border-left-color:#ff6b6b;opacity:.7;}"
+    +"#pane-templates .tt{font-weight:800;font-size:13px;flex:0 0 auto;color:#e8e8e8;}"
+    +"#pane-templates .tinact{color:#8a93a0;font-weight:600;font-size:10.5px;border:1px solid #333;border-radius:4px;padding:0 5px;}"
+    +"#pane-templates .tbody{color:#9aa7b0;font-size:12px;flex:1 1 220px;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
+    +"#pane-templates .tubar{flex:0 0 120px;height:16px;border-radius:5px;background:#0e0e0e;border:1px solid #262626;position:relative;overflow:hidden;}"
+    +"#pane-templates .tubar .fill{position:absolute;left:0;top:0;bottom:0;background:#12402c;border-right:2px solid #7CFFB2;}"
+    +"#pane-templates .tubar.warm .fill{background:#2a2008;border-right-color:#ffce85;}"
+    +"#pane-templates .tubar.dead .fill{background:#2a1111;border-right-color:#ff6b6b;width:2px;}"
+    +"#pane-templates .tuv{flex:0 0 80px;text-align:right;font-size:12.5px;font-weight:800;color:#e8e8e8;font-family:Consolas,monospace;}"
+    +"#pane-templates .tuv .lab{color:#6b7a82;font-weight:400;font-size:10.5px;}"
+    +"#pane-templates .tdead{flex:0 0 auto;color:#ff9b9b;font-size:10px;font-weight:800;letter-spacing:.04em;}"
+    +"#pane-templates .tattrnote{color:#8fb7c4;font-size:11.5px;line-height:1.5;background:#0c1418;border:1px solid #14323e;border-radius:8px;padding:8px 12px;margin:8px 0 4px;max-width:720px;}"
+    +"#pane-templates .tattrnote b{color:#6FC3DF;}"
+    +"#pane-templates .tbk{flex:0 0 auto;color:#6FC3DF;font-size:11px;font-weight:700;cursor:pointer;background:#0c1418;border:1px solid #14323e;border-radius:6px;padding:2px 8px;white-space:nowrap;}"
+    +"#pane-templates .tbk:hover{border-color:#6FC3DF;}"
+    +"#pane-templates .tbk.open{background:#6FC3DF;color:#06222c;border-color:#6FC3DF;}"
+    +"#pane-templates .tbk.none{color:#4a5258;background:none;border:0;cursor:default;font-weight:400;}"
+    +"#pane-templates .tbkx{flex:1 1 100%;color:#9fd6e6;font-size:11.5px;font-family:Consolas,monospace;background:#0c1418;border:1px solid #14323e;border-radius:6px;padding:6px 10px;margin-top:2px;}"
+    +"</style><div id='ztpl-wrap'>"+ztplInner()+"</div>";
 }
 document.addEventListener("click", function(e){
-  if(e.target && e.target.closest && e.target.closest("[data-osgload]")){ osgLoad(); return; }
-  const sc = e.target && e.target.closest && e.target.closest("[data-osgscope]");
-  if(sc){ const v=sc.getAttribute("data-osgscope"); if(v!==OSG.scope && !OSG.busy){ OSG.scope=v; OSG.run=null; OSG.err=""; osgLoad(); } return; }
-  const cp = e.target && e.target.closest && e.target.closest("[data-osgcopy]");
-  if(cp){
-    const i=+cp.getAttribute("data-osgcopy"); const g=OSG.run&&OSG.run.gaps&&OSG.run.gaps[i];
-    if(g && g.draftBody!=null){
-      // Same in-gesture synchronous copy as the Latchkey Share button (_clipSync) -- the async
-      // clipboard API can lose the user-gesture window; execCommand inside the click never does.
-      const ok=_clipSync(String(g.draftBody));
-      cp.innerHTML = ok ? "&#10003; Copied" : "copy failed";
-      cp.classList.toggle("done", ok);
-      setTimeout(function(){ cp.innerHTML="&#128203; Copy drafted macro"; cp.classList.remove("done"); }, 2200);
-    }
-    return;
-  }
+  if(e.target && e.target.closest && e.target.closest("[data-ztplload]")){ ztplLoad(); return; }
+  // "attributed in N →" backlink — expand/collapse the sample ticket ids (same pattern as data-hist).
+  const bk = e.target && e.target.closest && e.target.closest("[data-ztplbk]");
+  if(bk){ const r=document.getElementById("ztplbk-"+bk.getAttribute("data-ztplbk")); if(r){ const open=r.style.display!=="none"; r.style.display=open?"none":"block"; bk.classList.toggle("open",!open); } return; }
 });
 function commentsPane(){
   return "<style>"
@@ -3406,7 +3739,7 @@ function render(){
     audit:"<button class='tabv"+(TAB==="audit"?" on":"")+"' data-tab='audit'><span class='ti'>&#128737;</span><span class='tl'>Security Audit"+auditBadge+"</span></button>",
     focus:"<button class='tabv"+(TAB==="focus"?" on":"")+"' data-tab='focus'><span class='ti'>&#127919;</span><span class='tl'>Focus"+(FOCUS_SAMPLE?" &middot; <b class='bad'>"+FOCUS_SAMPLE.detractors.filter(d=>d.status!=='resolved').length+"</b>":"")+"</span></button>",
     programs:"<button class='tabv"+(TAB==="programs"?" on":"")+"' data-tab='programs'><span class='ti'>&#129513;</span><span class='tl'>Conversations</span></button>",
-    templates:"<button class='tabv"+(TAB==="templates"?" on":"")+"' data-tab='templates'><span class='ti'>&#128221;</span><span class='tl'>Off-Script &amp; Gaps"+((OSG.run&&OSG.run.gaps&&OSG.run.gaps.length)?" &middot; <b class='bad'>"+OSG.run.gaps.length+"</b>":"")+"</span></button>",
+    templates:"<button class='tabv"+(TAB==="templates"?" on":"")+"' data-tab='templates'><span class='ti'>&#128221;</span><span class='tl'>Templates"+((ZTPL.run&&ZTPL.run.hot)?" &middot; <b class='ok'>"+ZTPL.run.hot+"</b>":"")+"</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Tickets</span></button>",
     rawids:"<button class='tabv"+(TAB==="rawids"?" on":"")+"' data-tab='rawids'><span class='ti'>&#128190;</span><span class='tl'>Raw IDS"+(RAWIDS.seed?" &middot; <b class='ok'>"+(RAWIDS.seed.cases>=1000?Math.round(RAWIDS.seed.cases/1000)+'k':RAWIDS.seed.cases)+"</b>":"")+"</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
@@ -3450,7 +3783,7 @@ function render(){
   // API Browser -- read-only multi-source endpoint explorer (ZBX3)
   h+="<div id='pane-focus' class='"+paneCls("focus")+"'>"+realBadge("demo")+focusPane()+cmBar("focus","Focus tab")+"</div>";
   h+="<div id='pane-programs' class='"+paneCls("programs")+"'>"+realBadge("demo")+programsPane()+cmBar("conversations","Conversations tab")+"</div>";
-  h+="<div id='pane-templates' class='"+paneCls("templates")+"'>"+realBadge("live")+offscriptPane()+cmBar("templates","Off-Script & Gaps tab")+"</div>";
+  h+="<div id='pane-templates' class='"+paneCls("templates")+"'>"+realBadge("live")+templatesPane()+cmBar("templates","Templates tab")+"</div>";
   h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+realBadge("live")+commentsPane()+cmBar("tickets","Tickets tab")+"</div>";
   h+="<div id='pane-rawids' class='"+paneCls("rawids")+"'>"+realBadge("live")+rawIdsPane()+cmBar("rawids","Raw IDS tab")+"</div>";
   h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+realBadge("live")+apiBrowserPane()+cmBar("apibrowser","API Browser tab")+"</div>";
@@ -4832,7 +5165,7 @@ renderFeatures();
 </script>
 <div id="brand-strip">
   <span id="brand-mark">ARGUS</span>
-  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">r497 . ed736e7 . 2026-07-09</span>
+  <span id="build-stamp" title="live build — match this to the commit you were told shipped; if it doesn't match, the CDN edge hasn't caught up yet (wait ~30s)">__BUILD__</span>
   <a id="api-pill" class="ip-pill" href="#" title="REST endpoint Argus calls (read-only Meraki proxy)" target="_blank" rel="noopener">API &middot; &hellip;</a>
   <span style="flex:1"></span>
   <div id="brand-ip" title="CONFIDENTIAL &middot; TRADE SECRET &middot; PROPRIETARY &middot; Property of Joseph M. Castillo &middot; All rights reserved. Unauthorized use, disclosure, or reproduction is strictly prohibited.">
