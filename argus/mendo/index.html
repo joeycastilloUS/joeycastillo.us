@@ -577,7 +577,7 @@ const APPS = {
   zendesk: { label:"Zendesk", icon:"&#128172;", tag:"Support · read-only", tabs:["focus","programs","templates","comments","zdaudit","apibrowser"], source:"zendesk" },
   cloudflare: { label:"Cloudflare", icon:"&#9729;&#65039;", tag:"Edge · read-only", tabs:["apibrowser"], source:"cloudflare" },
   airbyte: { label:"Airbyte", icon:"&#128260;", tag:"Airbyte migration", tabs:["helm","apibrowser"], source:"airbyte" },
-  salesforce: { label:"Salesforce", icon:"&#9729;", tag:"OneDine · read-only", tabs:["rawids","apibrowser"], source:"salesforce" },
+  salesforce: { label:"Salesforce", icon:"&#9729;", tag:"OneDine · read-only", tabs:["rawids","sfprog","sfscrub","apibrowser"], source:"salesforce" },
   gcp: { label:"GCP", icon:"&#128176;", tag:"Cloud cost", tabs:["cost"] }
 };
 if(!APPS[APP]) APP="meraki";
@@ -1945,6 +1945,58 @@ function rawProgram(p){
     +"<div class='psig'>signature &nbsp;<code>"+abEsc(sig)+"</code> <span class='muted'>— conversations sharing this route the same, $0, no model</span></div>"
     +"</div></div>";
 }
+// ===== Programs + Scrub tabs (SF4: every conversation is a program) — driven by programs.json =====
+var PJ = { loaded:false, data:null };
+async function loadPrograms(){ if(PJ.loaded) return; PJ.loaded=true;
+  try{ var r=await fetch("programs.json?_="+Date.now(),{cache:"no-store"}); if(r.ok) PJ.data=await r.json(); }catch(e){}
+  render();
+}
+function pjn(x){ return (typeof x==="number")?x.toLocaleString():x; }
+function sfProgPane(){
+  if(!PJ.loaded) loadPrograms();
+  var d=PJ.data;
+  var h="<style>#pane-sfprog .psum{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}"
+    +"#pane-sfprog .pk{background:#1A1A1A;border:1px solid #242424;border-radius:6px;padding:12px 16px;flex:1;min-width:110px}"
+    +"#pane-sfprog .pk .n{color:#6FC3DF;font-size:23px;font-weight:700}#pane-sfprog .pk .l{color:#888;font-size:11px;text-transform:uppercase;letter-spacing:.5px}"
+    +"#pane-sfprog .prow{display:flex;gap:12px;align-items:baseline;padding:6px 8px;border-bottom:1px solid #1c1c1c}"
+    +"#pane-sfprog .pc{color:#6FC3DF;font-variant-numeric:tabular-nums;min-width:52px;text-align:right;font-weight:600}#pane-sfprog .pp{color:#888;min-width:48px;text-align:right;font-size:12px}"
+    +"#pane-sfprog .pa{color:#eec089;font-family:Consolas,monospace;min-width:64px}#pane-sfprog .pe{background:#6FC3DF14;border:1px solid #6FC3DF44;color:#9fd8ec;border-radius:4px;padding:1px 7px;font-size:12px;margin:1px;display:inline-block}"
+    +"#pane-sfprog .bar{height:6px;background:#243b44;border-radius:3px;display:inline-block;vertical-align:middle}</style>";
+  if(!d) return h+"<div class='box'><div class='muted'>loading programs…</div></div>";
+  h+="<div class='box'><div style='display:flex;align-items:center;gap:12px'><h2 style='margin:0'>Programs</h2><span class='rb rb-live'>&#9679; every conversation is a program</span></div>"
+    +"<div class='muted' style='margin:6px 0'>Every OneDine case, decoded via understand() then scrubbed, collapses into an <b>action + entities</b> program. Recurring conversations share a program &mdash; deterministic, $0, no model. The model is reserved for the novel tail.</div>";
+  h+="<div class='psum'>"
+    +"<div class='pk'><div class='n'>"+pjn(d.total)+"</div><div class='l'>cases</div></div>"
+    +"<div class='pk'><div class='n'>"+pjn(d.scrubbed.distinct)+"</div><div class='l'>distinct programs</div></div>"
+    +"<div class='pk'><div class='n'>"+(d.programs[0]?d.programs[0].pct+'%':'-')+"</div><div class='l'>top program</div></div>"
+    +"<div class='pk'><div class='n'>"+d.scrubbed.top100+"%</div><div class='l'>top-100 cover</div></div></div>";
+  var max=d.programs[0]?d.programs[0].count:1;
+  h+="<div>"+d.programs.map(function(p){
+    return "<div class='prow'><span class='pc'>"+pjn(p.count)+"</span><span class='pp'>"+p.pct+"%</span><span class='pa'>"+abEsc(p.action||"-")+"</span><span style='flex:1'>"+p.entities.map(function(e){return "<span class='pe'>"+abEsc(e)+"</span>";}).join("")+"</span><span class='bar' style='width:"+Math.round(70*p.count/max)+"px'></span></div>";
+  }).join("")+"</div></div>";
+  return h;
+}
+function sfScrubPane(){
+  if(!PJ.loaded) loadPrograms();
+  var d=PJ.data;
+  var h="<style>#pane-sfscrub .rk{background:#1A1A1A;border:1px solid #242424;border-radius:6px;padding:12px 16px;flex:1;min-width:100px}#pane-sfscrub .rk .n{color:#e0a246;font-size:21px;font-weight:700}#pane-sfscrub .rk .l{color:#888;font-size:11px;text-transform:uppercase;letter-spacing:.5px}#pane-sfscrub .rr{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}"
+    +"#pane-sfscrub table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}#pane-sfscrub td,#pane-sfscrub th{text-align:left;padding:5px 8px;border-bottom:1px solid #202020}#pane-sfscrub th{color:#777;font-size:11px;text-transform:uppercase}#pane-sfscrub .kh{color:#777;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-top:10px}</style>";
+  if(!d) return h+"<div class='box'><div class='muted'>loading…</div></div>";
+  var r=d.redaction||{};
+  h+="<div class='box'><div style='display:flex;align-items:center;gap:12px'><h2 style='margin:0'>Scrub / Derive</h2><span class='rb rb-live'>&#9679; clean + redact</span></div>"
+    +"<div class='muted' style='margin:6px 0'>The separate derive step between the raw and the programs: <b>redact PII</b> before decode, then <b>scrub</b> (drop tokens seen in &lt;"+d.df_threshold+" cases &mdash; names, client brands, one-offs) to keep the shared operative vocabulary. Runs in the mesh over the sealed raw &mdash; Salesforce untouched.</div>";
+  h+="<div class='rr'>"
+    +"<div class='rk'><div class='n'>"+pjn(r.emails||0)+"</div><div class='l'>emails redacted</div></div>"
+    +"<div class='rk'><div class='n'>"+pjn(r.numbers||0)+"</div><div class='l'>numbers</div></div>"
+    +"<div class='rk'><div class='n'>"+pjn(r.urls||0)+"</div><div class='l'>urls</div></div>"
+    +"<div class='rk'><div class='n'>"+pjn(r.phones||0)+"</div><div class='l'>phones</div></div></div>";
+  h+="<div class='kh'>convergence &mdash; % of cases covered by the top-N programs</div>"
+    +"<table><tr><th>set</th><th>distinct</th><th>top10</th><th>top25</th><th>top100</th><th>50% needs</th></tr>"
+    +"<tr><td>raw</td><td>"+pjn(d.raw.distinct)+"</td><td>"+d.raw.top10+"%</td><td>"+d.raw.top25+"%</td><td>"+d.raw.top100+"%</td><td>"+pjn(d.raw.p50)+" progs</td></tr>"
+    +"<tr><td><b>scrubbed</b></td><td>"+pjn(d.scrubbed.distinct)+"</td><td>"+d.scrubbed.top10+"%</td><td>"+d.scrubbed.top25+"%</td><td>"+d.scrubbed.top100+"%</td><td>"+pjn(d.scrubbed.p50)+" progs</td></tr></table>"
+    +"<div class='muted' style='margin-top:8px'>novel-after-scrub: <b>"+d.unmatched_after_scrub+"</b> cases ("+(100*d.unmatched_after_scrub/d.total).toFixed(1)+"%) &mdash; the genuinely-unique tail the model handles. Everything else routes to a program.</div>";
+  return h+"</div>";
+}
 function rawIdsPane(){
   if(!RAWIDS.loaded && !RAWIDS.busy) loadRawIds();
   return "<style>#pane-rawids .ric{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}"
@@ -2762,71 +2814,7 @@ function renderCMSearch(){ const w=document.getElementById("cm-sd"); if(w) w.inn
 // ── Drill-in: click any Focus/Programs card to see the whole pipeline for that ticket —
 // raw Zendesk thread -> what the decoder did -> what nous.api + the models did -> Zora voice.
 let PROG_SEL=null, FOCUS_SEL=null;
-const DRILL = {
-  "341562": { subject:"US Foods vendor support — 'Unspecified Item' invoice", group:"84 - Cherry Creek", status:"open", rawChars:"19 comments · 8,520 chars", gated:false,
-    thread:[
-      {who:"GM · Cherry Creek", pub:true, when:"08/16 09:12", body:"Hi US Foods — we received almost $600 of invoicing for 'Food, COGS' / 'Unspecified Item' dated 08/14, but it says the invoice date is 06/04. Can you clarify what this is for and why it's more than 2 months delayed? Account Name: Mendocino Farms."},
-      {who:"Guest Relations", pub:true, when:"08/16 10:04", body:"Thanks for flagging this — I'm pulling the invoice detail from the US Foods portal now and will come back with a line-item breakdown."},
-      {who:"Guest Relations", pub:false, when:"08/16 10:20", body:"Internal: portal shows the 08/14 charge under COGS-Unspecified tied to a 06/04 delivery correction. Looks like a backdated catch-up bill. Confirming with the vendor rep before we approve anything."},
-      {who:"US Foods (vendor)", pub:true, when:"08/17 08:41", body:"The 08/14 charge is a backdated adjustment for a 06/04 delivery. We can send the itemization on request."},
-      {who:"GM · Cherry Creek", pub:true, when:"08/17 09:55", body:"So we're being billed now for something from June? We are not approving $600 until it's fully itemized."},
-      {who:"Guest Relations", pub:true, when:"08/17 10:30", body:"Completely understood — we will not approve until it's itemized and makes sense to you. Requesting the full breakdown from US Foods now and holding the charge."}
-    ],
-    decode:{ strip:74, atoms:[{t:"ENTITY",v:"US Foods"},{t:"ENTITY",v:"Cherry Creek"},{t:"ENTITY",v:"invoice"},{t:"PROPERTY",v:"$600"},{t:"PROPERTY",v:"Unspecified Item"},{t:"PROPERTY",v:"delayed 2mo"},{t:"ACTION",v:"clarify"},{t:"ACTION",v:"dispute"},{t:"ACTION",v:"hold approval"},{t:"STRUCTURE",v:"QUANTITY $600"},{t:"STRUCTURE",v:"CAUSAL delay->dispute"}],
-      program:[["GUEST","disputes a $600 'Unspecified Item' charge, 2 months delayed"],["AGENT","separates the vendor billing dispute from the guest thread"],["SYSTEM","retrieves the invoice + delivery record (read-only)"],["AGENT","refuses approval until itemized; confirms the hold"],["SYSTEM","routes the vendor issue to accounting, tags pending-itemization"]] },
-    models:{ verdict:"GROUNDED", verdictNote:"The judge confirmed the draft cites only facts present in the thread ($600, 08/14, 06/04, 'Unspecified Item') — no invented amounts or dates.", tone:"firm · frustrated (justified)", panel:"gemini-2.5-flash + gemini-2.5-pro + judge", cost:"$0.004",
-      precedents:[{id:"228640",label:"expired noodles -> credit",out:"recovered"},{id:"251801",label:"double-charge dispute",out:"recovered"},{id:"261912",label:"invoice mismatch -> credit",out:"recovered"}],
-      draft:"Acknowledge the delay is unreasonable, commit to withholding approval until itemized, and set the expectation of a follow-up once US Foods returns the breakdown." },
-    zora:"Hi — thank you for catching this, and I'm sorry for the runaround. I've asked US Foods for a full line-item breakdown of the $600 'Unspecified Item' charge from 08/14, and we won't approve anything until it's itemized and makes sense to you. You shouldn't have to chase a two-month-old invoice — we're on it, and I'll come straight back to you the moment they send the detail." },
-  "375102": { subject:"Missing items — Not So Fried Chicken + sides", group:"Marina del Rey", status:"open", rawChars:"6 comments · 2,140 chars", gated:false,
-    thread:[
-      {who:"Guest (NPS 2)", pub:true, when:"Today 6:31 PM", body:"Ordered online for pickup and half of it was missing — no Not So Fried Chicken, no sides. This is the second time this month. Really disappointing."},
-      {who:"Guest Relations", pub:true, when:"Today 6:44 PM", body:"I'm so sorry — that's not the experience we want, especially twice. Let me make this right."},
-      {who:"Guest Relations", pub:false, when:"Today 6:45 PM", body:"Internal: 2nd missing-items report this month for this guest. Pull next I'm Sorry Code (read-only), notify GM + DO-Maria."}
-    ],
-    decode:{ strip:61, atoms:[{t:"ENTITY",v:"Not So Fried Chicken"},{t:"ENTITY",v:"Marina del Rey"},{t:"PROPERTY",v:"missing items"},{t:"PROPERTY",v:"2nd this month"},{t:"ACTION",v:"apologize"},{t:"ACTION",v:"pull coupon"},{t:"STRUCTURE",v:"REPEAT x2"}],
-      program:[["GUEST","reports missing Not So Fried Chicken + sides (2nd time)"],["AGENT","acknowledges + apologizes in Zora's voice"],["SYSTEM","peeks the next I'm Sorry Code (read-only — never writes the sheet)"],["AGENT","sends the code + confirms the store was notified"],["SYSTEM","routes to DO-Maria + store, tags resolved"]] },
-    models:{ verdict:"GROUNDED", verdictNote:"Draft references only what the guest stated (missing items, second occurrence). No promise beyond the coupon policy.", tone:"disappointed -> recoverable", panel:"gemini-2.5-flash + gemini-2.5-pro + judge", cost:"$0.002",
-      precedents:[{id:"375061",label:"missing sides -> coupon",out:"recovered"},{id:"374920",label:"wrong order -> coupon",out:"recovered"},{id:"374811",label:"missing entree (no reply)",out:"lost"}],
-      draft:"Warm apology, own the repeat, offer the I'm Sorry Code, confirm the store was told so it doesn't happen a third time." },
-    zora:"Hi — I'm really sorry, especially since this is the second time. That's on us, not you. I've shared a code below for your next visit, and I've let the Marina del Rey team know directly so we tighten up the pickup checks. Thank you for giving us the chance to make it right — I'd love to hear it's better next time." },
-  "375061": { subject:"Rude counter experience — named shift", group:"El Segundo", status:"open", rawChars:"4 comments · 1,510 chars", gated:false,
-    thread:[
-      {who:"Guest (NPS 1)", pub:true, when:"Today 5:58 PM", body:"The person at the counter this afternoon was flat-out rude to my kids. I asked a simple question and got attitude. Won't be back if that's the vibe."},
-      {who:"Guest Relations", pub:true, when:"Today 6:10 PM", body:"I'm so sorry — that is absolutely not who we are. Thank you for telling me; I want to get this to the right person."},
-      {who:"Guest Relations", pub:false, when:"Today 6:11 PM", body:"Internal: guest named a specific shift/person. Do NOT auto-reply with a coupon — a coupon reads as buying silence on a staff issue. Escalate to GM for a personal callback."}
-    ],
-    decode:{ strip:58, atoms:[{t:"ENTITY",v:"counter staff"},{t:"ENTITY",v:"El Segundo"},{t:"PROPERTY",v:"rude / attitude"},{t:"PROPERTY",v:"named shift"},{t:"ACTION",v:"escalate to GM"},{t:"STRUCTURE",v:"NEGATION won't return"}],
-      program:[["GUEST","reports a rude, named staff experience; churn risk"],["AGENT","acknowledges, does NOT offer a coupon"],["SYSTEM","flags UNVERIFIED — a person was named; holds auto-send"],["AGENT","escalates to the GM for a personal callback"]] },
-    models:{ verdict:"UNVERIFIED", verdictNote:"The judge HELD the auto-reply: the complaint names a specific person, so a canned coupon reply could inflame it. This is exactly where the human takes over — the oracle locked the gate.", tone:"hot · churn risk", panel:"gemini-2.5-flash + gemini-2.5-pro + judge", cost:"$0.002",
-      precedents:[{id:"371940",label:"named-staff rudeness -> GM callback",out:"recovered"},{id:"370112",label:"coupon sent on staff issue",out:"lost"}],
-      draft:"Do not send. Escalate to GM with a summary; recommend a personal callback within 24h, no coupon." },
-    zora:"(Held — no automated reply sent.) Recommended GM opener: 'Hi, this is the GM at our El Segundo location. I read what happened at the counter today and I'm genuinely sorry — that's not okay, and I'd like to make it right personally. Do you have a few minutes to talk?'" },
-  "228640": { subject:"US Foods credit request — expired noodles", group:"79 - Kirkland", status:"solved", rawChars:"8 comments · 3,020 chars", gated:false,
-    thread:[
-      {who:"GM · Kirkland", pub:true, when:"10/29 14:02", body:"The case of noodles we received today has been expired since April 2024. Recovery: Yes. Account 3025709. Item: Noodle - cooked, Item #7162175. Invoice #3457830. Delivery 10-29-2024."},
-      {who:"Guest Relations", pub:true, when:"10/29 15:10", body:"Thank you — filing a credit request with US Foods against invoice #3457830 for the expired case now."},
-      {who:"US Foods (vendor)", pub:true, when:"10/30 09:20", body:"Credit approved for the expired case, item #7162175. Applied to account 3025709."},
-      {who:"Guest Relations", pub:true, when:"10/30 09:45", body:"Credit confirmed and applied. Closing this out — thanks for the quick flag."}
-    ],
-    decode:{ strip:68, atoms:[{t:"ENTITY",v:"noodles"},{t:"ENTITY",v:"invoice #3457830"},{t:"ENTITY",v:"US Foods"},{t:"PROPERTY",v:"expired 04/2024"},{t:"ACTION",v:"credit request"},{t:"ACTION",v:"credit approved"},{t:"STRUCTURE",v:"QUANTITY 1 case"}],
-      program:[["GUEST","reports an expired case of noodles with full invoice detail"],["AGENT","files the credit against invoice #3457830"],["SYSTEM","retrieves account + item record (read-only)"],["AGENT","confirms the approved credit and closes"]] },
-    models:{ verdict:"GROUNDED", verdictNote:"Straightforward, fully-specified claim — every fact (item #, invoice #, account, date) is present. Nothing to invent.", tone:"matter-of-fact", panel:"gemini-2.5-flash + judge", cost:"$0.001",
-      precedents:[{id:"341562",label:"US Foods unspecified invoice",out:"recovered"},{id:"261912",label:"invoice mismatch -> credit",out:"recovered"}],
-      draft:"Confirm the credit request is filed, then confirm approval and close — no embellishment needed." },
-    zora:"Thanks for catching this and sending all the detail — that made it fast. The credit for the expired case (item #7162175, invoice #3457830) has been approved and applied to your account. Appreciate you flagging it so quickly; that's exactly how we keep the quality up." },
-  "48213": { subject:"Guest reports feeling ill after eating", group:"FSQA (routed)", status:"SEVERE · after-hours", rawChars:"3 comments · 980 chars", gated:true,
-    thread:[
-      {who:"Guest", pub:true, when:"9:47 PM", body:"I ate at your Marina del Rey location tonight and a few hours later I've been really sick — nausea and stomach cramps. I wanted to let you know in case it's the food."},
-      {who:"After-hours auto-receipt", pub:false, when:"9:47 PM", body:"Internal: sick/gastroenteritis language detected after hours. SEVERE branch. Route FSQA + DO-Maria + store. HOLD all guest-facing writes for human approval."}
-    ],
-    decode:{ strip:40, atoms:[{t:"ENTITY",v:"Marina del Rey"},{t:"PROPERTY",v:"nausea"},{t:"PROPERTY",v:"cramps"},{t:"PROPERTY",v:"after eating"},{t:"ACTION",v:"report illness"},{t:"STRUCTURE",v:"TEMPORAL hours-after"},{t:"STRUCTURE",v:"SEVERITY high"}],
-      program:[["GUEST","reports illness symptoms after eating (after hours)"],["SYSTEM","detects sick/gastroenteritis -> SEVERE branch"],["SYSTEM","routes to FSQA + DO-Maria + store, priority urgent"],["AGENT","(HELD) acknowledgement drafted — awaits human approval"]] },
-    models:{ verdict:"GROUNDED", verdictNote:"Symptoms + timing are stated plainly. But severe food-illness NEVER auto-fires — the model drafts, a human sends.", tone:"concerned · urgent", panel:"gemini-2.5-flash + gemini-2.5-pro + judge", cost:"$0.003",
-      precedents:[{id:"41120",label:"illness -> FSQA + callback",out:"handled"},{id:"39880",label:"illness -> health-dept loop",out:"handled"}],
-      draft:"Warm, non-admitting acknowledgement; alert FSQA + manager; promise a personal same-day follow-up. Do not admit fault or diagnose." },
-    zora:"Hi Danielle — I'm so sorry to hear you're feeling unwell after eating with us. Your health is what matters most right now. I've flagged this to our Food Safety team and the manager at our Marina del Rey location directly, and someone will personally follow up with you today. Thank you for telling us — it genuinely helps us keep everyone safe." }
-};
+const DRILL = {}; /* demoware drill data removed — tabs read the sealed raw IDS */
 function drillStages(id){
   const D=DRILL[id];
   let s="<style>"
@@ -3742,6 +3730,8 @@ function render(){
     templates:"<button class='tabv"+(TAB==="templates"?" on":"")+"' data-tab='templates'><span class='ti'>&#128221;</span><span class='tl'>Templates"+((ZTPL.run&&ZTPL.run.hot)?" &middot; <b class='ok'>"+ZTPL.run.hot+"</b>":"")+"</span></button>",
     comments:"<button class='tabv"+(TAB==="comments"?" on":"")+"' data-tab='comments'><span class='ti'>&#128172;</span><span class='tl'>Tickets</span></button>",
     rawids:"<button class='tabv"+(TAB==="rawids"?" on":"")+"' data-tab='rawids'><span class='ti'>&#128190;</span><span class='tl'>Raw IDS"+(RAWIDS.seed?" &middot; <b class='ok'>"+(RAWIDS.seed.cases>=1000?Math.round(RAWIDS.seed.cases/1000)+'k':RAWIDS.seed.cases)+"</b>":"")+"</span></button>",
+    sfprog:"<button class='tabv"+(TAB==="sfprog"?" on":"")+"' data-tab='sfprog'><span class='ti'>&#129513;</span><span class='tl'>Programs"+(PJ.data?" &middot; <b class='ok'>"+Math.round(PJ.data.scrubbed.distinct/1000)+"k</b>":"")+"</span></button>",
+    sfscrub:"<button class='tabv"+(TAB==="sfscrub"?" on":"")+"' data-tab='sfscrub'><span class='ti'>&#129532;</span><span class='tl'>Scrub</span></button>",
     apibrowser:"<button class='tabv"+(TAB==="apibrowser"?" on":"")+"' data-tab='apibrowser'><span class='ti'>&#128269;</span><span class='tl'>API Browser</span></button>",
     zdaudit:"<button class='tabv"+(TAB==="zdaudit"?" on":"")+"' data-tab='zdaudit'><span class='ti'>&#128203;</span><span class='tl'>Audit"+((ZAUD.run&&ZAUD.run.findings.length)?" &middot; <b class='bad'>"+ZAUD.run.findings.length+"</b>":"")+"</span></button>",
     helm:"<button class='tabv"+(TAB==="helm"?" on":"")+"' data-tab='helm'><span class='ti'>&#9784;</span><span class='tl'>Helm</span></button>",
@@ -3786,6 +3776,8 @@ function render(){
   h+="<div id='pane-templates' class='"+paneCls("templates")+"'>"+realBadge("live")+templatesPane()+cmBar("templates","Templates tab")+"</div>";
   h+="<div id='pane-comments' class='"+paneCls("comments")+"'>"+realBadge("live")+commentsPane()+cmBar("tickets","Tickets tab")+"</div>";
   h+="<div id='pane-rawids' class='"+paneCls("rawids")+"'>"+realBadge("live")+rawIdsPane()+cmBar("rawids","Raw IDS tab")+"</div>";
+  h+="<div id='pane-sfprog' class='"+paneCls("sfprog")+"'>"+realBadge("live")+sfProgPane()+cmBar("sfprograms","Programs tab")+"</div>";
+  h+="<div id='pane-sfscrub' class='"+paneCls("sfscrub")+"'>"+realBadge("live")+sfScrubPane()+cmBar("sfscrub","Scrub tab")+"</div>";
   h+="<div id='pane-apibrowser' class='"+paneCls("apibrowser")+"'>"+realBadge("live")+apiBrowserPane()+cmBar("apibrowser","API Browser tab")+"</div>";
   h+="<div id='pane-zdaudit' class='"+paneCls("zdaudit")+"'>"+realBadge("live")+zdAuditPane()+cmBar("audit","Audit tab")+"</div>";
   // Helm -- the Airbyte migration steering wheel (gated writes live here, NEVER in the API Browser)
@@ -4567,7 +4559,7 @@ document.addEventListener("click", function(e){
 setInterval(function(){ if(TAB==="watch" && !document.hidden) wchLoad(true); }, WCH_POLL_MS);
 
 const EXPORT_CSS="@page{margin:12mm;size:landscape}body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,sans-serif;margin:0;color:#16242b;font-size:11px;line-height:1.5}h2{color:#0d6e8c;font-size:14px;margin:18px 0 6px;border-bottom:2px solid #6FC3DF;padding-bottom:4px;font-weight:700}.nethead,.tmpl,.stamp,.netbar,.pickbar,.combochips,.exprow{display:none!important}.rpt-head{border-bottom:3px solid #6FC3DF;padding-bottom:10px;margin-bottom:14px}.rpt-brand{font-size:11px;font-weight:800;letter-spacing:3px;color:#0d6e8c}.rpt-brand span{color:#9aa3ad;font-weight:600;letter-spacing:1px}.rpt-title{font-size:22px;font-weight:800;color:#16242b;margin:4px 0 1px}.rpt-subject{font-size:14px;font-weight:700;color:#0d6e8c;margin-bottom:9px}.rpt-meta{width:auto;border-collapse:collapse;font-size:10px;margin:0}.rpt-meta td{border:none;padding:1px 0;vertical-align:top}.rpt-meta td:first-child{color:#8a93a0;text-transform:uppercase;letter-spacing:.5px;padding-right:16px;white-space:nowrap;font-size:9px}.rpt-meta td:last-child{color:#3a4650}table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}th{text-align:left;background:#eef1f4;padding:5px 8px;border:1px solid #c9d0d8;font-size:9.5px;text-transform:uppercase;color:#555}td{padding:2.5px 8px;border:1px solid #dfe4e9;vertical-align:top}td.port{font-weight:bold;color:#0d6e8c}.disc td{color:#9aa0a6}.st-conn{color:#1f7a4d;font-weight:bold}.st-disc{color:#9aa0a6}.ip{font-family:Consolas,monospace;white-space:nowrap}.nw{white-space:nowrap}.hint{color:#0d6e8c}.nameok{color:#1f7a4d;font-weight:bold}.namewarn{color:#c0392b;font-weight:bold}.planned{color:#b35900;font-weight:bold}.av{color:#777}thead{display:table-header-group}tr{break-inside:avoid}.tabs{display:none}.hidden{display:block!important}.wifi-ap{color:#666}.wifi-flag{display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#b35900;border:1px solid #d98a2b;border-radius:5px;padding:0 6px;font-weight:bold}.moreinfo{display:none}.bar{display:none}.box{display:none}.tabdesc{display:none}.auditmode{display:none}.scopeflip{display:none}.planlink{display:none}.pexec{display:none}.readmore{display:none}.histrow{display:none!important}.sect-body{display:block!important}.sect-h .chev{display:none}.sect-h{cursor:auto}.nameit{display:none}.namebar{display:none}.secref{display:none}.renameit{display:none}.renbox{display:none}.sortind{display:none}.savewrap{display:none}.acceptbtn{display:none}.planchk{display:none}.empty{display:none}.audithero{display:none}.plinks{display:none}.rmore{display:none}";
-function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="watch") return "Watch — device connectivity"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="rawids") return "Raw IDS — the OneDine seed"; if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="programs") return "Conversations — every conversation is a program"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
+function viewName(){ if(TAB==="operations") return "Operations"; if(TAB==="network") return "Network"; if(TAB==="watch") return "Watch — device connectivity"; if(TAB==="audit"){ const cr=AUD.runs[AUD.view]; return "Security Audit"+(cr?" — "+(cr.scope==="org"?"Organization":cr.tgt.name):""); } if(TAB==="rawids") return "Raw IDS — the OneDine seed"; if(TAB==="sfprog") return "Programs — every conversation is a program"; if(TAB==="sfscrub") return "Scrub / Derive — clean + redact"; if(TAB==="apibrowser") return "API Browser"; if(TAB==="focus") return "Focus — detractors & food-illness"; if(TAB==="programs") return "Conversations — every conversation is a program"; if(TAB==="comments") return "Tickets"; if(TAB==="zdaudit") return "Audit — Feature & Config Usage"; if(TAB==="cost") return "Cloud Cost"; return "View"; }
 function activePaneHtml(){ const id=TAB==="operations"?"pane-operations":TAB==="network"?"pane-network":TAB==="watch"?"pane-watch":TAB==="apibrowser"?"pane-apibrowser":TAB==="focus"?"pane-focus":TAB==="programs"?"pane-programs":TAB==="comments"?"pane-comments":TAB==="zdaudit"?"pane-zdaudit":TAB==="cost"?"pane-cost":"pane-audit"; const el=document.getElementById(id); return el?el.innerHTML:LAST; }
 const BRAND_FOOT="<div style='margin-top:16px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5px;color:#888;letter-spacing:1px'>CONFIDENTIAL &middot; TRADE SECRET &middot; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED &middot; ARGUS</div>";
 function exportStore(){
