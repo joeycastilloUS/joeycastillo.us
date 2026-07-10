@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — De-atomize POC: conversation from programs</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; } nav .title { color: #999; font-size: 14px; } nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 27px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 15px; margin: 18px 0 6px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; } p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background:#0a0a0a; border:1px solid #222; border-radius:6px; padding:14px 16px; overflow-x:auto; color:#bcd; font-size:12.5px; font-family:Consolas,monospace; margin:12px 0; line-height:1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; } .fail { color:#ff6b6b; font-weight:600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="title">~d — De-atomize POC: conversation from programs</span><span class="pub">Published 2026-07-09 17:55 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/5be57aa7-5f0b-42fb-9f1e-a1b63365d29b/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>~d — De-atomize POC: conversation from programs</h1>
+<blockquote>"Now that we have this massive amount of data&hellip; put it up in memory ALL and run all kinds of things on it&hellip; conversation from programs&hellip; let's <strong>de-atomize</strong>. Give me a small POC." — Joey, 2026-07-09</blockquote>
+
+<div class="section">
+<h2>1. Need</h2>
+<p>The full Mendocino Farms Zendesk corpus is sealed and mesh-resident: <strong>431,260 tickets &middot; 977,029 comments &middot; 8,247,494 triples &middot; 4,610,372 unique strings &middot; 563&nbsp;MB</strong> (<code>gs://acmedev-mendo-tickets-ids/full/</code>, IDS handle <code>8963900c&hellip;</code>). Every comment is a first-class <code>comment:&lt;id&gt;</code> subject with the public/internal flag. Every ticket-thread is a <strong>program</strong> (a-d-d &sect;6, conversation-as-program).</p>
+<p>We proved the reduce direction this session: <code>understand()</code> &rarr; 43 atoms on a real ticket. The decoder is bidirectional — <code>restate()</code> goes the other way — but we have <strong>never run the expand direction against this corpus</strong>. What's missing is proof that a program reconstitutes to conversation (de-atomize), and the payoff proof: one canonical conversation synthesized from a <em>cluster</em> of real programs. Why now: the corpus just became real, the store is mmap-mountable, and both primitives already exist. Zero new theory — one small harness.</p>
+</div>
+
+<div class="section">
+<h2>2. Raw User Stories</h2>
+<ul data-cm="1-need">
+<li>As the operator, I want the whole 563&nbsp;MB store mounted in memory so passes over all 431K programs run at memory speed, not I/O speed.</li>
+<li>As the operator, I want one real ticket-thread de-atomized back into a readable conversation, side by side with the original, so I can see the program reconstitute — deterministically, no model.</li>
+<li>As the operator, I want one canonical conversation synthesized from the common structure of N similar tickets — "this is how support actually handles X" — from real programs, not a summary hallucinated by a model.</li>
+<li>As the operator, I want this as a small read-only C99 tool so I can run cheap corpus-wide passes next, without touching the sealed source.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>3. Sourced Solution <span class="tag">all reuse</span></h2>
+<table data-cm="3-sourced-solution-all-reuse">
+<tr><th>Primitive</th><th>Source</th><th>Role here</th></tr>
+<tr><td><code>restate(const Fact*, int, TripleStore*, const char (*focus)[MAX_ENTITY], int, uint8_t intent_type, char*, int)</code></td><td><code>nous/intelligence/skill/understand/understand.h:182</code></td><td><strong>THE de-atomizer.</strong> In-memory store facts + focus + intent &rarr; fluent text. Deterministic, pure C, no model.</td></tr>
+<tr><td><code>restate_with(const Understanding*, char*, int, const Datamap*)</code></td><td>same header</td><td>Voice stage (&sect;6): atoms &rarr; operator color. Available if the POC wants a datamap voice pass; not required for move 1.</td></tr>
+<tr><td><code>understand(text) &rarr; Understanding{atoms[], entities[], actions[]}</code></td><td>same skill — proven this session (43 atoms, real ticket)</td><td>The reduce direction; already done. POC exercises the inverse.</td></tr>
+<tr><td>mmap'd <code>TripleStore</code> (sealed <code>.ids</code>)</td><td><code>mendo-zendesk-ai/data/full/raw-ids-full</code>, built by <code>be/tools/seal_triples.c</code></td><td>"Up in memory ALL" is the store's design: mount, OS pages 563&nbsp;MB into RAM, iterate 431K programs at memory speed.</td></tr>
+<tr><td><code>PI_DATAMAP</code> + fact-pull pattern</td><td><code>mendo-zendesk-ai/be/tools/derive.c</code>, <code>atomize_one.c</code></td><td>Existing code that mounts this exact store and walks <code>comment:&lt;id&gt;</code> subjects — the harness copies this pattern.</td></tr>
+<tr><td>Intents <code>INTENT_TIMELINE</code>, <code>INTENT_DESCRIBE</code></td><td><code>understand.h:105-113</code></td><td>Move 1 restates a thread as a timeline; move 2 restates cluster-common facts as a description.</td></tr>
+</table>
+<pre>mounted .ids (mmap, all in RAM)
+   |
+   |-- MOVE 1: pull one ticket's comment facts --> restate(facts, TIMELINE) --> conversation
+   |           (original vs de-atomized, side by side)
+   |
+   `-- MOVE 2: cluster N programs --> intersect common facts --> restate(common, DESCRIBE)
+               --> ONE canonical conversation ("how support actually handles X")</pre>
+<p><strong>Reuse:</strong> everything above — <code>restate</code> exists, the store exists, the mount/walk pattern exists in <code>derive.c</code>. <strong>New:</strong> only the POC harness (<code>deatomize_poc.c</code>) and the cluster-common step (a fact intersection over N programs — a loop and a compare, ~30 lines).</p>
+</div>
+
+<div class="section">
+<h2>4. Naming <span class="tag">literal</span></h2>
+<table data-cm="4-naming-literal">
+<tr><th>Name</th><th>Means</th></tr>
+<tr><td><strong>de-atomize</strong></td><td>Facts &rarr; conversation text. It IS <code>restate()</code> — the name states the direction, the function does the work.</td></tr>
+<tr><td><strong>program</strong></td><td>One ticket-thread's facts in the store (its <code>.pi</code>). Conversation-as-program, a-d-d &sect;6.</td></tr>
+<tr><td><strong>canonical conversation</strong></td><td>The one conversation de-atomized from the facts N similar programs share.</td></tr>
+<tr><td><strong><code>deatomize_poc</code></strong></td><td>The tool. Says what it does, says it's a POC.</td></tr>
+</table>
+<p>Collisions: <span class="pass">none</span> — no existing <code>deatomize*</code> in nous, mendo tools, or argus.</p>
+</div>
+
+<div class="section">
+<h2>5. Shape</h2>
+<p>One C99 file, <code>deatomize_poc.c</code>, read-only against the sealed store. Prints to stdout.</p>
+<ol>
+<li><strong>Mount</strong> — open <code>data/full/raw-ids-full</code> the way <code>derive.c</code> does; the 563&nbsp;MB store is now RAM-speed.</li>
+<li><strong>Move 1 — round-trip one thread</strong> — pick one real ticket, pull its <code>comment:&lt;id&gt;</code> facts (public flag respected), call <code>restate(facts, nfacts, store, focus=ticket, INTENT_TIMELINE, out)</code>. Print original comments vs de-atomized restatement side by side.</li>
+<li><strong>Move 2 — conversation from programs</strong> — take N=5 tickets sharing a group/type, pull each program's facts, keep the facts common across the cluster (predicate+object intersection), call <code>restate(common, &hellip;, INTENT_DESCRIBE, out)</code>. Print the ONE canonical conversation.</li>
+</ol>
+<h3>Out of scope (YAGNI)</h3>
+<ul>
+<li><span class="fail">✗</span> Argus UI wiring — POC prints to stdout (a small HTML dump at most).</li>
+<li><span class="fail">✗</span> Model-based generation — <code>restate()</code> is deterministic; no model anywhere.</li>
+<li><span class="fail">✗</span> Full situation-classifier — cluster pick is "same group/type," nothing smarter.</li>
+<li><span class="fail">✗</span> Any write path — read-only; the sealed <code>.ids</code> is never touched. No network.</li>
+</ul>
+<h3>Choices — reconstruct vs synthesize</h3>
+<p>Move 1 <em>reconstructs</em> the actual thread (all of one program's facts, <code>INTENT_TIMELINE</code> — fidelity is the test). Move 2 <em>synthesizes</em> a canonical one (only the facts N programs share, <code>INTENT_DESCRIBE</code> — generality is the test). Different outputs, same primitive, one parameter apart. The POC does both, small — together they bracket what de-atomize can do.</p>
+</div>
+
+<div class="section">
+<h2>6. First Move</h2>
+<p>Compile a ~60-line <code>deatomize_poc.c</code>: mount <code>data/full/raw-ids-full</code>, pull one ticket's comment facts, call <code>restate(&hellip;, INTENT_TIMELINE, &hellip;)</code>, print original vs de-atomized. One ticket, one round-trip, off the store we already have. Move 2 (cluster &rarr; canonical) follows only after move 1 reads clean.</p>
+<pre>TripleStore store;              /* mmap the sealed .ids — all in RAM   */
+Fact facts[MAX_FACTS]; int n;   /* one ticket's comment facts          */
+char focus[1][MAX_ENTITY];      /* "ticket:&lt;id&gt;"                       */
+char out[8192];
+restate(facts, n, &store, focus, 1, INTENT_TIMELINE, out, sizeof out);
+printf("--- original ---\n%s\n--- de-atomized ---\n%s\n", orig, out);</pre>
+<h3>All kinds of things — named, not scoped</h3>
+<ul>
+<li><em>Next:</em> per-situation canonical exemplars — move 2 run per group/type over the whole corpus.</li>
+<li><em>Next:</em> a de-atomized digest of an entire ticket-class — one page of conversation standing for thousands of programs.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>DoD</h2>
+<ul data-cm="5-shape">
+<li><span class="pass">✓</span> Six-section spine present, right-sized for a POC</li>
+<li><span class="pass">✓</span> Sourced from real primitives (<code>restate</code> verified at <code>understand.h:182</code>; intents at <code>:105-113</code>; store + <code>derive.c</code> pattern on disk)</li>
+<li><span class="pass">✓</span> Names literal — de-atomize, program, canonical conversation, <code>deatomize_poc</code>; zero collisions</li>
+<li><span class="pass">✓</span> First Move genuinely small — ~60 lines, one ticket, one round-trip, runs on the store we built</li>
+<li><span class="pass">✓</span> Read-only &middot; no model &middot; no network &middot; pure C99</li>
+</ul>
+<p><strong>Next:</strong> <code>~p</code> then <code>~b</code> move 1.</p>
+</div>
+
+</div>
+<footer>v0 &middot; r489 &middot; 2026-07-09 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"5be57aa7-5f0b-42fb-9f1e-a1b63365d29b"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
