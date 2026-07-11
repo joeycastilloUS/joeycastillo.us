@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design &mdash; metal in every view (the prevailing in-app comments system)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 16px; margin: 20px 0 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .optional h2 { border-bottom-style: dashed; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; }
+  li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; }
+  pre code { background: none; padding: 0; color: #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 14px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  .have { color: #22c55e; }
+  .lack { color: #E5484D; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~d &mdash; metal in every view &middot; Fable5</span>
+  <span class="pub">Published 2026-07-11 14:00 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/a8361384-2ed9-411a-864e-782d6261a4a9/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Design &mdash; metal in every view</h1>
+<p style="color:#999;">Make the metal comment system the prevailing in-app comments system in Argus &mdash; every view gets a metal thread, so jc and metal work together to continue the build from inside the build.</p>
+
+<h2>1. Need</h2>
+<div data-cm="1-need" class="section">
+  <p>jc and metal already collaborate through comment threads &mdash; but only on Be artifacts
+  (designs, plans, reports) at their cap-URLs. Inside Argus itself, where jc actually
+  <em>looks at the work</em>, there is only a homegrown comment bar (<code>cmBar</code>/<code>acx</code>,
+  <code>web/app/index.html:628&ndash;658</code>) on 8 of 21 views &mdash; and it is a dead letterbox:
+  comments land in Firestore, <strong>nobody answers</strong>. No session wakes, no tilde routes, no
+  model/token/cost attribution, no live status. Meanwhile the metal stack shipped all of that this
+  week (comments route straight to a live session; the exchange narrates itself). Two comment systems
+  have diverged; the better one isn't in the app. The need: <strong>one prevailing comments system
+  &mdash; the metal one &mdash; on every Argus view</strong>, so a comment in any view is a working
+  conversation with metal about that view, and the build continues from where the work is seen.</p>
+</div>
+
+<h2>The Analysis &mdash; Argus today (Zendesk console)</h2>
+<div data-cm="the-analysis-argus-today-zendesk" class="section">
+  <p>Argus is the read-only multi-source ops console in front of Zendesk (plus Meraki, Cloudflare,
+  Airbyte, Salesforce, GCP). Frontend is one vanilla-JS single page (<code>web/app/index.html</code>)
+  with a cached-pane view dispatch (<code>paneInner(TAB)</code>, lines 4909&ndash;4951) &mdash; 21 views,
+  one switch, one render path. That is the whole integration surface.</p>
+  <table>
+    <tr><th>Views (21)</th><th>Comment bar today</th><th>Metal routing today</th></tr>
+    <tr><td>Focus, Off-Script &amp; Gaps, Tickets, Raw IDS, Programs (SF), Scrub, API Browser, Zendesk Audit</td><td class="have">&#10003; acx bar (8 views)</td><td class="lack">&#10007; none &mdash; nobody answers</td></tr>
+    <tr><td>Operations, Network, Watch, Security Audit, Sync, Helm, Cost, Find, Programs (corpus), Matches, Patterns, Shape, Load Data</td><td class="lack">&#10007; no comments (13 views)</td><td class="lack">&#10007; none</td></tr>
+  </table>
+  <p>The existing acx bar posts <code>{doc:"argus-zendesk", obj:"zd-&lt;view&gt;"}</code> to gcp-bridge
+  <code>/comments</code> &mdash; same backend the metal widget uses. So the store is already shared;
+  what Argus lacks is the <strong>widget</strong> (threads, replies, live status, N-new, attribution)
+  and the <strong>ear</strong> (a session that hears and acts). ARCHITECTURE.md &sect;4-B already
+  blesses this exact feature: <em>"Argus itself will get a similar in-app comment mechanism later
+  &mdash; that too is dialogue / app-dev, not institutional knowledge."</em> No spec drift &mdash;
+  this design fills a slot the architecture reserved.</p>
+</div>
+
+<h2>2. Raw User Stories</h2>
+<div data-cm="2-raw-user-stories" class="section">
+  <ul>
+    <li>As jc, I want a metal thread on every Argus view, so that I can steer the build from the exact view I'm looking at.</li>
+    <li>As jc, I want a <code>~</code> comment in any view to wake a metal session that executes it, so that build orders don't require leaving the app.</li>
+    <li>As jc, I want the session's reply in-thread with the live exchange (asking &rarr; [model] working Ns &rarr; done &middot; tok &middot; $cost), so that I see who did it and what it cost.</li>
+    <li>As a metal session, I want the view's identity and repo resolvable from the comment's doc token, so that I wake in <code>C:/argus</code> with the right context, not in the wrong repo.</li>
+    <li>As the architecture owner, I want view threads to stay Channel B (dialogue) and never feed wisdom, so that the two-channel law (&sect;4) holds.</li>
+  </ul>
+</div>
+
+<h2>3. Sourced Solution</h2>
+<div data-cm="3-sourced-solution" class="section">
+  <p>Mine what exists before inventing. Cite the source of every candidate.</p>
+  <table>
+    <tr><th>Source</th><th>What's there we can use</th><th>Reuse / model / invent</th></tr>
+    <tr><td><code>kastil-systems/a-d-d</code></td><td>Latchkey pattern (every artifact born a commentable cap-URL); Argus ARCHITECTURE.md &sect;4-B reserves the in-app comment slot, Channel A/B law.</td><td>reuse</td></tr>
+    <tr><td><code>kastil-systems/nous</code> + <code>src/sdk/</code></td><td><code>src/session/session-ear.c</code> (metal) &mdash; pure C99 watcher: polls <code>/session/inbox</code>, wakes <code>claude -p</code> per order (question/order kinds, 8 concurrent, 10-min timeout), posts the answer with the <code>&#10214;session:model|tok|usd|ms&#10215;</code> trailer.</td><td>reuse + one extension (per-token repo)</td></tr>
+    <tr><td>Apps we've built</td><td>metal's <code>artifact-comments.js</code> (hosted widget: per-section threads, replies, edits, 15s poll, live self-narrating exchange, N-new badge); <code>latchkey_publish.py</code> + <code>cap_tokens.py</code> Ledger; gcp-bridge <code>/comments</code> + <code>/comments/recent</code> + <code>/session/inbox</code>; Argus's own <code>cmBar</code>/<code>acx</code> (the retiree, and proof the store works in-app).</td><td>lift wholesale</td></tr>
+    <tr><td>Outside</td><td>Figma/Google-Docs contextual comments, Intercom-style in-app messengers &mdash; the pattern "comment where you look" is proven product design.</td><td>model (validates; nothing to copy)</td></tr>
+  </table>
+  <p><strong>Proposed approach:</strong> Reuse the entire metal comment stack unchanged where possible.
+  Invent only three pieces of glue: (1) <strong>view tokens</strong> &mdash; mint one cap-token per Argus
+  view into the Argus Ledger (<code>kind: argus-view</code>, <code>key: &lt;tab id&gt;</code>) with a new
+  <code>repo</code> field; (2) a <strong>mount point</strong> &mdash; one injection in Argus's
+  <code>render()</code> that mounts the hosted widget under every pane with the active view's token as
+  <code>doc</code>; (3) an <strong>ear ledger list</strong> &mdash; session-ear reads N Ledgers (metal +
+  argus) and wakes the session in the token's <code>repo</code>. gcp-bridge and Firestore need zero changes.</p>
+</div>
+
+<h2>4. Naming</h2>
+<div data-cm="4-naming" class="section">
+  <p>Literal names for what each thing does.</p>
+  <table>
+    <tr><th>Thing</th><th>Literal name</th><th>Why this is what it is</th></tr>
+    <tr><td>Cap-token minted per Argus view</td><td><code>view token</code> (kind <code>argus-view</code>)</td><td>It is the capability token for one view's thread. The doc IS the view.</td></tr>
+    <tr><td>The comment thread on a view</td><td><code>view thread</code></td><td>A thread addressed to a view: <code>{doc: view-token, obj: section}</code>.</td></tr>
+    <tr><td>The one line in <code>render()</code> that mounts the widget on every pane</td><td><code>mount point</code></td><td>Where the widget mounts. One place, all 21 views.</td></tr>
+    <tr><td>New Ledger field: which repo a woken session runs in</td><td><code>repo</code></td><td>Names the working directory literally. Ear uses it as cwd.</td></tr>
+    <tr><td>session-ear reading multiple Ledgers</td><td><code>ledger list</code></td><td>A list of Ledgers the ear reads. Nothing more.</td></tr>
+    <tr><td>The UI block itself, as jc sees it in-app</td><td><strong>metal</strong></td><td>jc's own words: "each view has metal." The block is a metal thread &mdash; the name is literally what it is.</td></tr>
+    <tr><td>Removing the homegrown bar</td><td><code>acx retirement</code></td><td>The acx widget retires; the metal widget prevails.</td></tr>
+  </table>
+  <p><strong>Collisions:</strong> Argus has a view named <em>Tickets (Comments)</em> &mdash; those are
+  <strong>Zendesk ticket comments</strong> (customer data), a different thing entirely. Resolution: the
+  in-app block is labeled <strong>metal</strong>, never "comments," so the two never blur. No tilde or
+  file collisions.</p>
+</div>
+
+<h2>5. Shape</h2>
+<div data-cm="5-shape" class="section">
+  <p><strong>Minimum viable structure &mdash; four parts, three of them already built:</strong></p>
+  <ul>
+    <li><strong>View tokens (new, one-time).</strong> Mint 21 tokens via <code>cap_tokens.get_or_mint("argus-view", &lt;tab&gt;, title, rel_path="web/app/index.html#&lt;tab&gt;")</code> + <code>repo:"C:/argus"</code> into <code>C:/argus/be/cap-tokens.json</code>. Ship the public map <code>VIEW_TOKENS = {tab: token}</code> into the frontend (tokens are capabilities, not secrets to the operator using the gated app).</li>
+    <li><strong>Mount point (new, ~10 lines).</strong> In <code>render()</code> after <code>paneInner(TAB)</code>: append <code>&lt;div class="metal"&gt;</code>, set <code>window.ARTIFACT={doc: VIEW_TOKENS[TAB]}</code>, and (re)init the hosted widget. Widget gains a <code>remount(doc)</code> entry so the SPA can switch docs on tab change &mdash; one visible view, one active doc. Script loaded once by URL (<code>/metal/artifact-comments.js</code>, never inline).</li>
+    <li><strong>Ear ledger list + repo wake (small extension).</strong> session-ear.c reads a list of Ledger paths (metal + argus). When an order's doc resolves to an <code>argus-view</code> token, the ear spawns <code>claude -p</code> with cwd = the token's <code>repo</code>, prompt naming the view. Answers post back with the standard attribution trailer; the widget narrates the exchange live.</li>
+    <li><strong>Store + law (unchanged).</strong> gcp-bridge <code>/comments</code> endpoints as-is; Firestore <code>comments</code>/<code>comment_seen</code> collections as-is. View threads are Channel B dialogue &mdash; they never write to <code>corrections</code>/<code>wisdom</code> (&sect;4 rule holds by construction: different collections, no code path between them).</li>
+  </ul>
+  <p><strong>Out of scope (YAGNI):</strong></p>
+  <ul>
+    <li>Per-ticket or per-row threads (a thread per Zendesk ticket) &mdash; the view is the unit; go finer only when a real need shows.</li>
+    <li>Migrating historical acx comments &mdash; old <code>doc:"argus-zendesk"</code> threads stay readable in Firestore; no data migration.</li>
+    <li>Comment auth/identity beyond the existing gate + name field.</li>
+    <li>Any wisdom/AI-training coupling &mdash; forbidden by &sect;4.</li>
+  </ul>
+</div>
+
+<h2>6. First Move</h2>
+<div data-cm="6-first-move" class="section">
+  <blockquote>Mint ONE view token (<code>argus-view/focus</code>), hand-mount the metal widget on the Focus pane only, post a <code>~</code> comment from inside Argus, and watch the ear wake a session in <code>C:/argus</code> and the answer land in-thread with the model/tok/cost trailer. One view round-tripping end-to-end proves the whole design.</blockquote>
+  <p>These go into the plan (not written to board.md here): mount point for all 21 views + <code>VIEW_TOKENS</code> map; widget <code>remount(doc)</code>; ear ledger list + <code>repo</code> wake; acx retirement (remove <code>cmBar</code> calls + dead CSS); per-section <code>obj</code> anchors inside heavy views (Focus cards, Audit sections).</p>
+</div>
+
+<div class="optional">
+<h2>Choices + Consequences <span class="tag">earned</span></h2>
+<div data-cm="choices-consequences-earned" class="section">
+  <table>
+    <tr><th>Fork</th><th>Options</th><th>Pick + Reason</th></tr>
+    <tr>
+      <td>Thread addressing</td>
+      <td>(a) one doc for the whole app, obj per view (today's acx shape) &mdash; 2nd: zero minting &mdash; 3rd: ear can't route per view, no per-view provenance or deep link.<br>(b) one token per view &mdash; 2nd: 21 Ledger rows (cheap, one-time) &mdash; 3rd: each view is a first-class Latchkey: per-view routing, provenance, shareable thread.</td>
+      <td><strong>(b).</strong> "Each view has metal" &mdash; literally. The token is what makes a view addressable.</td>
+    </tr>
+    <tr>
+      <td>Homegrown acx bar</td>
+      <td>(a) keep both widgets &mdash; 2nd: two UIs on one store &mdash; 3rd: permanent drift, double maintenance.<br>(b) retire acx, metal widget prevails &mdash; 2nd: one system &mdash; 3rd: every widget improvement lands in Argus for free.</td>
+      <td><strong>(b).</strong> jc's word: "prevailing." One comments system.</td>
+    </tr>
+    <tr>
+      <td>Where argus tokens live</td>
+      <td>(a) mirror into metal's Ledger &mdash; 2nd: ear needs no change &mdash; 3rd: two sources of truth, breaks Rule 2 (artifacts live in the project repo).<br>(b) argus Ledger + ear ledger list &mdash; 2nd: small C99 extension &mdash; 3rd: tokens stay with their repo; pattern scales to the next app.</td>
+      <td><strong>(b).</strong> Truth stays home; the ear learns to read more than one home.</td>
+    </tr>
+  </table>
+</div>
+</div>
+
+<div class="optional">
+<h2>Escape Routes <span class="tag">earned</span></h2>
+<div data-cm="escape-routes-earned" class="section">
+  <table>
+    <tr><th>Load-bearing choice</th><th>Reversal path</th></tr>
+    <tr><td>acx retirement</td><td>Fully reversible &mdash; cmBar/acx code stays in git history; restoring is one revert. Old threads untouched in Firestore.</td></tr>
+    <tr><td>Per-view token minting</td><td>Append-only and idempotent (<code>get_or_mint</code>); abandoning costs nothing &mdash; unused Ledger rows are inert.</td></tr>
+    <tr><td>Ear ledger list</td><td>Additive with metal-only fallback; removing the argus path returns the ear to today's behavior.</td></tr>
+  </table>
+</div>
+</div>
+
+<div class="optional">
+<h2>Pure Metal Test <span class="tag">earned</span></h2>
+<div data-cm="pure-metal-test-earned" class="section">
+  <p>No frameworks, no external runtime, no vendor lock?</p>
+  <table>
+    <tr><th>Dependency</th><th>Role</th><th>Load-bearing?</th></tr>
+    <tr><td><code>artifact-comments.js</code></td><td>Thread UI, vanilla JS, ours, hosted once</td><td>No &mdash; ours, replaceable</td></tr>
+    <tr><td><code>session-ear.c</code></td><td>Wake + answer loop, pure C99, ours</td><td>No &mdash; ours</td></tr>
+    <tr><td>gcp-bridge (C# jacket)</td><td>Foreign-API gate for Firestore REST</td><td>Yes &mdash; but bridge-tier by the Language Boundary law; retirement target already named (nous replicated mesh, per the comment-action-loop design)</td></tr>
+    <tr><td>Firestore</td><td>Bootstrap comment store</td><td>Behind the bridge; swaps with the bridge's retirement</td></tr>
+  </table>
+  <p><strong>Verdict:</strong> <span class="pass">&#10003; Passes</span> &mdash; one load-bearing foreign dependency, already jacketed and already carrying a named exit.</p>
+</div>
+</div>
+
+<h2>Definition of Done</h2>
+<div data-cm="definition-of-done" class="section">
+  <ul>
+    <li><span class="pass">&#10003;</span> A-D-D verified (ARCHITECTURE.md &sect;4-B reserves this feature; design stays Channel B &mdash; no drift)</li>
+    <li><span class="pass">&#10003;</span> Design committed (HTML artifact)</li>
+    <li><span class="pass">&#10003;</span> Commit hash in telemetry</li>
+    <li><span class="pass">&#10003;</span> HTML saved at <code>be/designs/2026-07-11-1400-design-metal-in-every-view-fable5.html</code></li>
+    <li><span class="pass">&#10003;</span> Index updated</li>
+    <li><span class="pass">&#10003;</span> Pushed to remote</li>
+    <li><span class="pass">&#10003;</span> No prior work damaged (read-only design; no source edits)</li>
+    <li><span class="pass">&#10003;</span> Production verified (cap-URL serves HTTP 200)</li>
+    <li><span class="pass">&#10003;</span> Six spine sections present (Need, Stories, Sourced Solution, Naming, Shape, First Move)</li>
+    <li><span class="pass">&#10003;</span> Solution sourced (a-d-d + nous/src/sdk + our apps + outside) before inventing</li>
+    <li><span class="pass">&#10003;</span> Names literal; right-sized tools included only where earned</li>
+  </ul>
+</div>
+
+</div>
+<footer>v0 &middot; r585 &middot; 2026-07-11 &middot; Be &middot; argus</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"a8361384-2ed9-411a-864e-782d6261a4a9"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
