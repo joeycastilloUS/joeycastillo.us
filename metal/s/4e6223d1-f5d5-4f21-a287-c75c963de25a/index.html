@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design &mdash; Argus-for-Zendesk, Wire-Native</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 16px; margin: 20px 0 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; }
+  li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; }
+  pre code { background: none; padding: 0; color: #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 14px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .kill { color: #ff9b9b; }
+  .keep { color: #7CFFB2; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~d &mdash; Argus-for-Zendesk, Wire-Native</span>
+  <span class="pub">Published 2026-07-13 14:01 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/4e6223d1-f5d5-4f21-a287-c75c963de25a/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Design &mdash; Argus-for-Zendesk, Wire-Native</h1>
+<p style="color:#999;">Re-cast the Zendesk corpus pipeline from HTTP / GCS / Cloud-Run to the nous wire &mdash; the way the Communication Law requires, and the only way the operator's event-ripple actually works.</p>
+
+<div class="section">
+<h2>1 &middot; Need</h2>
+<p>The pipeline we shipped works but violates the communication law: <em>the way to talk to Purcius is the wire protocol &mdash; never HTTP/REST into the substrate.</em> Today every hop is a violation: console &rarr; <code>gcp-bridge</code> (C# HTTP) &rarr; <code>zendesk-raw</code> (C99 <b>HTTP</b> service, daily-passphrase bearer) &rarr; GCS objects &rarr; Cloud Run fold/derive jobs &rarr; env-var promote.</p>
+<p>The violations aren't cosmetic &mdash; they're the direct cause of the operator's three complaints:</p>
+<ol>
+  <li><b>Slow.</b> The daily feed re-derives all 433K tickets (~1&ndash;2h) because GCS blobs + batch jobs can't ripple; plus HTTP round-trips and Cloud Run cold starts on every read.</li>
+  <li><b>Stale.</b> Ticket #455091 was solved in Zendesk and showed unhandled in Argus <b>for days</b>. Batch pull + batch fold = staleness by construction.</li>
+  <li><b>No ripple.</b> The operator's stated vision: &ldquo;we receive a webhook/event, the ripple effect is the key, all data self-organizes and relates, DMA at the metal is light speed.&rdquo; HTTP+GCS+batch cannot deliver that. The wire can &mdash; the corpus already <b>is</b> a sealed IDS store, and the mesh already speaks triples.</li>
+</ol>
+<p><b>Need:</b> the corpus lives on a <b>prime</b>, is served over <b>NTRP0001</b>, and is fed by an <b>event ripple</b> &mdash; one ticket in, O(one ticket) of work out, fresh in seconds.</p>
+</div>
+
+<div class="section">
+<h2>2 &middot; Raw User Stories</h2>
+<ul data-cm="1-need">
+  <li>When a ticket changes in Zendesk, Argus reflects it in <b>seconds</b> &mdash; #455091 never happens again.</li>
+  <li>As the console, I query the corpus over wire and get triples back &mdash; no bearer, no HTTP, no cold start.</li>
+  <li>As Focus / Find / precedents, I hear a ticket signal and update myself &mdash; &ldquo;one pipe in, many ears out,&rdquo; no polling.</li>
+  <li>As the operator, the daily 1&ndash;2h re-derive disappears; ingest cost is O(one ticket).</li>
+  <li>As the operator, &ldquo;is Argus in sync with Zendesk?&rdquo; is one wire query, not a script counting HTTP GETs.</li>
+  <li>As the builder, I migrate incrementally &mdash; keep the C# Zendesk jacket and the sealed IDS format, no big-bang.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>3 &middot; Sourced Solution</h2>
+<p>Everything needed already exists in the substrate. Nothing new is invented; the outside world contributes nothing (no Kafka, no Pub/Sub, no GCS).</p>
+<table>
+<tr><th>Piece</th><th>Source</th><th>What it gives us</th></tr>
+<tr><td>Transport</td><td><code>nous/comms/skill/wire</code> (<code>wire.h</code>)</td><td>NTRP0001 packed triples over TCP; self-framing (triple_count + payload_bytes); <code>wire_request()</code>, <code>wire_pack/unpack</code>; atom macros <code>W_ACTION/W_ENTITY/W_STRUCTURE</code>. A wire message <b>is</b> an array of understand()-atoms &mdash; the same shape the store holds. No serialization boundary anywhere in the system.</td></tr>
+<tr><td>Gate</td><td><code>nous/comms/skill/relay</code> (<code>relay_server.c</code>)</td><td>Authenticated forwarder between the open internet and locked primes &mdash; auth / forward / status verbs, sessions in the triple store, AES-256-GCM transport. Forked from <code>prime_server.c</code>, which is exactly the skeleton the corpus prime forks again.</td></tr>
+<tr><td>Store</td><td><code>nous/memory/skill/store</code> (<code>store.h</code>)</td><td>The sealed IDS TripleStore: <code>facts.bin/dict.bin/strings.bin</code>, mmap'd, fnv1a ids, <code>ids_insert/ids_query</code>, WAL (<code>Journal</code>), AES-256-GCM at rest (<code>ids_open_encrypted</code>), O(1) dict hash at 4.6M strings. <b>The 433K-ticket corpus (<code>raw-ids-full</code>) already IS one.</b></td></tr>
+<tr><td>Decompose</td><td>nous <code>understand()</code></td><td>Ticket text &rarr; atoms. Atoms are wire triples are store facts &mdash; one representation from Zendesk edge to query result. Cannot hallucinate.</td></tr>
+<tr><td>Events</td><td>Signals canon</td><td>Every event = sealed IDS record <code>{kind:"Signal", what, by, cmd, context, at, seal}</code>, Ed25519-sealed by operator FQDN, broadcast into <code>nous/comms</code>. The ripple's ignition.</td></tr>
+<tr><td>Foreign edge</td><td>existing C# <code>zendesk-bridge</code> jacket</td><td>The ONE legitimate jacket (Language Boundary canon). Keep it. Repoint its output: instead of gzip deltas to GCS, it emits wire.</td></tr>
+<tr><td>Mesh plumbing</td><td><code>nous/comms/skill/mesh</code>, <code>dns</code> (relay.3-nous.net), <code>pulse</code></td><td>Discovery, liveness, addressing &mdash; already deployed for relay/prime.</td></tr>
+</table>
+<p><b>The ripple mechanism</b> (the one genuinely new part, built from store primitives): projections (BM25 postings, similar-ticket links, Focus rollups) are stored <em>as facts</em>, each keyed by the fnv1a content-hash of its input fact set. A delta ingest touches a known set of ids; only projections whose input set intersects those ids recompute. BM25 is per-term incremental (adjust postings + doc count for one doc); similar/precedent recomputes only the new ticket's neighborhood. <b>The 20-shard full derive becomes O(one ticket).</b></p>
+</div>
+
+<div class="section">
+<h2>4 &middot; Literal Naming</h2>
+<table data-cm="3-sourced-solution">
+<tr><th>Name</th><th>What it is &mdash; literally</th></tr>
+<tr><td><b>zendesk jacket</b></td><td>The one C# edge: Zendesk REST pull + webhook receipt. Exists today; keeps its name.</td></tr>
+<tr><td><b>corpus prime</b></td><td><code>corpus_prime.c</code>, forked from <code>prime_server.c</code> &mdash; the locked node holding the sealed Zendesk IDS store, serving corpus verbs over NTRP0001, behind the relay.</td></tr>
+<tr><td><b>ticket signal</b></td><td>The sealed Signal record for one Zendesk ticket event, atoms attached, broadcast into <code>nous/comms</code>.</td></tr>
+<tr><td><b>ripple</b></td><td><code>corpus_ripple(Ids*, delta)</code> &mdash; insert delta facts, recompute only intersecting projections, emit &ldquo;corpus updated&rdquo; signal.</td></tr>
+<tr><td><b>projection</b></td><td>A derived queryable view stored as facts, content-hash-keyed to its inputs (bm25-postings, similar-links, focus-rollup).</td></tr>
+<tr><td><b>wire verbs</b></td><td><code>search replay similar version ingest audit</code> &mdash; 1:1 literal successors of the HTTP endpoints they kill. Carried as atoms: <code>W_ACTION("search")</code> + <code>W_ENTITY(term)</code>&hellip; + <code>W_STRUCTURE</code> for filters.</td></tr>
+<tr><td><b>product edge</b></td><td>The thin translator at the Argus product boundary that turns its web face's calls into wire. Products may have web faces; substrate reach is wire &mdash; the only place HTTP survives, and it's <em>outside</em> the substrate.</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>5 &middot; Shape</h2>
+<pre data-cm="5-shape"><code>Zendesk (foreign REST + webhooks)
+   |  their HTTPS -- foreign edge
+   v
+zendesk jacket (C#, the ONE jacket -- pull + webhook receipt)
+   |  understand(ticket) -> atoms -> NTRP0001 frame + sealed ticket signal
+   v  wire over TLS
+relay  (relay_server.c: auth / forward / status)  &lt;-- console (C99, wire native)
+   |  forward triples                             &lt;-- product edge (web->wire,
+   v                                                   product boundary only)
+corpus prime  (corpus_prime.c &lt;- fork of prime_server.c)
+   |-- sealed IDS: facts.bin / dict.bin / strings.bin  (AES-256-GCM at rest, WAL)
+   |-- ingest -> ids_insert(delta) -> ripple -> intersecting projections recompute
+   |-- search / replay / similar / version / audit -> ids_query + projections
+   \-- emits "corpus updated" signal -> many ears (Focus, Find, precedents)</code></pre>
+<p><b>Ingest as signal/ripple.</b> Webhook fires &rarr; jacket calls <code>understand()</code> &rarr; atoms &rarr; one NTRP frame through the relay to the corpus prime's <code>ingest</code> verb + one sealed ticket signal into <code>nous/comms</code>. The prime inserts the delta and ripples. Focus/Find/precedents are ears on the pipe &mdash; they update in near-real-time. <b>Contrast:</b> today a solved ticket waits for the nightly pull, a GCS delta, a 1&ndash;2h 433K-ticket re-derive, and a promote flip. Wire: the ripple is O(one ticket). That is &ldquo;DMA at the metal is light speed,&rdquo; realized with primitives that already exist.</p>
+<p><b>Serve.</b> Console speaks <code>wire_request()</code> natively (it's C99). <code>zendesk-raw</code>'s HTTP surface and the <code>gcp-bridge</code> corpus lane are replaced by the prime's verbs; the daily-passphrase bearer is replaced by relay auth (sessions already live in the relay's own triple store).</p>
+<p><b>Sync/freshness.</b> Freshness becomes intrinsic &mdash; a live-rippled store IS current; there is no &ldquo;promote,&rdquo; just <code>version</code> (fact count + journal seq). The coverage audit becomes the <code>audit</code> verb: prime reports per-window ticket counts / max-id / id-set hash from the IDS; the jacket reports the same from Zendesk REST; the diff comes back as triples. No HTTP counting scripts.</p>
+<p class="kill"><b>Kill list</b> (all law violations): <code>zendesk-raw</code> HTTP service, <code>/corpus/pull</code>, GCS gzip deltas, Cloud Run fold job, 20-shard derive job + merge, env-var promote, daily-passphrase bearer.</p>
+<h3>Constraints / Unknowns</h3>
+<ul>
+  <li><code>WIRE_BUF_SIZE</code> is 128KB / 1024 triples per frame &mdash; a long ticket thread may need multi-frame chunking on <code>ingest</code>; spec a <code>part i/n</code> meta-triple before build.</li>
+  <li>The corpus prime co-locates with existing prime infra behind relay.3-nous.net; heed Rule 13 &mdash; verify from inside GCP, wire over TLS, <code>curl</code> will lie.</li>
+  <li>Projection content-hash keying needs a reverse index (input-id &rarr; projection) &mdash; <code>ids_create_index</code> exists; confirm <code>IndexField</code> coverage fits or add one.</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>6 &middot; First Move</h2>
+<p><b>Serve the EXISTING sealed corpus over the wire &mdash; read path only, prove the law end-to-end before touching ingest.</b></p>
+<ol>
+  <li>Fork <code>prime_server.c</code> &rarr; <code>corpus_prime.c</code>; <code>ids_open_encrypted()</code> the existing <code>raw-ids-full</code> store (format unchanged &mdash; zero data migration).</li>
+  <li>Implement ONE verb: <code>search</code> &mdash; unpack <code>W_ACTION("search")</code> + entity terms, run BM25 over the existing derived projection, return top-k hits as triples <code>{ticket-id, "hit", subject}</code> + <code>{ticket-id, "score", n}</code>.</li>
+  <li>One C99 console client: <code>wire_request()</code> through the relay to the corpus prime; print hits.</li>
+  <li>Prove: same query against <code>zendesk-raw</code> HTTP vs the wire &mdash; identical results, latency measured side by side.</li>
+</ol>
+<p>HTTP stays live during the proof; nothing breaks. Then the migration runs incremental:</p>
+<ul>
+  <li><b>Phase 1</b> &mdash; cut console + <code>gcp-bridge</code> corpus reads to wire; add <code>replay/similar/version</code>.</li>
+  <li><b>Phase 2</b> &mdash; webhook &rarr; jacket &rarr; signal &rarr; <code>ingest</code> ripple, with the nightly HTTP pull demoted to audit backstop.</li>
+  <li><b>Phase 3</b> &mdash; retire GCS + Cloud Run fold/derive + <code>zendesk-raw</code> once <code>audit</code> runs green N consecutive days.</li>
+</ul>
+<p class="keep">Kept throughout: the C# zendesk jacket, the IDS seal/format, the derive algorithms (re-hosted in the prime as incremental ripple, not batch).</p>
+</div>
+
+<div class="section">
+<h2>Definition of Done &mdash; this artifact</h2>
+<ul data-cm="6-first-move">
+  <li>&#10003; A-D-D verified &mdash; grounded in real code: <code>wire.h</code> (NTRP0001, <code>wire_request</code>, 128KB frame), <code>relay_server.c</code> (auth/forward, prime-fork lineage, sessions-in-store), <code>store.h</code> (<code>Ids</code>, <code>ids_open_encrypted</code>, WAL, <code>ids_create_index</code>).</li>
+  <li>&#10003; Communication Law honored &mdash; wire into the substrate; the one C# jacket stays only at the Zendesk foreign edge.</li>
+  <li>&#10003; Six-section spine present; literal naming; sourced from existing substrate (no invented infra).</li>
+  <li>&#10003; First move is the smallest law-proving slice (wire-serve the existing store, read path).</li>
+  <li>&#10003; Design only &mdash; no substrate code written; lands in the Argus repo (Rule 2), not metal-console.</li>
+</ul>
+</div>
+
+<footer>
+  Be &middot; ~d &middot; v0 &middot; r608 &middot; 2026-07-13 &middot; Fable5 design, Opus render<br>
+  Argus-for-Zendesk &mdash; wire-native corpus. One pipe in, many ears out.
+</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"4e6223d1-f5d5-4f21-a287-c75c963de25a"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body>
+</html>
