@@ -53,7 +53,7 @@
 
 <h2>1. Need</h2>
 <div data-cm="1-need" class="section">
-  <p>The recovery is modeled but nothing executes. We proved the practice against LIVE Zendesk (244 &ldquo;Follow Up On Your Mendo Feedback&rdquo; tickets, agent Tyler&rsquo;s fixed skeleton reproduced byte-identical, guest reply-back receipt on #456251) and we proved the mechanism (the alert&rsquo;s requester is the NPS system account 49995154539796 &mdash; the send lane is a <em>new</em> follow-up ticket, requester = guest, public comment). The send lane is even built (<code>zendesk-bridge</code> ReplySend FollowUpTicket mode, sandbox creds wired). What&rsquo;s missing is the <strong>loop closed with a receipt</strong>: no ticket has ever been raised by us, no recovery email has ever left the sandbox, and nothing catches the email on the far side to prove the body is right. Until one detractor round-trips &mdash; sim guest in, recovery email out, captured, byte-matched &mdash; &ldquo;it works&rdquo; is a claim, not a receipt. jc hurts because he cannot arm prod on a claim. Why now: the sandbox exists, the skeleton is proven, <code>pirun</code> is real, and the-last-test.com is sitting there waiting to catch mail.</p>
+  <p>The recovery is modeled but nothing executes. We proved the practice against LIVE Zendesk (244 &ldquo;Follow Up On Your Mendo Feedback&rdquo; tickets, agent Tyler&rsquo;s fixed skeleton reproduced byte-identical, guest reply-back receipt on #456251) and we proved the mechanism (the alert&rsquo;s requester is the NPS system account 49995154539796 &mdash; the send lane is a <em>new</em> follow-up ticket, requester = guest, public comment). The send lane is even built (<code>zendesk-bridge</code> ReplySend FollowUpTicket mode, sandbox creds wired). What&rsquo;s missing is the <strong>loop closed with a receipt</strong>: no ticket has ever been raised by us, no recovery email has ever left the sandbox, and nothing catches the email on the far side to prove the body is right. Until one detractor round-trips &mdash; sim guest in, recovery email out, captured, byte-matched &mdash; &ldquo;it works&rdquo; is a claim, not a receipt. jc hurts because he cannot arm prod on a claim. Why now: the sandbox exists, the skeleton is proven, <code>pirun</code> is real, and ai-metal.net is sitting there waiting to catch mail.</p>
 </div>
 
 <h2>2. Raw User Stories</h2>
@@ -61,7 +61,7 @@
   <ul>
     <li>As jc, I want a <code>.pi</code> that submits the NPS as the guest &mdash; raising a real Guest Experience Alert detractor ticket in the sandbox &mdash; so the recovery has a real trigger without waiting on a real unhappy guest.</li>
     <li>As jc, I want the recovery to run as a <code>pirun</code> card &mdash; hold at preview with every slot editable, stop AWAIT_FIRE at the send &mdash; so nothing emails a guest without my finger on the trigger.</li>
-    <li>As jc, I want the guest&rsquo;s address to be one we control on the-last-test.com, so the sandbox&rsquo;s real outbound email lands where we can read it &mdash; and forwarded to my inbox so I see it too.</li>
+    <li>As jc, I want the guest&rsquo;s address to be one we control on ai-metal.net, so the sandbox&rsquo;s real outbound email lands where we can read it &mdash; and forwarded to my inbox so I see it too.</li>
     <li>As jc, I want TLT to pull the captured email and byte-match it against the fixed skeleton with a real claimed code, so &ldquo;the email is correct&rdquo; is an exit code, not an opinion.</li>
     <li>As jc, I want feedback that signals food-borne illness to end the run with escalate-only &mdash; no draft, no code, no email &mdash; proven by a sim ticket that says &ldquo;I got sick.&rdquo;</li>
     <li>As jc, I want every step on the run ledger (IDS triples) so I can audit who wrote what, edit a slot mid-run, and replay the whole thing later.</li>
@@ -90,10 +90,10 @@
     <tr><td>Recovery card (re-expressed)</td><td><code>be/pi/recover-guest.pi</code></td><td>Keeps its name; the file changes format (prose rules &rarr; pirun protocol[]), not identity.</td></tr>
     <tr><td>Receipt card: capture pull + byte-match</td><td><code>be/pi/verify-loop.pi</code></td><td>It verifies the loop closed. Nothing cuter earns its keep.</td></tr>
     <tr><td>C99 pirun host binary</td><td><code>argus-run</code></td><td>It runs Argus .pi cards. Loads a card, polls <code>pirun_advance()</code>, exposes operator verbs (hold/edit/continue/fire/abort).</td></tr>
-    <tr><td>Controlled guest address</td><td><code>guest@the-last-test.com</code></td><td>The simulated guest. On the zone we control, so the recovery email round-trips to us.</td></tr>
+    <tr><td>Controlled guest address</td><td><code>guest@ai-metal.net</code></td><td>The simulated guest. On the zone we control, so the recovery email round-trips to us.</td></tr>
     <tr><td>zendesk-bridge per-env write switch</td><td><code>ZENDESK_WRITE_ARM</code> (value = env name, e.g. <code>sandbox</code>)</td><td>Write lanes refuse any env not named in the flag. Prod is never named &rarr; prod stays disarmed by construction.</td></tr>
     <tr><td>zendesk-bridge sim-ticket lane</td><td><code>/zendesk/alert-create</code></td><td>Creates the Guest Experience Alert ticket in the sandbox. Only lane the sim card calls.</td></tr>
-    <tr><td>cloudflare-bridge Email Routing write</td><td><code>/cloudflare/email-route</code></td><td>Creates the routing rule. Gated + allow-listed to the <code>the-last-test.com</code> zone, body built in-process &mdash; the <code>/cloudflare/dns</code> shape.</td></tr>
+    <tr><td>cloudflare-bridge Email Routing write</td><td><code>/cloudflare/email-route</code></td><td>Creates the routing rule. Gated + allow-listed to the <code>ai-metal.net</code> zone, body built in-process &mdash; the <code>/cloudflare/dns</code> shape.</td></tr>
     <tr><td>Cloudflare Email Worker (capture glue)</td><td><code>email-capture</code></td><td>Receives the message on the zone, writes raw MIME to KV, done. A dumb pipe with a literal name; all logic stays in C99.</td></tr>
     <tr><td>KV namespace holding captured mail</td><td><code>EMAIL_CAPTURE</code></td><td>Key = the message&rsquo;s <code>to</code>+timestamp; value = raw MIME. Read via cloudflare-bridge <code>/read</code>.</td></tr>
     <tr><td>TLT email assertion</td><td><code>tlt email-check</code></td><td>Pulls the captured message (via cloudflare-bridge), normalizes (decode quoted-printable, strip transport headers), byte-compares against the expected body. Exit 0 = match.</td></tr>
@@ -106,25 +106,25 @@
 <div data-cm="5-shape" class="section">
   <p><strong>The loop, left to right:</strong></p>
   <pre><code>submit-nps.pi ──&gt; sandbox alert ticket ──&gt; recover-guest.pi (pirun)
-   (sim guest)      (Guest Experience         understand &rarr; claim code &rarr;
+  (sim guest)       (Guest Experience         understand &rarr; claim code &rarr;
                      Alert &middot; Detractor)       generate &rarr; HOLD preview &rarr; FIRE
-                                                        │
-                                                        ▼
-        TLT byte-match &lt;── KV pull &lt;── email-capture &lt;── Zendesk sandbox
-        (verify-loop.pi)   (cloudflare-   worker on        emails guest@
-                            bridge)       the-last-test    the-last-test.com
-                                          .com (+ forward           │
-                                          to jc's inbox) &lt;──────────┘</code></pre>
+                                                            │
+                                                            ▼
+   TLT byte-match  &lt;──  KV pull  &lt;──  email-capture  &lt;──  Zendesk sandbox
+   (verify-loop.pi)     (cloudflare-    worker on the        emails
+                         bridge)        ai-metal.net zone     guest@ai-metal.net
+                                        (+ forward to jc)            │
+                                              ▲──────────────────────┘</code></pre>
 
   <h3>REAL vs FAKED</h3>
   <table>
     <tr><th>Leg</th><th>Status</th><th>Detail</th></tr>
-    <tr><td>The guest + the NPS survey system</td><td class="fake">FAKED</td><td><code>submit-nps.pi</code> plays both: raises the Guest Experience Alert &middot; Detractor ticket in the sandbox with <code>guest_email = guest@the-last-test.com</code>. Optional second act: replays the guest&rsquo;s thank-you (the #456251 receipt) after the recovery lands.</td></tr>
+    <tr><td>The guest + the NPS survey system</td><td class="fake">FAKED</td><td><code>submit-nps.pi</code> plays both: raises the Guest Experience Alert &middot; Detractor ticket in the sandbox with <code>guest_email = guest@ai-metal.net</code>. Optional second act: replays the guest&rsquo;s thank-you (the #456251 receipt) after the recovery lands.</td></tr>
     <tr><td>Zendesk writes (alert ticket, follow-up ticket, public comment)</td><td class="real">REAL</td><td>Against sandbox <code>mendocinofarms1781637851</code> only, via zendesk-bridge with <code>ZENDESK_WRITE_ARM=sandbox</code>.</td></tr>
     <tr><td>pirun executing the cards; <code>understand()</code> classifying feedback</td><td class="real">REAL</td><td>The actual biRT runtime and the actual C99 skill &mdash; nothing mocked.</td></tr>
     <tr><td>Code-vault claim</td><td class="real">REAL</td><td>Atomic, idempotent-per-ticket claim from sandbox Firestore vault (standalone GCP), seeded with <code>IMSORRYTEST</code> codes.</td></tr>
     <tr><td>Zendesk sending the recovery email</td><td class="real">REAL</td><td>The sandbox&rsquo;s own outbound mail on the public comment &mdash; the same engine prod uses.</td></tr>
-    <tr><td>Cloudflare routing + capture + forward to jc</td><td class="real">REAL</td><td>Email Routing on the-last-test.com: rule &rarr; <code>email-capture</code> worker (KV) + forward to jc&rsquo;s verified inbox.</td></tr>
+    <tr><td>Cloudflare routing + capture + forward to jc</td><td class="real">REAL</td><td>Email Routing on ai-metal.net: rule &rarr; <code>email-capture</code> worker (KV) + forward to jc&rsquo;s verified inbox.</td></tr>
     <tr><td>TLT capture + byte-match</td><td class="real">REAL</td><td><code>tlt email-check</code> pulls KV via cloudflare-bridge and byte-compares. The round-trip proof.</td></tr>
   </table>
 
@@ -143,7 +143,7 @@ protocol[]:
   { unit: guest-replies,  skill: zendesk-guest-reply,      # mirrors the #456251 thank-you receipt
     in:  [followup.ticket_id],
     out: [reply.comment_id],                    gate: hold, fail: continue }</code></pre>
-  <p>Seed data (<code>sim.*</code>) is written to the run ledger at <code>pirun_start</code> &mdash; nps=2, a real-shaped complaint, store=&ldquo;Santa Barbara&rdquo;, guest_email=<code>guest@the-last-test.com</code>. A second seed variant carries an illness phrase to prove the hard exclusion.</p>
+  <p>Seed data (<code>sim.*</code>) is written to the run ledger at <code>pirun_start</code> &mdash; nps=2, a real-shaped complaint, store=&ldquo;Santa Barbara&rdquo;, guest_email=<code>guest@ai-metal.net</code>. A second seed variant carries an illness phrase to prove the hard exclusion.</p>
 
   <h3>Part 2 &mdash; <code>recover-guest.pi</code> (the recovery, re-expressed as a pirun card)</h3>
   <p>The prose intent (rules, verdicts, slots, voice, vault law) stays in the file header as operator canon; the protocol[] below is what <code>pirun_load</code> parses. Every verdict maps to a gate.</p>
@@ -206,7 +206,7 @@ protocol[]:
   <h3>Part 4 &mdash; bridge gaps to close (foreign edges, C# jackets)</h3>
   <ul>
     <li><strong>zendesk-bridge:</strong> per-env WRITE-ARM (<code>ZENDESK_WRITE_ARM=sandbox</code>; write lanes hard-refuse any env not named &mdash; prod is never named) + the <code>/zendesk/alert-create</code> lane. FollowUpTicket send lane already exists.</li>
-    <li><strong>cloudflare-bridge:</strong> <code>/cloudflare/email-route</code> &mdash; gated write modeled on <code>/cloudflare/dns</code>: allow-listed zone (<code>the-last-test.com</code> only), body built in-process, never free-form. Creates: Email Routing enablement (MX), destination-address entry for jc&rsquo;s inbox (Cloudflare emails jc a verification link &mdash; the one human step, jc already volunteered: &ldquo;i can forward email based on what you want&rdquo;), and the rule <code>guest@the-last-test.com &rarr; email-capture worker + forward to jc</code>. Plus a KV read lane on the <code>EMAIL_CAPTURE</code> namespace.</li>
+    <li><strong>cloudflare-bridge:</strong> <code>/cloudflare/email-route</code> &mdash; gated write modeled on <code>/cloudflare/dns</code>: allow-listed zone (<code>ai-metal.net</code> only), body built in-process, never free-form. Creates: Email Routing enablement (MX), destination-address entry for jc&rsquo;s inbox (Cloudflare emails jc a verification link &mdash; the one human step, jc already volunteered: &ldquo;i can forward email based on what you want&rdquo;), and the rule <code>guest@ai-metal.net &rarr; email-capture worker + forward to jc</code>. Plus a KV read lane on the <code>EMAIL_CAPTURE</code> namespace.</li>
     <li><strong>email-capture worker:</strong> the one piece of code on the foreign edge. It does exactly one thing &mdash; <code>message &rarr; KV.put(raw MIME)</code> &mdash; zero logic, so it lives in the same moral category as a jacket: foreign surface, minimal, dumb.</li>
   </ul>
 
@@ -224,7 +224,7 @@ protocol[]:
 
 <h2>6. First Move</h2>
 <div data-cm="6-first-move" class="section">
-  <blockquote><strong>One ticket, all the way around:</strong> wire the email leg (<code>/cloudflare/email-route</code> mints <code>guest@the-last-test.com</code> &rarr; <code>email-capture</code> worker + forward to jc; jc clicks the verification link) &mdash; then run <code>submit-nps.pi</code> once to raise a single detractor alert in the sandbox, run <code>recover-guest.pi</code> to AWAIT_FIRE, jc fires, the sandbox emails the guest, and <code>verify-loop.pi</code> pulls the capture and byte-matches skeleton + claimed <code>IMSORRYTEST</code> code. One green <code>match.result</code> proves every leg of the design at once.</blockquote>
+  <blockquote><strong>One ticket, all the way around:</strong> wire the email leg (<code>/cloudflare/email-route</code> mints <code>guest@ai-metal.net</code> &rarr; <code>email-capture</code> worker + forward to jc; jc clicks the verification link) &mdash; then run <code>submit-nps.pi</code> once to raise a single detractor alert in the sandbox, run <code>recover-guest.pi</code> to AWAIT_FIRE, jc fires, the sandbox emails the guest, and <code>verify-loop.pi</code> pulls the capture and byte-matches skeleton + claimed <code>IMSORRYTEST</code> code. One green <code>match.result</code> proves every leg of the design at once.</blockquote>
   <p>These go into the plan: WRITE-ARM flag + alert-create lane (zendesk-bridge), email-route write + KV read (cloudflare-bridge), email-capture worker, sandbox vault seed, <code>argus-run</code> host + the five C99 skills + five bridge shims, the three cards, <code>tlt email-check</code>, and the illness-exclusion sim variant as the second run.</p>
 </div>
 
@@ -267,8 +267,8 @@ protocol[]:
 <div data-cm="escape-routes" class="section">
   <table>
     <tr><th>Load-bearing choice</th><th>Reversal path</th></tr>
-    <tr><td>Firing the follow-up send &mdash; a real email leaves the sandbox</td><td><span class="warn">&#9888;</span> <strong>No reversal &mdash; sent is sent.</strong> Contained instead: sandbox only, recipient is our own <code>guest@the-last-test.com</code>, fire gate disarmed by default, idempotent <code>draft_id</code> means a re-fire cannot double-send, SentDrafts + run ledger record it. The blast radius of a mistake is one email to ourselves.</td></tr>
-    <tr><td>Email Routing on the-last-test.com (MX takeover of the zone&rsquo;s mail)</td><td>Delete the rule + destination + disable routing via the same gated lane; MX records revert. Cost: minutes. TLT&rsquo;s web-serving is untouched &mdash; MX &ne; A/CNAME.</td></tr>
+    <tr><td>Firing the follow-up send &mdash; a real email leaves the sandbox</td><td><span class="warn">&#9888;</span> <strong>No reversal &mdash; sent is sent.</strong> Contained instead: sandbox only, recipient is our own <code>guest@ai-metal.net</code>, fire gate disarmed by default, idempotent <code>draft_id</code> means a re-fire cannot double-send, SentDrafts + run ledger record it. The blast radius of a mistake is one email to ourselves.</td></tr>
+    <tr><td>Email Routing on ai-metal.net (MX takeover of the zone&rsquo;s mail)</td><td>Delete the rule + destination + disable routing via the same gated lane; MX records revert. Cost: minutes. ai-metal.net&rsquo;s cap-URL serving is untouched &mdash; MX &ne; A/CNAME (the cap-URLs are A/CNAME records).</td></tr>
     <tr><td>New gated bridge lanes (<code>alert-create</code>, <code>email-route</code>, KV read)</td><td>Additive routes behind allow-lists; delete the route, nothing else moves. The DNS-write pattern already proved this shape safe.</td></tr>
     <tr><td>Sandbox vault seeded + codes spent</td><td><code>IMSORRYTEST</code> codes have no monetary reality; re-seed at will. Claims are per-ticket idempotent, so replays never double-spend.</td></tr>
     <tr><td>recover-guest.pi format change (prose &rarr; protocol[])</td><td>Prose canon is retained verbatim as the card&rsquo;s header commentary; git history holds the original. Revert = checkout.</td></tr>
