@@ -1,0 +1,69 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Build — Sandbox↔Prod Env Selector + Compare</title>
+<style>
+:root{--bg:#111;--r:#1A1A1A;--a:#6FC3DF;--ink:#e8e8e8;--mut:#8b8b8b;--gold:#ffc043;--grn:#5fbf7f;--red:#ff7a7a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.55}
+nav.nav{position:sticky;top:0;z-index:9;background:#000;border-bottom:2px solid var(--a);display:flex;justify-content:space-between;align-items:center;padding:10px 18px}
+nav.nav .brand{font-weight:700;letter-spacing:.5px}nav.nav .pub{font-size:12px;color:var(--mut)}
+.wrap{max-width:800px;margin:0 auto;padding:26px 20px 60px}
+h1{font-size:24px;margin:.2em 0}h2{font-size:17px;color:var(--a);margin:1.6em 0 .5em;border-bottom:1px solid #2a2a2a;padding-bottom:4px}
+.sub{color:var(--mut);margin:.2em 0 1.2em}code{font-family:ui-monospace,Consolas,monospace;font-size:.9em;color:var(--a)}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13.5px}td,th{border:1px solid #262626;padding:7px 10px;text-align:left;vertical-align:top}th{color:var(--a)}
+.amber{color:var(--gold)}.grn{color:var(--grn)}.red{color:var(--red)}
+ul li{margin:4px 0}.card{background:var(--r);border:1px solid #262626;border-radius:10px;padding:14px 16px;margin:12px 0}
+.foot{color:var(--mut);font-size:12.5px;margin-top:26px;border-top:1px solid #262626;padding-top:12px}
+</style></head><body>
+<nav class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-14 18:21 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/692489b8-1308-4bb5-ad30-2cfa6f0c310c/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+<h1>Sandbox↔Prod environment selector + Compare</h1>
+<p class="sub">The confirmation gate: see which Zendesk environment Argus is pointed at, and prove sandbox ≠ prod, before any simulated send. <b>Registry-driven — scales horizontally to N environments.</b> Chain: Fable5 <code>~d~p~e</code> → Opus <code>~b~t~s</code>.</p>
+
+<h2>What was built</h2>
+<ul data-cm="what-was-built">
+<li><b>Environment registry</b> (<code>ENVIRONMENTS[]</code>) — the horizontal-scale seam jc asked for. Each entry is <code>{id,label,subdomain,tone}</code>; add one to add an environment. The selector, badge, env-aware reads, deep links, and Compare are ALL driven off this list — zero code change to scale. Today: prod + sandbox.</li>
+<li><b>Selector + amber badge</b> in the nav — a per-registry-entry dropdown that <b>sticks</b> (localStorage <code>argus_env</code>). Any non-prod environment lights an always-on-screen <span class="amber">AMBER badge</span> + a whole-frame amber ring. Prod is neutral.</li>
+<li><b>Env-aware reads at one choke point</b> — <code>zdFetch</code> appends <code>&env=&lt;id&gt;</code> from <code>ENV.param()</code>, so all ~15 read call-sites route to the selected environment. Prod appends nothing (bridge default) — no regression for the default case.</li>
+<li><b>Per-env deep links</b> — <code>ZD_ADMIN</code> resolves the selected environment's subdomain; the <code>ZD_DEEP</code> builders follow it.</li>
+<li><b>Compare panel</b> — fingerprints <b>every</b> registered environment side by side (subdomain, ticket count, newest ticket #/subject/date) and returns a verdict: <span class="grn">ISOLATED ✓</span> only when every env answers AND their live fingerprints are pairwise distinct; otherwise <span class="red">⚠ NOT isolated</span> (misrouted creds / same tenant). Empirical proof, not a declared label.</li>
+</ul>
+
+<h2>Test results</h2>
+<p>Functional test against the live bridge — the two environments are unmistakably distinct tenants, so the <span class="grn">ISOLATED ✓</span> verdict is real:</p>
+<table>
+<tr><th>Env</th><th>Bridge routed to</th><th>Tickets</th><th>Newest #</th><th>Newest subject</th></tr>
+<tr><td>prod</td><td class="grn">prod ✓</td><td><b>431,160</b></td><td>457790</td><td>A New Vendor submission needs to be audited…</td></tr>
+<tr><td>sandbox</td><td class="grn">sandbox ✓</td><td><b>500</b></td><td>500</td><td>650 - 1000 Lab: Local Sales Building…</td></tr>
+</table>
+<ul>
+<li>Smoke — <code>esc()</code> present, all new identifiers wired, JS block passes <code>node --check</code>.</li>
+<li>Functional — prod (431k tickets) vs sandbox (500) return different counts + different newest ticket → distinct fingerprints → verdict fires correctly.</li>
+<li>Fail-safe — missing/unknown/corrupt <code>argus_env</code> resolves to prod; env-switch is fully reversible.</li>
+</ul>
+
+<h2>Files changed</h2>
+<table data-cm="test-results">
+<tr><th>File</th><th>Change</th></tr>
+<tr><td><code>web/app/index.html</code></td><td>ENV registry+object (after ZBRIDGE); nav selector/badge + Compare modal + CSS; <code>zdFetch</code> env-aware; dead <code>ENV</code> ref neutralized; <code>ZD_ADMIN</code> per-env; <code>applyEnv/initEnv/zdFetchEnv/envFingerprint/compareEnvs</code>.</td></tr>
+<tr><td><code>be/designs/…compare-selector.html</code></td><td>Fable5 <code>~d~p~e</code> + horizontal-scaling amendment.</td></tr>
+</table>
+
+<h2>Definition of Done</h2>
+<ul data-cm="definition-of-done">
+<li>✓ A-D-D verified (matches the ~d~p~e design + the horizontal-scale amendment)</li>
+<li>✓ Registry-driven — scales to N environments with one entry (+ bridge creds), zero UI code change</li>
+<li>✓ Env-aware reads at one choke point; fail-safe to prod</li>
+<li>✓ Amber badge + frame ring on any non-prod env; sticky across reload</li>
+<li>✓ Compare returns empirical ISOLATED verdict (tested live: 431,160 vs 500)</li>
+<li>✓ Syntax validated (node --check); no regression to the prod default path</li>
+<li>△ Production verify — argus.com.ai/app after Pages deploy</li>
+</ul>
+<h2>What's next</h2>
+<p class="card">The selector makes the pointer <b>visible</b>. It gates reads today; the day writes arm, the amber state becomes a hard write-confirm (noted in the design's <i>When To Revisit</i>). With this live, the sandbox NPS-recovery simulation can proceed safely — you can confirm ISOLATED ✓ before any send.</p>
+<div class="foot">metal console · Be · v0 · r618 · 2026-07-14 · Argus — sandbox↔prod compare + env selector · Generated 2026-07-14 18:21</div>
+</div>
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"692489b8-1308-4bb5-ad30-2cfa6f0c310c"};</script>
+<script src="/metal/artifact-comments.js"></script>
+</body></html>
