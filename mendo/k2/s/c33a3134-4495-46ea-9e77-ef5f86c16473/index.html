@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Konductor Dashboard — clickable prototype (INTERNAL ONLY)</title>
+<style>
+:root{
+  --bg:#0a0a0a; --surface:#141414; --line:#242424; --text:#e8e8e8; --dim:#8a93a0;
+  --blocker:#ff8b8b; --claim:#E0B84C; --verified:#7CD992; --nav:#6FC3DF;
+  --mono:Consolas,'SF Mono',ui-monospace,monospace; --touch:44px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;}
+.cls{position:sticky;top:0;z-index:40;background:#2a0a0a;border-bottom:1px solid #7a3a3a;color:#e59b9b;font-weight:700;font-size:11px;letter-spacing:.06em;padding:6px 12px;}
+
+/* tabs across the top — works at any width, always reachable */
+.tabs{position:sticky;top:25px;z-index:35;display:flex;gap:4px;overflow-x:auto;background:#0d0d0d;border-bottom:1px solid var(--line);padding:6px 8px;}
+.tab{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 12px;min-height:var(--touch);
+     border:1px solid transparent;border-radius:7px;color:#b9c2cc;cursor:pointer;font-size:13px;white-space:nowrap;background:none;}
+.tab:hover{background:#131313;}
+.tab.on{background:#101a20;border-color:#2a4a55;color:#fff;}
+.tab .cnt{font-family:var(--mono);font-weight:800;font-size:11px;padding:1px 6px;border-radius:20px;}
+.cnt.bad{background:#3a0d0d;color:var(--blocker);border:1px solid #6b1a1a;}
+.cnt.claim{background:transparent;color:var(--claim);border:1px dashed #5b5b1a;}
+.cnt.dim{background:#1a1a1a;color:var(--dim);border:1px solid #2a2a2a;}
+
+.wrap{max-width:1000px;margin:0 auto;padding:12px 12px 60px;}
+.hdr{font-size:12px;color:var(--dim);margin-bottom:10px;}
+.hdr b{color:var(--text);}
+
+/* source bar */
+.srcbar{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-bottom:14px;}
+.src{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:10px;}
+.src .who{font-size:13px;font-weight:700;line-height:1.25;}
+.src .when{display:block;color:var(--dim);font-size:11.5px;font-family:var(--mono);font-weight:400;}
+.btn{margin-left:auto;min-height:38px;padding:9px 12px;border-radius:7px;border:1px solid #2a4a55;
+     background:#0e2230;color:var(--nav);font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.btn:active{transform:translateY(1px);}
+.btn.lock{border-color:#4a3a1a;background:#221a06;color:var(--claim);}
+.btn.done{border-color:#2f6b45;background:#0f2a18;color:var(--verified);}
+.src.stale{border-color:#5b5b1a;} .src.stale .when{color:var(--claim);}
+
+.triage{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px;margin-bottom:16px;}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+.stat b{display:block;font-size:26px;font-weight:700;line-height:1.15;font-family:var(--mono);}
+.stat span{color:var(--dim);font-size:12px;}
+.stat.bad b{color:var(--blocker);} .stat.claim b{color:var(--claim);}
+
+h2{font-size:15px;margin:18px 0 8px;font-weight:700;}
+h2 .hint{font-weight:400;font-size:12px;color:var(--dim);}
+.row{background:var(--surface);border:1px solid var(--line);border-left:4px solid #2f6b45;border-radius:8px;padding:11px 12px;margin-bottom:9px;}
+.row.blocker{border-left-color:var(--blocker);}
+.row.claim{border-left-style:dashed;border-left-color:var(--claim);}
+.rh{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+.code{font-family:var(--mono);font-weight:700;font-size:14px;}
+.nm{font-size:14px;font-weight:600;}
+.meta{color:var(--dim);font-size:11.5px;font-family:var(--mono);width:100%;}
+.chip{font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:4px;font-family:var(--mono);}
+.chip.bad{background:#3a0d0d;color:var(--blocker);border:1px solid #6b1a1a;}
+.chip.claim{background:transparent;color:var(--claim);border:1px dashed #5b5b1a;}
+.chip.ver{background:#0f2a18;color:var(--verified);border:1px solid #2f6b45;}
+.items{margin:8px 0 0;padding:0;list-style:none;}
+.items li{padding:4px 0;display:flex;gap:8px;align-items:flex-start;font-size:13px;}
+.tag{flex:0 0 auto;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;font-family:var(--mono);}
+.tag.claim{background:transparent;color:var(--claim);border:1px dashed #5b5b1a;}
+.tag.bad{background:#3a0d0d;color:var(--blocker);border:1px solid #6b1a1a;}
+.tag.ver{background:#0f2a18;color:var(--verified);border:1px solid #2f6b45;}
+.acts{margin-top:10px;display:flex;gap:7px;flex-wrap:wrap;}
+.act{min-height:var(--touch);padding:11px 13px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;
+     border:1px solid #2a4a55;background:#0e2230;color:var(--nav);}
+.act.ver{border-color:#2f6b45;background:#0f2a18;color:var(--verified);}
+.act.owed{border-color:#5b5b1a;background:#2a2206;color:var(--claim);}
+.act:active{transform:translateY(1px);}
+.q{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--claim);border-radius:8px;padding:11px 12px;margin-bottom:9px;}
+.q.blocker{border-left-color:var(--blocker);}
+.unans{display:inline-block;background:#2a2206;color:var(--claim);border:1px solid #5b5b1a;font-weight:800;
+       font-size:11.5px;letter-spacing:.06em;padding:3px 9px;border-radius:4px;font-family:var(--mono);}
+.qwhy{color:var(--dim);font-size:12.5px;margin-top:6px;}
+.legend{background:#101010;border:1px dashed #333;border-radius:8px;padding:11px 12px;margin-top:18px;color:var(--dim);font-size:12.5px;}
+.legend b{color:var(--text);}
+.pane{display:none;} .pane.on{display:block;}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#0f2a18;border:1px solid #2f6b45;
+       color:var(--verified);padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;z-index:60;
+       opacity:0;pointer-events:none;transition:opacity .12s;}
+.toast.show{opacity:1;}
+.done-row{opacity:.55;}
+</style>
+</head>
+<body>
+<div class="cls">🔒 INTERNAL ONLY — Mendocino Farms / kASTIL Systems. Not for external distribution.</div>
+
+<div class="tabs">
+  <button class="tab on" data-p="tonight">🌅 Tonight <span class="cnt dim">4</span></button>
+  <button class="tab" data-p="review">📋 Review <span class="cnt claim" id="c-rev">3</span></button>
+  <button class="tab" data-p="exceptions">⚠️ Exceptions <span class="cnt bad">9</span></button>
+  <button class="tab" data-p="questions">❓ Questions <span class="cnt claim">11</span></button>
+  <button class="tab" data-p="sites">🏢 Sites <span class="cnt dim">94</span></button>
+</div>
+
+<div class="wrap">
+  <div class="hdr"><b>🚀 Konductor</b> — Mendo rollout · day 1 · Sun 2026-08-02 · <span id="clk">live prototype</span></div>
+
+  <div class="srcbar">
+    <div class="src"><span class="who">C1 sheet<span class="when" id="w1">pulled 21:18 · v2578</span></span><button class="btn" data-src="1">↻ Refresh</button></div>
+    <div class="src stale"><span class="who">EN sheet (Elbert)<span class="when" id="w2">pulled 21:20 · v368 · 7/17 tab</span></span><button class="btn" data-src="2">↻ Refresh</button></div>
+    <div class="src"><span class="who">Airtable submissions<span class="when" id="w3">no token — needs PAT</span></span><button class="btn lock" data-src="3">🔒 Connect</button></div>
+    <div class="src"><span class="who">Field notes (Slack)<span class="when" id="w4">pasted 21:30 · 3 sites</span></span><button class="btn" data-src="4">↻ Refresh</button></div>
+  </div>
+
+  <!-- TONIGHT -->
+  <div class="pane on" id="p-tonight">
+    <div class="triage">
+      <div class="stat"><b>4</b><span>installing tonight</span></div>
+      <div class="stat"><b>4</b><span>go live tomorrow</span></div>
+      <div class="stat bad"><b>9</b><span>exceptions open</span></div>
+      <div class="stat claim"><b>3</b><span>need your review</span></div>
+      <div class="stat bad"><b>2</b><span>owed Airtable writes</span></div>
+      <div class="stat bad"><b>8/9</b><span>playbook cliff</span></div>
+    </div>
+    <h2>Tonight <span class="hint">— sorted worst first</span></h2>
+
+    <div class="row blocker">
+      <div class="rh"><span class="code">CA.0032</span><span class="nm">180 Broadway</span>
+        <span class="chip bad">■ EXC-001</span><span class="chip claim">no prep notes</span>
+        <span class="meta">19:00 · Robert Mutton · live 8/3</span></div>
+      <ul class="items">
+        <li><span class="tag bad">DEVIATION</span><span>HerdServer terminal moved a few inches to clear a 3″ metal bar — approved by Elbert. <b>Playbook disagrees with as-built.</b></span></li>
+        <li><span class="tag claim">owed</span><span>Airtable <b>Site Status → Issues</b> (O-10) — not written</span></li>
+      </ul>
+      <div class="acts"><button class="act owed" data-owed>Write Airtable "Issues"</button><button class="act">Playbook deck ↗</button></div>
+    </div>
+
+    <div class="row claim">
+      <div class="rh"><span class="code">CA.0067</span><span class="nm">Porter Ranch</span><span class="chip claim">2 open</span>
+        <span class="meta">20:30 · Chandra Retino · live 8/3</span></div>
+      <ul class="items">
+        <li><span class="tag bad">■ UNKNOWN</span><span>HerdServe old port OR WiFi — <i>"not sure"</i> (Elbert's flag)</span></li>
+        <li><span class="tag claim">conflict</span><span>Ingest device claimed delivered — <b>sheet says FALSE</b> (Q-002)</span></li>
+        <li><span class="tag claim">open</span><span>L-90 printers — <b>DEC-001</b> self-test, keep in place unless suspicious</span></li>
+      </ul>
+      <div class="acts"><button class="act">Playbook deck ↗</button></div>
+    </div>
+
+    <div class="row claim">
+      <div class="rh"><span class="code">CA.0034</span><span class="nm">Culver City</span><span class="chip claim">3 open</span>
+        <span class="meta">20:30 · Nancy Geden · live 8/3</span></div>
+      <ul class="items">
+        <li><span class="tag claim">unverified</span><span>Network Shelf <i>"arrived, need to call the store to verify"</i></span></li>
+        <li><span class="tag claim">open</span><span>Printer Tray + Ingest device — due Jul 31, <b>no DONE</b></span></li>
+      </ul>
+      <div class="acts"><button class="act">Playbook deck ↗</button></div>
+    </div>
+
+    <div class="row">
+      <div class="rh"><span class="code">CA.0023</span><span class="nm">Sacramento (Midtown)</span><span class="chip bad">■ EXC-002</span>
+        <span class="meta">20:30 · Melissa Walker · live 8/3</span></div>
+      <ul class="items"><li><span class="tag claim">claimed done</span><span>Network Shelf · Printer Tray · IT device sent · Bread cable</span></li></ul>
+      <div class="acts"><button class="act">Playbook deck ↗</button></div>
+    </div>
+  </div>
+
+  <!-- REVIEW -->
+  <div class="pane" id="p-review">
+    <h2>Needs your eyes <span class="hint">— JotForm submissions the checks flagged</span></h2>
+    <div class="row blocker" id="rev-1">
+      <div class="rh"><span class="code">CA.0023</span><span class="nm">Sacramento (Midtown)</span><span class="chip bad">■ EXC-002</span>
+        <span class="meta">Inventory · submitted 22:40</span></div>
+      <ul class="items">
+        <li><span class="tag bad">FAILS FORMAT</span><span>Bread Scanner Serial <b>541T102271</b> — not 14 digits. Matches the <b>Salad Microtouch</b> shape; wrong device captured.</span></li>
+        <li><span class="tag claim">correction</span><span>Lorraine Padilla: should be <b>25344523704522</b></span></li>
+      </ul>
+      <div class="acts"><button class="act ver" data-fix="rev-1">✓ Apply correction</button><button class="act owed" data-owed>Write Airtable "Issues"</button><button class="act" data-dismiss="rev-1">Dismiss</button></div>
+    </div>
+    <div class="row claim" id="rev-2">
+      <div class="rh"><span class="code">CA.0060</span><span class="nm">Land Park</span><span class="chip claim">flag = No</span>
+        <span class="meta">Inventory · submitted 21:10</span></div>
+      <ul class="items"><li><span class="tag claim">equipment</span><span>Salad 15″ Microtouch = <b>No</b> — absent or not installed. No serial recorded.</span></li></ul>
+      <div class="acts"><button class="act ver" data-fix="rev-2">✓ Confirm expected</button><button class="act owed" data-owed>Raise exception</button></div>
+    </div>
+    <div class="row" id="rev-3">
+      <div class="rh"><span class="code">—</span><span class="nm">All sites · cross-checks</span><span class="chip ver">✓ clean</span></div>
+      <ul class="items">
+        <li><span class="tag ver">clean</span><span>duplicate serials across sites: none</span></li>
+        <li><span class="tag ver">clean</span><span>missing photos: none</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- EXCEPTIONS -->
+  <div class="pane" id="p-exceptions">
+    <h2>Exceptions <span class="hint">— every one lands in the AAR</span></h2>
+    <div class="row blocker"><div class="rh"><span class="code">EXC-001</span><span class="nm">180 Broadway</span><span class="chip bad">approved-deviation</span><span class="meta">approved by Elbert Nghiem · photo evidence</span></div>
+      <ul class="items"><li><span class="tag bad">open</span><span>HerdServer terminal moved to clear a 3″ metal bar. Deck not updated — decide: correct the playbook, or record as-built only (Q-005).</span></li></ul>
+      <div class="acts"><button class="act owed" data-owed>Write Airtable "Issues"</button><button class="act ver" data-fix="x1">✓ Mark resolved</button></div></div>
+    <div class="row blocker" id="x1"><div class="rh"><span class="code">EXC-002</span><span class="nm">Sacramento (Midtown)</span><span class="chip bad">data-error</span><span class="meta">raised by Lorraine Padilla</span></div>
+      <ul class="items"><li><span class="tag bad">open</span><span>Wrong Bread Scanner serial submitted. Machine-detectable: 11 of 12 rows pass the 14-digit rule, only this one fails.</span></li></ul></div>
+    <h2>Candidates <span class="hint">— you disposition these</span></h2>
+    <div class="row claim"><div class="rh"><span class="code">CA.0067</span><span class="nm">Porter Ranch</span><span class="chip claim">open-question</span></div>
+      <ul class="items"><li><span class="tag claim">candidate</span><span>HerdServe old port OR WiFi — unresolved on install day</span></li></ul></div>
+    <div class="row claim"><div class="rh"><span class="code">ALL</span><span class="nm">cross-site</span><span class="chip claim">standing-task</span></div>
+      <ul class="items"><li><span class="tag claim">candidate</span><span>C1 reprograms the two L-90 printers — governed by <b>DEC-001</b></span></li></ul></div>
+  </div>
+
+  <!-- QUESTIONS -->
+  <div class="pane" id="p-questions">
+    <h2>Open questions <span class="hint">— 11 unanswered, blockers first</span></h2>
+    <div class="q blocker"><div class="rh"><span class="code">Q-001</span><span class="chip bad">BLOCKER-FOR-ACCURACY</span><span class="meta">for Elbert Nghiem</span></div>
+      <div style="margin-top:7px;font-size:14px;">Does "DONE" mean <b>verified</b> done, or <b>claimed</b> done?</div>
+      <div class="qwhy">Sets the default state of every DONE on every site. Until answered, everything renders as claimed.</div>
+      <div style="margin-top:9px;"><span class="unans">UNANSWERED</span></div></div>
+    <div class="q blocker"><div class="rh"><span class="code">Q-008</span><span class="chip bad">BLOCKER-FOR-OBLIGATION</span><span class="meta">for Chris Gonzalez</span></div>
+      <div style="margin-top:7px;font-size:14px;">Airtable base + write access — we owe "Site Status = Issues" and can't yet write it.</div>
+      <div style="margin-top:9px;"><span class="unans">UNANSWERED</span></div></div>
+    <div class="q"><div class="rh"><span class="code">Q-002</span><span class="chip claim">HIGH</span><span class="meta">for Elbert / C1</span></div>
+      <div style="margin-top:7px;">Porter Ranch ingest device — note says delivered, sheet says FALSE. Real conflict, or column semantics?</div>
+      <div style="margin-top:9px;"><span class="unans">UNANSWERED</span></div></div>
+    <div class="q"><div class="rh"><span class="code">Q-003</span><span class="chip claim">HIGH</span><span class="meta">for C1</span></div>
+      <div style="margin-top:7px;">Playbooks exist only through 8/5. Is the deck pipeline a week ahead by design, or stalled?</div>
+      <div style="margin-top:9px;"><span class="unans">UNANSWERED</span></div></div>
+  </div>
+
+  <!-- SITES -->
+  <div class="pane" id="p-sites">
+    <h2>Coverage <span class="hint">— playbooks per install date</span></h2>
+    <div class="triage">
+      <div class="stat"><b>16/94</b><span>have a playbook</span></div>
+      <div class="stat bad"><b>78</b><span>no deck</span></div>
+      <div class="stat bad"><b>8/9</b><span>cliff — 4 sites</span></div>
+      <div class="stat"><b>6</b><span>states</span></div>
+    </div>
+    <div class="row"><div class="rh"><span class="nm">8/2 – 8/5</span><span class="chip ver">✓ 16 of 16 have decks</span></div></div>
+    <div class="row blocker"><div class="rh"><span class="nm">8/9 onward</span><span class="chip bad">■ 0 of 78 have decks</span></div>
+      <ul class="items"><li><span class="tag bad">cliff</span><span>Pacific City · Walnut Creek · Gainey Ranch · Bellevue install 8/9 with no deck. The 8/10 tab's Playbook column is entirely empty.</span></li></ul></div>
+  </div>
+
+  <div class="legend">
+    <b>How to read it —</b>
+    <span class="tag claim">hollow</span> machine repeating a claim, nothing proven ·
+    <span class="tag bad">solid</span> recorded fact with an ID ·
+    <span class="chip ver">✓ verified</span> <b>you</b> tapped it.
+    Red rail = blocker · dashed = unproven · worst first. <b>Green only ever appears after your tap.</b>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+  clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show');},1900);}
+
+// tabs
+document.querySelectorAll('.tab').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});
+    document.querySelectorAll('.pane').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    document.getElementById('p-'+b.dataset.p).classList.add('on');
+    window.scrollTo(0,0);
+  });
+});
+
+// per-source refresh — no scheduler, each pulls only itself and reports WHAT CHANGED
+var SRC={1:{el:'w1',name:'C1 sheet',res:'pulled just now · v2579 · 1 change: CA.0073 install date moved'},
+         2:{el:'w2',name:'EN sheet',res:'pulled just now · v368 · no change'},
+         3:{el:'w3',name:'Airtable',res:null},
+         4:{el:'w4',name:'Field notes',res:'pulled just now · 1 new note (Lorraine, serial correction)'}};
+document.querySelectorAll('[data-src]').forEach(function(b){
+  b.addEventListener('click',function(){
+    var s=SRC[b.dataset.src];
+    if(!s.res){ toast('Airtable needs a Personal Access Token first'); return; }
+    b.textContent='↻ Pulling…'; b.disabled=true;
+    setTimeout(function(){
+      document.getElementById(s.el).textContent=s.res;
+      b.textContent='↻ Refresh'; b.disabled=false;
+      b.classList.add('done'); setTimeout(function(){b.classList.remove('done');},1200);
+      toast(s.name+' refreshed');
+    },600);
+  });
+});
+
+// operator dispositions — the ONLY way green enters the UI
+document.querySelectorAll('[data-fix]').forEach(function(b){
+  b.addEventListener('click',function(){
+    var row=document.getElementById(b.dataset.fix)||b.closest('.row');
+    row.classList.add('done-row'); row.style.borderLeftColor='#2f6b45'; row.style.borderLeftStyle='solid';
+    b.textContent='✓ done'; b.disabled=true;
+    var c=document.getElementById('c-rev'); if(c){var n=Math.max(0,parseInt(c.textContent,10)-1); c.textContent=n;}
+    toast('Marked verified by you — machine can never set this');
+  });
+});
+document.querySelectorAll('[data-dismiss]').forEach(function(b){
+  b.addEventListener('click',function(){
+    var row=document.getElementById(b.dataset.dismiss); row.classList.add('done-row');
+    b.textContent='dismissed'; b.disabled=true;
+    var c=document.getElementById('c-rev'); if(c){var n=Math.max(0,parseInt(c.textContent,10)-1); c.textContent=n;}
+    toast('Dismissed');
+  });
+});
+document.querySelectorAll('[data-owed]').forEach(function(b){
+  b.addEventListener('click',function(){ toast('Blocked — Airtable PAT required (O-10 write)'); });
+});
+</script>
+</body>
+</html>
