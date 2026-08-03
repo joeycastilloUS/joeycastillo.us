@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field test — Ingest shows Offline but works</title>
+<style>
+:root{--bg:#0d0d0d;--surf:#171717;--line:#2a2a2a;--ink:#ececec;--dim:#9aa4ae;--ok:#7CD992;--bad:#ff8b8b;--warn:#E0B84C;--acc:#6FC3DF;--mono:Consolas,'SF Mono',ui-monospace,monospace;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55;}
+.top{background:#000;border-bottom:2px solid var(--acc);padding:11px 16px;}
+.top b{color:var(--acc);} .top span{color:var(--dim);font-size:12.5px;display:block;}
+.wrap{max-width:620px;margin:0 auto;padding:16px 16px 60px;}
+h1{font-size:21px;margin:.3em 0 .1em;line-height:1.25;}
+.sub{color:var(--dim);font-size:14px;margin-top:0;}
+h2{font-size:16px;color:var(--acc);margin:1.6em 0 .5em;text-transform:uppercase;letter-spacing:.05em;}
+.step{background:var(--surf);border:1px solid var(--line);border-radius:9px;padding:14px 15px;margin:11px 0;}
+.step .n{display:inline-flex;width:26px;height:26px;border-radius:6px;background:#0e2230;color:var(--acc);font-weight:800;font-size:14px;align-items:center;justify-content:center;margin-right:8px;}
+.cmd{display:block;background:#000;border:1px solid #333;border-radius:7px;padding:12px 13px;margin:10px 0;font-family:var(--mono);font-size:14px;color:#cfe8ef;word-break:break-all;-webkit-user-select:all;user-select:all;}
+.res{border-left:4px solid var(--line);padding:10px 13px;margin:9px 0;background:#121212;border-radius:0 7px 7px 0;}
+.res.good{border-left-color:var(--ok);} .res.bad{border-left-color:var(--bad);}
+.res b{display:block;margin-bottom:3px;}
+.good b{color:var(--ok);} .bad b{color:var(--bad);}
+.tag{display:inline-block;font-family:var(--mono);font-size:12px;font-weight:700;padding:2px 8px;border-radius:5px;}
+.tag.ok{background:#0f2a18;color:var(--ok);border:1px solid #2f6b45;}
+.tag.no{background:#3a0d0d;color:var(--bad);border:1px solid #6b1a1a;}
+.known{background:#101a20;border:1px solid #24414d;border-radius:9px;padding:13px 15px;}
+.known b{color:var(--acc);}
+ul{padding-left:20px;margin:.4em 0;} li{margin:.35em 0;}
+.warn{color:var(--warn);}
+.foot{color:var(--dim);font-size:12.5px;margin-top:30px;border-top:1px solid var(--line);padding-top:12px;}
+.big{font-size:17px;font-weight:700;}
+</style>
+</head>
+<body>
+<div class="top"><b>KONDUCTOR FIELD TEST</b><span>Ingest shows Offline but the device works &middot; 2026-08-03</span></div>
+<div class="wrap">
+
+<h1>Ingest says <span class="tag no">Offline</span> but it&rsquo;s working</h1>
+<p class="sub">Two minutes. You need a laptop on the store network (same LAN as the POS switch).</p>
+
+<div class="known">
+<b>What we already know &mdash; don&rsquo;t re-check these:</b>
+<ul>
+<li>The Ingest device <b>is online</b>. Meraki sees it right now on <b>switch port 23, VLAN 90</b>.</li>
+<li>It&rsquo;s the <b>same VLAN as Bread/Salad/Expo</b>, which all report fine.</li>
+<li><b>It is not a firewall problem.</b> This traffic never leaves the switch.</li>
+<li>Ingest has <b>never reported a software version</b> &mdash; the other devices all do.</li>
+</ul>
+So: don&rsquo;t swap cables, don&rsquo;t reboot the switch, don&rsquo;t touch firewall settings. <b>We&rsquo;re testing one thing: is the Ingest device answering on port 22288?</b>
+</div>
+
+<h2>The test</h2>
+
+<div class="step">
+<span class="n">1</span><b>Get on the store LAN.</b> Wired into the POS switch is best. Wi-Fi on the same store network is fine.
+</div>
+
+<div class="step">
+<span class="n">2</span><b>Confirm you can see the device.</b> Open PowerShell (Windows) or Terminal (Mac) and run:
+<code class="cmd">ping 10.90.100.101</code>
+<div class="res good"><b>Replies come back</b> &rarr; good, keep going to step 3.</div>
+<div class="res bad"><b>Request timed out / no reply</b> &rarr; stop. You&rsquo;re on the wrong network or wrong VLAN. Check you&rsquo;re on the POS switch, then re-run.</div>
+</div>
+
+<div class="step">
+<span class="n">3</span><b>THE ACTUAL TEST &mdash; is port 22288 answering?</b>
+<div style="color:var(--dim);font-size:13.5px;margin:6px 0 2px;">Windows / PowerShell:</div>
+<code class="cmd">Test-NetConnection 10.90.100.101 -Port 22288</code>
+<div style="color:var(--dim);font-size:13.5px;margin:6px 0 2px;">Mac / Linux:</div>
+<code class="cmd">nc -vz -w 5 10.90.100.101 22288</code>
+</div>
+
+<h2>What the answer means</h2>
+
+<div class="res good">
+<b>TcpTestSucceeded : True &nbsp;(or &ldquo;succeeded!&rdquo; on Mac)</b>
+The device <b>is</b> answering on 22288. The network and the device are fine &mdash; the problem is on the Konductor side (it&rsquo;s polling the wrong address, or this store was never added to monitoring).
+<div style="margin-top:7px;"><b class="big">&rarr; Report: &ldquo;22288 OPEN, still shows Offline.&rdquo;</b> Nothing more to do on site.</div>
+</div>
+
+<div class="res bad">
+<b>TcpTestSucceeded : False &nbsp;(or &ldquo;Connection refused / timed out&rdquo;)</b>
+The device is on the network but <b>nothing is listening on 22288</b>. The Ingest software isn&rsquo;t running, didn&rsquo;t finish setup, or a firewall <i>on the Ingest box itself</i> is blocking it.
+<div style="margin-top:7px;">Then do this, in order:</div>
+<ul>
+<li>Is the Ingest device <b>powered on and booted</b>? (It has its own power supply &mdash; it is <b>not</b> PoE, so a dead switch port won&rsquo;t show it.)</li>
+<li><b>Reboot the Ingest device</b> and wait 3 minutes. Re-run step 3.</li>
+<li>Still False &rarr; <b class="big">Report: &ldquo;22288 CLOSED after reboot.&rdquo;</b> The unit needs re-provisioning &mdash; that&rsquo;s not a field fix.</li>
+</ul>
+</div>
+
+<h2>Send back exactly this</h2>
+<div class="step" style="font-family:var(--mono);font-size:14px;">
+Store: ______________________<br>
+Ping 10.90.100.101: &nbsp;OK / FAIL<br>
+Port 22288: &nbsp;OPEN / CLOSED<br>
+Rebooted Ingest? &nbsp;Y / N<br>
+Port 22288 after reboot: &nbsp;OPEN / CLOSED<br>
+Konductor still shows: &nbsp;Offline / Online
+</div>
+
+<h2 class="warn">Heads up</h2>
+<ul>
+<li><b>Same test, same address at every store.</b> The Ingest is <code style="font-family:var(--mono)">10.90.100.101</code> on port 23 at Broadway, Porter Ranch, Culver City and Sacramento &mdash; they are configured identically.</li>
+<li><b>Don&rsquo;t change firewall or VLAN settings.</b> Those come from a shared config template &mdash; a change at one store silently breaks the pattern for all 15.</li>
+<li>If you get the <b>same answer at two stores</b>, say so. That makes it a rollout-wide fix, not a per-store one.</li>
+</ul>
+
+<div class="foot">
+Konductor rollout &middot; field test card &middot; 2026-08-03<br>
+Questions &rarr; Joey Castillo. Please don&rsquo;t forward outside the rollout team.
+</div>
+
+</div>
+</body>
+</html>
