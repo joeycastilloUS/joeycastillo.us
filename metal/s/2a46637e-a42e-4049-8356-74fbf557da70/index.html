@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OneDine Case Data &mdash; Status, Provenance, and Access Asks</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#e2e6e8;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:8px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:40px}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:11px 22px;display:flex;align-items:baseline;gap:12px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:13px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:820px;margin:0 auto;padding:8px 24px 60px}
+ h1{font-size:22px;margin:20px 0 4px;color:#fff;font-weight:700}
+ .sub{color:#8a949b;font-size:13px;margin:0 0 6px}
+ .meta{color:#6a7a82;font-size:12px;margin:0 0 20px}
+ h2{font-size:12px;color:#6FC3DF;margin:30px 0 8px;letter-spacing:.08em;text-transform:uppercase}
+ p{font-size:14px;margin:8px 0}
+ ol,ul{font-size:14px;margin:8px 0;padding-left:22px}
+ li{margin:6px 0}
+ a{color:#6FC3DF}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 5px;border-radius:4px}
+ pre{background:#0a0d0f;border:1px solid #1e2a30;border-radius:10px;padding:16px;overflow:auto;font-size:12px;color:#9fb3bd;font-family:Consolas,monospace;line-height:1.45}
+ .diag{background:#0a0d0f;border:1px solid #1e2a30;border-radius:10px;padding:20px 18px;margin:16px 0}
+ .note{color:#8a949b;font-size:12.5px;margin-top:12px}
+ .tag{display:inline-block;border-radius:20px;padding:2px 11px;font-size:11px;font-weight:700;margin-left:8px;vertical-align:middle}
+ .t-done{background:#0c1c14;border:1px solid #1f5f47;color:#7CFFB2}
+ .t-today{background:#1c1a12;border:1px solid #5f4f20;color:#f0c674}
+ .t-block{background:#1c1212;border:1px solid #5f2020;color:#ff9b9b}
+ table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+ td,th{border-bottom:1px solid #1e1e1e;padding:9px 8px;vertical-align:top;text-align:left}
+ th{color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+ td.k{color:#7d8894;white-space:nowrap;width:190px}
+ td.n{text-align:right;font-family:Consolas,monospace;color:#9fe0f2;white-space:nowrap}
+ .obs{border-left:3px solid #6FC3DF;background:#141414;padding:12px 16px;margin:12px 0;font-size:14px;border-radius:0 8px 8px 0}
+ .obs.warn{border-left-color:#f0c674}
+ .obs.block{border-left-color:#ff9b9b}
+ .refs{font-size:12.5px;color:#9fb3bd}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved &middot; Confidential</div>
+<nav><span class="b">ONEDINE &middot; CASE DATA STATUS</span><span class="p">2026-07-26</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/2a46637e-a42e-4049-8356-74fbf557da70/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+<h1>OneDine Case Data: where we are, where it comes from, what's blocked</h1>
+<p class="sub">Read-only ingestion of OneDine Salesforce cases for root-cause mining and a case-pattern knowledge base</p>
+<p class="meta">Status brief &middot; every number below was measured live on 2026-07-26 &middot; nothing is estimated</p>
+
+<h2>1. Where we are</h2>
+<div class="lk-sec" data-cm="1-where-we-are"><p>The full OneDine case history has been pulled once, sealed into an immutable local store, and is being served read-only to the Argus console. Salesforce is not touched again after the pull &mdash; every downstream question is answered from our own copy. That copy is live and queryable today.</p>
+
+<table>
+<tr><td class="k">Cases</td><td class="n">42,402</td><td>complete history, not a recent window</td></tr>
+<tr><td class="k">Case comments</td><td class="n">16,385</td><td>the only correspondence we currently have &mdash; see &sect;5</td></tr>
+<tr><td class="k">Facts (triples)</td><td class="n">634,907</td><td>every field of every record, preserved verbatim</td></tr>
+<tr><td class="k">Pulled</td><td class="n">2026-07-10</td><td>00:00 UTC, in <b>182 API calls</b> total</td></tr>
+<tr><td class="k">Method</td><td colspan="2">adaptive created-date windows &mdash; query a span, split it if it hits the page cap, recurse. Completeness is guaranteed regardless of case density.</td></tr>
+<tr><td class="k">Rate impact</td><td colspan="2">182 calls against a ~100,000/day allowance, paced at 0.35 s. Effectively zero load on the org.</td></tr>
+</table>
+
+<div class="obs">
+<b>What this buys:</b> the corpus can be re-derived, re-indexed, re-analyzed as many times as we like at zero cost and zero risk to OneDine &mdash; no re-querying, no rate pressure, no chance of a runaway integration. The only time we go back to Salesforce is to fetch what's <i>new</i>.
+</div></div>
+<h2>2. Where the data comes from</h2>
+<div class="lk-sec" data-cm="2-where-the-data-comes"><pre>OneDine Salesforce  (production, READ-ONLY -- no write path exists)
+      |
+      |  OAuth client credentials, one secret, one service
+      v
+salesforce-bridge   a read-only proxy. It holds the credential; nothing else does.
+      |             Its whole vocabulary is: run this SELECT, return the rows.
+      v
+pull (once)         adaptive date-window walk -> cases.jsonl + comments.jsonl
+      |             plus a manifest recording exactly where the cursor stopped
+      v
+sealed store        append-only, one writer, provenance and cursor stored INSIDE
+      |             the store. Checksummed. Archived to cloud storage.
+      v
+query service       answers from the sealed store. Never calls Salesforce.
+      |
+      v
+Argus console       what an operator actually looks at</pre>
+<table>
+<tr><td class="k">Objects read</td><td><code>Case</code>, <code>CaseComment</code>, <code>User</code></td></tr>
+<tr><td class="k">Case fields pulled</td><td><code>Id</code>, <code>CaseNumber</code>, <code>Status</code>, <code>Priority</code>, <code>Origin</code>, <code>Type</code>, <code>Reason</code>, <code>IsClosed</code>, <code>IsEscalated</code>, <code>CreatedDate</code>, <code>ClosedDate</code>, <code>Subject</code>, <code>Description</code></td></tr>
+<tr><td class="k">Comment fields</td><td><code>Id</code>, <code>ParentId</code>, <code>CommentBody</code>, <code>IsPublished</code>, <code>CreatedDate</code>, <code>CreatedById</code></td></tr>
+<tr><td class="k">Write access</td><td><b>None.</b> No credential in this chain can create, update, or delete anything in Salesforce.</td></tr>
+<tr><td class="k">Integrity</td><td>store checksum <code>c20d0856&hellip;3e9916</code> &mdash; the archived copy is byte-verifiable against what the service serves</td></tr>
+</table></div>
+<h2>3. What the corpus actually holds</h2>
+<div class="lk-sec" data-cm="3-what-the-corpus-actually"><p>These distributions are the whole case history, counted from our copy this morning. They are the shape of the problem, and they decide what a knowledge base can and cannot do.</p>
+
+<p class="meta" style="margin:16px 0 4px"><b>How cases arrive</b> &mdash; the corpus is overwhelmingly an email archive.</p>
+<table>
+<tr><td class="k">Email</td><td class="n">36,947</td><td>87%</td></tr>
+<tr><td class="k">Phone</td><td class="n">5,385</td><td>13% &mdash; these carry call metadata, not conversation text</td></tr>
+<tr><td class="k">Web</td><td class="n">70</td><td>&lt;1%</td></tr>
+</table>
+
+<p class="meta" style="margin:16px 0 4px"><b>What kind of case</b> &mdash; support is under a third of the volume.</p>
+<table>
+<tr><td class="k">Problem</td><td class="n">12,605</td><td>the support / root-cause set</td></tr>
+<tr><td class="k">Task</td><td class="n">8,227</td><td>operational work</td></tr>
+<tr><td class="k">Notification</td><td class="n">6,892</td><td>machine-generated</td></tr>
+<tr><td class="k">Data Request</td><td class="n">3,817</td><td>someone asking for data they couldn't get themselves</td></tr>
+<tr><td class="k">Question</td><td class="n">2,745</td><td>documentation gap, by definition</td></tr>
+<tr><td class="k">Install</td><td class="n">1,156</td><td>onboarding</td></tr>
+<tr><td class="k">Bug</td><td class="n">802</td><td>field-reported defects</td></tr>
+<tr><td class="k">Feature Request</td><td class="n">449</td><td>demand signal</td></tr>
+</table>
+
+<p class="meta" style="margin:16px 0 4px"><b>How cases end</b> &mdash; <code>Reason</code> is already a human-filled root-cause taxonomy. This is the single most valuable field in the corpus.</p>
+<table>
+<tr><td class="k">Task Complete</td><td class="n">17,189</td><td>no diagnostic content</td></tr>
+<tr><td class="k">Escalated to Customer/Vendor/IT</td><td class="n">3,704</td><td>handed off</td></tr>
+<tr><td class="k">No Solution</td><td class="n">2,907</td><td><b>root cause never found</b></td></tr>
+<tr><td class="k">Training / How to</td><td class="n">1,868</td><td>deflectable with docs</td></tr>
+<tr><td class="k">Reboot / Restart</td><td class="n">1,534</td><td>workaround, not a fix &mdash; recurrence candidates</td></tr>
+<tr><td class="k">Resolved By Development (Bug Fix)</td><td class="n">1,381</td><td>real defects, real fixes</td></tr>
+<tr><td class="k">Configuration Change</td><td class="n">1,188</td><td>environmental</td></tr>
+<tr><td class="k">Install Completed</td><td class="n">1,164</td><td></td></tr>
+<tr><td class="k">Resolved itself</td><td class="n">945</td><td><b>root cause never found</b></td></tr>
+</table>
+<div class="obs">
+<b>The target is measurable.</b> "No Solution" plus "Resolved itself" is <b>3,852 cases &mdash; 9% of everything</b> &mdash; where a root cause was never established. That is the number a pattern KB exists to move, and it can be reported on every rebuild.
+</div>
+
+<p class="meta" style="margin:16px 0 4px"><b>Fields that look useful and aren't</b> &mdash; worth knowing before anyone builds on them.</p>
+<table>
+<tr><td class="k">IsEscalated</td><td colspan="2"><code>False</code> on all 42,402 records. The field is unused in this org. Real escalation shows up in <code>Status</code> instead: Tier 2 (208), Development (92), Vendor (5).</td></tr>
+<tr><td class="k">Priority</td><td colspan="2">Level 2 on 33,128 of 42,402 (78%) &mdash; effectively a default, not a signal. Level 3 (7,498), Level 4 (983), Level 1 (792).</td></tr>
+<tr><td class="k">Status = Merged</td><td colspan="2">8,128 cases (19%) are merged duplicates. <b>Only 8 of them carry a <code>ParentId</code></b>, so what each was merged <i>into</i> is not recoverable from the fields we can see. See ask 4.</td></tr>
+</table></div>
+<h2>4. What's live right now</h2>
+<div class="lk-sec" data-cm="4-what-s-live-right"><p>Checked this morning against both the live org and our copy:</p>
+<table>
+<tr><th>Measure</th><th>Live Salesforce</th><th>Our copy</th><th>Delta</th></tr>
+<tr><td>Cases</td><td class="n">42,565</td><td class="n">42,402</td><td class="n">+163</td></tr>
+<tr><td>Case comments</td><td class="n">16,472</td><td class="n">16,385</td><td class="n">+87</td></tr>
+</table>
+<p>16 days of drift, 163 cases. Small &mdash; but today we only know that because it was measured by hand. There is no refresh path wired yet: the cursor is stored, the job that advances it is not built. That is on us, not on OneDine, and it is the next thing we build.</p></div>
+<h2>5. The gaps &mdash; what's blocked</h2>
+<div class="lk-sec" data-cm="5-the-gaps-what-s"><div class="obs block">
+<b>The correspondence is not in the corpus.</b> 87% of cases arrive by email, but the entire org holds only <b>16,472 case comments &mdash; 0.39 per case</b>. The actual email threads live in Salesforce's <code>EmailMessage</code> object, and every query against it fails: the simplest valid request, <code>SELECT Id FROM EmailMessage LIMIT 1</code>, returns HTTP 400. That is the response Salesforce gives when the object isn't visible to the integration user.
+<div class="note">Consequence: today we can mine case <b>subjects and descriptions</b>, but not the back-and-forth where the diagnosis actually happens. For root-cause mining, that is the difference between reading the title of a book and reading the book.</div>
+</div>
+
+<p>Same result, same likely cause, for two more:</p>
+<table>
+<tr><td class="k">EmailMessage</td><td><span class="tag t-block">BLOCKED</span></td><td>the email correspondence &mdash; the priority ask</td></tr>
+<tr><td class="k">Account &middot; Case.AccountId</td><td><span class="tag t-block">BLOCKED</span></td><td>no way to attribute a case to a customer or site</td></tr>
+<tr><td class="k">Contact &middot; Case.ContactId</td><td><span class="tag t-block">BLOCKED</span></td><td>no way to attribute a case to a person</td></tr>
+</table>
+<p class="note">Confirmed field by field: <code>OwnerId</code>, <code>SuppliedEmail</code>, <code>SuppliedName</code> and <code>Origin</code> all return normally on the same query shape &mdash; only <code>AccountId</code> and <code>ContactId</code> fail. So this is specific access, not a broken query.</p>
+
+<p style="margin-top:18px">And three objects that are <b>already readable and simply not being pulled yet</b> &mdash; no permission needed, just a decision:</p>
+<table>
+<tr><td class="k">CaseHistory</td><td class="n">79,960</td><td><span class="tag t-today">READY</span> field-level change trail &mdash; 21,318 owner changes, 11,530 status changes. This is <b>how</b> a case moved through Tier 2 / Development, not just where it ended. Nearly double the case count in rows.</td></tr>
+<tr><td class="k">Task</td><td class="n">3,819</td><td><span class="tag t-today">READY</span> activity records linked to cases</td></tr>
+<tr><td class="k">Attachment</td><td class="n">465</td><td><span class="tag t-today">READY</span> metadata (screenshots, logs referenced by cases)</td></tr>
+</table>
+<p class="note">Likewise <code>OwnerId</code>, <code>SuppliedEmail</code> and <code>SuppliedName</code> are readable today and are not yet in our pull &mdash; adding them gives agent attribution and requester identity for the 87% email population without needing Contact access at all.</p></div>
+<h2>6. The asks</h2>
+<div class="lk-sec" data-cm="6-the-asks"><p>Four for whoever administers the OneDine org; the rest is our work.</p>
+<ol>
+<li><b>Grant read on <code>EmailMessage</code></b> to the integration user. This is the one that changes the product. Everything about root-cause mining and case-pattern matching depends on the conversation, and the conversation is in there.</li>
+<li><b>Grant read on <code>Account</code> / <code>Case.AccountId</code></b> (and <code>Contact</code> / <code>ContactId</code> if it's not sensitive). Without it we cannot say "this problem hits these customers" or "this site generates 40% of the Tier 2 load" &mdash; only "this problem exists."</li>
+<li><b>Confirm we may pull <code>CaseHistory</code>, <code>Task</code> and <code>Attachment</code> metadata.</b> They're already readable; we want the nod before roughly doubling what we hold.</li>
+<li><b>Where does the merge link live?</b> 8,128 cases sit at Status = Merged with no parent pointer we can see. If a custom field records what each was merged into, that's 8,128 human-verified "these are the same problem" pairs &mdash; a free, hand-labeled validation set for the matcher. If it isn't recorded anywhere, we'd like to know that too, so we stop looking.</li>
+</ol>
+<p class="note">A fifth, informational: are <code>Priority</code> and <code>IsEscalated</code> deliberately unused, or unused by accident? We won't build on them either way &mdash; but if they're supposed to carry signal, that's a process finding worth surfacing.</p></div>
+<h2>7. What we build, in order</h2>
+<div class="lk-sec" data-cm="7-what-we-build-in"><ol>
+<li><b>Refresh path.</b> Incremental pull from the stored cursor, a rebuild that re-derives the whole store locally, and an explicit promote step so a new corpus only goes live when someone chooses it. Plus two counters &mdash; how far behind we are, and whether we hold everything the source has. The equivalent already runs in production on a support corpus 10&times; this size.</li>
+<li><b>Search that ranks.</b> Current search finds matches but doesn't rank them, and truncates silently past a couple of thousand matches. The ranked, indexed version is a port of code already running.</li>
+<li><b>The pattern KB.</b> With email threads in hand: cluster by root cause using <code>Reason</code> as the seed labels, match new cases against the clusters, and report against the 3,852 unexplained cases as the scoreboard.</li>
+<li><b>Beyond support.</b> The same corpus already answers questions nobody is asking it yet &mdash; 3,817 data requests (a self-service gap with receipts), 2,745 questions (the documentation backlog, clustered into the docs that don't exist), 802 field bugs, 449 feature requests ranked by real demand.</li>
+</ol>
+<div class="obs warn">
+<b>One honesty note for any coverage claim.</b> Notification cases (6,892) and phone cases (5,385) together are <b>12,277 &mdash; 29% of the corpus &mdash; and carry little or no minable text</b>; a phone case body is call metadata, not conversation. Any KB coverage number should be stated against the ~30,000 cases that actually contain language, not against 42,402.
+</div></div>
+<h2>8. How to verify any of this</h2>
+<div class="lk-sec" data-cm="8-how-to-verify-any"><p>Every figure here came from one of two places, both repeatable by a third party with the same credentials:</p>
+<ul>
+<li><b>Live org</b> &mdash; read-only SOQL counts through the bridge (<code>SELECT COUNT() FROM Case</code>, and the field-by-field access probes in &sect;5).</li>
+<li><b>Our sealed copy</b> &mdash; the query service's own status and facet endpoints, which read the store and never touch Salesforce.</li>
+</ul>
+<p>Nothing in this document is inferred from code comments or prior documentation. Where the documentation and the running system disagreed, the running system won.</p>
+<p class="meta" style="margin-top:16px">Comments are open below. Corrections and additions welcome.</p>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved &middot; Confidential</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"2a46637e-a42e-4049-8356-74fbf557da70"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

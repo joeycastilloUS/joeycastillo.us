@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status Bridge — the pure intents (use what we have)</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  nav.bar { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  nav.bar .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  nav.bar .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:820px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:25px; margin:.2em 0 .1em; }
+  h2 { font-size:19px; color:var(--accent); margin-top:1.9em; border-bottom:1px solid #262626; padding-bottom:5px; }
+  h3 { font-size:15px; margin:1.2em 0 .3em; color:#cfcfcf; }
+  .sub { color:var(--mut); margin-top:0; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  .lead { border-left:3px solid var(--accent); padding-left:12px; }
+  .win { border-left:3px solid var(--ok); padding-left:12px; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  pre { background:#000; border:1px solid #242424; border-radius:6px; padding:12px 14px; overflow:auto; font-size:12px; color:#cfe8ef; line-height:1.45; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:12.5px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid #242424; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  .strike { color:var(--mut); text-decoration:line-through; }
+  ul { margin:.4em 0; padding-left:20px; } li { margin:.26em 0; }
+  .pts { color:var(--accent); font-weight:600; }
+  .foot { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #242424; padding-top:12px; }
+  .big { font-size:15px; }
+</style>
+</head>
+<body>
+<div style="background:#3a0d0d;border-bottom:1px solid #E06C6C;color:#f2b8b8;text-align:center;font-size:12px;font-weight:700;letter-spacing:2px;padding:6px 10px;">CONFIDENTIAL &nbsp;//&nbsp; TOP SECRET &nbsp;&mdash;&nbsp; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED</div>
+<nav class="bar"><span class="brand">Be</span><span class="pub">Published 2026-07-18 13:43 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/194f09c7-7969-436a-bd5b-b765b175019e/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+
+<h1>Status Bridge &mdash; the pure intents</h1>
+<p class="sub">Use what we have &middot; paired (skill-reuse map + DIA pure-intent model, reconciled) &middot; corrects the sizing in <code>1127</code>/<code>1333</code></p>
+
+<div class="card lead big">
+<b>The correction:</b> the <span class="strike">44-point</span> estimate was <b>rebuild-sizing</b> &mdash; it priced writing discovery, crypto, probing, persistence, and publishing that <b>already ship as C99 skills.</b> Purcius doctrine is <b>compose, not rebuild.</b> The status bridge is a <b>`.pi` (pure intent) that binds skills that already run.</b> Real size: <span class="pts">14 pts</span>, and the only genuinely new code is ~40 lines.
+</div>
+
+<h2>What already exists (the reuse map)</h2>
+<p>Paired inspection of all ~46 C skills in <code>C:\nous</code> + the DIA runtime. Every need the design asks for is already shipped:</p>
+<table>
+<tr><th>Need</th><th>Existing skill</th><th>Proof</th><th>New?</th></tr>
+<tr><td>Discover members dynamically (on/off, no recompile)</td><td><code>comms/skill/dns</code> &middot; <code>dns_discover_primes</code></td><td>relay_server.c:662 &mdash; signed DNS discover&rarr;parse&rarr;verify&rarr;store, live vs the prime mesh</td><td class="warn">lift</td></tr>
+<tr><td>Admit only operator-authentic nodes</td><td><code>security/skill/crypt</code> &middot; <code>ed25519_verify</code></td><td>relay_server.c:696 &mdash; bad sig REJECTED, not stored</td><td class="ok">none</td></tr>
+<tr><td>Probe node health</td><td><code>comms/skill/http</code> + relay <code>/status</code></td><td>status_bridge.c:80 already probes it; relay_server.c:1244 serves it (no addresses)</td><td class="ok">none</td></tr>
+<tr><td>Stable public id from pubkey</td><td><code>security/skill/crypt</code> &middot; <code>sha256</code></td><td>crypt.h:40,134 &mdash; <code>id = 8hex(sha256(pubkey))</code>, 2-line compose</td><td class="ok">none</td></tr>
+<tr><td>Closed allowlist projection</td><td><i>pattern (v1 already does it)</i></td><td>status_bridge.c:145 builds output from named locals; addr never assigned to out</td><td class="bad">~20 lines</td></tr>
+<tr><td>seen-cache (first/last seen, departed)</td><td><code>memory/skill/store</code> (IDS)</td><td>store.h:103+; relay already persists discovered nodes as triples</td><td class="ok">bind</td></tr>
+<tr><td>Publish to Cloudflare Pages</td><td><code>comms/skill/dns</code>+<code>http</code> (CF-API pattern) / cloudflare-bridge</td><td>dns_announce.c:113 live <code>http_request</code>&rarr;api.cloudflare.com, cert-pinned</td><td class="ok">bind</td></tr>
+<tr><td>Emit as a native signal</td><td><code>comms/skill/signals</code></td><td>signals.h:131 <code>signals_emit</code> &mdash; sealed, never-fails-caller</td><td class="ok">bind (opt)</td></tr>
+</table>
+<div class="card win"><b>The ONLY genuinely new code:</b> (1) <code>mesh.project</code> allowlist word-hardening &mdash; a region/transport enum so a probed node can&rsquo;t inject an address into a forwarded string (~20 lines); (2) <code>dns.discover_relays</code> &mdash; a <b>copy</b> of <code>dns_discover_primes</code>, <code>_prime</code>&rarr;<code>_relay</code>, <code>role=='p'</code>&rarr;<code>'r'</code>; (3) refactor <code>status_bridge</code> <code>main()</code> into the named <code>pub</code> entry points the <code>.sm</code> binds. Plus one upstream: relay re-announce &lt; TTL. <b>Everything else is bind-to-existing.</b></div>
+
+<h2>The pure intents &mdash; <code>purcius-mesh-status.pi</code></h2>
+<p class="sub">What happens and what we say &mdash; never how. The cortex = this <code>.pi</code> + the <code>.si</code> plan + the <code>.sm</code> catalog. <code>pi_run</code> enacts it; biRT refuses to load on drift. Full file at <code>be/pi/dianoia/purcius-mesh-status.pi</code>.</p>
+<pre>demand:
+
+  D1  Discover the mesh the way the mesh discovers itself. A node that is on has
+      announced a signed presence; a node that is off has let it expire. There is
+      no baked list -- turn one on and it appears, turn it off and it is gone, and
+      no one recompiles anything.
+
+  D2  Admit only what the operator signed. A record that does not verify is dropped
+      before it enters the roster. The signature is the membership authority.
+
+  D3  Probe every admitted node from the right vantage, in-VPC. Relay over its
+      status surface; prime by reaching its wire port; this bridge up by running.
+
+  D4  A probe that does not answer is reported as not reachable -- never the reason
+      (the reason maps the firewall and must never leave this process).
+
+  D5  Only an allowlist of fields ever leaves: a stable id, role, region, whether
+      it answered, when last seen. Never an address, key, topology, identity, or
+      error. Free text a node reports is accepted only if it matches a known word.
+
+  D6  Report what was observed, not a verdict. Emit first/last seen + whether it
+      answered. "stale" / "down" / "healthy" is the watcher's judgement, not ours.
+
+  D7  Give every record a stable id -- the hash of its public key -- and stamp the
+      report with the UTC instant. Same mesh, same instant, same bytes.
+
+  D8  Emit mesh.json + a human page from projected data only, and publish by
+      pushing to Cloudflare Pages. This node opens no inbound port; it only pushes
+      out. status.purcius.net is a Pages custom domain.
+
+  D9  Do not republish an unchanged mesh. A node here-then-absent is remembered as
+      departed, so the watcher can tell "gone" from "never seen".</pre>
+
+<h2>How each intent binds an existing skill (<code>.si</code>)</h2>
+<table data-cm="what-already-exists-the-reuse">
+<tr><th>unit</th><th>why</th><th>binds</th><th>reality</th></tr>
+<tr><td>discover_relays</td><td>D1,D2</td><td><code>dns.discover_relays</code></td><td class="warn">LIFT of dns_discover_primes</td></tr>
+<tr><td>probe_nodes</td><td>D3,D4</td><td><code>mesh.probe</code></td><td class="ok">exists (status_bridge.c)</td></tr>
+<tr><td>project_allowlist</td><td>D5</td><td><code>mesh.project</code></td><td class="bad">the ~20 new lines</td></tr>
+<tr><td>id_and_stamp</td><td>D7</td><td><code>crypt.sha256_id</code></td><td class="ok">crypt.h, 2 lines</td></tr>
+<tr><td>mark_seen</td><td>D6,D9</td><td><code>store.seen</code></td><td class="ok">IDS store, bind</td></tr>
+<tr><td>emit_status</td><td>D8</td><td><code>mesh.emit</code></td><td class="ok">exists (schema tweak)</td></tr>
+<tr><td>changed_gate</td><td>D9</td><td><code>store.changed</code></td><td class="ok">IDS store, bind</td></tr>
+<tr><td>publish_status</td><td>D8</td><td><code>http.cf_pages_publish</code></td><td class="ok">cloudflare jacket, bind</td></tr>
+</table>
+<p class="sub">biRT verifies the whole cortex before a single unit runs: every <code>bind:</code> is a <code>pub</code> row, every <code>why:</code> a real demand, every demand claimed, every <code>in:</code> key produced upstream, every word sealed. Verified == executed, enforced at the door.</p>
+
+<h2>Honest estimate &mdash; 14 pts (was 44)</h2>
+<table data-cm="honest-estimate-14-pts-was">
+<tr><th>Item</th><th>Pts</th><th>Kind</th></tr>
+<tr><td>purcius-mesh-status cortex (.pi + .si + .sm) + biRT-verify</td><td class="pts">2</td><td>write intent, bind existing</td></tr>
+<tr><td>dns.discover_relays (lift dns_discover_primes &rarr; _relay, pub micro-op)</td><td class="pts">3</td><td class="warn">lift</td></tr>
+<tr><td>mesh.project word-hardening + refactor main() into pub entry points</td><td class="pts">3</td><td class="bad">the real new code</td></tr>
+<tr><td>relay re-announce &lt; TTL (upstream, Rule 11, in-VPC)</td><td class="pts">3</td><td class="warn">upstream fix</td></tr>
+<tr><td>pi_run the cortex on the node + pages-add-domain + live verify (in-VPC)</td><td class="pts">3</td><td>wire + Rule-9 proof</td></tr>
+<tr><td><b>Total</b></td><td class="pts">14</td><td></td></tr>
+</table>
+<p class="sub">The <code>.pi</code>, <code>.si</code>, and <code>.sm.add</code> are <b>already written</b> (this artifact&rsquo;s siblings in <code>be/pi/dianoia/</code>) &mdash; the 2-pt cortex item is mostly done; it needs biRT-verify against the built <code>pi_run</code>. The compose-core (cortex + lift + project) is <b>8 pts</b>; the other 6 are the two things that genuinely aren&rsquo;t composition (the upstream relay fix + the live in-VPC publish). Down from 44. Board <code>SBDYN</code> rewritten to match.</p>
+
+<h2>Definition of Done &mdash; this artifact</h2>
+<ul data-cm="definition-of-done-this-artifact">
+<li class="ok">&#10003; A-D-D verified &mdash; sourced against all ~46 skills + the DIA/.pi model; corrects prior over-sizing</li>
+<li class="ok">&#10003; Reuse-first proven &mdash; each need cites the existing skill (file:line); only ~40 new lines named</li>
+<li class="ok">&#10003; Pure intents delivered as a real cortex (<code>.pi</code>/<code>.si</code>/<code>.sm.add</code> in be/pi/dianoia)</li>
+<li class="ok">&#10003; Board SBDYN re-pointed 44 &rarr; 14 &middot; publication date top-right &middot; committed + pushed &middot; cap-URL</li>
+</ul>
+
+<div class="foot">metal console &middot; Be &middot; v0 &middot; r710 &middot; 2026-07-18 &middot; Purcius &mdash; status bridge, the pure intents (compose, not build)</div>
+</div>
+<div style="background:#3a0d0d;border-top:1px solid #E06C6C;color:#f2b8b8;text-align:center;font-size:12px;font-weight:700;letter-spacing:2px;padding:6px 10px;">CONFIDENTIAL &nbsp;//&nbsp; TOP SECRET &nbsp;&mdash;&nbsp; &copy; 2026 JOSEPH M. CASTILLO &middot; ALL RIGHTS RESERVED</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"194f09c7-7969-436a-bd5b-b765b175019e"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

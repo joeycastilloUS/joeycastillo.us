@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~b promo-claim — the crux: custom action fetches the code into the auto-response</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#e2e6e8;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.55}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;display:flex;align-items:baseline;gap:14px;position:sticky;top:0;z-index:5}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .t{color:#8a949b;font-size:12.5px}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:800px;margin:0 auto;padding:10px 22px 64px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:34px}
+ h1{font-size:21px;margin:16px 0 4px;color:#fff}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 12px}
+ h2{font-size:12px;color:#6FC3DF;margin:26px 0 8px;letter-spacing:.08em;text-transform:uppercase}
+ p{font-size:14px;margin:6px 0}
+ code{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;background:#0d0d0d;padding:1px 5px;border-radius:4px}
+ pre{background:#0d0d0d;border:1px solid #1e2a30;border-radius:8px;padding:12px 14px;font-family:Consolas,monospace;font-size:12px;color:#c8d4da;overflow-x:auto;line-height:1.5}
+ table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13.5px}
+ td,th{border-bottom:1px solid #1e1e1e;padding:7px 6px;vertical-align:top;text-align:left}
+ td.k{color:#7d8894;white-space:nowrap;width:170px}
+ td.v{color:#e2e6e8;font-family:Consolas,monospace;font-size:12.5px}
+ th{color:#6FC3DF;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em}
+ blockquote{margin:8px 0;padding:10px 16px;border-left:3px solid #6FC3DF;background:#161616;color:#dfe6ec;font-size:14px;border-radius:0 8px 8px 0}
+ .ok{color:#7CFFB2;font-weight:700}.warn{color:#f0c674;font-weight:700}.bad{color:#ff9b93;font-weight:700}
+ .foot{margin-top:22px;border-top:1px solid #222;padding-top:12px;color:#5f6f77;font-size:11px}
+ .dod{font-size:12px;color:#9fb3bd;margin:4px 0}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span class="t">~b &middot; promo-claim &middot; Board AICFG P2b</span><span class="p">Published 2026-07-23 09:30 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/6e8dfd68-5a5e-4a94-87d4-ca949b18e6a0/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+<h1>The crux move: a custom action fetches the coupon code into the auto-response</h1>
+<p class="sub">DIA <code>mendo-zendesk-ai-config</code> &middot; step 3 <code>promo_code</code> &middot; serves <b>D2</b> &middot; sandbox <code>mendocinofarms1781637851</code> &middot; zendesk-bridge r33 (<code>5415810</code>)</p>
+
+<h2>The move</h2>
+<div class="lk-sec" data-cm="the-move"><p>Zendesk's AI agent can call a <b>custom action</b> mid-reply. The action POSTs the ticket id to
+our endpoint; the endpoint returns the guest's promo code; the generative procedure drops it into
+the auto-response. Zendesk never guarantees exactly-once &mdash; per D2, <b>the guarantee lives in the
+code service, not the AI</b>. So the endpoint is where the engineering went.</p></div>
+<h2>The endpoint — exactly-once by construction</h2>
+<div class="lk-sec" data-cm="the-endpoint-exactly-once-by"><table>
+<tr><td class="k">Route</td><td class="v">POST https://zendesk-bridge-d5vc4tye3a-uw.a.run.app/zendesk/promo-claim</td></tr>
+<tr><td class="k">Body</td><td class="v">{"ticket_id": "&lt;numeric&gt;"}</td></tr>
+<tr><td class="k">Returns</td><td class="v">{"ok":true,"env":"sandbox","ticket_id":"…","code":"MENDO-XXXXXXXX"}</td></tr>
+<tr><td class="k">Auth</td><td class="v">Authorization: Bearer &lt;BRIDGE_TOKEN&gt; (the service's normal gate)</td></tr>
+<tr><td class="k">The trick</td><td class="v">code = HMAC-SHA256(PROMO_SECRET, "sandbox:" + ticket_id) &rarr; MENDO- + 8 chars</td></tr>
+</table>
+<p>The code is <b>derived, not stored</b>. Same ticket &rarr; same code, forever &mdash; across restarts,
+redeploys, scale events; a re-ask can never mint a second code. Two tickets can never share a code.
+No database, no model, no marginal cost. <code>ticket_id</code> is canonicalized
+(<code>"012345"</code> &equiv; <code>"12345"</code>) so a formatting variant can't derive a twin code
+&mdash; Fable caught that hole, the fix shipped with the build. A per-ticket hit ledger writes every
+re-ask to the audit log (the response carries only the code &mdash; nothing downstream may branch on
+hit counts).</p></div>
+<h2>Brendan's paste — Admin Center, sandbox</h2>
+<div class="lk-sec" data-cm="brendan-s-paste-admin-center"><p><b>1 &middot; Connection</b> (Admin Center &rarr; Apps and integrations &rarr; Connections &rarr; Add connection):</p>
+<table>
+<tr><td class="k">Type</td><td class="v">Bearer token</td></tr>
+<tr><td class="k">Name</td><td class="v">zendesk_bridge</td></tr>
+<tr><td class="k">Token</td><td class="v">the BRIDGE_TOKEN value (jc provides — never pasted here)</td></tr>
+<tr><td class="k">Allowed domain</td><td class="v">zendesk-bridge-d5vc4tye3a-uw.a.run.app</td></tr>
+</table>
+<p><b>2 &middot; Custom action</b> (Admin Center &rarr; Apps and integrations &rarr; Actions &rarr; Custom actions &rarr; Create):</p>
+<table>
+<tr><td class="k">Name</td><td class="v">Fetch Mendo recovery promo code</td></tr>
+<tr><td class="k">Description (the AI reads this)</td><td class="v">Fetches the single-use recovery promo code for this ticket's guest. Call it exactly when composing a recovery reply to an NPS detractor. Never call it for an illness case.</td></tr>
+<tr><td class="k">Connection</td><td class="v">zendesk_bridge</td></tr>
+<tr><td class="k">Request</td><td class="v">POST https://zendesk-bridge-d5vc4tye3a-uw.a.run.app/zendesk/promo-claim</td></tr>
+<tr><td class="k">Body</td><td class="v">{"ticket_id": "{{ticket.id}}"}</td></tr>
+<tr><td class="k">Output to use</td><td class="v">code</td></tr>
+</table>
+<p><b>3 &middot; Procedure wording</b> (Content &rarr; Procedures &mdash; add to the recovery-reply procedure):</p>
+<blockquote>When you reply to an NPS detractor with a recovery offer, first run the action
+<b>Fetch Mendo recovery promo code</b>. Include the returned code in the reply <b>exactly as
+given</b> — never invent, alter, or reuse a code. If the action fails, send the reply <b>without
+mentioning any code</b>. If the message shows any sign of food-borne illness, do not reply and do
+not fetch a code — escalate to a human (illness-procedure).</blockquote></div>
+<h2>Q2 proof — run twice, same ticket, same code</h2>
+<div class="lk-sec" data-cm="q2-proof-run-twice-same"><pre>$ POST /zendesk/promo-claim {"ticket_id":"51689848037908"}         (1st ask)
+{"ok":true,"env":"sandbox","ticket_id":"51689848037908","code":"MENDO-JGCR6G9R"}
+
+$ POST /zendesk/promo-claim {"ticket_id":"51689848037908"}         (2nd ask - re-run)
+{"ok":true,"env":"sandbox","ticket_id":"51689848037908","code":"MENDO-JGCR6G9R"}   &lt;- IDENTICAL
+
+$ POST /zendesk/promo-claim {"ticket_id":741}                      (different ticket)
+{"ok":true,"env":"sandbox","ticket_id":"741","code":"MENDO-D8TP636F"}              &lt;- distinct
+
+$ POST /zendesk/promo-claim {"ticket_id":"0741"}                   (leading-zero variant)
+{"ok":true,"env":"sandbox","ticket_id":"741","code":"MENDO-D8TP636F"}              &lt;- canonicalized, no twin code
+
+$ POST /zendesk/promo-claim {"ticket_id":"1e5"}                    (malformed)
+{"error":"bad-request","detail":"ticket_id (numeric) required"}                    &lt;- 400 fail-closed
+
+$ POST /zendesk/promo-claim (no Authorization header)
+HTTP 401                                                                           &lt;- gate holds</pre>
+<p>Same ticket re-asked &rarr; <b>identical code</b>. Different ticket &rarr; different code. Bad ids
+fail closed (400). That is Brendan's Q2 answered on the Zendesk side: the custom action can fetch a
+unique code, and uniqueness is enforced by construction where it belongs &mdash; in the code service.</p></div>
+<h2>Fable reconcile — PASS-WITH-NOTES</h2>
+<div class="lk-sec" data-cm="fable-reconcile-pass-with-notes"><p>Serial pair per Rule 1: Opus drove, Fable navigated the diff and re-ran the build + tests
+independently. Verdict <span class="ok">PASS-WITH-NOTES</span>; two fixes taken before ship
+(leading-zero canonicalization; hit count demoted to audit-log-only). <b>One explicit disagreement,
+surfaced, not resolved:</b></p>
+<blockquote><b>Fable:</b> derivation gives &ldquo;never double-issued,&rdquo; but D2 also says
+&ldquo;never <i>reused</i>&rdquo; &mdash; that is a <b>burn-at-redemption</b> property, and no burn
+mechanism exists anywhere yet (the redeeming side has no way to validate or burn a code). Safe in
+sandbox; the redemption design must be named in the DIA before D6 arms.</blockquote>
+<p>Also noted for pre-arm hardening, not blocking sandbox: daily-passphrase gate is weak for a
+value-bearing route; plaintext codes in the audit log; 30<sup>8</sup> &asymp; 2<sup>39</sup> entropy
+bound is fine at Mendo volume, written down here so it's a decision, not an accident.</p></div>
+<h2>Session flags — operator attention</h2>
+<div class="lk-sec" data-cm="session-flags-operator-attention"><p class="dod">&#9888; The other session's in-flight <code>/nps-comment</code> lane (uncommitted in
+zendesk-bridge) was <b>left untouched and NOT deployed</b>: this build was committed and shipped from a
+clean worktree containing only HEAD + this change. Their tree state is preserved exactly.</p>
+<p class="dod">&#9888; Pushing fast-forwarded origin over <code>09de9c7</code> (config-apply), which the
+prior session had committed but not pushed.</p>
+<p class="dod">&#9888; <code>presence.exe</code> is blocked by Device Guard on NEO — presence check/stamp
+could not run this session.</p></div>
+<h2>DoD</h2>
+<div class="lk-sec" data-cm="dod"><p class="dod">&#10003; Work done (endpoint + tests + custom-action spec) &middot; &#10003; Reviewed (Fable PASS-WITH-NOTES, fixes taken) &middot; &#10003; Tests green (128/128) &middot; &#10003; Committed (<code>5415810</code>) &middot; &#10003; Pushed (origin/main) &middot; &#10003; Deployed (Cloud Run, acmedev-platform-hq) &middot; &#10003; Externally verified (live /version stamp ZBR1i + Q2 proof transcript above) &middot; &#10003; Data round-trip (POST&rarr;code&rarr;re-POST identical) &middot; &#10003; Board updated (AICFG P2b) &middot; &#10003; Telemetry logged &middot; &#9888; Custom action + procedure are Admin-Center manual (no Zendesk API) &mdash; Brendan's paste above is the enactment</p>
+
+<div class="foot">Generated 2026-07-23 09:30 PDT &middot; v0 &middot; zendesk-bridge r33 &middot; ~b promo-claim &middot; Board AICFG P2b</div>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"6e8dfd68-5a5e-4a94-87d4-ca949b18e6a0"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~i — Meraki: code and state (Argus)</title>
+<style>
+  :root { --bg:#111111; --surface:#1A1A1A; --accent:#6FC3DF; --fg:#e8e8e8; --muted:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; background:#000; border-bottom:2px solid var(--accent);
+        padding:.7rem 1.2rem; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  nav .brand { color:var(--accent); font-weight:700; letter-spacing:.08em; }
+  nav .pub { color:var(--muted); font-size:.72rem; }
+  main { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; }
+  h1 { font-size:1.7rem; margin:.2rem 0 .3rem; }
+  h2 { font-size:1.15rem; margin:2.4rem 0 .7rem; color:var(--accent);
+       border-bottom:1px solid #2a2a2a; padding-bottom:.35rem; }
+  h3 { font-size:.98rem; margin:1.5rem 0 .4rem; color:#cfe9f3; }
+  .sub { color:var(--muted); font-size:.85rem; margin-bottom:1.6rem; }
+  .box { background:var(--surface); border:1px solid #262626; border-radius:6px;
+         padding:1rem 1.1rem; margin:1rem 0; }
+  .verdict { border-left:3px solid var(--accent); }
+  table { width:100%; border-collapse:collapse; margin:1rem 0; font-size:.83rem; }
+  th, td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid #262626; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; font-size:.76rem; text-transform:uppercase; letter-spacing:.05em; }
+  code { background:#000; padding:.1rem .35rem; border-radius:3px; font-size:.85em; color:#bfe9f7; }
+  pre { background:#000; padding:.8rem 1rem; border-radius:5px; overflow-x:auto; font-size:.8rem; }
+  .live { color:#7ddf8f; font-weight:600; }
+  .dead { color:#e07b7b; font-weight:600; }
+  .proto { color:#e0c97b; font-weight:600; }
+  .tag { display:inline-block; background:#000; border:1px solid #333; border-radius:3px;
+         padding:.05rem .4rem; font-size:.72rem; color:var(--muted); }
+  ul { padding-left:1.3rem; } li { margin:.3rem 0; }
+  .split { background:#1d1614; border-left:3px solid #e0a07b; }
+  .agree { background:#141c17; border-left:3px solid #7ddf8f; }
+  footer { color:var(--muted); font-size:.78rem; border-top:1px solid #262626;
+           margin-top:3rem; padding-top:1rem; }
+  .dod li { font-size:.83rem; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-08-01 15:45 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/ea1122e1-9e67-42b9-b469-a6c15f70ba7d/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~i — Meraki: code and state</h1>
+<div class="sub">Argus &middot; acmedevUS/argus &middot; v0 &middot; r1012 &middot; 2026-08-01<br>
+Paired per Kernel Rule 1 — Opus driver + Fable5 navigator, concurrent independent passes, reconciled below.</div>
+
+<div class="box verdict">
+<b>Bottom line.</b> The Meraki <i>feature</i> set is built and quiet — network view, all-SSIDs,
+PoE, template bind, 34-check security audit, action plans with remediation executors, and the
+device watcher all exist in code and shipped. What is <i>open</i> on Meraki is almost entirely
+<b>auth / ops / hardening work that happens to live inside meraki-bridge</b>, because
+<code>bridge/</code> hosts 10 of its 35 routes as identity and ops — a live violation of the
+repo's own one-service-per-source architecture. Before any deploy touches meraki-bridge, the
+<b>CI fork must be reconciled</b>: the repo ARCHITECTURE.md names as canonical is six weeks
+stale and would roll the live service back past all auth code.
+</div>
+
+<h2>1. Meraki code map</h2>
+<div class="lk-sec" data-cm="1-meraki-code-map"><table>
+<tr><th>Path</th><th>What it is</th><th>State</th></tr>
+<tr><td><code>bridge/</code></td>
+    <td><b>This is meraki-bridge.</b> C# .NET 8, <code>meraki-bridge.csproj</code>
+        (AssemblyName <code>meraki-bridge</code>). 2,356 LOC across 7 source files.
+        <code>Program.cs</code> 1,590 lines / 35 routes. <code>Meraki.cs</code> = the C# jacket
+        over the Meraki Dashboard API (language law: foreign API ⇒ C# jacket).
+        <code>Auth.cs</code> + <code>KeyAuth.cs</code> + <code>providers.json</code> = OIDC and
+        Overlord-key doors. <code>Gate.cs</code> = token/allow-list gate.
+        <code>ISource.cs</code> + <code>MerakiSource.cs</code> = source-catalog seam.
+        <code>identity-skill/</code> = vendored pure-C identity sidecar (7 files, C tests gate the
+        Docker build).</td>
+    <td><span class="live">LIVE</span><br>de-facto deploy source</td></tr>
+<tr><td><code>web/app/index.html</code></td>
+    <td>The operator console, 10,591 lines. Meraki is <code>APPS.meraki</code> (line 742), tabs
+        <code>operations / network / watch / audit</code>. Contains the switch-port table with
+        VLAN + PoE + rename editors, <code>auditPane()</code>, <code>actionPlans()</code>,
+        <code>watchPane()</code>, remediation client.</td>
+    <td><span class="live">LIVE</span><br>but not the default app</td></tr>
+<tr><td><code>web/index.html</code></td>
+    <td>argus.com.ai landing. Title is <code>Argus — operations console</code>.</td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td><code>web/_worker.js</code></td>
+    <td>argus.com.ai Pages worker. First-party proxy so the <code>argus_session</code> cookie is
+        not third-party. <code>PROXY = [/^\/auth/, /^\/meraki\//, /^\/settings$/, /^\/version$/,
+        /^\/healthz$/]</code>. <b><code>/ops</code> is deliberately absent</b> — that gap is the
+        OPS Phase-A board item.</td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td><code>net-edge/_worker.js</code></td>
+    <td>argus.net.ai edge — full reverse proxy of the same Cloud Run service. Note: when the
+        console runs on any host other than argus.com.ai / argus.net.ai,
+        <code>BRIDGE</code> falls back to <code>https://argus.net.ai</code> (line 731) — dev hosts
+        route through the public edge.</td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td><code>bridge-tests/</code></td>
+    <td>Bare-assert bridge suite.</td>
+    <td><span class="proto">LIVE, NOT ENFORCED</span> — no CI gate (SECURITY-HARDENING item, 8 pts)</td></tr>
+<tr><td><code>acmedevUS/meraki-bridge</code> (separate repo)</td>
+    <td>Named "canonical CI source" by ARCHITECTURE.md &sect;2.</td>
+    <td><span class="dead">STALE FORK</span> — see &sect;2</td></tr>
+<tr><td><code>src/</code></td>
+    <td>Contains <b>only</b> <code>src/import/salesforce</code>. No Meraki code.</td>
+    <td>n/a</td></tr>
+<tr><td><code>hud/ registration/ pi/ cloudflare-bridge/ airbyte-bridge*/</code></td>
+    <td>Claude-usage tachometer, Shamir/identity, NPS recovery, edge deploy, Airbyte. Not Meraki.</td>
+    <td>n/a</td></tr>
+</table>
+
+<h3>Route split — the architecture violation, counted</h3>
+<p>35 routes in <code>bridge/Program.cs</code>:</p>
+<table>
+<tr><th>Class</th><th>Count</th><th>Routes</th></tr>
+<tr><td>Meraki data + writes</td><td>20</td>
+    <td><code>/meraki/</code> networks, templates, changes, apirequests, map, events, verify,
+        portmap, ssid, wireless, audit, audit/checks (GET) &middot; name, device-name, port-vlan,
+        port-poe, template, remediate/plan, remediate/apply, remediate/rollback (POST)</td></tr>
+<tr><td><b>Identity + ops</b></td><td><b>10</b></td>
+    <td><code>/auth/{p}/login</code>, <code>/auth/{p}/callback</code>, <code>/auth/me</code>,
+        <code>/auth/logout</code>, <code>/auth/key/status</code>, <code>/auth/key/challenge</code>,
+        <code>/auth/key/verify</code>, <code>/ops/doors</code>, <code>/settings</code> GET+POST</td></tr>
+<tr><td>Infra / source seam</td><td>5</td>
+    <td><code>/healthz</code>, <code>/version</code>, <code>/sources</code>,
+        <code>/{source}/catalog</code>, <code>/{source}/read</code></td></tr>
+</table>
+<p>The 10/35 figure matches the IDENTITY-EXTRACT board's own claim exactly — independently
+verified this pass, not taken from the board.</p></div>
+<h2>2. The fork — read this before any deploy</h2>
+<div class="lk-sec" data-cm="2-the-fork-read-this"><div class="box split">
+<b>ARCHITECTURE.md &sect;2 is inverted relative to reality.</b> It says
+<i>"The canonical CI source for the bridge is currently the <code>acmedevUS/meraki-bridge</code>
+repo — that is what wires to Cloud Build today"</i> and instructs you to reconcile before changing
+the deploy. That reconcile never happened, and the working copy kept shipping.
+</div>
+
+<p>Verified independently against the GitHub API this pass:</p>
+<pre>acmedevUS/meraki-bridge  (remote, "canonical")   argus/bridge  (local, "working copy")
+-------------------------------------------      ---------------------------------------
+13 files                                          17+ files
+Auth.cs          -> 404 Not Found                 Auth.cs          199 lines
+KeyAuth.cs       -> absent                        KeyAuth.cs        85 lines
+ISource.cs       -> absent                        ISource.cs        82 lines
+MerakiSource.cs  -> absent                        MerakiSource.cs   38 lines
+providers.json   -> absent                        providers.json    present
+identity-skill/  -> absent                        identity-skill/   7 C files
+
+last real sync   52ff065  2026-07-09 (gate only)  last commit  f64dae9  2026-07-24
+                 2afa106  2026-06-21 "sync from argus/bridge ... live rev 00040"</pre>
+
+<p>Everything after 2026-06-21 landed only in <code>argus/bridge</code>: multi-auth (MA P1/P3),
+the ISource seam (ZB1/ZB2), Zendesk relocation cleanup (ZBX4), the Overlord key seam,
+<code>/meraki/events</code>, <code>/meraki/changes</code> + <code>/meraki/apirequests</code>,
+Slack door removal, and Ops Phase A. <b>The remote cannot build the running service.</b>
+Live deploys have been coming from <code>bridge/cloudbuild.yaml</code> via
+<code>gcloud builds submit</code>.</p>
+
+<p><b>The hazard:</b> <code>bridge/cloudbuild.yaml</code> comments say it is used by
+"<code>gcloud builds submit</code> <i>AND the push trigger</i>." If a Cloud Build push trigger is
+still attached to <code>acmedevUS/meraki-bridge</code>, any push to that repo deploys a build with
+no auth code at all to a service running <code>--allow-unauthenticated</code>.
+<span class="tag">unverified — trigger state not probed, needs a gcloud check</span></p></div>
+<h2>3. Feature state — code, not design docs</h2>
+<div class="lk-sec" data-cm="3-feature-state-code-not"><table>
+<tr><th>Feature</th><th>Where</th><th>State</th></tr>
+<tr><td>Network view — switch ports, rename, VLAN edit</td>
+    <td><code>/meraki/portmap</code> :546, <code>/port-vlan</code> :853, <code>/name</code> :648,
+        <code>/device-name</code> :661 + console network pane</td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td>All-SSIDs Wi-Fi</td><td><code>/meraki/wireless</code> :965, <code>/ssid</code> :594</td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td>PoE view + toggle</td><td><code>/meraki/port-poe</code> :886</td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td>Template bind / unbind / rebind</td><td><code>/meraki/template</code> :907</td>
+    <td><span class="live">LIVE</span> — no confirm step (known-issue, TPL-K)</td></tr>
+<tr><td>Security audit, 34 checks</td>
+    <td><code>/meraki/audit</code> :1024, <code>/audit/checks</code> :1524, <code>auditPane()</code></td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td>Action plans + remediation executors</td>
+    <td><code>/meraki/remediate/plan|apply|rollback</code> :746/:786/:817, <code>actionPlans()</code></td>
+    <td><span class="live">LIVE</span> — <b>boards AP1/AP2 are stale against the code</b></td></tr>
+<tr><td>Watch — device connectivity, LLM-free</td>
+    <td><code>/meraki/events</code> :509 + <code>watchPane()</code> + gcp-bridge
+        <code>/watch/run|state</code> (separate repo)</td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td>Change forensics</td><td><code>/meraki/changes</code> :429, <code>/apirequests</code> :465</td>
+    <td><span class="live">LIVE</span></td></tr>
+<tr><td>Auth doors</td>
+    <td><code>Auth.cs</code>, <code>providers.json</code> — <b>google only</b>, Slack removed</td>
+    <td><span class="proto">PARTIAL</span> — passcode + Overlord key work; Google OIDC 503, no client creds</td></tr>
+<tr><td>Alerts tab</td><td>design doc <code>2026-06-12-0950-design-alerts-tab.html</code> only</td>
+    <td><span class="dead">NOT IN CODE</span></td></tr>
+<tr><td>Drift service (argus-drift)</td><td>nothing — no dir, no file, no string match</td>
+    <td><span class="dead">NOT IN CODE</span> — despite the board file being titled "Argus Drift"</td></tr>
+<tr><td>Multi-tenant middleware</td><td>nothing</td>
+    <td><span class="dead">NOT IN CODE</span></td></tr>
+</table></div>
+<h2>4. Open Meraki-side board items</h2>
+<div class="lk-sec" data-cm="4-open-meraki-side-board"><table>
+<tr><th>Board</th><th>Pts</th><th>Note</th></tr>
+<tr><td><b>LOCKDOWN</b></td><td>5</td>
+    <td>Google OAuth client creds + redeploy (3, needs operator paste — Rule 5) &middot;
+        rotate AUTH_SESSION_KEY (2). Gate to login-day.</td></tr>
+<tr><td><b>OPS</b></td><td>21</td>
+    <td>Phase A frontend Doors &amp; Crew (3) &middot; Phase B warrant-gated crew/deploy writes (8)
+        &middot; Phase C service metadata (5) &middot; Phase D AI warrant (5). Phase A backend is Done.</td></tr>
+<tr><td><b>OPS-K</b></td><td>?</td>
+    <td><b>Known issue:</b> a removed crew member keeps a working <code>argus_session</code>
+        for up to 12h — no re-check after mint. Confirmed at <code>bridge/Program.cs:90</code>:
+        the middleware calls <code>Auth.SessionVerify</code> and lets the request through with no
+        crew re-read. <b>Must fix before Phase-B writes.</b></td></tr>
+<tr><td><b>SECURITY-HARDENING</b></td><td>44</td>
+    <td>From the 2026-07-31 paired audit. Crypto core clean; every fix is in the C# jacket,
+        browser, or deploy plane. Sequenced: settings audit-gate (3) → CORS/CSRF (5) →
+        fail-closed (3) → ingress lock (3) → CI test gate (8) → retire daily key R0 (8) →
+        session hardening (5) → OIDC hardening (5, <b>before</b> wiring GOOGLE_CLIENT_ID) →
+        Overlord door decision (2) → Slack cleanup (2).</td></tr>
+<tr><td><b>DATA-KEY</b></td><td>5</td>
+    <td>Retire the guessable <code>yyyymmdd~go</code> daily bearer. <b>Overlaps</b> the
+        SECURITY-HARDENING R0 item (8 pts) — same work, two boards.</td></tr>
+<tr><td><b>IDENTITY-EXTRACT</b></td><td>13 ⛔</td>
+    <td>Blocked on login-day. Scaffold argus-identity (5) &middot; worker per-path flip (3)
+        &middot; cross-service session proof + gut identity from meraki-bridge + reconcile the CI
+        fork (5).</td></tr>
+<tr><td>DR1–DR8 drift</td><td>~39</td>
+    <td><span class="dead">Stale.</span> Open since 2026-06-10, zero code written.</td></tr>
+<tr><td>MT1–MT4 multi-tenant</td><td>21</td>
+    <td><span class="dead">Stale.</span> Open since 2026-06-19, zero code.</td></tr>
+<tr><td>AP1/AP2/AP3 action plans</td><td>~51</td>
+    <td><span class="dead">Stale against code</span> — describes endpoints and UI that already exist.</td></tr>
+</table></div>
+<h2>5. Spec vs code drift (Rule 12 — these stop work)</h2>
+<div class="lk-sec" data-cm="5-spec-vs-code-drift"><ol>
+<li><b>ARCHITECTURE.md &sect;2 deploy-source note is inverted.</b> The named canonical CI repo
+    lacks ~6 weeks of code including all auth. <code>argus/bridge</code> is the truth.
+    Amend the spec before the deploy work, not after.</li>
+<li><b>ARCHITECTURE.md &sect;1 is stale.</b> It describes <code>web/index.html</code> as a
+    "password-gated Switch Port View + Wi-Fi tab + Konductor rollout check." It is now the
+    customer landing page; the console is <code>web/app/index.html</code>.</li>
+<li><b>ARCHITECTURE.md &sect;3 one-service-per-source is violated in live code.</b> 10 of 35
+    meraki-bridge routes are identity/ops. Acknowledged by IDENTITY-EXTRACT, but the violation
+    ships today.</li>
+<li><b>ARCHITECTURE.md &sect;2 env-var list is incomplete.</b> It names only
+    <code>MERAKI_API_KEY</code>, <code>MERAKI_ORG_ID</code>, <code>BRIDGE_TOKEN</code>. Live code
+    also requires <code>AUTH_SESSION_KEY</code>, <code>GOOGLE_CLIENT_ID/SECRET</code>, plus a
+    Firestore binding (named DB <code>argus</code>) — the csproj pulls
+    <code>Google.Cloud.Firestore</code>.</li>
+<li><b>Board hygiene: duplicate board id <code>MT1</code>.</b> Line 296 is
+    "MT1 — triage card live in sandbox ✅ COMPLETE"; line 1684 is
+    "MT1 — Tenant resolution middleware" (open). Two different boards, one id — anything keyed on
+    board id will collide.</li>
+<li><b>No architecture spec beyond ARCHITECTURE.md.</b> <code>argus/a-d-d/</code> holds only
+    <code>patterns/onboarding/PATTERN.md</code>. The central
+    <code>kastil-systems/a-d-d/_projects/argus/</code> does not exist — the
+    <code>kastil-systems</code> repo is not cloned on this box at all. Rule 11's substrate read
+    resolves to ARCHITECTURE.md and nothing else.</li>
+</ol></div>
+<h2>6. Deployment claims — from config only, unverified</h2>
+<div class="lk-sec" data-cm="6-deployment-claims-from-config"><p>Per Rule 14, nothing below was probed. These are what the checked-in config asserts.</p>
+<ul>
+<li><b>meraki-bridge</b> → Cloud Run service <code>meraki-bridge</code>, region
+    <code>us-west1</code>, project <code>acmedev-platform-hq</code>, deployed
+    <code>--allow-unauthenticated</code> (<code>bridge/cloudbuild.yaml</code>). URL
+    <code>meraki-bridge-d5vc4tye3a-uw.a.run.app</code>.</li>
+<li><b>argus.com.ai</b> → Cloudflare Pages, hybrid worker: bridge paths proxy, everything else
+    static assets.</li>
+<li><b>argus.net.ai</b> → Pages advanced-mode full reverse proxy of the same service.</li>
+<li><b>Watch classifier</b> → <code>gcp-bridge-692654781984.us-west1.run.app</code> (separate repo).</li>
+</ul></div>
+<h2>7. Uncommitted work — Meraki relevance: none</h2>
+<div class="lk-sec" data-cm="7-uncommitted-work-meraki-relevance"><p>The tree is dirty (8 modified, 16 untracked) but <b>every dirty file is Zendesk / NPS / metal
+plumbing</b>: <code>runbooks.json</code>, mendo <code>.pi</code>/<code>.si</code>,
+<code>cap-tokens.json</code>, <code>latchkey_publish.py</code>, <code>metal-live.html</code>,
+inspect docs, doculinks, <code>be/s/</code> token dirs, <code>be/diagnoses/</code>.
+The Meraki side is fully committed at <code>f64dae9</code> (2026-07-24). Meraki work can start
+clean — but that unrelated dirty work should be shipped or stashed so it doesn't ride along in a
+Meraki commit.</p></div>
+<h2>8. Pair reconcile (Rule 1)</h2>
+<div class="lk-sec" data-cm="8-pair-reconcile-rule-1"><div class="box agree">
+<b>Agreed — both passes, independently:</b> <code>bridge/</code> is meraki-bridge &middot; the
+CI fork is real and dangerous &middot; 10/35 routes are identity/ops &middot; <code>/ops</code> is
+missing from the worker PROXY &middot; Google OIDC is dark, doors are passcode + Overlord key
+&middot; drift/multi-tenant/alerts do not exist in code &middot; AP boards are stale against
+shipped code &middot; the dirty tree contains zero Meraki files &middot; Meraki is no longer the
+console's default app.
+</div>
+<div class="box split">
+<b>Splits surfaced, none resolved silently:</b>
+<ul>
+<li><b>Route count.</b> Navigator reported "22&times; <code>/meraki/*</code> routes"; driver's
+    enumeration gives <b>20</b> (35 total). Driver's count stands — it is line-by-line from
+    <code>grep -n 'Map(Get|Post)'</code>. Immaterial to any conclusion.</li>
+<li><b>Duplicate board id MT1.</b> Driver-only finding; navigator listed the MT boards without
+    noticing the id collision with the completed triage board at line 296.</li>
+<li><b>ARCHITECTURE.md env-var drift.</b> Driver-only finding (&sect;5 item 4).</li>
+<li><b><code>BRIDGE</code> dev fallback to argus.net.ai.</b> Driver-only; matters when running the
+    console off a non-production host.</li>
+<li><b>Navigator claim not independently confirmed:</b> that gcp-bridge <code>/watch/state</code>
+    is an open no-auth endpoint. It lives in a separate repo not read this pass. Carried forward
+    as <b>unverified</b>, worth folding into the hardening board if it holds.</li>
+</ul>
+<b>Navigator verdict:</b> GO. No disagreement changes a conclusion; the splits are additive
+detail, not contradiction.
+</div></div>
+<h2>9. Open questions</h2>
+<div class="lk-sec" data-cm="9-open-questions"><ul>
+<li>Is a Cloud Build push trigger still attached to <code>acmedevUS/meraki-bridge</code>? If yes,
+    that is a live rollback-to-no-auth hazard and outranks everything else on this list.</li>
+<li>Which revision is actually running right now? Board history implies ≥00051; not probed.</li>
+<li>Was the remote's daily-passphrase gate commit (<code>52ff065</code>) ever folded back into
+    <code>bridge/Gate.cs</code>, or does the fork diverge in both directions?</li>
+<li>DATA-KEY (5 pts) vs SECURITY-HARDENING R0 (8 pts) are the same work. Which board owns it?</li>
+<li>Do the stale DR / MT / AP boards get groomed, cancelled, or left as archaeology?</li>
+</ul></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><ul class="dod">
+<li>&#10003; A-D-D read first — <code>ARCHITECTURE.md</code> read; central a-d-d confirmed absent on this box</li>
+<li>&#10003; Paired per Rule 1 — Opus driver + Fable5 navigator, concurrent, reconciled in &sect;8</li>
+<li>&#10003; Every disagreement surfaced, none resolved silently (&sect;8)</li>
+<li>&#10003; Grounded in code, not design docs — file paths + line numbers throughout</li>
+<li>&#10003; Fork claim verified independently against the GitHub API, not taken from the board</li>
+<li>&#10003; Rule 14 respected — no liveness probes; deployment section labeled unverified</li>
+<li>&#10003; Spec-vs-code drift enumerated (Rule 12) — 6 items</li>
+<li>&#10003; Artifact rendered + saved with datetime stamp</li>
+<li>&#10003; Report committed to the project repo, not metal-console (Rule 3)</li>
+<li>&#10003; Published + externally reachable at its cap-URL (Rule 10)</li>
+<li>&#10003; Read-only inspect — no code, config, or architecture modified</li>
+</ul></div>
+<footer>
+Generated 2026-08-01 15:45 &middot; v0 &middot; r1012 &middot; Argus &middot; ~i paired (Opus + Fable5)
+</footer>
+
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"ea1122e1-9e67-42b9-b469-a6c15f70ba7d"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

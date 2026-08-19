@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~i — Identity is in the wrong house (meraki-bridge)</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  .nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  .nav .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  .nav .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:800px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:26px; margin:.2em 0 .1em; }
+  h2 { font-size:19px; color:var(--accent); margin-top:1.9em; border-bottom:1px solid #262626; padding-bottom:5px; }
+  h3 { font-size:15px; margin:1.3em 0 .3em; color:#cfcfcf; }
+  .sub { color:var(--mut); margin-top:0; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:13px; }
+  pre { background:#000; border:1px solid #242424; border-radius:6px; padding:12px; overflow:auto; font-size:12.5px; color:#cfe8ef; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13px; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid #242424; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  ul { margin:.4em 0; padding-left:20px; } li { margin:.25em 0; }
+  .foot { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #242424; padding-top:12px; }
+  .big { font-size:15px; }
+  .lead { border-left:3px solid var(--accent); padding-left:12px; }
+  .warnrail { border-left:3px solid var(--warn); padding-left:12px; }
+  .ok-rail { border-left:3px solid var(--ok); padding-left:12px; }
+</style>
+</head>
+<body>
+<div class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-25 10:35 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/0b7b1632-d763-4a91-a16f-1796c41506e9/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+<h1>~i — Identity is in the wrong house</h1>
+<p class="sub">Paired inspection (two blind passes, reconciled) &middot; driver Opus + navigator Fable5 &middot; project: <b>argus</b> &middot; r917 &middot; trigger: operator &mdash; "meraki-bridge seems like the wrong place"</p>
+
+<div class="card lead big">
+<b>Verdict:</b> the operator's instinct is right &mdash; the console's entire <b>human-identity surface lives inside meraki-bridge</b>, a service named for network switches. It should be <b>extracted to a dedicated <code>argus-identity</code> service</b>. But <b>not now</b>: <b>get both logins working first</b> (Google + Overlord), <i>then</i> extract. Migrating an auth flow that has never once authenticated anyone &mdash; across the one deploy pipeline the architecture doc flags as forked &mdash; is two unknowns in one incident. Working logins are the regression test that makes the move safe. The <code>_worker.js</code> proxy is the seam that makes the extraction flag-day-free and makes today's login work non-throwaway.
+</div>
+
+<h2>What it is &mdash; the smell, quantified</h2>
+<div class="lk-sec" data-cm="what-it-is-the-smell"><p><b>meraki-bridge</b> (<code>bridge/meraki-bridge.csproj</code>) has <b>35 routes</b>. Only 22 are Meraki. <b>10 are identity/ops</b> &mdash; ~30% of a "Meraki" service is the console's identity substrate:</p>
+<table>
+<tr><th>Identity/ops route</th><th>Concern</th></tr>
+<tr><td><code>/auth/{p}/login</code>, <code>/auth/{p}/callback</code>, <code>/auth/me</code>, <code>/auth/logout</code></td><td>OIDC member federation (Google)</td></tr>
+<tr><td><code>/auth/key/status</code>, <code>/auth/key/challenge</code>, <code>/auth/key/verify</code></td><td>Ed25519 Overlord key door</td></tr>
+<tr><td><code>GET/POST /settings</code></td><td>carries the crew allow-list (who may sign in)</td></tr>
+<tr><td><code>/ops/doors</code></td><td>the just-built Argus Ops surface</td></tr>
+</table></div>
+<h2>Why it's the wrong house</h2>
+<div class="lk-sec" data-cm="why-it-s-the-wrong"><div class="card">
+<b>1. It violates the architecture's own law.</b> <code>ARCHITECTURE.md</code> canon: one Cloud Run service per <i>source</i> &mdash; own secret, own IAM, own deploy. The fleet honors it: <code>gcp-bridge</code>=Vertex/cost, <code>zendesk-bridge</code>=Zendesk, <code>slack-bridge</code>, <code>cloudflare-bridge</code>, <code>airbyte-bridge</code>. <b>Identity is not a source</b> &mdash; it's the substrate every source's gate depends on. It has no business inside the Meraki box.
+</div>
+<div class="card">
+<b>2. The deploy coupling is real and we felt it.</b> Twice <b>this session</b> we rebuilt + redeployed the <i>Meraki</i> service purely to change <i>auth</i> (removing the Slack door; adding <code>/ops/doors</code>) &mdash; each redeploy putting the 22 Meraki data routes at risk for an identity change. And every auth deploy rides meraki-bridge's <b>known CI fork</b> (canonical <code>acmedevUS/meraki-bridge</code> vs the working <code>bridge/</code> copy, flagged in <code>ARCHITECTURE.md</code>).
+</div>
+<div class="card">
+<b>3. The crypto is already pure-C.</b> The Ed25519 identity core is a pure-C sidecar (<code>bridge/identity-skill</code>); the C# is only a thin OIDC/session/crew jacket. A dedicated identity service is the natural seam to let the jacket shrink and the Purcius-native core grow &mdash; consistent with the Language Boundary law (C# only for foreign-API jackets; OIDC is the only foreign API here).
+</div></div>
+<h2>The non-conflation (important)</h2>
+<div class="lk-sec" data-cm="the-non-conflation-important"><div class="card warnrail">
+This is <b>not</b> the <code>purcius-bridge-auth</code> plan (2026-07-20). That plan is a <b>different auth</b>: it replaces the guessable daily key (<code>yyyymmdd~go</code>) with <b>prime-signed Ed25519 wire auth between machines and the data bridges</b> &mdash; the R0 data-plane / machine-to-machine fix. It says nothing about the <b>human/member</b> identity surface. So there is <b>no existing approved plan</b> to extract human auth from meraki-bridge &mdash; this ~i is a new call. Keep the two "Purcius auth" threads separate: <b>machine wire-auth</b> (purcius-bridge-auth / R0) vs <b>human identity home</b> (this).
+</div></div>
+<h2>Where it should live</h2>
+<div class="lk-sec" data-cm="where-it-should-live"><p><b>A dedicated service named <code>argus-identity</code></b> (navigator's naming call, reconciled):</p>
+<ul>
+<li><b>Not <code>identity-bridge</code></b> &mdash; in this fleet <code>-bridge</code> means "foreign-API jacket for a source." Identity is substrate, not a source.</li>
+<li><b>Not <code>purcius-identity</code></b> &mdash; invites conflation with the machine-plane purcius-bridge-auth plan above.</li>
+<li>Stays <b>C# OIDC jacket + C sidecar</b> today; it is the seam to go pure-Purcius later (jacket shrinks, sidecar grows).</li>
+</ul></div>
+<h2>Sequencing &mdash; the load-bearing call</h2>
+<div class="lk-sec" data-cm="sequencing-the-load-bearing-call"><div class="card ok-rail big">
+<b>Logins first. Extract second. Firm (both passes).</b> The counter-argument &mdash; "extract first so you don't wire Google creds into a service you're about to gut" &mdash; <b>dies on the worker seam</b>: <code>_worker.js</code> makes <code>/auth/*</code> first-party at the <b>console domain</b> (<code>argus.com.ai</code>), so the Google OAuth redirect URI points at the console's <b>path</b>, not the run.app service. Wiring the creds today is <b>preserved across the extraction by design</b> &mdash; nothing done for login-day is wasted. Meanwhile, extracting an auth flow that <b>has never authenticated anyone</b> means debugging OIDC + Overlord + a service migration at once. Working logins <b>are</b> the regression test. It also honors the operator's own gate literally: "nothing changes until I can log in."
+</div></div>
+<h2>Migration &mdash; flag-day-free (do it after login-day)</h2>
+<div class="lk-sec" data-cm="migration-flag-day-free-do"><ol>
+<li>Both logins <b>green</b> on the current meraki-bridge (the baseline / regression test).</li>
+<li>Scaffold <code>argus-identity</code>: move <code>/auth/*</code>, <code>/ops/*</code>, <code>/settings</code> + the key sidecar. Bind the shared state: <code>argus-session-secret</code> (authSessionKey), Firestore db <code>argus</code> (<code>settings</code>/<code>members</code>/<code>sessions</code>), <code>providers.json</code>, <code>BRIDGE_TOKEN</code>.</li>
+<li>Deploy alongside; smoke <code>/auth</code> + <code>/ops/doors</code> directly at its run.app URL.</li>
+<li><b>Worker flip:</b> replace the single <code>BRIDGE</code> const in <code>_worker.js</code> with a per-path target map; route <code>/auth</code>, <code>/ops</code>, <code>/settings</code> &rarr; argus-identity. (Note: <code>/ops</code> is <b>not</b> in today's PROXY list &mdash; add it.)</li>
+<li>Verify sessions minted by argus-identity <b>validate on the Meraki data routes</b> (shared authSessionKey + sessions-doc shape). <b>This is the step most likely to break.</b></li>
+<li>Gut identity from meraki-bridge, one redeploy, and reconcile the CI fork.</li>
+</ol></div>
+<h2>Risks</h2>
+<div class="lk-sec" data-cm="risks"><ul>
+<li class="warn"><b>Biggest risk of doing it NOW:</b> splitting an auth flow that has never authenticated anyone, across the one deploy pipeline the architecture doc flags as forked. &rarr; Sequence it after login-day.</li>
+<li><b>Most likely break during migration:</b> cross-service session validation &mdash; meraki-bridge rejecting a cookie minted by argus-identity (key or session-doc-shape drift). Mitigate: identical <code>AUTH_SESSION_KEY</code> + identical <code>SessionSign</code> payload shape, verified in step 5 before the worker flip.</li>
+<li><b>CI fork</b> on meraki-bridge (canonical repo vs working copy) should be reconciled as part of step 6, not carried into the new service.</li>
+</ul></div>
+<h2>Recommendation / first move</h2>
+<div class="lk-sec" data-cm="recommendation-first-move"><p><b>Do nothing structural yet.</b> First move is still <b>login-day</b>: wire the Google OAuth creds (operator creates client) + build the Overlord warrant signer, prove both logins from the operator's machine. <b>Then</b> the first structural move is step 2 above &mdash; scaffold <code>argus-identity</code> and stand it up alongside, worker-flip last. Board it as its own <code>IDENTITY-EXTRACT</code> board, blocked on login-day.</p></div>
+<h2 class="ok">Definition of Done &mdash; this artifact</h2>
+<div class="lk-sec" data-cm="definition-of-done-this-artifact"><ul>
+<li>&#10003; Paired (Rule 1): two independent passes, reconciled; navigator owned the verdict (first navigator spawn stalled mid-stream &mdash; relaunched tight, delivered)</li>
+<li>&#10003; Concern-mix quantified from source (10/35 identity routes), cited</li>
+<li>&#10003; Non-conflation established: purcius-bridge-auth (machine wire-auth / R0) &ne; this (human identity home)</li>
+<li>&#10003; Disagreement surfaced: none beyond sequencing emphasis &mdash; both passes land "extract second, logins first"</li>
+<li>&#10003; Architecture read first (Rule 11): <code>ARCHITECTURE.md</code> one-service-per-source canon</li>
+<li>&#10003; Rendered to <code>be/plans/</code>, house style, published datetime</li>
+<li>&#9723; Latchkey published (cap-URL on publish); committed + pushed</li>
+<li>&#8213; Production verification: N/A &mdash; inspection artifact; the extraction it recommends carries the Rule-10 gate (cross-service session validation proven before the worker flip)</li>
+</ul>
+
+<div class="foot">
+Be &middot; ~i paired inspection &middot; argus &middot; v0 &middot; r917 &middot; 2026-07-25 10:35 PDT<br>
+Driver: Opus 4.8 &middot; Navigator: Fable5 &middot; One signal in, full chain reaction out.
+</div>
+
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"0b7b1632-d763-4a91-a16f-1796c41506e9"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

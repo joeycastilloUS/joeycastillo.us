@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brief — Hardware Power-Fail Early-Warning for Purcius Nodes</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  .mark { background: #24160f; border: 1px solid #6a3a1a; border-radius: 6px; padding: 10px 14px; margin: 14px 0; font-size: 12.5px; color: #e0b088; letter-spacing: 0.02em; }
+  .mark strong { color: #f0a060; }
+  .expire { background: #2a1015; border: 1px solid #7a2030; color: #f0909c; }
+  .expire strong { color: #ff8090; }
+  h1 { color: #6FC3DF; font-size: 25px; margin: 14px 0 4px; }
+  h2 { color: #6FC3DF; font-size: 18px; margin: 28px 0 10px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  .meta { color: #999; font-size: 13px; margin: 8px 0 4px; }
+  .meta b { color: #cfcfcf; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 18px 20px; margin: 14px 0; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; color: #6FC3DF; }
+  pre { background: #0a0a0a; padding: 14px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; color: #cfcfcf; font-size: 12px; line-height: 1.5; }
+  .q { color: #6FC3DF; font-weight: 600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 40px; padding: 20px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">kASTIL Systems</span>
+  <span class="title">Brief — Power-Fail Early-Warning</span>
+  <span class="pub">2026-07-19</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/0d220751-8eac-47fa-83e6-87c04fee1fb1/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<div class="mark"><strong>CONFIDENTIAL — TRADE SECRET</strong> — Property of Joseph M. Castillo. All rights reserved. Shared in confidence for evaluation only; do not forward, copy, or disclose.</div>
+<div class="mark expire"><strong>EXPIRES 2026-07-26</strong> (7 days). This link and its contents are time-boxed — please disregard and discard after that date.</div>
+
+<h1>Hardware Power-Fail Early-Warning for Purcius Nodes</h1>
+<p class="meta"><b>To:</b> Norman Campbell (hardware) &nbsp;·&nbsp; <b>From:</b> Joey Castillo, kASTIL Systems &nbsp;·&nbsp; <b>Re:</b> can the board tell the runtime a power cut is coming? &nbsp;·&nbsp; <b>Status:</b> forward-looking — not a work order</p>
+
+<h2>The one-paragraph context</h2>
+<div class="lk-sec" data-cm="the-one-paragraph-context"><div class="section">
+  <p>Purcius is our bare-metal, pure-C runtime — it runs as firmware, first layer after BIOS, no legacy OS in the way. Its new distributed store already <strong>self-heals from an abrupt power loss in software</strong>: before any irreversible act it writes a durable, <code>fsync</code>'d intent, and on reboot a resume pass drives any unfinished act to completion exactly once. That's the floor, and it holds even if the plug is yanked mid-operation. <strong>The question for you is the ceiling:</strong> if the <em>hardware</em> could tell us a power cut is imminent — a few milliseconds' warning — the node could pause <em>cleanly</em> instead of recovering after the fact. Novel, and only possible because we own the stack down to the metal.</p>
+</div></div>
+<h2>The idea</h2>
+<div class="lk-sec" data-cm="the-idea"><div class="section">
+  <p>A supervisor / brownout-detector IC watches the rail. The instant it dips below threshold — while the bulk capacitors still hold charge for a short window — it asserts a <strong>power-fail interrupt</strong> (PFI / NMI) to the SoC. Because Purcius is pure C on bare metal, that interrupt lands directly in a tiny deterministic handler: <strong>flush the log, mark a clean checkpoint, park.</strong> To the system, power loss becomes "time paused cleanly"; on power return, "time unpauses" and it resumes. No legacy OS scheduler, no userland, no lost window between the interrupt and the flush.</p>
+  <pre>  rail voltage
+   good ─────────────┐
+                     │ undervoltage
+                     ▼ detected
+        PFI/NMI asserted ──►  [ HOLD-UP WINDOW ]   ◄── bulk caps buy this time
+                                (a few ms?)     │
+                                                ▼
+                              runtime: fsync log → checkpoint → PARK
+                                                │
+   Vcore collapses ─────────────────────────────┘
+        · · · · · · · ·  (power out — clean pause)  · · · · · · · ·
+   power restored ──►  boot ──►  resume from checkpoint (no loss, no dup)</pre>
+  <p>The hold-up window is the whole game: <strong>how many milliseconds the caps buy us after the warning is exactly our flush budget.</strong> Our flush is tiny (a sealed append + fsync), so even a very small window is plenty — but we need to know it.</p>
+</div></div>
+<h2>Where you come in — the hardware questions</h2>
+<div class="lk-sec" data-cm="where-you-come-in-the"><div class="section">
+  <ul>
+    <li><span class="q">Supervisor IC.</span> Is there a brownout/undervoltage detector (or PMIC feature) on the target boards that can assert an interrupt line to the SoC on power dip? Threshold + response time?</li>
+    <li><span class="q">Hold-up time.</span> Given the bulk capacitance at our expected load, roughly how long after the PFI does Vcore stay valid? That number is our flush budget — even 1–2 ms likely suffices.</li>
+    <li><span class="q">The line itself.</span> A GPIO / NMI / power-good pin we can standardize on across node classes, so one firmware handler serves all boards?</li>
+    <li><span class="q">Edge + custom silicon.</span> For the small edge units — and eventually our own silicon — is it worth a dedicated power-fail domain and a small NV-backed flush region, so the "clean park" is guaranteed by design rather than by cap math?</li>
+    <li><span class="q">Anything novel</span> you'd reach for that we're not thinking of — supercap ride-through, a second rail, an early-warning from the PSU itself?</li>
+  </ul>
+</div></div>
+<h2>Scope + why it's not urgent</h2>
+<div class="lk-sec" data-cm="scope-why-it-s-not"><div class="section">
+  <ul>
+    <li><strong>The software floor already covers us.</strong> An abrupt cut is survived today; this signal only upgrades "recover after" to "pause cleanly."</li>
+    <li><strong>The node is small and portable</strong> — it can be moved on the fly without missing a beat — and it runs <strong>N-way replicated</strong>, so losing one node is a non-event. The power-fail signal is about making even a single node's local durability graceful, and about the differentiator: a runtime that shakes hands with the hardware on the way down.</li>
+    <li><strong>This is a brief, not a build.</strong> A full detailed document with schematics-level diagrams follows when we prioritize it. For now: does this direction excite you, and what's the hold-up window we'd actually have to work with?</li>
+  </ul>
+</div>
+
+<div class="mark expire"><strong>EXPIRES 2026-07-26.</strong> Confidential — trade secret, Property of Joseph M. Castillo. Do not forward.</div></div>
+<footer>kASTIL Systems · Purcius · Brief for N. Campbell · 2026-07-19 · expires 2026-07-26 · confidential</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"0d220751-8eac-47fa-83e6-87c04fee1fb1"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

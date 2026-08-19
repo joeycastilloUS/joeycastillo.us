@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~laf — Drift tab + first mockup</title>
+<style>
+  :root { --bg:#111111; --surface:#1A1A1A; --accent:#6FC3DF; --fg:#e8e8e8; --muted:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav.top { position:sticky; top:0; background:#000; border-bottom:2px solid var(--accent);
+        padding:.7rem 1.2rem; display:flex; justify-content:space-between; align-items:center; z-index:100; }
+  nav.top .brand { color:var(--accent); font-weight:700; letter-spacing:.08em; }
+  nav.top .pub { color:var(--muted); font-size:.72rem; }
+  main { max-width:960px; margin:0 auto; padding:1.4rem 1.2rem 4rem; }
+  h1 { font-size:1.6rem; margin:.2rem 0 .3rem; }
+  h2 { font-size:1.1rem; margin:2.2rem 0 .6rem; color:var(--accent);
+       border-bottom:1px solid #2a2a2a; padding-bottom:.35rem; }
+  h3 { font-size:.95rem; margin:1.4rem 0 .4rem; color:#cfe9f3; }
+  .sub { color:var(--muted); font-size:.84rem; margin-bottom:1.2rem; }
+  .box { background:var(--surface); border:1px solid #262626; border-radius:6px;
+         padding:1rem 1.1rem; margin:1rem 0; }
+  .verdict { border-left:3px solid var(--accent); }
+  .split { background:#1d1614; border-left:3px solid #e0a07b; }
+  .agree { background:#141c17; border-left:3px solid #7ddf8f; }
+  .corr { background:#1a1420; border-left:3px solid #b48fd9; }
+  .ask { background:#14202a; border-left:3px solid #6FC3DF; }
+  table { width:100%; border-collapse:collapse; margin:1rem 0; font-size:.8rem; }
+  th, td { text-align:left; padding:.42rem .55rem; border-bottom:1px solid #262626; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; }
+  code { background:#000; padding:.1rem .35rem; border-radius:3px; font-size:.85em; color:#bfe9f7; }
+  pre { background:#000; padding:.8rem 1rem; border-radius:5px; overflow-x:auto; font-size:.76rem; line-height:1.5; }
+  ul { padding-left:1.3rem; } li { margin:.28rem 0; }
+  ol { padding-left:1.3rem; } ol li { margin:.4rem 0; }
+  footer { color:var(--muted); font-size:.78rem; border-top:1px solid #262626;
+           margin-top:3rem; padding-top:1rem; }
+  .dod li { font-size:.83rem; }
+  /* ---- doc tab strip ---- */
+  .dtabs { display:flex; gap:6px; border-bottom:1px solid #2a2a2a; margin:1.2rem 0 1.4rem; flex-wrap:wrap; }
+  .dtab { background:transparent; border:1px solid transparent; border-bottom:none; color:var(--muted);
+          padding:.5rem 1rem; font:inherit; font-size:.86rem; font-weight:700; cursor:pointer;
+          border-radius:6px 6px 0 0; margin-bottom:-1px; }
+  .dtab:hover { color:var(--fg); background:#181818; }
+  .dtab.on { color:var(--accent); background:#0d1a20; border-color:#2a3f48; border-bottom-color:#0d1a20; }
+  .dpane { display:none; } .dpane.on { display:block; }
+  .swatch { display:inline-block; width:13px; height:13px; border-radius:3px; vertical-align:-2px;
+            margin-right:6px; border:1px solid #333; }
+  /* ================= PROTOTYPE — console-faithful, scoped under #screen ================= */
+  #screen { --bg:#0a0a0a; --surface:#141414; --line:#262626; --accent:#6FC3DF; --text:#e8e8e8;
+            --dim:#888; --ok:#7CFFB2; --off:#777; --warn:#ffce85; --bad:#ff6b6b;
+            background:var(--bg); color:var(--text); border:1px solid #333; border-radius:10px;
+            overflow:hidden; font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
+            line-height:1.5; font-size:14px; margin:1rem 0 .4rem; }
+  #screen .snav { background:#000; border-bottom:2px solid var(--accent); padding:5px 16px;
+                  display:flex; justify-content:space-between; align-items:center; letter-spacing:.5px; }
+  #screen .be { color:var(--accent); font-weight:800; font-size:1.05rem; letter-spacing:3px; }
+  #screen .navsub { color:var(--dim); font-size:.58rem; letter-spacing:1.5px; text-transform:uppercase; }
+  #screen .navsub b { color:var(--accent); font-weight:800; }
+  #screen .ropill { color:var(--dim); font-size:.6rem; letter-spacing:1.5px; text-transform:uppercase;
+                    border:1px solid var(--line); border-radius:20px; padding:3px 11px; }
+  #screen .sbody { display:flex; min-height:560px; }
+  #screen .sside { width:172px; flex:0 0 auto; background:var(--surface); border-right:1px solid var(--line);
+                   padding:12px 9px; }
+  #screen .appsw-btn { display:flex; align-items:center; gap:8px; width:100%; background:#0c1418;
+                       border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:11px; }
+  #screen .appsw-ic { font-size:1.05rem; width:20px; text-align:center; }
+  #screen .appsw-nm { color:var(--text); font-weight:800; font-size:.85rem; line-height:1.1; }
+  #screen .appsw-tg { color:var(--dim); font-size:.54rem; text-transform:uppercase; letter-spacing:.07em; }
+  #screen .tabv { display:flex; align-items:center; gap:9px; background:transparent; color:var(--dim);
+                  border:1px solid transparent; border-radius:9px; padding:9px 11px; font-size:.85rem;
+                  font-weight:700; cursor:pointer; font-family:inherit; text-align:left; width:100%;
+                  transition:background .12s,color .12s; margin-bottom:5px; }
+  #screen .tabv:hover { color:var(--text); background:#161616; }
+  #screen .tabv.on { background:#1d2a31; color:var(--accent); border-color:rgba(111,195,223,.35); }
+  #screen .tabv .ti { display:inline-flex; width:17px; justify-content:center; }
+  #screen .tabv .tl { flex:1; }
+  #screen .tbadge { background:#3a1212; color:#ff9b9b; font-size:.62rem; font-weight:800;
+                    border-radius:9px; padding:1px 7px; }
+  #screen .swrap { flex:1 1 auto; padding:16px 18px 26px; min-width:0; }
+  #screen .rb { display:inline-block; font-size:.6rem; font-weight:800; letter-spacing:.09em;
+                border-radius:5px; padding:2px 9px; background:#332608; color:#ffd479; border:1px solid #5a4410; }
+  #screen h2.ph { font-size:1.05rem; margin:11px 0 3px; color:var(--text); font-weight:800; border:0; padding:0; }
+  #screen .lead { color:#8a93a0; font-size:12.5px; line-height:1.5; margin-bottom:12px; max-width:660px; }
+  #screen .chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:11px; }
+  #screen .chip { font-size:11.5px; font-weight:600; border-radius:6px; padding:3px 10px;
+                  border:1px solid #262626; background:#0e0e0e; color:#8a93a0; cursor:pointer; font-family:inherit; }
+  #screen .chip b { color:#e8e8e8; font-weight:800; }
+  #screen .chip.cbad b { color:#ff9b9b; } #screen .chip.cok b { color:#7CFFB2; }
+  #screen .chip.cunk b { color:#c9b3e6; }
+  #screen .chip.on { border-color:var(--accent); background:#0c1418; }
+  #screen .ref { margin-left:auto; background:#12181d; color:#8fb7c4; border:1px solid #2a343b;
+                 border-radius:6px; padding:5px 12px; font-size:11.5px; font-weight:700;
+                 cursor:pointer; font-family:inherit; }
+  #screen .ref:hover { border-color:var(--accent); color:var(--accent); }
+  #screen .stalebar { background:#332608; border:1px solid #5a4410; color:#ffd479; border-radius:8px;
+                      padding:9px 12px; font-size:12.5px; margin-bottom:10px; }
+  /* density strip */
+  #screen .strip { background:#0e0e0e; border:1px solid var(--line); border-radius:8px;
+                   padding:10px 12px 8px; margin-bottom:12px; }
+  #screen .striph { color:#8a93a0; font-size:11px; text-transform:uppercase; letter-spacing:.09em;
+                    font-weight:700; margin-bottom:8px; display:flex; align-items:center; }
+  #screen .striph span { margin-left:auto; text-transform:none; letter-spacing:0; font-weight:600; }
+  #screen .lane { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  #screen .lanenm { width:104px; flex:0 0 auto; color:#9fb4bf; font-size:11px; font-weight:700;
+                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #screen .ticks { display:flex; gap:2px; flex:1 1 auto; }
+  #screen .tk { flex:1 1 auto; height:13px; border-radius:2px; background:#1a1a1a; cursor:pointer; }
+  #screen .tk.t1 { background:#2f4a3c; } #screen .tk.t2 { background:#5a4410; }
+  #screen .tk.t3 { background:#6b2b2b; } #screen .tk.tu { background:#3d3350; }
+  #screen .tk:hover { outline:1px solid var(--accent); }
+  /* drift cards */
+  #screen .dcard { background:#141414; border:1px solid #262626; border-left:4px solid #262626;
+                   border-radius:8px; padding:10px 14px; margin-bottom:8px; }
+  #screen .dcard.sev { border-left-color:#ff6b6b; }
+  #screen .dcard.acc { border-left-color:#7CFFB2; opacity:.72; }
+  #screen .dtop { display:flex; align-items:center; gap:10px; flex-wrap:wrap; cursor:pointer; }
+  #screen .chev { color:var(--accent); font-size:.72em; transition:transform .15s; display:inline-block; }
+  #screen .dcard.open .chev { transform:rotate(90deg); }
+  #screen .dlabel { font-weight:800; font-size:13.5px; color:#e8e8e8; flex:1 1 auto; }
+  #screen .dwhen { color:#8a93a0; font-size:11.5px; white-space:nowrap; }
+  #screen .dnet { color:#6FC3DF; font-size:11px; font-weight:700; background:#0c1418;
+                  border:1px solid #14323e; border-radius:5px; padding:0 7px; }
+  /* attribution badges — the heart of the ask */
+  #screen .att { flex:0 0 auto; font-size:11px; font-weight:800; letter-spacing:.05em;
+                 border-radius:6px; padding:2px 10px; border:1px solid transparent; }
+  /* SOLID border = direct evidence.  DASHED border = inferred.  One rule, everywhere. */
+  #screen .att.a-argus { background:#06251a; color:#7CFFB2; border-color:#17513a; }
+  #screen .att.a-api { background:#1a0f1a; color:#d6a3ff; border-color:#7a4f9a; }
+  #screen .att.a-dash { background:#0e1a1f; color:#6FC3DF; border-color:#2a3f48; border-style:dashed; }
+  #screen .att.a-ext { background:#332608; color:#ffd479; border-color:#5a4410; border-style:dashed; }
+  #screen .att.a-unk { background:#14181c; color:#8a93a0; border-color:#2c3a42; border-style:dashed; }
+  #screen .infr { color:#6b7a82; font-size:10.5px; font-style:italic; margin-left:-4px; }
+  #screen .fanout { background:#0c1418; border:1px solid #14323e; border-radius:6px;
+                    padding:7px 11px; margin-bottom:9px; font-size:12px; color:#9fb4bf; }
+  #screen .fanout b { color:#6FC3DF; }
+  #screen .dbody { display:none; margin-top:10px; padding-top:10px; border-top:1px solid #232323; }
+  #screen .dcard.open .dbody { display:block; }
+  #screen .why { background:#0e0e0e; border:1px solid #232323; border-radius:7px;
+                 padding:9px 12px; margin-bottom:10px; }
+  #screen .whyh { color:#8a93a0; font-size:10.5px; text-transform:uppercase; letter-spacing:.1em;
+                  font-weight:800; margin-bottom:5px; }
+  #screen .whyl { font-size:12.5px; color:#d5dde5; margin:2px 0; }
+  #screen .whyl b { color:#e8e8e8; }
+  #screen .whyl .k { color:#8a93a0; display:inline-block; min-width:96px; }
+  #screen .whynote { color:#a9b4c4; font-size:11.5px; margin-top:6px; font-style:italic; }
+  #screen table.dif { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+  #screen table.dif th { text-align:left; color:#8a93a0; font-size:10px; text-transform:uppercase;
+                         letter-spacing:.08em; padding:3px 8px; border-bottom:1px solid #232323; font-weight:700; }
+  #screen table.dif td { padding:4px 8px; border-bottom:1px solid #1c1c1c; vertical-align:top; }
+  #screen .fld { color:#9fb4bf; font-family:Consolas,monospace; font-size:11.5px; white-space:nowrap; }
+  #screen .was { color:#8a93a0; text-decoration:line-through; font-family:Consolas,monospace; font-size:11.5px; }
+  #screen .now { color:#7CFFB2; font-weight:700; font-family:Consolas,monospace; font-size:11.5px; }
+  #screen .arr { color:#555; padding:0 6px; }
+  #screen .add { color:#7CFFB2; } #screen .rem { color:#ff9b9b; } #screen .same { color:#666; }
+  #screen .ord { color:#ffd479; font-family:Consolas,monospace; font-size:11.5px; }
+  #screen .dacts { display:flex; gap:8px; margin-top:11px; align-items:center; flex-wrap:wrap; }
+  #screen .acceptbtn { background:#0c1418; color:#8fb7c4; border:1px solid #2a343b; border-radius:6px;
+                       padding:5px 13px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+  #screen .acceptbtn:hover { border-color:var(--accent); color:var(--accent); }
+  #screen .acceptbtn.arm { background:#3a1212; color:#ffb4b4; border-color:#6b2b2b; }
+  #screen .ghost { background:transparent; color:#8a93a0; border:1px solid #232323; border-radius:6px;
+                   padding:5px 11px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:inherit; }
+  #screen .acchint { color:#8a93a0; font-size:11.5px; }
+  #screen .accdone { color:#7CFFB2; font-size:12px; font-weight:700; }
+  #screen .empty-ico { font-size:2.4rem; line-height:1; color:var(--accent); margin-bottom:14px; }
+  #screen .empty-title { font-size:1.25rem; font-weight:700; margin:0 0 10px; }
+  #screen .empty-desc { color:var(--dim); font-size:.9rem; line-height:1.6; margin:0 auto 8px; max-width:430px; }
+  #screen .hero { text-align:center; max-width:540px; margin:26px auto; padding-bottom:16px; }
+  #screen .swept { color:#6b7a82; font-size:11.5px; }
+  .protonote { color:var(--muted); font-size:.78rem; margin:.2rem 0 1.4rem; }
+</style>
+</head>
+<body>
+<nav class="top"><span class="brand">Be</span><span class="pub">Published 2026-08-01 17:30 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/90f49470-770e-41db-92ef-e03d43b17787/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~laf — Drift tab</h1>
+<div class="sub">Argus &middot; acmedevUS/argus &middot; v0 &middot; r1018 &middot; 2026-08-01<br>
+Upstream: <code>be/designs/2026-08-01-1650-design-network-drift-detection.html</code><br>
+Paired per Kernel Rule 1 — Opus driver + Fable5 navigator, concurrent independent passes.</div>
+
+<div class="dtabs">
+  <button class="dtab on" data-p="p-proto">Mockup</button>
+  <button class="dtab" data-p="p-why">Why it happened</button>
+  <button class="dtab" data-p="p-laf">Look &amp; Feel</button>
+  <button class="dtab" data-p="p-rec">Reconcile</button>
+</div>
+
+<!-- ============================== MOCKUP ============================== -->
+<div class="dpane on" id="p-proto">
+
+<div class="box verdict">
+<b>Same place you already go.</b> This is the Argus console, Meraki app, with one new item in the
+left sidebar: <b>Drift</b>. Everything below is clickable — expand a card, flip the filters, arm and
+fire Accept, and use the two state buttons under the frame to see the empty state and the stale state.
+Colours, spacing, and component shapes are lifted from the running console, not invented.
+</div>
+
+<div id="screen">
+  <div class="snav">
+    <div><span class="be">ARGUS</span> <span class="navsub">Meraki &middot; <b>Drift</b></span></div>
+    <div><span class="ropill">read-only</span></div>
+  </div>
+  <div class="sbody">
+    <div class="sside">
+      <div class="appsw-btn"><span class="appsw-ic">&#128225;</span>
+        <span><span class="appsw-nm">Meraki</span><br><span class="appsw-tg">Network operations</span></span></div>
+      <button class="tabv"><span class="ti">&#9881;</span><span class="tl">Operations</span></button>
+      <button class="tabv"><span class="ti">&#128268;</span><span class="tl">Network</span></button>
+      <button class="tabv"><span class="ti">&#128065;</span><span class="tl">Watch</span></button>
+      <button class="tabv"><span class="ti">&#128737;</span><span class="tl">Audit</span></button>
+      <button class="tabv on"><span class="ti">&#9707;</span><span class="tl">Drift</span><span class="tbadge" id="tb">4</span></button>
+    </div>
+    <div class="swrap" id="pane"></div>
+  </div>
+</div>
+<div class="protonote">Prototype states:
+  <button class="dtab" style="padding:.25rem .7rem;font-size:.78rem" onclick="setState('drift')">drift</button>
+  <button class="dtab" style="padding:.25rem .7rem;font-size:.78rem" onclick="setState('clean')">no drift</button>
+  <button class="dtab" style="padding:.25rem .7rem;font-size:.78rem" onclick="setState('stale')">sweep stalled</button>
+</div>
+
+<h3>What each part is doing</h3>
+<table>
+<tr><th>Element</th><th>Answers</th><th>Lifted from</th></tr>
+<tr><td><b>Sidebar item + count badge</b></td><td>"is there drift right now" without opening the tab</td>
+    <td><code>.tabv</code> / <code>.tabv.on</code> — <code>index.html:~110</code></td></tr>
+<tr><td><b>Density strip</b> (30 days &times; 5 networks)</td><td>the <b>timeline</b> — where the bursts were, which network is noisy. Click a day to filter.</td>
+    <td>net-new; colour vocabulary from <code>--ok/--warn/--bad</code></td></tr>
+<tr><td><b>Filter chips</b></td><td>slice the history by attribution — "show me only the ones nobody can explain"</td>
+    <td><code>.wchip</code> — Watch pane <code>:9530</code></td></tr>
+<tr><td><b>Drift card</b> with 4px left border</td><td>one change, severity by colour, collapsed by default</td>
+    <td><code>.wcard</code> — Watch pane <code>:9540</code></td></tr>
+<tr><td><b>Attribution badge</b><br><span style="color:#8a8a8a;font-size:.9em">solid = evidenced, dashed = inferred</span></td>
+    <td><b>why it happened</b> — see the next tab</td>
+    <td><code>.wverdict</code>/<code>.wunk</code> pill <code>:9544-45</code> + <code>.lvl-org</code> purple <code>:339</code></td></tr>
+<tr><td><b>"inferred" suffix</b></td><td>marks a conclusion as a conclusion</td>
+    <td><code>realBadge</code>'s <code>.rb-note</code> provenance suffix <code>:712-718</code></td></tr>
+<tr><td><b>Fan-out line</b></td><td>one template change = one event, not five duplicates</td>
+    <td>net-new; chip geometry from <code>.wgrp</code></td></tr>
+<tr><td><b>Diff table (ordered)</b></td><td>L3 rule <i>order</i> is semantic — shown as moves</td>
+    <td><code>.histtbl</code> <code>:377-380</code> + the <code>nosort</code> exemption so <code>initSortables</code> <code>:820</code> leaves it alone</td></tr>
+<tr><td><b>Expand → Why panel + diff table</b></td><td><b>click into the change</b>: evidence, then before&rarr;after</td>
+    <td><code>.sect-h</code>/<code>.chev</code> disclosure <code>:381</code></td></tr>
+<tr><td><b>Accept (two-step)</b></td><td>empty the list; re-baseline</td>
+    <td><code>.acceptbtn</code> already exists in <code>EXPORT_CSS</code>; two-step from the rename editor <code>:9767</code></td></tr>
+<tr><td><b>Stale bar</b></td><td>a stalled sweep must never look clean</td>
+    <td><code>.wstalebar</code> — Watch <code>:9538</code></td></tr>
+<tr><td><b>Empty hero</b></td><td>"no drift" reading as confident, not broken</td>
+    <td><code>.audithero</code>/<code>.empty-*</code> — <code>:204</code>, <code>:356</code></td></tr>
+<tr><td><b>DEMO badge</b></td><td>this is a prototype and says so</td>
+    <td><code>realBadge("demo")</code> — <code>:718</code></td></tr>
+</table>
+</div>
+
+<!-- ============================== WHY ============================== -->
+<div class="dpane" id="p-why">
+<h2>"Why did it happen" — the honest answer</h2>
+<p>You asked for <b>user / API / external factors</b>, and — critically — <i>"if we can't tell why,
+state as such."</i> That second clause is the harder requirement and it drives the whole treatment.</p>
+
+<p>We have exactly two evidence sources: Meraki's <code>configurationChanges</code> (what changed, old→new,
+which admin) and <code>apiRequests</code> (every API call: admin, method, path, sourceIp, userAgent,
+<b>31-day hard cap</b>). Cross-referencing them at the change timestamp &plusmn;60s yields five honest
+categories and no more:</p>
+
+<table>
+<tr><th>Badge</th><th>Means</th><th>How we know</th><th>Class</th></tr>
+<tr><td><b style="color:#7CFFB2">ARGUS</b></td><td>We did it — an Argus write path</td>
+    <td>API-request entry whose userAgent is our own bridge, plus our own audit line</td><td><b>Direct</b> — solid</td></tr>
+<tr><td><b style="color:#d6a3ff">API</b></td><td>Another API client did it</td>
+    <td>API-request entry &plusmn;60s, userAgent is not ours. We show admin, sourceIp, userAgent.</td><td><b>Direct</b> — solid</td></tr>
+<tr><td><b style="color:#6FC3DF">DASHBOARD</b></td><td>A person clicked in Meraki</td>
+    <td>Change-log entry with <b>no</b> matching API request. Dashboard actions never appear in the API log — absence is the signal.</td><td><i>Inferred</i> — dashed</td></tr>
+<tr><td><b style="color:#ffd479">EXTERNAL</b></td><td>Something outside every channel we watch</td>
+    <td>The hash moved but Meraki's change feed has <b>no row at all</b>. Consistent with a template push side-effect, a Meraki support action, or an out-of-band edit.</td><td><i>Inferred</i> — dashed</td></tr>
+<tr><td><b style="color:#8a93a0">UNKNOWN</b></td><td>We know <i>what</i> changed. We cannot say <i>who</i>.</td>
+    <td>Change-log entry exists but the change predates the 31-day API-request window, so API-vs-dashboard is no longer resolvable</td><td><b>None, and it says so</b></td></tr>
+</table>
+
+<p><b>Your three words map exactly:</b> "user" → DASHBOARD, "api" → API and ARGUS, "external factors"
+→ EXTERNAL. UNKNOWN is the fifth, and it is the one you specifically asked for.</p>
+
+<div class="box corr">
+<b>Confidence is encoded structurally, not just in the wording — one rule, everywhere:</b>
+<b>solid border = direct evidence. Dashed border + the word "inferred" = a conclusion.</b>
+<br><br>
+That means <b>DASHBOARD is always dashed too</b>, not just UNKNOWN — because "a human clicked it" is a
+conclusion drawn from a <i>missing row</i> in the API log, not from a record of a person. Rendering that
+as confidently as an API call with a source IP would be exactly the dishonesty you asked us to avoid.
+<i>This was the navigator's catch; the driver's first pass only dashed UNKNOWN.</i>
+</div>
+
+<div class="box ask">
+<b>UNKNOWN must read as honest, not broken.</b> Four rules:
+<ol>
+<li><b>Dashed border, neutral slate.</b> Not red — it is not an error. Not grey-dead — it is not a
+    missing field. It is a legitimate verdict with its own identity.</li>
+<li><b>It gets the same evidence line as a known attribution — the evidence is the absence, written out.</b>
+    Never a blank cell. <i>"Meraki's change feed has no record; that feed misses ~20-25% of changes; the
+    backstop sweep caught it anyway."</i> or <i>"API-request log only covers 31 days and this change
+    predates the window."</i> A broken UI hides what it doesn't know; an honest one itemises it.</li>
+<li><b>It is filterable and countable.</b> An <span style="color:#c9b3e6"><b>unexplained</b></span> chip
+    in the summary row. If that number climbs, that is itself the signal — somebody is changing things
+    outside every channel we can see.</li>
+<li><b>Attribution is resolved once, at detection, and stored immutably in <code>drift_events</code></b> —
+    never re-derived at render time. Otherwise a change attributed correctly today silently becomes
+    UNKNOWN on day 32 when the API window rolls past it. With detection-time resolution, "window expired"
+    only ever applies to backfilled archaeology, and a badge never changes under your feet.
+    <i>Navigator's catch — an engine contract, and the driver's design missed it entirely.</i></li>
+</ol>
+</div>
+
+<h3>Template ripple is a grouping problem, not an attribution one</h3>
+<p>The driver's first pass gave template ripple its own <b>TEMPLATE</b> badge, which produced two cards
+for one act. The navigator's rule is better and is what the mockup now does: a template change that fans
+out to five bound networks renders as <b>one event on the template subject</b> with a fan-out line naming
+the affected networks. One change happened, so it is one event — and accepting it accepts the ripple.
+The template is a first-class drift subject precisely so the stream can say "1 change" when 1 change
+happened.</p>
+
+<h3>Rendering before→after by shape</h3>
+<p>Three shapes, three treatments. Getting the third one wrong would be a real bug:</p>
+<ul>
+<li><b>Scalar</b> (VLAN 100 → 20): old struck through and dimmed, arrow, new in green.</li>
+<li><b>List</b> (allowed VLANs): set diff — <span style="color:#7CFFB2">+ added</span>,
+    <span style="color:#ff9b9b">&minus; removed</span>, unchanged dimmed. Order is not meaningful, so
+    don't imply it is.</li>
+<li><b>Ordered array</b> (L3 firewall rules): numbered rows with explicit move indicators
+    (<code>#3 → #1</code>). <b>Firewall rule order is semantic</b> — a reorder with no content change
+    still changes what the firewall does. Never render this as a set.</li>
+</ul>
+</div>
+
+<!-- ============================== LAF ============================== -->
+<div class="dpane" id="p-laf">
+<h2>1. Intent</h2>
+<div class="lk-sec" data-cm="1-intent"><p>Drift is a <b>trust surface</b>: its job is to be believed when it says something changed, and
+believed when it says nothing did. It is a new tab inside a shipped, dense operations console, so the
+`~laf` axes are constrained more by the existing product than by taste. The six resolve to
+<b>serious, dense, abstract, bold, responsive, restrained</b>. The top two traits are <b>dense</b> and
+<b>serious</b>. The one real contradiction — dense wants to pack, bold hierarchy wants whitespace to
+separate — resolves the way the console already resolves it: <b>hierarchy comes from colour and weight,
+never from added whitespace</b>. A 4px left border does the work eight pixels of padding would have.</p></div>
+<h2>2. System rules</h2>
+<div class="lk-sec" data-cm="2-system-rules"><h3>Colour — strategy, anchored to the console's live values</h3>
+<p>Inherited verbatim from <code>web/app/index.html :root</code>. The mockup does not introduce a
+single new base colour:</p>
+<p>
+<span class="swatch" style="background:#0a0a0a"></span><code>--bg #0a0a0a</code> &nbsp;
+<span class="swatch" style="background:#141414"></span><code>--surface #141414</code> &nbsp;
+<span class="swatch" style="background:#262626"></span><code>--line #262626</code> &nbsp;
+<span class="swatch" style="background:#6FC3DF"></span><code>--accent #6FC3DF</code><br>
+<span class="swatch" style="background:#e8e8e8"></span><code>--text #e8e8e8</code> &nbsp;
+<span class="swatch" style="background:#888888"></span><code>--dim #888</code> &nbsp;
+<span class="swatch" style="background:#7CFFB2"></span><code>--ok #7CFFB2</code> &nbsp;
+<span class="swatch" style="background:#ffce85"></span><code>--warn #ffce85</code> &nbsp;
+<span class="swatch" style="background:#ff6b6b"></span><code>--bad #ff6b6b</code>
+</p>
+<p><b>Temperature:</b> cool neutral base, single cyan accent, warm only for warning. <b>Relationships:</b>
+one accent and never two — cyan means "interactive or identifying," never "good." Good is
+<code>--ok</code>. <b>Contrast:</b> body text <code>#e8e8e8</code> on <code>#0a0a0a</code> is ~17:1;
+<code>--dim #888</code> on surface is ~5.2:1, which holds AA for the 11.5–12.5px metadata it carries.
+Nothing meaningful is ever encoded in colour alone — every badge carries a word.</p>
+<p><b>One new sub-palette, and only one:</b> the five attribution badges. Each derives from an existing
+console hue — green from <code>--ok</code>, cyan from <code>--accent</code>, amber from <code>--warn</code>,
+violet from the existing <code>.lvl-org</code> purple <code>#d6a3ff</code>, slate net-new for UNKNOWN.</p>
+
+<h3>Spacing</h3>
+<p>Base unit <b>4px</b>. Scale 2/4/6/8/10/12/14/18/26. Card padding <code>10px 14px</code> — the Watch
+card's exact value, kept so Drift and Watch cards sit at identical rhythm when you flip between tabs.
+Card gap 8px. Section gap 12px.</p>
+
+<h3>Typography</h3>
+<p>System stack, no web fonts (hard constraint — no CDN):
+<code>-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif</code>. Monospace
+<code>Consolas, monospace</code> for every machine value: MACs, field paths, old/new values, hashes.
+<b>That distinction is load-bearing</b> — if it's a value the machine read, it's monospace; if it's
+prose we wrote, it's the sans stack.</p>
+<p>Scale: 10px uppercase micro-label &middot; 11px badge &middot; 11.5px metadata &middot; 12.5px body
+&middot; 13.5px card title &middot; 1.05rem pane heading. Weights 600/700/800 only — no light weights,
+they disappear at these sizes on this background. Line-height 1.5 body, 1.1 titles.</p>
+
+<h3>Density</h3>
+<p>Target: <b>8–10 drift cards visible per viewport collapsed</b>, plus the density strip and the chip
+row, without scrolling on a 900px-tall window. Collapsed card height ~40px. Padding-to-content ratio
+stays under 1:3. The strip compresses 30 days &times; 5 networks into ~90px of vertical space.</p>
+
+<h3>Depth</h3>
+<p><b>Flat, with one exception.</b> No shadows on cards, no gradients, no texture — elevation is
+communicated by border and surface value only (<code>#141414</code> card on <code>#0a0a0a</code> page,
+<code>#262626</code> hairline). The single exception is the dropdown menu, which the console already
+gives <code>box-shadow:0 12px 30px rgba(0,0,0,.6)</code>, because a floating layer genuinely needs to
+read as floating. Depth is information, not decoration.</p></div>
+<h2>3. Component behaviour</h2>
+<div class="lk-sec" data-cm="3-component-behaviour"><h3>Buttons</h3>
+<p>Three tiers. <b>Primary</b> — none in this tab; Drift never has a "do the thing" button, because it
+never writes to Meraki. <b>Secondary</b> (<code>.acceptbtn</code>, <code>.ref</code>): transparent fill,
+<code>1px #2a343b</code> border, 5px/13px padding, 6px radius, hover promotes border and text to accent.
+<b>Ghost</b>: no border until hover, for tertiary actions like "view in Meraki."</p>
+<p><b>Accept is two-step and the second step is red.</b> First click arms it — the label changes to
+"Re-baseline &mdash; confirm" and the button turns to the <code>--bad</code> family. It re-blesses
+state; it deserves the same friction as a delete, without a modal (modals in a dense console are a tax).</p>
+
+<h3>Cards</h3>
+<p><code>#141414</code> surface, <code>1px #262626</code> border, <b>4px left border carrying severity</b>,
+8px radius, <code>10px 14px</code> padding. Collapsed by default — the collapsed row must carry enough to
+triage without expanding: what changed, which network, when, and why. Expanding reveals evidence then diff,
+in that order. <b>Evidence before diff</b> is deliberate: you ask "who did this" before "what exactly."</p>
+
+<h3>Tables</h3>
+<p>The diff table is the only table. Row height 4px vertical padding, no zebra striping (the console
+doesn't stripe), 1px <code>#1c1c1c</code> row rule. Header 10px uppercase, letter-spacing .08em,
+<code>--dim</code>. Values monospace. Columns: field, was, now — and for ordered arrays, a fourth
+position column.</p>
+
+<h3>Navigation</h3>
+<p>Fixed left sidebar, 172–188px, already built. Drift takes the fifth slot, after Audit — <b>last,
+because it is the newest</b>, and the existing order is muscle memory. Active state
+<code>background:#1d2a31; color:accent; border:rgba(111,195,223,.35)</code>, unchanged from the shipped
+rule. The count badge is the only sidebar element allowed to carry the <code>--bad</code> family, and
+only when the count is non-zero. Deep links follow the existing three-segment scheme:
+<code>#meraki/drift/&lt;eventId&gt;</code> — same shape the Runbooks tab already uses, so a drift item
+is shareable by URL.</p></div>
+<h2>4. Interaction</h2>
+<div class="lk-sec" data-cm="4-interaction"><h3>Transitions</h3>
+<p><b>120–150ms, no exceptions.</b> The console's shipped values are <code>.12s</code> for colour and
+background, <code>.15s</code> for the chevron rotate. Drift adds nothing slower. What animates:
+disclosure chevron rotation, hover colour, chip active state. <b>What must never animate: the arrival of
+a drift item.</b> No slide-in, no fade, no pulse. A new critical item appearing with motion trains you
+to watch for motion, and motion you learn to see is motion you learn to ignore. It appears; the count
+changes; that is all.</p>
+
+<h3>Feedback</h3>
+<ul>
+<li><b>Hover</b> — border and text promote to accent. Never a background jump on cards; only on nav items.</li>
+<li><b>Focus</b> — <code>outline:2px solid #6FC3DF; outline-offset:2px</code>, the console's existing
+    <code>:focus-visible</code> rule. Every control is keyboard-reachable; the disclosure row is a real button.</li>
+<li><b>Loading</b> — the existing <code>.spin</code>; the pane keeps prior data visible while refetching,
+    so a refresh never blanks the screen.</li>
+<li><b>Error</b> — the Watch error bar (<code>#2a1414</code> / <code>#6b2b2b</code> / <code>#ffb4b4</code>)
+    with an inline Retry, falling back to last-known state <i>labelled as</i> last-known.</li>
+<li><b>Poll cadence — 60s, not Watch's 45s.</b> The engine ticks every 15 minutes; polling faster than
+    that buys nothing but churn. <b>The poll diff-checks before re-rendering, and never collapses an
+    expanded card.</b> Re-rendering under the operator's cursor mid-read is energetic, not responsive.
+    <i>Navigator's catch — the driver's pass would have shipped that bug.</i></li>
+<li><b>Stale</b> — amber bar at <b>&gt;35 minutes</b> since last sweep (two missed ticks plus a 5-minute
+    margin). <b>The bar composes above everything, including the empty state</b> — the clean card and
+    the stale banner render together, so a stalled sweep can never look like a clean network. That
+    inversion is the single most important feedback rule in the tab.</li>
+</ul></div>
+<h2>Axes, and the contradiction</h2>
+<table>
+<tr><th>Axis</th><th>Resolved</th><th>Why</th></tr>
+<tr><td>Emotion</td><td><b>Serious</b></td><td>A trust surface. Not <i>aggressive</i> — permanent alarm is fatigue. Not <i>calm</i> — it must be able to raise its voice.</td></tr>
+<tr><td>Density</td><td><b>Dense</b></td><td>The console is already dense; a sparse tab would read as a different product. Joey: show me, don't tell me.</td></tr>
+<tr><td>Reality</td><td><b>Abstract</b></td><td>Flat and geometric. The console has no skeuomorphism anywhere.</td></tr>
+<tr><td>Hierarchy</td><td><b>Bold</b></td><td>One question dominates: is there drift, yes or no. The count badge and the strip answer it before you read a word.</td></tr>
+<tr><td>Rhythm</td><td><b>Responsive</b></td><td>120–150ms, matching shipped values. Not <i>energetic</i> — nothing bounces on an ops console.</td></tr>
+<tr><td>Expression</td><td><b>Restrained</b></td><td>Colour carries meaning only. Five attribution badges are the entire expressive budget, and each one is doing a job.</td></tr>
+</table>
+<div class="box split">
+<b>Contradiction found:</b> <i>dense</i> ✕ <i>bold hierarchy</i>. Dense packs; bold separates.<br>
+<b>Resolved toward coherence:</b> hierarchy is carried by <b>colour and weight</b>, not by whitespace.
+The 4px left border, the badge, and the 800-weight title do all the separating; padding stays at the
+Watch card's tight <code>10px 14px</code>. This is not a compromise invented here — it is the rule the
+console already follows, made explicit.
+</div>
+</div>
+
+<!-- ============================== RECONCILE ============================== -->
+<div class="dpane" id="p-rec">
+<h2>Pair reconcile (Rule 1)</h2>
+<div class="lk-sec" data-cm="pair-reconcile-rule-1"><div class="box agree">
+<b>Converged independently — neither pass saw the other's work.</b> Top two traits
+<b>serious + dense</b>, identically. Abstract, restrained. <b>Zero new root variables</b> — both anchored
+to the live <code>:root</code>. Vertical stream, expand-in-place, deep link
+<code>#meraki/drift/&lt;eventId&gt;</code> on the existing three-segment pattern. Accept as a two-step
+inline confirm with no modal. Ordered arrays get move indicators and are never rendered as delete+add.
+The empty state must carry a freshness stamp. The stale banner must be able to render <i>with</i> the
+clean state. Flat, no shadows except true overlays. Monospace for machine values, sans for prose.
+Five attribution categories. Same contradiction found (dense ✕ bold hierarchy), same resolution
+(colour and weight carry hierarchy, not whitespace).
+</div>
+
+<div class="box corr">
+<b>Where the navigator beat the driver — all adopted, and the mockup above was rebuilt to match:</b>
+<ol>
+<li><b>Confidence encoded as border style.</b> Solid = direct evidence, dashed = inferred. The driver
+    dashed only UNKNOWN. The navigator dashes <b>DASHBOARD</b> too, because "a human clicked it" is a
+    conclusion drawn from a <i>missing row</i>, not a record of a person. This is the single most
+    important correction in the pass — it is precisely what "if we can't tell why, state as such" demands.</li>
+<li><b>Attribution resolved once at detection and stored immutably.</b> An engine contract the driver
+    missed entirely. Without it, a correctly-attributed change silently degrades to UNKNOWN on day 32
+    when the 31-day API window rolls past. Badges must never change under the operator.</li>
+<li><b>EXTERNAL as its own category</b>, and template ripple demoted from a badge to a
+    <b>fan-out grouping</b>. The driver's version produced two cards for one act; the navigator's
+    produces one event on the template subject. One change happened — one event.</li>
+<li><b><code>POST /drift/accept</code> must be added to the <code>woprGated</code> regex</b>
+    (<code>index.html:854</code>). Accept re-baselines; it is a write; it must be intercepted like every
+    other write in the console. The driver never looked at the write-gate.</li>
+<li><b>The poll must diff-check before re-rendering and must never collapse an expanded card.</b>
+    A real bug the driver would have shipped. Also 60s not 45s — the engine ticks every 15 minutes,
+    so faster polling buys only churn.</li>
+<li><b>A dozen component recipes the driver never found:</b> <code>.fcard</code> findings cards,
+    <code>.fcev</code> mono evidence blocks, <code>.histtbl</code>/<code>.histcap</code> nested history,
+    <code>.execfield</code>/<code>.execrow</code> before→after grammar and its two-step state machine,
+    <code>.rbback</code> rolled-back badge, <code>.cchip</code> diff chips, <code>.af-num</code>/
+    <code>.af-cov</code> facts header, <code>RB_DEEPLINK</code>, <code>fcflash</code>, the
+    <code>TABS</code> map at <code>:6595</code>, <code>ALL_PANES</code> at <code>:6650</code>, and the
+    <code>nosort</code> exemption needed so <code>initSortables</code> leaves a semantic diff order alone.</li>
+</ol>
+</div>
+
+<div class="box split">
+<b>Two splits, neither resolved silently:</b>
+<h3 style="margin-top:.6rem">1. The density strip — driver's, and the navigator argues against it</h3>
+<p><b>Driver:</b> keep the 30-day &times; 5-network tick strip. You asked for "drift <i>timelines</i>"
+plural, and burst-pattern-at-a-glance is something a chronological stream structurally cannot show —
+you can see at once that Culver City has been quiet for three weeks and Davis lit up twice today.
+It costs ~90px.</p>
+<p><b>Navigator:</b> drop it. At five subjects those are "mostly-empty ribbons 95% of the time," they
+cap out around eight networks, <b>nothing in the shipped console scrolls sideways</b>, and every
+chronological precedent in the product is a vertical stack. The subject filter chip <i>is</i> the
+per-network timeline when you want one.</p>
+<p><b>Both are right about different things.</b> The strip is in the mockup so you can judge it with your
+eyes. <b>The navigator's scaling objection is the real one</b>: it works at 5 networks and breaks at 20.
+If Argus stays Mendo-only it earns its keep; if it goes multi-tenant it has to go.</p>
+
+<h3>2. Arrival animation</h3>
+<p><b>Driver:</b> a new drift item must never animate in. Motion you learn to watch for is motion you
+learn to ignore.<br>
+<b>Navigator:</b> use the console's existing one-shot <code>fcflash</code> pulse
+(<code>:153</code>) — it already ships, it does not loop, and consistency with the product beats a
+private rule.<br>
+<b>Navigator's consistency argument wins on Rule-1 precedence and is adopted</b>, but the driver's
+concern is on the record: if the flash ever starts firing often enough to be background noise, it should
+go.</p>
+</div>
+
+<div class="box ask">
+<b>Still open from the <code>~d</code>, and this mockup takes a position on it:</b> Accept granularity.
+The mockup shows <b>per-entity</b> — Accept sits on the individual card, so accepting port 7 does not
+bless port 11. That is the driver's position. The navigator's <code>~d</code> verdict was per-section.
+Both agree Accept must live <i>inside</i> the expanded drill-down — you should not be able to bless a
+change you have not looked at. <b>Your call.</b>
+</div>
+
+<h3>Open questions neither pass could close</h3>
+<ul>
+<li><b>Can we identify our own bridge in <code>apiRequests</code>?</b> The ARGUS-vs-API split needs a
+    stable marker — our userAgent, or the admin identity of the bridge's key. If Meraki reports a
+    generic UA, ARGUS attribution has to come from correlating our own audit log instead. Unverified.</li>
+<li><b>Clock skew between the two logs.</b> The &plusmn;60s window assumes
+    <code>configurationChanges.ts</code> and <code>apiRequests.ts</code> share a clock. If skew is worse,
+    DASHBOARD-by-absence gets noisier — though the dashed "inferred" treatment already covers us honestly.</li>
+<li><b>How template pushes actually appear in the feed</b> — one template-level row, N network-level rows,
+    or nothing. Determines whether fan-out grouping can be read from the feed or must be inferred from
+    simultaneous same-hash drift across bound subjects.</li>
+<li><b>Sidebar position.</b> Placed fifth because the existing order is muscle memory. Argument for
+    second: it is the tab you want first each morning. Cheap to move.</li>
+<li><b>History depth.</b> 30 days shown, matching the attribution horizon. Meraki's change log holds 365,
+    but everything past 31 days reads UNKNOWN — true, and useless. Past ~200 events the stream needs a
+    "load older" cut; <code>drift_events</code> supports cursoring.</li>
+</ul></div>
+<h2>Definition of Done</h2>
+<ul class="dod">
+<li>&#10003; A-D-D read first (upstream <code>~i</code>/<code>~d</code>, same session)</li>
+<li>&#10003; Paired per Rule 1 — navigator spawned concurrently; verdict section held open, not predicted</li>
+<li>&#10003; Existing UI mined before inventing — every value traced to <code>web/app/index.html</code></li>
+<li>&#10003; 6 axes inferred with stated reasoning; contradiction detected and resolved</li>
+<li>&#10003; 4-section <code>~laf</code> output present (Intent / System Rules / Component Behaviour / Interaction)</li>
+<li>&#10003; Operator's explicit asks all addressed — timeline, history, click-in, why, honest unknown</li>
+<li>&#10003; Working clickable mockup, vanilla HTML/CSS/JS, no frameworks, no CDN, no build step</li>
+<li>&#10003; Mockup carries the console's own DEMO badge — not mistakable for live data</li>
+<li>&#10003; Artifact rendered + saved with datetime stamp</li>
+<li>&#10003; Committed to the project repo, not metal-console (Rule 3)</li>
+<li>&#10003; Published + externally reachable at its cap-URL (Rule 10)</li>
+<li>&#10003; Reconcile complete — navigator's 6 wins adopted and the mockup rebuilt to match; 2 splits + 1 carried-over decision surfaced, none resolved silently</li>
+</ul>
+</div>
+
+<footer>
+Generated 2026-08-01 17:30 &middot; v0 &middot; r1018 &middot; Argus &middot; ~laf paired (Opus + Fable5) &middot; next: ~b NDD1
+</footer>
+</main>
+
+<script>
+/* ---- doc tabs ---- */
+document.querySelectorAll(".dtab[data-p]").forEach(function(b){
+  b.addEventListener("click", function(){
+    document.querySelectorAll(".dtab[data-p]").forEach(x=>x.classList.remove("on"));
+    document.querySelectorAll(".dpane").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    document.getElementById(b.dataset.p).classList.add("on");
+    window.scrollTo({top:0,behavior:"instant"});
+  });
+});
+
+/* ---- prototype data ---- */
+var NETS=["023 - Sacramento","032 - 180 Broadway","034 - Culver City","067 - Porter Ranch","073 - Davis"];
+var ITEMS=[
+ {id:"e-4417",net:"073 - Davis",sect:"switchports",title:"Switch POS &mdash; port 7 native VLAN changed",
+  when:"today 14:12", att:"dash", accepted:false,
+  why:[["Change log","<b>Port 7 &mdash; VLAN</b> &middot; <code>100</code> &rarr; <code>20</code>"],
+       ["Meraki admin","jcastillo@mendocinofarms.com"],["API request","<b>none found</b> &plusmn;60s"],
+       ["Detected","change-feed gate, 14:15 sweep"]],
+  note:"No matching API call, so this was made by hand in the Meraki dashboard.",
+  kind:"scalar", rows:[["ports[7].vlan","100","20"]]},
+
+ {id:"e-4416",net:"073 - Davis",sect:"switchports",title:"Switch POS &mdash; port 7 disabled",
+  when:"today 14:12", att:"dash", accepted:false,
+  why:[["Change log","<b>Port 7 &mdash; enabled</b> &middot; <code>true</code> &rarr; <code>false</code>"],
+       ["Meraki admin","jcastillo@mendocinofarms.com"],["API request","<b>none found</b> &plusmn;60s"],
+       ["Detected","change-feed gate, 14:15 sweep"]],
+  note:"Same admin, same minute as the VLAN change &mdash; almost certainly one action.",
+  kind:"scalar", rows:[["ports[7].enabled","true","false"]]},
+
+ {id:"e-4412",net:"1 PRODUCTION &mdash; Global Firewall",sect:"l3",title:"Template &mdash; L3 firewall rules reordered",
+  when:"today 09:41", att:"api", accepted:false,
+  fan:"Fanned out to <b>5 bound networks</b> &mdash; 023, 032, 034, 067, 073. One change happened, so this is one event. Accepting it accepts the ripple.",
+  why:[["Change log","<b>L3 firewall rules</b> &middot; 6 rules, order changed"],
+       ["API request","<code>PUT /networks/&hellip;/l3FirewallRules</code>"],
+       ["Caller","admin <b>svc-netops</b> &middot; 34.82.11.7"],
+       ["User agent","<code>python-meraki/1.44.0</code>"],["Detected","change-feed gate, 09:45 sweep"]],
+  note:"Not an Argus write path &mdash; a third-party script. Rule ORDER changed with no content change; the firewall behaves differently even though every rule still exists.",
+  kind:"order", rows:[["deny 10.0.9.0/24 &rarr; any","#3","#1"],["allow any &rarr; 443/tcp","#1","#2"],["allow any &rarr; 80/tcp","#2","#3"]]},
+
+ {id:"e-4402",net:"034 - Culver City",sect:"switchports",title:"Switch BOH &mdash; port 11 allowed-VLAN list changed",
+  when:"Wed 22:07", att:"ext", accepted:false,
+  why:[["Change log","<b>no entry</b> for this network in the window"],
+       ["API request","no matching call"],
+       ["Detected","<b>24h re-hash floor</b> &mdash; the backstop sweep, not the feed"]],
+  note:"The config moved but Meraki's own change feed never recorded it. That feed provably misses roughly 20-25% of changes; the backstop sweep caught this one anyway. Consistent with a template push side-effect, a Meraki support action, or an out-of-band edit.",
+  kind:"list", rows:[["ports[11].allowedVlans","1-1000","1-100,200"]]},
+
+ {id:"e-4361",net:"067 - Porter Ranch",sect:"ssids",title:"SSID slot 3 renamed",
+  when:"27 days ago", att:"unk", accepted:false,
+  why:[["Change log","entry exists &mdash; <code>mendo-guest</code> &rarr; <code>mendo-wifi</code>"],
+       ["API request","<b>window expired</b>"],
+       ["Detected","change-feed gate, backfill"]],
+  note:"We know WHAT changed but not WHO. Meraki's API-request log only covers 31 days and this change is near the edge of that window, so API-vs-dashboard can no longer be resolved.",
+  kind:"scalar", rows:[["ssids[3].name","mendo-guest","mendo-wifi"]]},
+
+ {id:"e-4390",net:"032 - 180 Broadway",sect:"switchports",title:"Switch POS &mdash; port 3 renamed",
+  when:"Tue 11:30", att:"argus", accepted:true,
+  why:[["Change log","<b>Port 3 &mdash; name</b> &middot; <code>(unnamed)</code> &rarr; <code>Toast POS printer</code>"],
+       ["API request","<code>POST /meraki/name</code>"],["Caller","<b>Argus</b> &middot; one-click naming"],
+       ["Accepted","Tue 11:34 by jcastillo"]],
+  note:"This was us. Argus wrote it through its own audited path, so attribution is certain.",
+  kind:"scalar", rows:[["ports[3].name","(unnamed)","Toast POS printer"]]}
+];
+/* [0]=label [1]=class [2]=inferred?  Solid border = direct evidence. Dashed = inferred. */
+var ATT={argus:["ARGUS","a-argus",0],api:["API","a-api",0],dash:["DASHBOARD","a-dash",1],
+         ext:["EXTERNAL","a-ext",1],unk:["UNKNOWN","a-unk",1]};
+var FILTER="all", STATE="drift";
+
+function esc(s){return String(s);}
+function strip(){
+  var seed=[[0,0,0,1,0,0,0,0,2,0,0,0,0,0,1,0,0,0,0,0,0,0,3,0,0,0,0,0,0,3],
+            [0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3],
+            [0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,3]];
+  var cls=["","t1","t2","t3","tu"];
+  var x="<div class='strip'><div class='striph'>Drift timeline &mdash; last 30 days<span>"+
+        "<span style='color:#7CFFB2'>&#9646;</span> accepted &nbsp;"+
+        "<span style='color:#ffce85'>&#9646;</span> dashboard &nbsp;"+
+        "<span style='color:#ff6b6b'>&#9646;</span> open &nbsp;"+
+        "<span style='color:#8f7fb8'>&#9646;</span> unexplained</span></div>";
+  for(var i=0;i<5;i++){
+    x+="<div class='lane'><div class='lanenm'>"+NETS[i]+"</div><div class='ticks'>";
+    for(var d=0;d<30;d++) x+="<div class='tk "+cls[seed[i][d]]+"' title='day -"+(29-d)+"'></div>";
+    x+="</div></div>";
+  }
+  return x+"</div>";
+}
+function card(it){
+  var a=ATT[it.att];
+  var hdr="<div class='dtop' data-t='"+it.id+"'><span class='chev'>&#9654;</span>"+
+    "<span class='dlabel'>"+it.title+"</span>"+
+    "<span class='dnet'>"+it.net+"</span>"+
+    "<span class='att "+a[1]+"'>"+a[0]+"</span>"+
+    (a[2]?"<span class='infr'>inferred</span>":"")+
+    "<span class='dwhen'>"+it.when+"</span></div>";
+  var why="<div class='why'><div class='whyh'>Why it happened"+
+          (a[2]?" &mdash; <span style='color:#6b7a82;text-transform:none;letter-spacing:0;font-weight:600'>inferred, not directly evidenced</span>":"")+
+          "</div>";
+  it.why.forEach(function(r){ why+="<div class='whyl'><span class='k'>"+r[0]+"</span>"+r[1]+"</div>"; });
+  why+="<div class='whynote'>"+it.note+"</div></div>";
+  if(it.fan) why="<div class='fanout'>"+it.fan+"</div>"+why;
+  var tbl="<table class='dif'><tr><th>Field</th><th>"+(it.kind==="order"?"Was at":"Was")+"</th><th>"+
+          (it.kind==="order"?"Now at":"Now")+"</th></tr>";
+  it.rows.forEach(function(r){
+    if(it.kind==="order")
+      tbl+="<tr><td class='fld'>"+r[0]+"</td><td class='ord'>"+r[1]+"</td><td class='ord'>"+r[2]+"</td></tr>";
+    else if(it.kind==="list")
+      tbl+="<tr><td class='fld'>"+r[0]+"</td><td class='was'>"+(r[1]||"&mdash;")+"</td><td class='now'>"+r[2]+"</td></tr>";
+    else
+      tbl+="<tr><td class='fld'>"+r[0]+"</td><td class='was'>"+r[1]+"</td><td class='now'>"+r[2]+"</td></tr>";
+  });
+  tbl+="</table>";
+  var acts = it.accepted
+    ? "<div class='dacts'><span class='accdone'>&check; Accepted &mdash; this is the baseline now</span></div>"
+    : "<div class='dacts'><button class='acceptbtn' data-a='"+it.id+"'>Accept</button>"+
+      "<button class='ghost'>Open in Meraki</button>"+
+      "<span class='acchint'>Accept re-baselines this item. It stops reporting.</span></div>";
+  return "<div class='dcard "+(it.accepted?"acc":"sev")+"' id='c-"+it.id+"'>"+hdr+
+         "<div class='dbody'>"+why+tbl+acts+"</div></div>";
+}
+function render(){
+  var p=document.getElementById("pane");
+  var head="<span class='rb'>&#9888; DEMO &mdash; NOT REAL DATA</span>"+
+    "<h2 class='ph'>Drift</h2>"+
+    "<div class='lead'>Every change to your networks' <b>intended configuration</b>, measured against the "+
+    "baseline you last accepted. Live status stays in Watch. Read-only &mdash; Argus never changes your network.</div>";
+
+  if(STATE==="clean"){
+    document.getElementById("tb").style.display="none";
+    p.innerHTML=head+"<div class='hero'><div class='empty-ico'>&#9707;</div>"+
+      "<div class='empty-title'>No drift</div>"+
+      "<div class='empty-desc'>All 5 networks and the bound config template match their accepted baselines.</div>"+
+      "<div class='swept'>Last swept 3 minutes ago &middot; next sweep in 12 minutes &middot; 41 changes accepted to date</div></div>";
+    return;
+  }
+  document.getElementById("tb").style.display="";
+  var open=ITEMS.filter(i=>!i.accepted).length, unk=ITEMS.filter(i=>i.att==="unk").length;
+  var stale = STATE==="stale"
+    ? "<div class='stalebar'><b>Sweep stalled.</b> Last successful sweep was 3 hours 20 minutes ago "+
+      "(two ticks missed). <b>What you see below is history, not current state</b> &mdash; a network could "+
+      "have drifted since. <button class='ref' style='margin-left:8px;padding:2px 9px'>Run sweep now</button></div>"
+    : "";
+  var chips="<div class='chips'>"+
+    "<button class='chip cbad "+(FILTER==="all"?"on":"")+"' data-f='all'><b>"+open+"</b> open</button>"+
+    "<button class='chip cunk "+(FILTER==="unk"?"on":"")+"' data-f='unk'><b>"+unk+"</b> unexplained</button>"+
+    "<button class='chip "+(FILTER==="ext"?"on":"")+"' data-f='ext'><b>1</b> external</button>"+
+    "<button class='chip "+(FILTER==="dash"?"on":"")+"' data-f='dash'><b>2</b> dashboard</button>"+
+    "<button class='chip "+(FILTER==="api"?"on":"")+"' data-f='api'><b>1</b> API</button>"+
+    "<button class='chip cok "+(FILTER==="argus"?"on":"")+"' data-f='argus'><b>41</b> accepted</button>"+
+    "<button class='ref'>&#8635; Refresh</button></div>";
+  var list=ITEMS.filter(function(i){ return FILTER==="all"||i.att===FILTER; }).map(card).join("");
+  if(!list) list="<div class='hero'><div class='empty-desc'>Nothing matches that filter.</div></div>";
+  p.innerHTML=head+stale+chips+strip()+list;
+}
+document.addEventListener("click",function(e){
+  var t=e.target.closest?e.target.closest("[data-t]"):null;
+  if(t){ document.getElementById("c-"+t.dataset.t).classList.toggle("open"); return; }
+  var f=e.target.closest?e.target.closest("[data-f]"):null;
+  if(f){ FILTER=f.dataset.f; render(); return; }
+  var a=e.target.closest?e.target.closest("[data-a]"):null;
+  if(a){
+    if(!a.classList.contains("arm")){
+      a.classList.add("arm"); a.textContent="Re-baseline — confirm";
+      a.parentNode.querySelector(".acchint").innerHTML=
+        "<b style='color:#ffb4b4'>This blesses the current state.</b> The item stops reporting and the new value becomes normal.";
+    } else {
+      var it=ITEMS.filter(x=>x.id===a.dataset.a)[0]; if(it){ it.accepted=true; }
+      render();
+      var c=document.getElementById("c-"+a.dataset.a); if(c) c.classList.add("open");
+    }
+  }
+});
+function setState(s){ STATE=s; FILTER="all"; render(); }
+render();
+</script>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"90f49470-770e-41db-92ef-e03d43b17787"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

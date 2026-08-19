@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design &mdash; ai-metal.net Test Post Office</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav.nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav.nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav.nav .title { color: #999; font-size: 14px; }
+  nav.nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 16px; margin: 20px 0 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .optional h2 { border-bottom-style: dashed; }
+  ul, ol { margin: 8px 0 8px 22px; }
+  li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+  pre { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; font-size: 13px; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+  pre code { background: none; padding: 0; color: #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 14px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <span class="brand">Be</span>
+  <span class="title">~d &mdash; ai-metal.net Test Post Office</span>
+  <span class="pub">Published 2026-07-15 &middot; Argus / Purcius</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/7cb5affd-7d75-4e41-a110-cc96a347aea3/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Design &mdash; ai-metal.net as a Test Post Office</h1>
+<p style="color:#999;">A token-correlated email capture inbox for the NPS-recovery test loop. Every test mints a random token; the guest address is <code>&lt;token&gt;@ai-metal.net</code>; whatever the sandbox sends comes home to that token, captured, pull-verifiable, and eyeballable. One token threads the whole loop.</p>
+
+<blockquote>&ldquo;I want to use ai-metal.net as a post-office for our testing.. so we will receive automated responses to the email you sent from. each test will use a random different id or token.. make this easy on us.&rdquo; &mdash; jc, 2026-07-15</blockquote>
+
+<h2>1. Need</h2>
+<div data-cm="1-need" class="section">
+  <p>The sandbox recovery-loop design (2026-07-14) sketched the email leg &mdash; a single <code>guest@ai-metal.net</code> address, an <code>email-capture</code> worker, Workers KV, a pull. But a single fixed address collapses the moment two tests run: message two lands on the same key as message one, and &ldquo;which test got which email&rdquo; becomes archaeology. jc named the fix: <strong>each test gets its own random token</strong>. The token is the correlation key &mdash; the fake alert carries it in as <code>guest_email = &lt;token&gt;@ai-metal.net</code>, and the recovery email (plus any bounce or auto-response) comes home under the same token. What&rsquo;s missing is the post office itself: routing enabled on the zone, a catch-all so <em>any</em> token-address delivers, capture filed <em>by token</em>, and the &ldquo;easy&rdquo; part &mdash; mint a token in one call, fetch by token in one call, and an inbox page for human eyes. Without it, every test is a hand-built one-off; with it, a hundred tests can run without ever colliding, and the receipt for each one is a single lookup.</p>
+</div>
+
+<h2>2. Raw User Stories</h2>
+<div data-cm="2-raw-user-stories" class="section">
+  <ul>
+    <li>As jc, I want each test to mint a fresh random token in one call &mdash; getting back the token and its <code>&lt;token&gt;@ai-metal.net</code> address &mdash; so no two tests ever share a mailbox.</li>
+    <li>As jc, I want anything mailed to <em>any</em> token-address on ai-metal.net captured automatically and filed by token &mdash; recovery reply, bounce, auto-response, all of it &mdash; so the receipt is complete, not just the happy path.</li>
+    <li>As the test harness, I want to fetch &ldquo;what did test <code>&lt;token&gt;</code> receive&rdquo; in one pull call (Rule 13: the dev box takes no inbound), so the verify-loop can byte-match the captured body against the expected Zora reply.</li>
+    <li>As jc, I want a status check &mdash; <code>pending</code> or <code>received</code> &mdash; so the harness can poll cheaply while mail is in flight.</li>
+    <li>As jc, I want a post-office inbox page on ai-metal.net listing tokens and their captured mail, so I can eyeball a run without curling anything.</li>
+    <li>As jc, I want the option of a copy forwarded to my real inbox, so my own eyes stay in the loop &mdash; without that forward being the system of record.</li>
+    <li>As jc, I want all of this reversible and none of it touching cap-URL serving &mdash; ai-metal.net keeps its day job.</li>
+  </ul>
+</div>
+
+<h2>3. Sourced Solution</h2>
+<div data-cm="3-sourced-solution" class="section">
+  <p>Mine what exists before inventing. Every candidate names its source.</p>
+  <table>
+    <tr><th>Source</th><th>What&rsquo;s there we can use</th><th>Reuse / model / invent</th></tr>
+    <tr><td><code>be/designs/2026-07-14-1752-design-sandbox-recovery-loop-sim.html</code></td><td>Already sketched this leg: gated <code>/cloudflare/email-route</code> lane, <code>email-capture</code> worker &rarr; <code>EMAIL_CAPTURE</code> KV, pull-based read, forward-to-jc as the human copy, MX &ne; A/CNAME safety. This design <strong>realizes</strong> that sketch and adds the one thing it lacked: per-test token correlation + mint/fetch ergonomics.</td><td><strong>reuse</strong> the shape; keep the names</td></tr>
+    <tr><td><code>cloudflare-bridge</code> (C# jacket, read from source)</td><td><code>/cloudflare/dns</code> &mdash; the gated-write model: body built in-process (never free-form), narrow record-type gate, capture-before, <code>[AUDIT]</code> line. <code>pagesAllow</code> hash-set &mdash; the allow-list model (note: the DNS lane validates inputs but does <em>not</em> allow-list zone ids; the new email lanes will hard-pin the ai-metal.net zone id in-process &mdash; stricter than the model). Caller gate middleware (BRIDGE_TOKEN / daily passphrase) covers every new lane for free. <code>CloudflareClient</code> already speaks GET/POST/PUT to the CF v4 API &mdash; KV REST (<code>accounts/{a}/storage/kv/&hellip;</code>) rides the same client.</td><td><strong>model</strong> four new lanes on it</td></tr>
+    <tr><td>Cloudflare platform</td><td>Email Routing: MX + SPF on the zone, catch-all rule (<code>*@ai-metal.net</code>) &rarr; an <strong>Email Worker</strong>. Workers KV: keyed store with per-key metadata + list-by-prefix &mdash; readable/writable from outside via the REST API (so the jacket, not the worker, serves all reads). Worker custom domain on a subdomain (<code>postoffice.ai-metal.net</code>) &mdash; serves the inbox page without touching apex/Pages serving. Platform constraint, stated honestly: <strong>the CF edge runs JavaScript, not C or C99</strong> &mdash; so the capture worker is JS, a thin dumb pipe (raw MIME &rarr; KV, zero logic), same moral category as the C# jackets and the same precedent as <code>artifact-comments.js</code>: foreign edge, minimal, dumb. All owned logic (MIME decode, byte-match) stays in C99 on our side.</td><td><strong>reuse</strong> as-is behind the jacket</td></tr>
+    <tr><td><code>pirun</code> verify-loop (prior design, nous C99)</td><td><code>verify-loop.pi</code>&rsquo;s <code>pull-capture</code> unit already polls a bridge read and hands raw MIME to the C99 <code>email-match</code> skill. It gains exactly one refinement: it pulls <em>by token</em> instead of by fixed address.</td><td><strong>reuse</strong>; one input renamed</td></tr>
+    <tr><td><code>be/config.json</code> latchkey block</td><td>ai-metal.net is Cloudflare Pages project <code>ai-metal-net</code>, account <code>7c605ea04118cd9a0a18028083d1cf6e</code>, serving cap-URLs at <code>https://ai-metal.net/s/&lt;token&gt;/</code>. Email Routing adds MX/SPF records only &mdash; MX &ne; A/CNAME, so cap-URL serving is unaffected. Established earlier; restated here as the safety invariant.</td><td><strong>invariant</strong> to protect</td></tr>
+  </table>
+  <p><strong>Proposed approach:</strong> Invent almost nothing. One JS Email Worker (the platform&rsquo;s only option) doing exactly one thing; one KV namespace; four gated lanes on the existing cloudflare-bridge jacket (mint / status / get / one-time route setup), all reads and mints via the CF KV REST API so the worker never grows an API; an inbox page served by the same worker&rsquo;s <code>fetch()</code> on a subdomain. The token is minted at the post office and threaded through the loop that already exists.</p>
+</div>
+
+<h2>4. Naming</h2>
+<div data-cm="4-naming" class="section">
+  <p>Literal names. Where the 2026-07-14 design already named a thing, the name stands.</p>
+  <table>
+    <tr><th>Thing</th><th>Literal name</th><th>Why this is what it is</th></tr>
+    <tr><td>The correlation key</td><td><code>token</code> &mdash; 12 chars, lowercase base32 (<code>a-z2-7</code>)</td><td>It&rsquo;s a token; jc&rsquo;s word. 60 bits from the OS CSPRNG &mdash; random, url-safe, local-part-safe, case-insensitivity-safe (SMTP local-parts get case-folded in the wild; an all-lowercase alphabet can&rsquo;t be corrupted by that).</td></tr>
+    <tr><td>The test guest address</td><td><code>&lt;token&gt;@ai-metal.net</code></td><td>The token IS the local-part. Nothing to parse but a split on <code>@</code>.</td></tr>
+    <tr><td>Email Worker (capture pipe + inbox page)</td><td><code>email-capture</code></td><td>Named by the prior design; it captures email. Keeps the name.</td></tr>
+    <tr><td>KV namespace</td><td><code>EMAIL_CAPTURE</code></td><td>Named by the prior design; holds captured email.</td></tr>
+    <tr><td>Mint lane (bridge)</td><td><code>POST /email/mint</code></td><td>Mints a token. One call in, <code>{token, address}</code> out.</td></tr>
+    <tr><td>Status lane (bridge)</td><td><code>GET /email/status?token=</code></td><td>Answers <code>pending | received</code> for a token. The cheap poll.</td></tr>
+    <tr><td>Fetch lane (bridge)</td><td><code>GET /email/get?token=</code></td><td>Returns everything test <code>&lt;token&gt;</code> received. The receipt.</td></tr>
+    <tr><td>Route-setup lane (bridge, one-time)</td><td><code>POST /cloudflare/email-route</code></td><td>Named by the prior design. Enables routing + plants the catch-all. Gated write, body in-process.</td></tr>
+    <tr><td>Inbox page (human eyes)</td><td><code>https://postoffice.ai-metal.net/</code></td><td>The post office&rsquo;s counter window. Worker custom domain on a subdomain &mdash; apex serving untouched.</td></tr>
+    <tr><td>KV keys</td><td><code>t:&lt;token&gt;</code> (mint record) &middot; <code>m:&lt;token&gt;:&lt;ts-ms&gt;</code> (one captured message)</td><td><code>t</code> for token, <code>m</code> for message. Prefix-listable by token; timestamp suffix means multiple messages (reply + bounce) never collide.</td></tr>
+  </table>
+  <p><strong>Collisions:</strong> none. <code>/email/*</code> is a new lane family on cloudflare-bridge; <code>email-capture</code>/<code>EMAIL_CAPTURE</code>/<code>/cloudflare/email-route</code> are the prior design&rsquo;s names, realized here, not renamed. Token collisions: 60 bits makes a birthday hit vanishingly rare at test volumes; the mint lane checks <code>t:&lt;token&gt;</code> existence anyway (capture-before habit) and re-rolls on a hit.</p>
+</div>
+
+<h2>5. Shape</h2>
+<div data-cm="5-shape" class="section">
+
+  <h3>The token threads the loop &mdash; one key, IN to OUT</h3>
+  <pre><code>            MINT                    IN                        CARD
+  ┌──────────────────┐   ┌─────────────────────┐   ┌──────────────────────────┐
+  │ POST /email/mint │   │ /zendesk/alert-     │   │ recover-guest.pi (pirun) │
+  │ → token k7m2p9…  │──▶│ create              │──▶│ scan → understand →      │
+  │   addr  k7m2p9…  │   │ guest_email =       │   │ claim → compose → FIRE   │
+  │   @ai-metal.net  │   │ k7m2p9…@ai-metal.net│   │ (sandbox Zendesk sends)  │
+  └──────────────────┘   └─────────────────────┘   └────────────┬─────────────┘
+        KV: t:k7m2p9…              ticket/run label = token     │ SMTP
+            = pending                                           ▼
+  ┌──────────────────┐   ┌─────────────────────┐   ┌──────────────────────────┐
+  │ verify-loop.pi   │   │ GET /email/get?     │   │ ai-metal.net POST OFFICE │
+  │ byte-match vs    │◀──│ token=k7m2p9…       │◀──│ catch-all *@ai-metal.net │
+  │ expected Zora    │   │ (bridge → KV REST,  │   │ → email-capture worker   │
+  │ reply. GREEN.    │   │  PULL — Rule 13)    │   │ → KV m:k7m2p9…:&lt;ts&gt;      │
+  └──────────────────┘   └─────────────────────┘   │ (+ optional fwd → jc)    │
+       VERIFY                    FETCH             └──────────────────────────┘
+                                                            CAPTURE</code></pre>
+  <p>One token, whole loop: the fake alert carries it in, the recovery email carries it home, the receipt is one lookup. The token also becomes the pirun run&rsquo;s ticket label (sandbox ticket tagged <code>argus_sim_&lt;token&gt;</code>, run ledger seeds <code>sim.token</code>), so the IDS trace, the Zendesk ticket, and the captured mail all answer to the same key.</p>
+
+  <h3>Part 1 &mdash; Token scheme</h3>
+  <ul>
+    <li><strong>Format:</strong> 12 characters, lowercase base32 alphabet <code>a-z2-7</code> (RFC 4648, lowercased). 60 bits of OS-CSPRNG entropy (<code>RandomNumberGenerator</code> in the jacket). Example: <code>k7m2p9q4x6t3</code>.</li>
+    <li><strong>Why this shape:</strong> url-safe (rides in query strings and cap-style paths untouched), email-local-part-safe (no dots, no plus-tricks to strip), case-insensitivity-safe (mail relays may fold case; an all-lowercase alphabet is immune), short enough to read aloud, long enough that collisions are a non-event.</li>
+    <li><strong>Minted where:</strong> the post office &mdash; cloudflare-bridge <code>POST /email/mint</code>. The lane rolls the token, writes the placeholder <code>t:&lt;token&gt;</code> to KV via the CF REST API (value <code>pending</code>, metadata <code>{minted_at, note?}</code>), and returns <code>{token, address, status:"pending"}</code>. Minting at the post office is what makes <code>status</code> meaningful: a token the post office knows about but has no mail for is <em>pending</em>; an unknown token is an error, not a silent empty.</li>
+    <li><strong>Embedded how:</strong> the token is the entire local-part &mdash; <code>&lt;token&gt;@ai-metal.net</code> &mdash; delivered by the catch-all, recovered by <code>message.to.split("@")[0]</code>. It is also the run&rsquo;s label: the IN generator passes it as <code>guest_email</code> and tags the sandbox ticket <code>argus_sim_&lt;token&gt;</code>; pirun seeds it into the run ledger as <code>sim.token</code>.</li>
+  </ul>
+
+  <h3>Part 2 &mdash; Cloudflare Email Routing setup (one-time, gated, reversible)</h3>
+  <p><code>POST /cloudflare/email-route</code> &mdash; a new gated write lane on cloudflare-bridge, modeled on <code>/cloudflare/dns</code> and <em>stricter</em>: the ai-metal.net zone id is hard-pinned in-process (the DNS lane validates inputs but takes any zoneId; this lane takes none &mdash; there is exactly one post office). Same caller-gate middleware, capture-before reads, <code>[AUDIT]</code> lines. It performs, idempotently:</p>
+  <ol>
+    <li><strong>Enable Email Routing</strong> on the zone &mdash; CF plants the MX + SPF records itself. <span class="pass">Safety:</span> MX &ne; A/CNAME; the Pages custom-domain records that serve cap-URLs are untouched. <code>https://ai-metal.net/s/&lt;cap&gt;/</code> keeps returning 200 before, during, and after.</li>
+    <li><strong>Catch-all rule</strong> &mdash; <code>*@ai-metal.net</code> &rarr; action <code>worker: email-capture</code>. Catch-all (not per-address rules) is what makes tokens free: no write per test, ever.</li>
+    <li><strong>Optional destination address</strong> for jc&rsquo;s real inbox &mdash; CF emails jc a verification link (the one human click). Once verified, the worker&rsquo;s optional forward has a legal target.</li>
+  </ol>
+  <p>The <code>email-capture</code> worker itself (script + <code>EMAIL_CAPTURE</code> KV binding + <code>postoffice.ai-metal.net</code> custom domain) is deployed once via the CF API from the checked-in source (<code>argus/postoffice/email-capture.js</code>) &mdash; a one-time provisioning step in First Move, not a permanent lane.</p>
+
+  <h3>Part 3 &mdash; The Email Worker: a thin dumb pipe (the whole thing)</h3>
+  <p>The CF edge runs JavaScript only &mdash; so this is JS, held to jacket discipline: zero decisions, zero parsing beyond a split, raw MIME straight to KV. Headers the Email Worker API hands over for free (<code>from</code>, <code>to</code>, <code>subject</code>) ride as KV metadata so the inbox page can list without reading bodies; <em>no</em> MIME body parsing happens on the edge &mdash; decode (quoted-printable etc.) is C99&rsquo;s job in <code>email-match</code>, where it already lives.</p>
+  <pre><code>// email-capture — ai-metal.net post office. Thin dumb pipe: raw MIME → KV. Zero logic.
+export default {
+  async email(message, env) {
+    const token = message.to.split("@")[0].toLowerCase();
+    const raw = await new Response(message.raw).arrayBuffer();
+    await env.EMAIL_CAPTURE.put(`m:${token}:${Date.now()}`, raw, {
+      metadata: { from: message.from, to: message.to,
+                  subject: message.headers.get("subject") || "",
+                  ts: Date.now(), size: raw.byteLength } });
+    if (env.FORWARD_TO) await message.forward(env.FORWARD_TO);   // optional human copy
+  },
+  async fetch(request, env) { /* Part 5: the inbox page — read-only render of KV */ }
+};</code></pre>
+  <p>Bounces and auto-responses addressed to a token-address land through the same catch-all and file under the same token &mdash; the receipt is complete by construction. Messages to unknown local-parts still capture (a <code>m:</code> key with no <code>t:</code> mint record) &mdash; the inbox page flags them as strays instead of dropping evidence.</p>
+
+  <h3>Part 4 &mdash; The read path: PULL, by token (Rule 13)</h3>
+  <p>The dev box takes no inbound &mdash; so nothing ever pushes to it. All reads go through the C# jacket speaking the CF KV REST API (<code>accounts/{account}/storage/kv/namespaces/{ns}/&hellip;</code> &mdash; list-by-prefix + get-value + get-metadata), on the existing <code>CloudflareClient</code>. The worker never grows an API surface for machines; its only <code>fetch()</code> duty is the human inbox page.</p>
+  <table>
+    <tr><th>Lane</th><th>Does</th><th>Returns</th></tr>
+    <tr><td><code>GET /email/status?token=</code></td><td>KV list, prefix <code>m:&lt;token&gt;:</code> (keys only &mdash; cheap)</td><td><code>{token, status: "pending"|"received", count, latest_ts}</code> &mdash; <code>404 unknown-token</code> if never minted</td></tr>
+    <tr><td><code>GET /email/get?token=</code></td><td>KV list + get each value</td><td><code>{token, messages: [{from, to, subject, ts, size, rawBase64}]}</code> &mdash; raw MIME, untouched</td></tr>
+  </table>
+  <p><code>verify-loop.pi</code>&rsquo;s <code>pull-capture</code> unit polls <code>/email/status</code> with backoff (mail is not instant), then <code>/email/get</code>, and hands <code>rawBase64</code> to the C99 <code>email-match</code> skill &mdash; decode quoted-printable, strip transport headers, byte-compare against the expected Zora reply, assert the claimed <code>IMSORRYTEST</code> code appears exactly once. Green is an exit code, not an opinion.</p>
+
+  <h3>Part 5 &mdash; &ldquo;Make it easy&rdquo;: the three calls + the counter window</h3>
+  <pre><code># 1. MINT — one call, get your mailbox
+curl -X POST -H "Authorization: Bearer $BRIDGE" $CFB/email/mint
+→ { "token":"k7m2p9q4x6t3", "address":"k7m2p9q4x6t3@ai-metal.net", "status":"pending" }
+
+# 2. STATUS — cheap poll while mail is in flight
+curl -H "Authorization: Bearer $BRIDGE" "$CFB/email/status?token=k7m2p9q4x6t3"
+→ { "token":"k7m2p9q4x6t3", "status":"received", "count":1, "latest_ts":1768520000000 }
+
+# 3. FETCH — the receipt, raw and complete
+curl -H "Authorization: Bearer $BRIDGE" "$CFB/email/get?token=k7m2p9q4x6t3"
+→ { "token":"k7m2p9q4x6t3", "messages":[ { "from":"support@…zendesk.com",
+    "subject":"We're Sorry — From Your Friends at Mendocino Farms",
+    "ts":1768520000000, "size":18342, "rawBase64":"UmVjZWl2ZWQ6…" } ] }</code></pre>
+  <p><strong>The inbox page</strong> &mdash; <code>https://postoffice.ai-metal.net/?key=&lt;INBOX_KEY&gt;</code>, served by <code>email-capture</code>&rsquo;s <code>fetch()</code> on a worker custom domain (subdomain &mdash; deliberately NOT a <code>_worker.js</code> on the <code>ai-metal-net</code> Pages project, which would put edge code in front of cap-URL serving). Read-only render of KV, gated by a single shared key held as a worker secret: a table of tokens (newest first) &mdash; token &middot; status pill (<span class="warn">pending</span> / <span class="pass">received</span> / stray) &middot; count &middot; from &middot; subject &middot; received-at &mdash; each row expanding to the raw message. Be dark style. Eyeballing a run is: open the page, find your token, read the mail.</p>
+
+  <h3>Part 6 &mdash; Worked example: token <code>k7m2p9q4x6t3</code>, all the way around</h3>
+  <ol>
+    <li><code>POST /email/mint</code> &rarr; <code>k7m2p9q4x6t3</code> / <code>k7m2p9q4x6t3@ai-metal.net</code>. KV: <code>t:k7m2p9q4x6t3 = pending</code>.</li>
+    <li>IN: <code>/zendesk/alert-create</code> raises &ldquo;Guest Alert &ndash; Detractor&rdquo; in sandbox <code>mendocinofarms1781637851</code>, <code>guest_email = k7m2p9q4x6t3@ai-metal.net</code>, tag <code>argus_sim_k7m2p9q4x6t3</code>.</li>
+    <li>CARD: <code>recover-guest.pi</code> under pirun &mdash; scan &rarr; understand &rarr; claim <code>IMSORRYTEST-…</code> &rarr; compose Zora reply &rarr; AWAIT_FIRE &rarr; jc fires. Run ledger carries <code>sim.token = k7m2p9q4x6t3</code>.</li>
+    <li>Sandbox Zendesk emails the guest. The catch-all delivers to <code>email-capture</code>; KV gains <code>m:k7m2p9q4x6t3:1768520000000</code> = raw MIME; jc&rsquo;s inbox gets the optional copy.</li>
+    <li><code>verify-loop.pi</code>: poll <code>/email/status?token=k7m2p9q4x6t3</code> &rarr; <code>received</code>; <code>/email/get</code> &rarr; raw; C99 <code>email-match</code> byte-verifies skeleton + slots + code-appears-once. <span class="pass">GREEN.</span></li>
+    <li>jc opens <code>postoffice.ai-metal.net</code>, sees the row, reads the mail. Same token everywhere: ticket tag, run ledger, KV keys, inbox row.</li>
+  </ol>
+
+  <p><strong>Out of scope:</strong> prod anything (sandbox-only, per the 2026-07-14 design&rsquo;s arm discipline); retention/cleanup policy beyond KV TTL (set <code>expirationTtl</code> ~30 days on <code>m:</code> keys so the post office self-empties); DKIM/SPF alignment for <em>sending</em> from ai-metal.net (the post office only receives); multi-zone post offices.</p>
+</div>
+
+<h2>6. First Move</h2>
+<div data-cm="6-first-move" class="section">
+  <blockquote><strong>Stand up the post office and prove it with one letter:</strong> build the four bridge lanes (<code>/email/mint</code>, <code>/email/status</code>, <code>/email/get</code>, <code>/cloudflare/email-route</code>) + the ~20-line <code>email-capture</code> worker; run the route-setup once (jc clicks the one verification link); then &mdash; before any Zendesk is involved &mdash; mint a token, send a plain email to <code>&lt;token&gt;@ai-metal.net</code> from any mail account, and watch <code>/email/status</code> flip <code>pending &rarr; received</code> and <code>/email/get</code> return the exact bytes. That single round-trip proves routing, catch-all, worker, KV, and both pull lanes with zero moving parts from the rest of the loop. The sandbox recovery run is then just a different sender.</blockquote>
+  <p>Into the plan: the four lanes on cloudflare-bridge (in-process bodies, pinned zone id, audit lines), <code>argus/postoffice/email-capture.js</code> + one-time deploy (KV binding, custom domain, <code>INBOX_KEY</code> + optional <code>FORWARD_TO</code> secrets), the inbox page render in <code>fetch()</code>, <code>verify-loop.pi</code>&rsquo;s <code>pull-capture</code> switched to token inputs, and the smoke test above as a TLT check.</p>
+</div>
+
+<div class="optional">
+<h2>Choices + Consequences</h2>
+<div data-cm="choices-consequences" class="section">
+  <table>
+    <tr><th>Fork</th><th>Options</th><th>Pick + Reason</th></tr>
+    <tr>
+      <td>How captured mail reaches verification</td>
+      <td>(a) worker &rarr; KV, bridge <em>pulls</em> &mdash; 2nd: programmatic byte-verify, works from CI, no inbound to the dev box &mdash; 3rd: the same pull serves any future harness.<br>(b) forward-only routing to jc&rsquo;s inbox &mdash; zero code, zero worker &mdash; 2nd: no programmatic fetch-by-token; &ldquo;looks right&rdquo; replaces byte-match &mdash; 3rd: template drift ships silently.<br>(c) worker POSTs to the dev box &mdash; 2nd: home router blocks inbound &mdash; 3rd: Rule 13 says that vantage lies.</td>
+      <td><strong>(a) + optional forward to jc.</strong> The split: KV is the system of record for machines; the forward is the human copy. Byte-verify AND eyeball, neither pretending to be the other.</td>
+    </tr>
+    <tr>
+      <td>Where the token is minted</td>
+      <td>(a) bridge lane <code>POST /email/mint</code> writes a KV placeholder &mdash; 2nd: one call returns token+address; <code>pending</code> vs <code>unknown</code> becomes answerable &mdash; 3rd: the post office knows its own patrons.<br>(b) client-side in the C99 harness (CSPRNG local) &mdash; no round-trip &mdash; 2nd: post office has no mint record, so status can&rsquo;t distinguish &ldquo;in flight&rdquo; from &ldquo;typo&rsquo;d token&rdquo; &mdash; 3rd: every consumer reimplements the roll.<br>(c) the worker&rsquo;s <code>fetch()</code> mints &mdash; 2nd: logic accretes on the foreign edge &mdash; 3rd: violates the dumb-pipe law.</td>
+      <td><strong>(a).</strong> Mint where the mail lands. One call, and <code>status</code> earns its keep.</td>
+    </tr>
+    <tr>
+      <td>Where the inbox page lives</td>
+      <td>(a) <code>email-capture</code>&rsquo;s <code>fetch()</code> at <code>postoffice.ai-metal.net</code> &mdash; 2nd: same worker, same KV binding, subdomain &mdash; 3rd: apex cap-URL serving never routes through it.<br>(b) <code>_worker.js</code> advanced mode on the <code>ai-metal-net</code> Pages project (the bridge&rsquo;s <code>pages-deploy-site</code> supports it) &mdash; 2nd: puts edge code in front of every cap-URL request &mdash; 3rd: a bug in the inbox 404s the latchkey surface.<br>(c) local-rendered HTML via the bridge &mdash; 2nd: not &ldquo;on ai-metal.net&rdquo;, not shareable &mdash; 3rd: misses the ask.</td>
+      <td><strong>(a).</strong> The read-only counter window rides the pipe it already owns; the latchkey surface stays boring.</td>
+    </tr>
+  </table>
+</div>
+</div>
+
+<div class="optional">
+<h2>Escape Routes</h2>
+<div data-cm="escape-routes" class="section">
+  <table>
+    <tr><th>Load-bearing choice</th><th>Reversal path</th></tr>
+    <tr><td>Email Routing on ai-metal.net (MX on the zone)</td><td>Delete the catch-all rule + disable routing via the same gated lane; CF removes its MX/SPF records and the zone&rsquo;s mail posture reverts. Cost: minutes. <span class="pass">cap-URL serving is untouched either way</span> &mdash; MX &ne; A/CNAME; the Pages records never move.</td></tr>
+    <tr><td><code>email-capture</code> worker + <code>EMAIL_CAPTURE</code> KV + <code>postoffice.ai-metal.net</code></td><td>Delete the worker, the namespace, the custom domain &mdash; three API calls, nothing else references them. Source stays in the repo for re-provisioning.</td></tr>
+    <tr><td>Four new bridge lanes</td><td>Additive routes behind the existing gate; delete the routes, nothing else moves. The <code>/cloudflare/dns</code> pattern already proved this shape safe.</td></tr>
+    <tr><td>Forward-to-jc destination</td><td>Remove the destination address / unset <code>FORWARD_TO</code>; capture continues unchanged &mdash; the forward was never the system of record.</td></tr>
+    <tr><td>Token scheme (12-char base32)</td><td>Pure convention, enforced only at the mint lane; the catch-all + <code>split("@")</code> accept any local-part, so a scheme change is a mint-lane edit &mdash; old tokens keep resolving.</td></tr>
+  </table>
+</div>
+</div>
+
+<h2>Definition of Done</h2>
+<div data-cm="definition-of-done" class="section">
+  <ul>
+    <li><span class="pass">&#10003;</span> A-D-D verified &mdash; realizes (never contradicts) the 2026-07-14 sandbox-recovery-loop design; names (<code>email-capture</code>, <code>EMAIL_CAPTURE</code>, <code>/cloudflare/email-route</code>) carried forward; bridge model read from <code>cloudflare-bridge/Program.cs</code> source, including the correction that the DNS lane gates by record-type + validation, not a zone allow-list &mdash; the new lanes pin the zone harder</li>
+    <li><span class="pass">&#10003;</span> Six spine sections present (Need, Stories, Sourced Solution, Naming, Shape, First Move)</li>
+    <li><span class="pass">&#10003;</span> Solution sourced (prior design &rarr; cloudflare-bridge gated-write model &rarr; Workers KV / Email Routing &rarr; pirun verify-loop) before inventing</li>
+    <li><span class="pass">&#10003;</span> Platform constraint stated honestly: the CF edge runs JS only; the worker is a thin dumb pipe, all owned logic in C99</li>
+    <li><span class="pass">&#10003;</span> Rule 13 honored &mdash; capture is pull-based; nothing pushes to the dev box</li>
+    <li><span class="pass">&#10003;</span> Token is the one correlation key IN&harr;OUT, shown end-to-end in a worked example</li>
+    <li><span class="pass">&#10003;</span> &ldquo;Make it easy&rdquo; delivered as three one-call lanes + an inbox page</li>
+    <li><span class="pass">&#10003;</span> Choices (capture path, mint location, inbox placement) + Escape Routes (routing reversible, MX &ne; A/CNAME) included</li>
+    <li><span class="pass">&#10003;</span> HTML saved at <code>be/designs/2026-07-15-design-ai-metal-net-test-post-office.html</code>, self-contained, Be template</li>
+    <li><span class="pass">&#10003;</span> First Move is the smallest end-to-end proof: one minted token, one plain email, status flips, bytes match</li>
+    <li><span class="pass">&#10003;</span> Latchkey publish + commit + telemetry handled by the parent session on receipt of this artifact</li>
+  </ul>
+</div>
+
+</div>
+<footer>metal console &middot; Be &middot; v0 &middot; r638 &middot; 2026-07-15 &middot; Argus &mdash; ai-metal.net test post office</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"7cb5affd-7d75-4e41-a110-cc96a347aea3"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

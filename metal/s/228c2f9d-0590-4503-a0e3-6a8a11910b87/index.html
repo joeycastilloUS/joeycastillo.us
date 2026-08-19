@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~i~d — Three NPS Cards</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:800px;margin:0 auto;padding:8px 22px 60px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:36px}
+ h1{font-size:25px;margin:20px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:15px;color:#6FC3DF;margin:30px 0 9px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:6px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 6px}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 16px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:14px 16px;margin:12px 0}
+ .card.yes{border-left:3px solid #3aa06a}.card.no{border-left:3px solid #c9463f}
+ .card.warn{border-left:3px solid #c9a24b}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 6px;border-radius:4px}
+ pre{background:#0a0a0a;border:1px solid #262626;border-radius:7px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#c8d6dd;line-height:1.55}
+ table{width:100%;border-collapse:collapse;margin:11px 0;font-size:13.5px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:7px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:8px 9px;color:#c5d0d6}
+ td.k{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;white-space:nowrap}
+ ul{margin:7px 0;padding-left:20px}li{margin:5px 0}
+ .foot{margin-top:26px;border-top:1px solid #222;padding-top:13px;color:#5f6f77;font-size:11.5px}
+ .big{font-size:18px;color:#fff;font-weight:600;margin:0 0 6px}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">~i~d</span>
+<span class="p">2026-07-21 14:15 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/228c2f9d-0590-4503-a0e3-6a8a11910b87/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>Three NPS cards</h1>
+<p class="lede">One card per band, so each says only what is true of its band. The runtime cannot route to
+that today &mdash; three small C changes unlock it.</p>
+<p class="sub">Paired. Design only; no code or card touched.</p>
+
+<h2>The blocker</h2>
+<div class="card no">
+<pre>pi_run.c:455       the target card is ONE static name from the .si.
+               No unit can write it &mdash; there is no micro-op that could.
+
+pi_run.c:460-461   a card that was dispatched to CANNOT dispatch onward.
+               "nested fan-out refused"</pre>
+<p>Every card-only wiring dies on one of those:</p>
+<table>
+<tr><th>Wiring</th><th>Dies because</th></tr>
+<tr><td>Sweep bands, dispatches to one of three</td><td>The score does not exist yet &mdash; it appears only after the card reads the ticket.</td></tr>
+<tr><td>Entry card bands, dispatches onward</td><td>The recursion guard refuses it.</td></tr>
+<tr><td>Three cards, each skips if not its band</td><td><b>The skip cannot be written.</b> A card's only branch is the exit gate, and no micro-op can compare a score to a range to feed it. biRT refuses any bind not in the catalog.</td></tr>
+</table>
+<p><b>So three cards costs runtime work, not just card files.</b> You have already accepted a substrate
+change for the generative replies; this adds to it.</p>
+</div>
+
+<h2>The shape</h2>
+<pre>mendo-nps-sweep          finds alerts, dispatches each ticket          unchanged
+ └─ mendo-nps-triage     ENTRY. read · dedup claim · illness panel ·
+                         escalate-or-band.  Owns the safety floor.
+     ├─ mendo-nps-promoter    9-10   thank you  + $10   model-written
+     ├─ mendo-nps-passive     7-8    what can we do + $20   model-written
+     └─ mendo-nps-detractor   0-6    "We're Sorry"          deterministic</pre>
+
+<div class="card warn">
+<p><b>Four cards, not three.</b> The dedup claim and the illness panel must exist exactly once. The panel
+in particular has to sit above the split &mdash; <b>a guest can score 9 and still report a symptom</b> &mdash;
+so it cannot live inside any reply card.</p>
+<p>Folding the entry role into one of the three would work, but that card becomes privileged: promoter
+tickets would flow through a card named "detractor," and the safety floor would live somewhere arbitrary.
+A named entry card is the cleaner reading of the same four files.</p>
+</div>
+
+<h2>What each card holds</h2>
+<table>
+<tr><th>Card</th><th>Units</th><th>Demands</th></tr>
+<tr><td class="k">triage &mdash; entry</td><td>read · dedup claim · understand · illness panel · escalate · band decision</td><td>D1&ndash;D8, D13, D15 &mdash; the whole safety floor</td></tr>
+<tr><td class="k">detractor</td><td>re-read · classify · empathy · claim code · send</td><td>D9&ndash;D12, <b>verbatim as they read today</b></td></tr>
+<tr><td class="k">promoter</td><td>re-read · generate · claim $10 · send</td><td>new: never-say list, fallback, denomination</td></tr>
+<tr><td class="k">passive</td><td>re-read · generate · claim $20 · send</td><td>same shape, different intent</td></tr>
+</table>
+<p><b>No reply card carries the dedup gate</b> &mdash; see the failure modes below. Each re-reads the alert
+because a dispatched card starts with a fresh ledger and inherits nothing but the ticket id.</p>
+<p><b>D14 rides on all four.</b> "Sandbox until jc arms prod" is env-scoped, not path-scoped &mdash; it is
+carried by every card&#39;s <code>env:</code> header, and arming is per card. That matters here: <b>four
+cards means four things to arm</b>, and a card left unarmed composes silently instead of sending. Nothing
+else is unassigned; D1&ndash;D15 are fully partitioned.</p>
+
+<div class="card yes">
+<p class="big">The prize: D9 and D10 stop being conditional.</p>
+<p>Today they would have to read "on the detractor path, no model writes a word a guest reads&hellip;"
+&mdash; a guarantee with an exception clause. Split, they stay <b>exactly as written</b> and become the
+plain law of one card. Each card can be read alone and believed.</p>
+<p class="sub">The amendment burden moves rather than vanishes: <b>D1 still changes</b> &mdash; "Every
+NPS-<i>detractor</i> alert" becomes "Every NPS alert" on the entry card, and the detractor-scoped naming
+carries through the sweep with it.</p>
+</div>
+
+<h2>What it takes</h2>
+<table>
+<tr><th>#</th><th>Change</th><th>Kind</th></tr>
+<tr><td>1</td><td><b>Band-decision micro-op</b> &mdash; compare the score, write the successor's name</td><td>C arm + catalog row + recompile</td></tr>
+<tr><td>2</td><td>Let the dispatch target come from a value a unit wrote, not only a static <code>set:</code></td><td>dispatcher</td></tr>
+<tr><td>3</td><td>Depth limit of two instead of a flat refusal &mdash; keep the guard, bound it</td><td>dispatcher</td></tr>
+<tr><td>4</td><td><b>Generative micro-op</b> for the written replies</td><td>C + catalog row + recompile + probable bridge lane</td></tr>
+<tr><td>5</td><td>Denomination-aware vault claim</td><td>small local edit &mdash; the vault already holds $10 and $20</td></tr>
+<tr><td>6</td><td>3 new cards, plus rewriting today's card into the detractor card</td><td>4 &times; <code>.pi</code> + 4 &times; <code>.si</code> + 4 seals, each biRT-verified, each copied to both seats</td></tr>
+</table>
+
+<div class="card no">
+<p><b>A second hop breaks three things a depth counter alone does not fix:</b></p>
+<ul>
+<li>The resolver snapshot is one shared buffer &mdash; nested, the inner dispatch overwrites the outer's,
+and the sweep restores the wrong map. Must be per-depth.</li>
+<li>The per-ticket child store path is derived from environment and ticket id, so entry and band card
+compute the <b>same file</b> for the same ticket. Needs a discriminator.</li>
+<li>Each hop gets a fresh ledger &mdash; only the ticket id is passed. Hence the re-read in every reply
+card.</li>
+</ul>
+<p class="sub">Checked and safe under nesting: the card-directory capture, id pre-tokenisation, the fan-out
+bound, the environment constant. The depth counter must decrement on every error return.</p>
+</div>
+
+<h2>Failure modes to design against</h2>
+<ul>
+<li><b>A reply card that keeps the dedup gate fails silently and reads green.</b> It finds the tag the
+entry card claimed, exits cleanly, returns success &mdash; so the entry card counts it dispatched. Every
+guest triaged, nobody replied to, every counter healthy. <b>Dedup is entry-only.</b></li>
+<li><b>"Dispatched" stops meaning "replied."</b> A clean exit counts as success, so a whole band can go
+unanswered behind a green number. Needs a per-band reply counter.</li>
+<li><b>Escalation must stay in the entry card.</b> Duplicated into reply cards, a guest could be escalated
+twice &mdash; D8 says once, ever.</li>
+<li><b>A missing catalog row is the good failure.</b> biRT refuses the card at load, loudly, rather than
+running it half-bound.</li>
+</ul>
+
+<h2>The standing cost</h2>
+<p>Cards reach the primes by manual copy, unverified, and that path <b>drifted silently within the last
+two days</b>. One card is one thing to keep in sync across two seats; four is four. This does not change
+the decision &mdash; it prices it. And it is reversible: the demands are written identically either way,
+so collapsing back to one card would be a file move, not a redesign.</p>
+
+<h2>Unknowns</h2>
+<ul>
+<li>Whether each dispatched card needs its own addressing row on the primes, or inherits the entry card's.
+Node-local; not knowable from these repos.</li>
+<li>Whether one generative micro-op serves both new cards or needs per-band variants.</li>
+<li>Whether the live vault claim honours denominations &mdash; the local store does; the claim that runs is
+bridge-side.</li>
+<li>Whether promoter and passive alerts reach Zendesk today at all. If only detractors arrive, this is
+correct and inert until the form sends the rest.</li>
+</ul>
+
+<h2>When to revisit</h2>
+<p>When the card deploy becomes a script &mdash; that retires the only real argument against the split. And
+if a fifth band or a second customer appears, because four cards becomes eight and the sync cost stops
+being theoretical.</p>
+
+<h2>Definition of Done</h2>
+<ul>
+<li>&#10003; Paired &mdash; navigator owns the verdict</li>
+<li>&#10003; Blocker found in the dispatcher and quoted, not designed over</li>
+<li>&#10003; All three card-only wirings tested against the source and each shown to fail, with the reason</li>
+<li>&#10003; Four-card count corrected against the ask, with the safety reason</li>
+<li>&#10003; Nesting breakages enumerated &mdash; the depth counter alone is not the fix</li>
+<li>&#10003; The silent green-counter failure named as a design constraint</li>
+<li>&#10007; Not built.</li>
+</ul>
+
+<div class="foot">Generated 2026-07-21 14:15 &middot; v0 &middot; ~i~d &middot;
+<code>pi_run.c:453-494</code>, <code>mendo-nps-sweep.si</code>,
+<code>mendo-nps-detractor-triage.pi/.si</code></div>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+</body></html>

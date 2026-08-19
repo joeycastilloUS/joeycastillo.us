@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~d v2 — Kitchen server + read-only port config</title>
+<style>
+  :root { --bg:#111111; --surface:#1A1A1A; --accent:#6FC3DF; --fg:#e8e8e8; --muted:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; background:#000; border-bottom:2px solid var(--accent);
+        padding:.7rem 1.2rem; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  nav .brand { color:var(--accent); font-weight:700; letter-spacing:.08em; }
+  nav .pub { color:var(--muted); font-size:.72rem; }
+  main { max-width:830px; margin:0 auto; padding:2rem 1.2rem 4rem; }
+  h1 { font-size:1.5rem; margin:.2rem 0 .3rem; }
+  h2 { font-size:1.06rem; margin:2rem 0 .5rem; color:var(--accent);
+       border-bottom:1px solid #2a2a2a; padding-bottom:.3rem; }
+  h3 { font-size:.93rem; margin:1.2rem 0 .35rem; color:#cfe9f3; }
+  .sub { color:var(--muted); font-size:.84rem; margin-bottom:1rem; }
+  .box { background:var(--surface); border:1px solid #262626; border-radius:6px;
+         padding:.9rem 1.05rem; margin:.9rem 0; }
+  .verdict { border-left:3px solid var(--accent); }
+  .stop { background:#241414; border-left:3px solid #e07b7b; }
+  .agree { background:#141c17; border-left:3px solid #7ddf8f; }
+  .corr { background:#1a1420; border-left:3px solid #b48fd9; }
+  .ask { background:#14202a; border-left:3px solid #6FC3DF; }
+  .split { background:#1d1614; border-left:3px solid #e0a07b; }
+  table { width:100%; border-collapse:collapse; margin:.8rem 0; font-size:.79rem; }
+  th, td { text-align:left; padding:.4rem .5rem; border-bottom:1px solid #262626; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; }
+  code { background:#000; padding:.1rem .32rem; border-radius:3px; font-size:.85em; color:#bfe9f7; }
+  pre { background:#000; padding:.75rem .95rem; border-radius:5px; overflow-x:auto; font-size:.75rem; line-height:1.5; }
+  ul { padding-left:1.25rem; } li { margin:.25rem 0; }
+  ol { padding-left:1.25rem; } ol li { margin:.35rem 0; }
+  footer { color:var(--muted); font-size:.78rem; border-top:1px solid #262626;
+           margin-top:2.6rem; padding-top:1rem; }
+  .dod li { font-size:.83rem; }
+  .y { color:#7CFFB2; font-weight:700; } .n { color:#ff9b9b; font-weight:700; }
+  .pt { text-align:center; font-weight:800; color:#cfe9f3; width:32px; }
+  .blk { color:#ff9b9b; font-weight:700; font-size:.9em; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-08-04 00:10 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/7242e1d0-a57d-4a75-8fa1-fe750d61967b/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~d v2 — Kitchen server + read-only port config</h1>
+<div class="sub">Argus &middot; acmedevUS/argus &middot; v0 &middot; r1043 &middot; 2026-08-04<br>
+<b>Addendum to <code>2026-08-03-2305-design-host-firewall-button.html</code></b> (cap <code>f98b81cd</code>) —
+corrects it in two places.<br>
+Paired per Kernel Rule 1 — Opus driver + Fable5 navigator, concurrent independent passes, reconciled at the end.</div>
+
+<h2>What changed</h2>
+<div class="lk-sec" data-cm="what-changed"><ol>
+<li><b>"The Ingest devices are the kitchen system server."</b> Singular. Wired. That invalidates where v1 put
+    the button and how v1 planned to find the host.</li>
+<li><b>Show Trunk/Access, Access policy and VLAN in the Network view — read-only for now.</b></li>
+</ol>
+<div class="box verdict">
+<b>The happy accident:</b> both land on the same surface. The kitchen server lives on a <b>switch port</b>,
+and the port row is exactly where Trunk/Access/policy/VLAN belong. One coherent addition, not two.
+<br><br>
+<b>And addition (2) is not a side quest — it is the instrument.</b> v1 argued the durable answer for a
+high-value host is network-side posture rather than a host setting. For a <i>wired server</i> that posture
+<i>is</i> the port config the operator just asked to see.
+</div></div>
+<h2>Correction 1 — v1 put the button where the server can never appear</h2>
+<div class="lk-sec" data-cm="correction-1-v1-put-the"><div class="box stop">
+<code>/meraki/wireless</code> drops every wired client by construction —
+<code>bridge/Program.cs:989-991</code>:
+<pre>// A client with a switch port is WIRED -- not on Wi-Fi, even if it carries a
+// residual ssid. Don't bucket it as Wi-Fi.
+if (!string.IsNullOrEmpty(c.Switchport)) continue;</pre>
+So a button in the SSIDs pane would answer for iPads and <b>never once</b> for the machine actually asked
+about. The kitchen server appears in exactly one place: the <b>portmap client cell</b>
+(<code>Program.cs:580-583</code>, rendered by the switch table at <code>index.html:1531-1581</code>).
+<br><br>
+<b>Position:</b> the port row is the primary surface. Keep the SSID-row button too — same endpoint,
+near-zero marginal cost, and it serves Windows Wi-Fi clients. Both tables live in the same Network tab,
+so "Network SSIDs view" still gets you there.
+</div></div>
+<h2>Correction 2 — the join key breaks for a wired host</h2>
+<div class="lk-sec" data-cm="correction-2-the-join-key"><div class="box corr">
+v1 joined our client MAC to an SM device with <code>sm/devices?wifiMacs=&lt;mac&gt;</code>. The navigator
+verified the <b>complete</b> filter set against Meraki's published docs:
+<code>wifiMacs</code>, <code>serials</code>, <code>ids</code>, <code>uuids</code>,
+<code>systemTypes</code>, <code>scope</code>.
+<br><br>
+<b>There is no ethernet-MAC filter and no IP filter.</b> A server with no Wi-Fi radio has no
+<code>wifiMac</code> to match, and <code>serials</code> means the SM-reported hardware serial, which a
+Meraki client row does not carry. <b>For a wired host there is no deterministic server-side join at all.</b>
+</div>
+<p><b>The fix:</b> fetch the SM network's device list unfiltered — one page covers any restaurant fleet —
+with <code>fields=ip,name,lastConnected,hasDesktopAgent</code>, and <b>match client-side on IP</b>. A kitchen
+system server is static-IP by definition, and our roster op-targets already encode named devices at fixed
+IPs (<code>index.html:1119</code>). Name-match is corroborating evidence, never the key.</p>
+<pre>GET /meraki/host-firewall?network=&amp;mac=&amp;ip=
+  1. try wifiMacs=&lt;mac&gt;        -> wireless case, unchanged from v1
+  2. else fetch list, match ip -> wired case
+  -> { state, fireWallName, lastConnected, matchedBy:"wifiMac"|"ip" }</pre>
+<p><b><code>matchedBy</code> is not decoration.</b> An IP join is honest-but-heuristic, so the UI must say
+how it knows — same dashed-border law Drift already ships: solid = evidenced, dashed = inferred.</p>
+
+<div class="box split">
+<b>Also correcting v1:</b> it listed <code>fwName</code> in the <code>sm/devices?fields=</code> set as if it
+meant firewall name. <b>That is unverified and may mean <i>firmware</i> name.</b> The verified firewall field
+is <code>securityCenters.fireWallName</code>. Treat <code>fwName</code> as decoration until proven.
+<i>Navigator's catch.</i>
+</div></div>
+<h2>The screenshot ask — what we already have</h2>
+<div class="lk-sec" data-cm="the-screenshot-ask-what-we"><p>Most of it is already in the browser. Verified against the live projection at
+<code>Program.cs:583</code>:</p>
+<table>
+<tr><th>Screenshot field</th><th>Meraki API</th><th>Our record</th><th>Sent to browser</th><th>Rendered</th></tr>
+<tr><td><b>VLAN</b> (<code>90</code>)</td><td class="y">yes</td><td class="y">yes</td><td class="y">yes</td><td class="y">YES — already a column</td></tr>
+<tr><td><b>Trunk / Access</b> (<code>type</code>)</td><td class="y">yes</td><td class="y">yes</td><td class="y">YES</td><td class="n">no column</td></tr>
+<tr><td><b>Access policy</b> (<code>Open</code>)</td><td class="y">yes</td><td class="n">no</td><td class="n">no</td><td class="n">no</td></tr>
+<tr><td><code>enabled</code> (admin state)</td><td class="y">yes</td><td class="y">yes</td><td class="n">DROPPED</td><td class="n">no — STATUS is link state, not admin state</td></tr>
+</table>
+<p><b>Trunk/Access is nearly free</b> — <code>type = p.Type</code> is already in the payload, it just isn't
+drawn. <b>Access policy</b> needs the full chain. And we know the field is populated because the audit
+already reads it raw: <code>AStr(p, "accessPolicyType")</code> at <code>Program.cs:1335</code>, the
+<code>SW-PORTSEC</code> check. It simply never made it into the typed record.</p>
+<p><code>enabled</code> rides along — it is the same one-line projection gap already on the board as a
+known-issue, and worth having: <b>STATUS shows link state; it will not tell you a port was
+administratively disabled.</b></p>
+
+<h3>Exactly what to add</h3>
+<ol>
+<li><b>Record</b> — <code>Meraki.cs:12</code>: <code>SwitchPort</code> gains
+    <code>string? AccessPolicyType, int? AccessPolicyNumber</code>. Parser at <code>:197-210</code>: two more pulls.</li>
+<li><b>Projection</b> — <code>Program.cs:583</code>: add
+    <code>enabled, accessPolicyType, accessPolicyNumber</code>. <b>This is the already-boarded drift item —
+    one fix serves both designs.</b></li>
+<li><b>UI</b> — <code>index.html:1531</code> header + <code>:1581</code> row builder: two columns,
+    <b>TYPE</b> (renders <code>Trunk</code>/<code>Access</code>, mirroring Meraki's radio) and
+    <b>ACCESS POLICY</b>. Plain text. No controls.</li>
+</ol></div>
+<h2>Access-policy naming</h2>
+<div class="lk-sec" data-cm="access-policy-naming"><p><code>accessPolicyType</code> is a documented enum: <b>Open · Custom access policy · MAC allow list ·
+Sticky MAC allow list</b>. Three of the four are self-naming and cover the screenshot exactly
+(<code>Open</code>).</p>
+<p>Only <b>Custom access policy</b> needs more — the meaningful name lives in
+<code>GET /networks/{net}/switch/accessPolicies</code>, keyed by <code>accessPolicyNumber</code>.
+<b>Position: project the number, render <code>Custom access policy #3</code>, and do not fetch the policy
+list at all.</b> A kitchen access port on a template-stamped restaurant network is Open or a MAC list;
+building name resolution for a policy type we have never observed in this org is speculative plumbing.
+When a <code>#N</code> actually renders in production, <i>that</i> is the signal to add the one-call
+resolve (Rule 7).</p></div>
+<h2>Drift interaction</h2>
+<div class="lk-sec" data-cm="drift-interaction"><div class="box agree">
+Once projected, <b><code>accessPolicyType</code> + <code>accessPolicyNumber</code> join the
+<code>switchports</code> fingerprint.</b> They are intended config, human-changed, low-churn — exactly
+fingerprint material, and nowhere near the excluded observed-state class.
+<br><br>
+<b>What that catches that we miss today:</b> the kitchen port silently flipping <b>Sticky MAC allow list →
+Open</b> — the lockdown quietly removed — or <b>access → trunk</b>, a VLAN-hopping vector on the
+highest-value port in the store. Today <code>SW-PORTSEC</code> only counts policies network-wide at audit
+time. <b>Drift would name the port and the moment.</b>
+</div></div>
+<h2>Read-only guardrails — and the blast radius</h2>
+<div class="lk-sec" data-cm="read-only-guardrails-and-the"><div class="box stop">
+<b>The temptation here is structural, not hypothetical.</b> The new ACCESS POLICY cell will sit directly
+beside VLAN cells that <b>already carry write pencils</b> (<code>vlanedit</code>,
+<code>index.html:1571-1572</code>), backed by a <b>live write path</b>: <code>POST /meraki/port-vlan</code>
+(<code>Program.cs:859</code>) can re-VLAN this exact port today when the <code>set-vlan</code> lab feature
+is on. <code>woprGated</code> intercepts it and <code>RequireWritable</code> gates server-side — but the
+machinery exists, and it is one "just add a policy dropdown" away from writable.
+<br><br>
+<b>Blast radius, named so nobody has to learn it the hard way:</b> re-VLANing or policy-flipping the kitchen
+server's port takes <b>POS and KDS down mid-service</b>. And a MAC-allow-list write that omits the server's
+own MAC is a <b>lockout that survives a reboot</b>.
+</div>
+<p><b>Guardrails held:</b></p>
+<ul>
+<li>TYPE and ACCESS POLICY cells render with <b>no <code>data-target</code>, no button class</b> — nothing
+    the delegated click handlers can find.</li>
+<li><b>No new PUT fields.</b> <code>port-vlan</code>'s rollback switch (<code>Program.cs:842-849</code>)
+    stays ignorant of <code>type</code> and <code>accessPolicy*</code>, so a future write attempt has no
+    rollback path and fails loudly in review rather than quietly in production.</li>
+<li>Read-only is not a phase here. <b>For this port it is the posture.</b></li>
+</ul></div>
+<h2>The board — 19 pts</h2>
+<div class="lk-sec" data-cm="the-board-19-pts"><p><b>Items 1-3 (9 pts) are unconditional</b> and ship the screenshot ask regardless of the SM answer.
+Items 4-5 stay <span class="blk">⛔ ONLY-IF gated</span> — v1's First Move (the <code>sm-networks</code>
+catalog line) is <b>still unexecuted</b>; there is no SM string anywhere in <code>bridge/</code> today.</p>
+<table>
+<tr><th>Item</th><th>Pts</th><th>Cmd</th></tr>
+<tr><td>{SwitchPort record + portmap projection -- Enabled + AccessPolicyType + AccessPolicyNumber, update with, Meraki.cs:12,197 + Program.cs:583}</td><td class="pt">3</td><td>~u~t</td></tr>
+<tr><td>{TYPE + ACCESS POLICY read-only columns, add to, Network switch-port table (index.html:1531,1581)}</td><td class="pt">3</td><td>~a~t</td></tr>
+<tr><td>{accessPolicyType + Number, add to, Drift switchports fingerprint}</td><td class="pt">3</td><td>~a~t</td></tr>
+<tr><td>{IP-fallback join for wired hosts + matchedBy in the response, update with, /meraki/host-firewall} <span class="blk">⛔ SM First Move</span></td><td class="pt">5</td><td>~u~t</td></tr>
+<tr><td>{Host firewall? button, add to, portmap client cell (Windows-OS appearance gate, dashed can't-tell)} <span class="blk">⛔ SM First Move</span></td><td class="pt">5</td><td>~a~t</td></tr>
+</table></div>
+<h2>Pair reconcile (Rule 1)</h2>
+<div class="lk-sec" data-cm="pair-reconcile-rule-1"><div class="box agree">
+<b>Converged independently:</b> the SSID pane can never show a wired server, proven from the same
+<code>continue;</code> at <code>Program.cs:989</code> &middot; the port row is the right surface &middot;
+<code>type</code> is already projected and only needs a column &middot; <code>accessPolicyType</code> is
+absent from the record but read raw by the audit at <code>:1335</code> &middot; both asks land on one
+surface &middot; the network-side instrument argument gets <i>stronger</i> for a wired server, not weaker.
+</div>
+<div class="box corr">
+<b>Where the navigator beat the driver — adopted:</b>
+<ol>
+<li><b>The join genuinely breaks, with the verified filter set.</b> The driver suspected
+    <code>wifiMacs</code> was wrong for a wired host; the navigator confirmed there is <b>no ethernet-MAC
+    and no IP filter at all</b>, so no server-side join exists — and supplied the fix (unfiltered list +
+    client-side IP match + <code>matchedBy</code>).</li>
+<li><b>The <code>accessPolicyType</code> enum values</b>, and the judgement that only
+    <i>Custom access policy</i> needs the extra call — with the Rule-7 trigger for when to add it.</li>
+<li><b>The read-only guardrails and the blast radius.</b> The driver had "read-only for now" as a
+    constraint; the navigator found that the new cell lands beside <i>live write pencils</i> backed by a
+    working <code>POST /meraki/port-vlan</code>, and named what breaks: POS/KDS down mid-service, and a
+    MAC-allow-list lockout that survives reboot.</li>
+<li><b>The <code>fwName</code> correction to v1</b> — it may mean firmware, not firewall.</li>
+</ol>
+</div>
+<div class="box split">
+<b>Driver-only kept:</b> the <code>enabled</code> projection gap folded into the same one-line fix, with
+the reason it matters (STATUS is link state and will never reveal an administratively disabled port).
+<br><br>
+<b>No unresolved splits.</b>
+</div>
+
+<div class="box ask">
+<b>Still open, and item 4-5 wait on it:</b> does Mendo license Systems Manager, and is a vendor-owned
+kitchen server even enrollable? That may be a contractual question rather than a technical one. <b>The
+9 unconditional points do not wait</b> — they ship your screenshot either way.
+</div></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><ul class="dod">
+<li>&#10003; Paired per Rule 1 — concurrent independent passes, reconciled above</li>
+<li>&#10003; Navigator owns the verdict; four of its findings adopted, two of which correct v1</li>
+<li>&#10003; v1's errors corrected explicitly rather than quietly superseded (button surface, join key, <code>fwName</code>)</li>
+<li>&#10003; API capability verified against published docs; inference labelled as inference</li>
+<li>&#10003; Field gap verified against the live projection, not assumed</li>
+<li>&#10003; Read-only stated as posture, with the blast radius named and guardrails specified</li>
+<li>&#10003; Sized 3/5 only, one board, 19 pts, 9 of them unconditional</li>
+<li>&#10003; Rule 14 respected — no probes; topology and field gaps reasoned from code and docs</li>
+<li>&#10003; Design only — no code written</li>
+</ul></div>
+<footer>
+Generated 2026-08-04 00:10 &middot; v0 &middot; r1043 &middot; Argus &middot; ~d v2 paired (Opus + Fable5) &middot; next: the 9 unconditional pts
+</footer>
+
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"7242e1d0-a57d-4a75-8fa1-fe750d61967b"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

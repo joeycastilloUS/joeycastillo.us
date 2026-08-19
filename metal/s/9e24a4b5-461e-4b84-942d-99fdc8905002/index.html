@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan &mdash; DIA hit count</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 4px; }
+  .banner { display:inline-block; background:#3a2f10; color:#e8c95c; border:1px solid #5a4a20; border-radius:4px; padding:2px 10px; font-size:12px; margin:8px 0 4px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 14px 0; }
+  ul, ol { margin: 8px 0 8px 22px; }
+  li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 14px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .pass { color: #22c55e; font-weight: 600; }
+  .warn { color: #f59e0b; font-weight: 600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 40px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~p &mdash; DIA hit count</span>
+  <span class="pub">Published 2026-07-19 02:40 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/9e24a4b5-461e-4b84-942d-99fdc8905002/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Plan &mdash; DIA hit count</h1>
+<div class="banner">Plan &mdash; Awaiting Approval</div>
+<p style="color:#999;">Implement the design (<code>design/dia-hit-count</code>): per item, per DIA, a hit count; bump is the claim. Retire mendo-nps's guest-keyed dedup.</p>
+
+<h2>Intent</h2>
+<div class="lk-sec" data-cm="intent"><div class="section">
+  <p>Replace mendo-nps <code>gate_handled</code> (searches Zendesk for any prior "Follow&nbsp;Up" <code>requester:&lt;guest&gt;</code> &mdash; keyed on the guest forever, blind to which DIA acted) with a per-item per-DIA <strong>hit count</strong> the DIA owns. Ship it as the default idempotency primitive every DIA can lean on, with mendo-nps as the first consumer.</p>
+</div></div>
+<h2>Scope</h2>
+<div class="lk-sec" data-cm="scope"><div class="section">
+  <p><strong>In:</strong></p>
+  <ul>
+    <li>Jacket ops: <code>count-bump</code> (atomic claim, returns <code>created</code>) + <code>count-read</code> on a ticket.</li>
+    <li><code>nous.sm</code> binds for the two ops; a <code>pi_run</code> hits helper (DIA-id from the card).</li>
+    <li>A declared <code>dedup: mark | none</code> policy in the <code>.si</code> + biRT check.</li>
+    <li>Rewire the mendo-nps gate to bump-then-act-on-<code>created</code>; retire the guest search.</li>
+    <li>Prove live: returning guest, re-sweep, and two near-simultaneous sweeps send exactly once.</li>
+  </ul>
+  <p><strong>Out:</strong> cross-item dedup, count expiry/decay, retro-marking historical tickets, the doculink/DIA viewer, and rolling this onto DIAs beyond mendo (generalization follows once mendo proves it).</p>
+</div></div>
+<h2>Approach</h2>
+<div class="lk-sec" data-cm="approach"><div class="section">
+  <p>Bottom-up: land the durable atomic counter first (it's the load-bearing bit), then the blind runtime plumbing, then the intent, then prove and retire the old gate.</p>
+  <ul>
+    <li><strong>Counter as claim</strong> &mdash; the jacket owns an atomic per-DIA increment on the ticket that reports whether <em>this</em> caller won the bump (<code>created</code>). Everything else keys off that boolean.</li>
+    <li><strong>Runtime stays blind</strong> &mdash; <code>pi_run</code> passes the DIA-id (from the <code>.pi</code> <code>card:</code>) and reads back <code>created</code>; it never knows Zendesk.</li>
+    <li><strong>Intent declares the meaning</strong> &mdash; <code>dedup: mark</code> acts iff <code>created</code>; <code>dedup: none</code> ignores it. Missing = biRT refusal.</li>
+  </ul>
+</div></div>
+<h2>Phases</h2>
+<div class="lk-sec" data-cm="phases"><div class="section">
+  <table>
+    <tr><th>#</th><th>Phase</th><th>Proves</th></tr>
+    <tr><td>1</td><td>Jacket <code>count-bump</code>/<code>count-read</code> (atomic, returns <code>created</code>) + <code>nous.sm</code> binds</td><td>a ticket can carry a per-DIA count that increments atomically</td></tr>
+    <tr><td>2</td><td><code>pi_run</code> hits helper (DIA-id from card) + <code>dedup:</code> grammar + biRT check</td><td>the runtime bumps/reads blind; the intent declares its policy</td></tr>
+    <tr><td>3</td><td>Rewire mendo-nps gate to bump-as-claim; retire the guest search</td><td>mendo dedups on its own count, not the guest</td></tr>
+    <tr><td>4</td><td>Prove live (returning guest + re-sweep + concurrency), ship</td><td>exactly-once under the real 15s sweep race</td></tr>
+  </table>
+</div></div>
+<h2>Constraints</h2>
+<div class="lk-sec" data-cm="constraints"><div class="section">
+  <ul>
+    <li><strong>KISS</strong> &mdash; it's a counter. No policy engine, no framework, no versioned-scheme ceremony beyond what a counter needs.</li>
+    <li><strong>Language Boundary</strong> &mdash; the atomic increment + vendor storage live in the C# jacket; <code>pi_run</code> stays C99 business-blind.</li>
+    <li><strong>The bump is the claim</strong> &mdash; act only after winning the bump; never read-then-act (the sweep race is real).</li>
+    <li><strong>Sandbox until armed</strong> &mdash; jc arms prod.</li>
+  </ul>
+</div></div>
+<h2>Unknowns</h2>
+<div class="lk-sec" data-cm="unknowns"><div class="section">
+  <ul>
+    <li><span class="warn">Storage primitive.</span> Zendesk <em>tags</em> are a set (increment = remove-old + add-new, not atomic) and may normalize <code>:</code>/<code>=</code>. A per-DIA <em>custom ticket field</em> or a checkbox-audit may be the better home for an atomic counter. <strong>Resolve in Phase 1 by testing both.</strong></li>
+    <li><span class="warn">Atomic-claim mechanism.</span> Does Zendesk <code>safe_update</code> + a stale <code>updated_stamp</code> reliably 409 so exactly one concurrent bump wins? Needs a real two-writer test, not an assumption.</li>
+    <li><span class="warn">What counts as a "hit."</span> Bump at the gate (before we know if we'll send) marks an illness-exit ticket as hit=1 with no recovery &mdash; is that correct (we <em>did</em> act: escalated) or should the bump sit at <code>send</code>? Define "act" per unit before wiring Phase 3.</li>
+  </ul>
+</div></div>
+<h2>When To Revisit</h2>
+<div class="lk-sec" data-cm="when-to-revisit"><div class="section">
+  <ul>
+    <li>After mendo proves it live (first consumer) and <strong>before</strong> a second DIA adopts it &mdash; the storage primitive and the "what is a hit" semantics may need adjustment once a DIA with different act-semantics uses the same counter.</li>
+    <li>If Phase 1 finds Zendesk can't give an atomic claim on any primitive &mdash; fall back to keeping the claim in the bridge (a small keyed ledger) and revisit the "mark lives on the item" choice.</li>
+  </ul>
+</div></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><div class="section">
+  <ul>
+    <li><span class="pass">&#10003;</span> Plan committed (HTML) &middot; hash in telemetry &middot; index updated &middot; pushed</li>
+    <li><span class="pass">&#10003;</span> All seven required sections present (Intent, Scope, Approach, Phases, Constraints, Unknowns, When&nbsp;To&nbsp;Revisit)</li>
+    <li><span class="pass">&#10003;</span> Unknowns named honestly (storage primitive, atomic claim, hit semantics) &mdash; not an empty section</li>
+    <li><span class="pass">&#10003;</span> Informed by <code>design/dia-hit-count</code></li>
+  </ul>
+</div>
+
+</div></div>
+<footer>v0 &middot; r732 &middot; 2026-07-19 &middot; Be &middot; Argus &mdash; DIA hit count (plan v1)</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"9e24a4b5-461e-4b84-942d-99fdc8905002"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

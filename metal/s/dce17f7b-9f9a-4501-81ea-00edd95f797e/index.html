@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~p — Drift tab (KISS)</title>
+<style>
+  :root { --bg:#111111; --surface:#1A1A1A; --accent:#6FC3DF; --fg:#e8e8e8; --muted:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; background:#000; border-bottom:2px solid var(--accent);
+        padding:.7rem 1.2rem; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  nav .brand { color:var(--accent); font-weight:700; letter-spacing:.08em; }
+  nav .pub { color:var(--muted); font-size:.72rem; }
+  main { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; }
+  h1 { font-size:1.6rem; margin:.2rem 0 .3rem; }
+  h2 { font-size:1.08rem; margin:2rem 0 .5rem; color:var(--accent);
+       border-bottom:1px solid #2a2a2a; padding-bottom:.3rem; }
+  .sub { color:var(--muted); font-size:.84rem; margin-bottom:1rem; }
+  .banner { background:#332608; border:1px solid #5a4410; color:#ffd479; border-radius:6px;
+            padding:.55rem 1rem; font-weight:700; font-size:.85rem; margin:1rem 0 1.4rem; }
+  .box { background:var(--surface); border:1px solid #262626; border-radius:6px;
+         padding:.9rem 1.05rem; margin:.9rem 0; }
+  .verdict { border-left:3px solid var(--accent); }
+  .split { background:#1d1614; border-left:3px solid #e0a07b; }
+  .agree { background:#141c17; border-left:3px solid #7ddf8f; }
+  .ask { background:#14202a; border-left:3px solid #6FC3DF; }
+  table { width:100%; border-collapse:collapse; margin:.8rem 0; font-size:.8rem; }
+  th, td { text-align:left; padding:.4rem .55rem; border-bottom:1px solid #262626; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; font-size:.71rem; text-transform:uppercase; letter-spacing:.05em; }
+  code { background:#000; padding:.1rem .35rem; border-radius:3px; font-size:.85em; color:#bfe9f7; }
+  pre { background:#000; padding:.7rem .9rem; border-radius:5px; overflow-x:auto; font-size:.76rem; line-height:1.5; }
+  ul { padding-left:1.25rem; } li { margin:.25rem 0; }
+  ol { padding-left:1.25rem; } ol li { margin:.35rem 0; }
+  footer { color:var(--muted); font-size:.78rem; border-top:1px solid #262626;
+           margin-top:2.6rem; padding-top:1rem; }
+  .dod li { font-size:.83rem; }
+  .cut { color:#7ddf8f; font-weight:700; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-08-02 08:05 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/dce17f7b-9f9a-4501-81ea-00edd95f797e/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~p — Drift tab (KISS)</h1>
+<div class="sub">Argus &middot; acmedevUS/argus &middot; v0 &middot; r1024 &middot; 2026-08-02 &middot;
+<b>v2 — supersedes <code>2026-08-01-2210-plan-network-drift-detection.html</code></b><br>
+Paired per Kernel Rule 1 — Opus driver + Fable5 navigator, concurrent independent plans, reconciled at the end.</div>
+
+<div class="banner">Plan — Awaiting Approval &middot; 19 pts &middot; ONE board &middot; zero backend &middot; was 76 pts / 5 boards</div>
+
+<div class="box verdict">
+<b>The whole plan in one line:</b> the prototype you approved is working code, and the data it needs is
+<b>already deployed with zero consumers</b>. Wire one to the other. <b>No bridge change, no Firestore,
+no scheduler, no fingerprint engine, no deploy risk.</b>
+<br><br>
+The 76-pt version was building a machine to <i>detect</i> drift. You asked to <i>see</i> it.
+Meraki already keeps the log — we've been proxying it since July and never read it once.
+</div>
+
+<h2>Intent</h2>
+<div class="lk-sec" data-cm="intent"><p>Ship the Drift tab you approved, fed by <code>GET /meraki/changes</code>
+(<code>bridge/Program.cs:429</code> — 365 days of history, with <code>oldValue</code> and
+<code>newValue</code> already in the payload) joined against <code>GET /meraki/apirequests</code>
+(<code>:465</code> — the API-vs-dashboard oracle). Both are live. Both have <b>zero consumers</b>.
+Detection-by-snapshot becomes v2, built when evidence demands it rather than on spec.</p></div>
+<h2>Scope</h2>
+<div class="lk-sec" data-cm="scope"><p><b>In:</b> the Drift tab in the Meraki app — fifth sidebar slot with a count badge, deep link
+<code>#meraki/drift/&lt;id&gt;</code>, the prototype's cards, chips, 30-day density strip,
+expand-in-place Why panel, diff renderers, template fan-out grouping; client-side attribution join;
+Accept rev 1, browser-local; honesty rails.</p>
+<p><b>Out — and this is the plan:</b></p>
+<table>
+<tr><th>76-pt piece</th><th>Does your ask need it?</th><th></th></tr>
+<tr><td>Canonicalisers + sha256 + <code>canonVer</code></td><td>No — the feed already carries old→new</td><td class="cut">CUT</td></tr>
+<tr><td><code>drift_baseline</code> / <code>drift_state</code> / <code>drift_events</code> / <code>drift_cursor</code></td><td>No — attribute at render</td><td class="cut">CUT</td></tr>
+<tr><td>Cloud Scheduler + sweep tick + 24h floor</td><td>No — fetch on tab open, like every other tab</td><td class="cut">CUT</td></tr>
+<tr><td><code>bridge/Drift.cs</code> + all <code>/drift/*</code> routes</td><td>No</td><td class="cut">CUT</td></tr>
+<tr><td>Template subject sweep <i>(was the top risk item)</i></td><td>No — feed rows get fan-out grouping</td><td class="cut">CUT</td></tr>
+<tr><td>Server-side Accept + <code>woprGated</code> change</td><td>No — browser-local, precedent already shipped</td><td class="cut">CUT</td></tr>
+<tr><td>Cloud Build stale-trigger fix</td><td>Only gates <i>bridge</i> deploys — this plan makes none</td><td class="cut">→ v2</td></tr>
+<tr><td><b>The tab, badges, diffs, Accept UX</b></td><td><b>Yes — this IS the ask, and it's already written</b></td><td><b>KEEP</b></td></tr>
+</table></div>
+<h2>Approach</h2>
+<div class="lk-sec" data-cm="approach"><div class="box agree">
+<b>v1 ships with no bridge changes at all — both passes verified this independently.</b>
+Both endpoints are live. <code>web/_worker.js:11</code> already proxies <code>/meraki/*</code>
+first-party. The console's <code>api()</code> helper (<code>index.html:827</code>) already calls
+<code>/meraki/*</code> exactly this way with credentials. <b>The only file that changes is
+<code>web/app/index.html</code></b>, deployed by the existing Cloudflare Pages CI on push to main.
+<br><br>
+<b>The stale Cloud Build trigger on <code>acmedevUS/meraki-bridge</code> is never exercised.</b>
+Deploy risk collapses to "did Pages build." Time to live: one push.
+</div>
+
+<ol>
+<li><b>Port the prototype.</b> Its <code>&lt;script&gt;</code> block — <code>render()</code>,
+    <code>card()</code>, <code>strip()</code>, the <code>ATT</code> map, filter and accept handlers —
+    plus the <code>#screen</code>-scoped CSS, moved into the shipped tab machinery:
+    <code>APPS.meraki.tabs</code>, the sidebar <code>TABS</code> entry, the dispatch case,
+    <code>ALL_PANES</code>, <code>viewName()</code>, the <code>T</code> map, the 3-segment deep link.
+    <b>The CSS was lifted <i>from</i> the console, so the port is mostly deletion.</b></li>
+<li><b>Attribution at render.</b> Fetch changes (30d) + apiRequests once on tab open. Join at ±60s by
+    admin. UserAgent <code>meraki-bridge/0 (acmedev)</code> (<code>Meraki.cs:31</code>) → <b>ARGUS</b>
+    (solid, provably us). Any other matching request → <b>API</b> (solid; show admin, sourceIp, UA).
+    No matching request → <b>DASHBOARD</b> (dashed, inferred by absence). Older than the 31-day API
+    window → <b>UNKNOWN</b>, "window expired." The solid-vs-dashed law survives intact.</li>
+<li><b>Accept means "reviewed," not "re-baselined."</b> With no baseline there is nothing to re-bless.
+    localStorage set, keyed by a deterministic fingerprint of the change row. Two-step arm→confirm kept
+    exactly as approved; only the hint copy changes. <b>Precedent already shipped in this repo:</b>
+    Case Patterns judgements are <i>"rev 1, browser-local."</i></li>
+<li><b>Honesty rails</b> carry the blind spot — see below.</li>
+</ol></div>
+<h2>Phases</h2>
+<div class="lk-sec" data-cm="phases"><p>One phase. One board. Nothing upstream to build.
+<b>Exit: you open argus.com.ai → Meraki → Drift and see real Mendo changes with real attributions.</b></p></div>
+<h2>Constraints</h2>
+<div class="lk-sec" data-cm="constraints"><ul>
+<li><b>Zero bridge changes.</b> Any item drifting toward <code>bridge/</code> stops work (Rule 12) —
+    that is v2 territory, and v2 is gated by the Cloud Build trigger fix.</li>
+<li>No new mutating <code>/meraki/*</code> route, so <code>woprGated</code> (<code>:849</code>) is
+    untouched. The tab is read-only end to end.</li>
+<li><b>The "Run sweep now" button and the sweep-stalled state do not ship.</b> There is no sweep;
+    shipping the button would be a lie. Freshness becomes a "last fetched" stamp plus the Watch-style
+    error bar.</li>
+<li>Prototype fidelity: colours, borders, two-step Accept, evidence-before-diff order all keep the
+    approved values. Deviations only where the missing sweep forces them.</li>
+<li>No browser CI exists — each item's <code>~t</code> is a written manual verification against the
+    live console, plus fixture-array render checks where possible. Said plainly, not pretended away.</li>
+</ul></div>
+<h2>Unknowns</h2>
+<div class="lk-sec" data-cm="unknowns"><ol>
+<li><b>Serialized shape of <code>oldValue</code>/<code>newValue</code></b> for structured settings
+    (L3 rules, allowed-VLAN lists). If JSON, the set-diff and ordered-move renderers work; if prose
+    strings, we fall back to a plain was→now. Honest either way. One real fetch answers it.</li>
+<li><b>How template pushes appear in the feed</b> — one template row, N network rows, or nothing.
+    Determines how often fan-out grouping fires. The heuristic is safe under all three.</li>
+<li><b>Clock agreement between the two logs.</b> ±60s is a guess — a constant to tune, not an
+    architecture risk, since DASHBOARD is already dashed and inferred.</li>
+<li><b>Real 30-day change volume</b> against the 1000-row single-page cap. Almost certainly fine at
+    five networks; the truncation notice covers the tail.</li>
+</ol></div>
+<h2>When To Revisit</h2>
+<div class="lk-sec" data-cm="when-to-revisit"><div class="box verdict">
+<b>The v2 trigger, precisely: the first time a real config change is discovered — via the Meraki
+dashboard, an audit run, or an incident — that the Drift tab never showed.</b>
+<br><br>
+That is the feed's ~20-25% miss, or presence drift, showing up as something you actually felt instead of
+a statistic in a June inspect. On that day the snapshot engine earns its points — and <b>it is already
+estimated and on the shelf</b> (boards D1+D2 of the superseded plan, ~36 pts), with the Cloud Build
+trigger fix as its mandatory first item.
+</div>
+<p>Secondary triggers: Accept needs to be shared across operators or machines → server-side Accept
+&middot; multi-tenant growth breaks the density strip &middot; the <i>unexplained</i> chip count climbs
+week over week.</p></div>
+<h2>What we give up — and how the UI admits it</h2>
+<div class="lk-sec" data-cm="what-we-give-up-and"><div class="box split">
+<ul>
+<li><b>EXTERNAL disappears as a badge.</b> A feed-only view cannot show a change the feed never
+    recorded — the amber EXTERNAL card in the prototype was produced by the snapshot backstop, which
+    does not exist in v1. Keeping the badge without the detector would be exactly the dishonesty the
+    <code>~laf</code> forbade. <b>v1 ships four categories: ARGUS · API · DASHBOARD · UNKNOWN.</b></li>
+<li><b>Presence drift stays invisible</b> — a device added or removed never appears in the feed.</li>
+<li><b>Attribution is render-time, not immutable.</b> A change attributed correctly today rolls to
+    UNKNOWN once the 31-day API window passes it — and the card explains that at the moment it happens.</li>
+<li><b>Accept is per-browser.</b> The accepted chip says "reviewed on this browser."</li>
+</ul>
+<b>The admission, in the lead and the empty state:</b> <i>"Sourced from Meraki's change feed, which
+misses roughly 20-25% of changes and never records device add/remove. What you see is what Meraki
+recorded — not a guarantee of everything that happened."</i>
+<br><br>
+And the empty state reads <b>"No recorded changes,"</b> never "No drift."
+</div></div>
+<h2>Traps</h2>
+<div class="lk-sec" data-cm="traps"><div class="box split">
+<ol>
+<li><b>The apiRequests 1000-row cap silently poisons DASHBOARD.</b> DASHBOARD is inferred from the
+    <i>absence</i> of a matching request — but if the request log was truncated, absence means nothing.
+    <b>This is the one trap that produces confidently wrong answers.</b> The degrade rule — truncated ⇒
+    absence verdicts become UNKNOWN "log truncated" — is baked into the join item, not left as polish.
+    <i>Navigator's catch.</i></li>
+<li><b>Feed rows have no id.</b> Accept keys on a content fingerprint; built sloppily (index, truncated
+    ts) accepted items silently un-accept on the next fetch. <i>Navigator's catch.</i></li>
+<li><b>Same-admin-same-minute ambiguity.</b> An admin running a script while clicking the dashboard can
+    be mis-joined. The fix is transparency, not cleverness: the Why panel shows the matched request
+    verbatim so you can overrule the machine with your own eyes.</li>
+<li><b>The mockup's sweep vocabulary leaks a machine that doesn't exist</b> — "re-baselines," "backstop
+    sweep," "next sweep in 12 minutes." Every string gets audited during the port; the honesty-rails
+    item owns it. <i>Navigator's catch.</i></li>
+<li><b><code>/meraki/changes</code> changes response shape when <code>q</code> is set</b> —
+    <code>{count, changes}</code> wrapped vs a raw array (<code>Program.cs:445-456</code>). Handle both,
+    or never pass <code>q</code>. <i>Navigator's catch.</i></li>
+<li><b>Scope creep back into the bridge</b> ("just one small cached endpoint…") re-arms the stale-trigger
+    landmine this whole path exists to avoid. Constraint #1 is the tripwire.</li>
+</ol>
+</div></div>
+<h2>Pair reconcile (Rule 1)</h2>
+<div class="lk-sec" data-cm="pair-reconcile-rule-1"><div class="box agree">
+<b>Converged independently, without coordinating:</b> v1 is frontend-only &middot; no bridge deploy, so
+the CI-fork hazard is sidestepped entirely &middot; the change feed's own <code>oldValue</code>/<code>newValue</code>
+replaces the whole fingerprint engine &middot; ARGUS attribution is direct via the
+<code>meraki-bridge/0</code> User-Agent &middot; Accept is browser-local on the Case Patterns precedent
+&middot; EXTERNAL cannot ship without a detector &middot; one board, 18–19 points &middot; the
+<code>oldValue</code> shape is the main fidelity risk against the approved mockup.
+<br><br>
+Two passes, no contact, same answer. That convergence is the strongest signal in this plan.
+</div>
+<div class="box split">
+<b>Navigator wins adopted:</b> the truncation-poisons-DASHBOARD degrade rule &middot; fingerprint-keyed
+Accept &middot; the <code>q</code>-parameter response-shape gotcha &middot; cutting the "Run sweep now"
+button and auditing every sweep-flavoured string &middot; "No recorded changes," never "No drift."
+&middot; keeping the button labelled <b>Accept</b> and changing only the hint copy, rather than the
+driver's proposed rename to "Acknowledge" — less churn against a design you already approved.
+<br><br>
+<b>Board structure:</b> the driver's four items became the navigator's five — honesty rails split out as
+its own item, which the copy-audit finding fully justifies.
+</div>
+<div class="box ask">
+<b>One thing to confirm, because you loved the mockup:</b> the <b>EXTERNAL</b> badge and the
+<b>sweep-stalled</b> state come out of v1. They were both produced by the snapshot engine. Everything
+else you saw — the timeline strip, filter chips, cards, solid/dashed attribution, the Why panel,
+before→after, two-step Accept, the empty state — ships. <b>Say the word if you want EXTERNAL kept as a
+disabled/greyed placeholder</b> rather than removed; the honest default is to remove it.
+</div></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><ul class="dod">
+<li>&#10003; Supersedes the 76-pt v1 plan; that plan's D1+D2 remain on the shelf as the v2 engine</li>
+<li>&#10003; Paired per Rule 1 — concurrent independent plans, reconciled above</li>
+<li>&#10003; Navigator owns the verdict; five of its catches adopted, including one correctness trap</li>
+<li>&#10003; All 7 required sections in order, Unknowns non-empty and specific (Rule 7)</li>
+<li>&#10003; When-To-Revisit names a concrete operator-felt signal, not a date</li>
+<li>&#10003; Leverages the shipped stack — two live routes with zero consumers, the existing tab machinery, an in-repo browser-local precedent</li>
+<li>&#10003; What is lost is named, and the UI is specified to admit it</li>
+<li>&#10003; Rule 14 respected — no liveness probes run</li>
+<li>&#10003; Committed to the project repo, not metal-console (Rule 3)</li>
+<li>&#10003; Published + externally reachable at its cap-URL (Rule 10)</li>
+</ul></div>
+<footer>
+Generated 2026-08-02 08:05 &middot; v0 &middot; r1024 &middot; Argus &middot; ~p paired (Opus + Fable5) &middot; next: ~e
+</footer>
+
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"dce17f7b-9f9a-4501-81ea-00edd95f797e"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

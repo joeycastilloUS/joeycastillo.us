@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~i — The Zendesk App Seam</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;position:sticky;top:0;z-index:9;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:800px;margin:0 auto;padding:26px 22px 70px}
+ h1{font-size:25px;margin:14px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:15px;color:#6FC3DF;margin:34px 0 10px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:7px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 6px}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 18px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:15px 17px;margin:13px 0}
+ .card.no{border-left:3px solid #c9463f}.card.yes{border-left:3px solid #3aa06a}
+ .card.warn{border-left:3px solid #c9a24b}.card.info{border-left:3px solid #3a6a90}
+ .card h3{margin:0 0 7px;font-size:15px;color:#fff}
+ code,.mono{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 6px;border-radius:4px}
+ pre{background:#0a0a0a;border:1px solid #262626;border-radius:7px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#c8d6dd;line-height:1.55}
+ table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:8px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:9px;vertical-align:top;color:#c5d0d6}
+ td.k{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;white-space:nowrap}
+ .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.05em}
+ .t-no{background:#2a1210;color:#ff9b93;border:1px solid #5a2a26}
+ .t-yes{background:#0f2318;color:#7CFFB2;border:1px solid #2a5a38}
+ .t-warn{background:#1a140f;color:#f0c674;border:1px solid #4a3a20}
+ ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+ .foot{margin-top:44px;border-top:1px solid #222;padding-top:15px;color:#5f6f77;font-size:11.5px}
+ .dod li{color:#b9c6cd;font-size:13px}
+</style></head><body>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">~i &middot; inspect</span>
+<span class="p">Published 2026-07-20 21:15 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/a3c858dd-dfb8-4587-a2db-0e5040591d76/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>&ldquo;The Zendesk app&rdquo; is not a Zendesk app</h1>
+<p class="lede">Inspecting the seam for hosting <b>Manage the Triage</b> inside Argus.</p>
+<p class="sub">Paired inspection &mdash; two independent passes (Opus driver / Fable navigator), reconciled.
+Working copy verified fresh: <code>efabceb</code>, 0 ahead / 0 behind <code>origin/main</code>.</p>
+
+<h2>The headline</h2>
+<div class="card no">
+<h3><span class="tag t-no">DOES NOT EXIST</span> &nbsp; A Zendesk platform app</h3>
+<p>No <code>manifest.json</code> anywhere in <code>C:\argus</code>. Zero hits for <code>ZAFClient</code>,
+<code>zendesk_app</code>, <code>zaf_sdk</code>, <code>ticket_sidebar</code>, <code>nav_bar</code>, <code>zcli</code>.
+No scaffold, no stub, and <b>no design doc proposing one</b>. Nothing Argus owns runs inside the Zendesk agent UI.</p>
+<p>Both passes reached this independently. The only near-miss is the substring <code>zCli</code> inside
+<code>airbyte-bridge\PhilzClient.cs</code> &mdash; an Airbyte client, unrelated.</p>
+</div>
+
+<div class="card yes">
+<h3><span class="tag t-yes">EXISTS</span> &nbsp; The Zendesk app <i>inside the Argus console</i></h3>
+<p><code>web/app/index.html:732</code> &mdash; one of six apps in an app-switcher, and the default landing app:</p>
+<pre>zendesk: { label:"Zendesk", tag:"Support &middot; corpus + live &middot; read-only",
+  tabs:["focus","zfind","zprogram","zmatches","zpatterns","zshape",
+        "zload","comments","templates","zdaudit","apibrowser"], source:"zendesk" }</pre>
+<p>That is what &ldquo;the Zendesk app part&rdquo; means here. Adding <b>Manage the Triage</b> to it is
+<b>three edits in one file</b>: a string in the <code>tabs</code> array, a <code>tabHtml</code> entry
+(<code>:5733</code>), and a <code>#pane-*</code> render block. Exactly how <code>templates</code> and
+<code>zdaudit</code> were added &mdash; the precedent is written down in
+<code>be/builds/2026-07-07-2259-build-templates-tab-first-move.html:35</code>.</p>
+<p>No new deploy surface. It ships as static Cloudflare Pages assets.</p>
+</div>
+
+<h2>What I see, in order of what it costs you</h2>
+
+<table>
+<tr><th>Finding</th><th>State</th><th>Evidence</th></tr>
+<tr><td class="k">Zendesk ZAF app</td><td><span class="tag t-no">NONE</span></td><td>repo-wide, zero markers</td></tr>
+<tr><td class="k">Console Zendesk app</td><td><span class="tag t-yes">LIVE</span></td><td><code>web/app/index.html:732</code></td></tr>
+<tr><td class="k">Tab-add pattern</td><td><span class="tag t-yes">PROVEN</span></td><td><code>:732</code> + <code>:5733</code> + pane</td></tr>
+<tr><td class="k">Zendesk API client</td><td><span class="tag t-warn">OTHER REPO</span></td><td><code>acmedevUS/zendesk-bridge</code>; <code>bridge/Program.cs:132</code></td></tr>
+<tr><td class="k">Settings persistence</td><td><span class="tag t-yes">EXISTS</span></td><td><code>/settings</code> &harr; Firestore <code>settings/argus</code></td></tr>
+<tr><td class="k">Manager can log in</td><td><span class="tag t-no">NO PATH</span></td><td><code>providers.json</code> = slack, google only</td></tr>
+<tr><td class="k">Applier (writes the .pi)</td><td><span class="tag t-no">NOT BUILT</span></td><td>nothing writes; staging is aspirational</td></tr>
+</table>
+
+<h2>The seam that already runs</h2>
+<div class="card info">
+<p>The navigator found the piece worth building on &mdash; Argus already has a config
+round-trip in production:</p>
+<pre>web/app/index.html:1049  settingsKeys() / settingsBlob() / applySettings()
+web/app/index.html:1056  loadSettings()  &rarr; GET  /settings
+web/app/index.html:1057  saveSettings()  &rarr; POST /settings
+bridge/Program.cs:648,656                &rarr; Firestore named DB 'argus', doc settings/argus
+web/_worker.js:10-11     /settings already in the first-party PROXY list</pre>
+<p>The server <b>re-reads the doc as gate authority</b> (<code>Program.cs:673-682</code>) rather than
+trusting the client &mdash; which is the shape the triage config needs anyway. This is the shortest
+honest persistence path, and it is already deployed.</p>
+</div>
+
+<h2>Three things that will bite, named now</h2>
+
+<div class="card warn">
+<h3>1. The manager cannot get in &mdash; and the workaround overshares</h3>
+<p>Console auth is a <b>shared operator password</b> (<code>PW</code> = BRIDGE_TOKEN, sent as a bearer on
+every call, <code>:815</code>) plus a hand-kept Crew allow-list (<code>bridge/Auth.cs:79-111</code>).
+Handing the Mendo support manager that password hands him <b>all six apps and every tab</b> &mdash;
+Meraki, Salesforce, GCP cost, the lot.</p>
+<p>&ldquo;Sign in with Zendesk&rdquo; was designed for exactly this
+(<code>be/designs/2026-07-08-2151-design-zendesk-user-login-fable5.html</code>, identity key
+<code>zendesk:&lt;subdomain&gt;:&lt;userid&gt;</code>, role &isin; {agent, admin}, fail-closed) and is
+<b>unbuilt</b> &mdash; <code>bridge/providers.json</code> holds only <code>slack</code> and
+<code>google</code>. Its own DoD closes &ldquo;awaiting operator call on policy pick.&rdquo; That call is still open.</p>
+</div>
+
+<div class="card warn">
+<h3>2. Porting the HTML alone ships a lie</h3>
+<p>The tab renders real values and real allowed sets, but <b>nothing writes</b>. Today that is honest
+because the file is visibly a dev tool. Inside the console it becomes a surface that looks editable to a
+manager and silently isn't &mdash; strictly worse than the current state. The applier
+(validate &rarr; write <code>.pi</code> &rarr; deploy sandbox) is the actual build, and the safety argument in
+the manager-console proposal depends entirely on it existing.</p>
+<p>Second-order: the config is currently a <b>build-time snapshot</b> baked from the <code>.pi</code> at
+publish. In the console it must read the intent <b>live</b>, or it will drift silently the first time the
+<code>.pi</code> changes.</p>
+</div>
+
+<div class="card warn">
+<h3>3. Two hazards each pass caught alone</h3>
+<ul>
+<li><b>Driver only:</b> <code>be/tools/bridge-postman.html</code> embeds a <b>Firestore API key in
+client-side source</b> (the comment thread). Contained while it is a local tool; it becomes real exposure
+the moment that content is hosted in the console. Strip the comment engine on port.</li>
+<li><b>Navigator only:</b> <code>bridge/</code> is a <b>working copy forked from canonical
+<code>acmedevUS/meraki-bridge</code></b> (<code>ARCHITECTURE.md:29-34</code>). Any <code>/settings</code>
+change must reconcile upstream first or it gets clobbered by CI.</li>
+</ul>
+<p>Neither pass caught both. That is the reconcile earning its keep.</p>
+</div>
+
+<h2>Stale record, flagged not fixed</h2>
+<ul>
+<li>The 2026-07-08 login design cites <code>web/index.html:1700</code> &mdash; the console moved to
+<code>web/app/</code>; <code>ZBRIDGE</code> now lives at <code>:1869</code>.</li>
+<li>The 2026-07-10 brief says &ldquo;the two Argus Zendesk apps&rdquo; &mdash; since merged into one
+(<code>:729-731</code>).</li>
+<li><code>ZRAW</code> is commented &ldquo;a clearly-marked PLACEHOLDER&rdquo; (<code>:4676</code>) yet
+carries a filled Cloud Run URL.</li>
+<li><code>mendo-app-survey-autoresponse.pi</code> retired 2026-07-15, still present.</li>
+</ul>
+
+<h2>Open, unverified</h2>
+<p>Whether <code>acmedevUS/zendesk-bridge</code> exposes a <code>/settings</code> pair is
+<b>not knowable from this repo</b> &mdash; its source is out-of-tree. If the config should live with the
+Zendesk service rather than in the shared <code>settings/argus</code> doc, that repo has to be opened
+before the path is chosen. Marked as inference, not evidence.</p>
+
+<h2>What I'd do first</h2>
+<div class="card yes">
+<p><b>Don't port the tab yet.</b> The cheap half (three edits, one file) is not the risky half. Land the
+applier against the <code>/settings</code> seam first &mdash; then the tab is a thin render over something
+that actually works, and it can go in behind the operator password while the Zendesk login question stays
+open. That also answers &ldquo;who gets to change what&rdquo; server-side, where it belongs, instead of with
+a <code>disabled</code> attribute the browser controls.</p>
+</div>
+
+<h2>Definition of Done</h2>
+<ul class="dod">
+<li>&#10003; A-D-D verified first (<code>ARCHITECTURE.md</code> read; no Argus spec in <code>a-d-d/</code> &mdash; architecture lives at repo root)</li>
+<li>&#10003; Paired &mdash; two independent passes, navigator owns the verdict, both divergences surfaced</li>
+<li>&#10003; Code read fresh (<code>git fetch</code>; 0 ahead / 0 behind <code>origin/main</code> at <code>efabceb</code>)</li>
+<li>&#10003; Every claim carries file:line evidence</li>
+<li>&#10003; Exists vs. described-only distinguished throughout</li>
+<li>&#10003; Inference marked as inference (zendesk-bridge <code>/settings</code>)</li>
+<li>&#10003; Read-only &mdash; no file modified by this inspection</li>
+<li>&#10003; Published to its cap-URL, HTTP 200 externally verified</li>
+</ul>
+
+<div class="foot">
+Generated 2026-07-20 21:15 &middot; v0 &middot; ~i &middot; inspect<br>
+Sources: <code>web/app/index.html</code>, <code>web/_worker.js</code>, <code>bridge/Program.cs</code>,
+<code>bridge/Auth.cs</code>, <code>bridge/providers.json</code>, <code>ARCHITECTURE.md</code>,
+<code>be/designs/2026-07-08-2151</code>, <code>be/designs/2026-07-20-1758</code>,
+<code>be/builds/2026-07-07-2259</code>
+</div>
+</div></body></html>

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIA Spec — How to Generate a Card</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;position:sticky;top:0;z-index:9;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:860px;margin:0 auto;padding:8px 22px 70px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:40px}
+ h1{font-size:25px;margin:20px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:15px;color:#6FC3DF;margin:34px 0 10px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:7px}
+ h3{font-size:15px;color:#fff;margin:20px 0 7px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 6px}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 18px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:15px 17px;margin:13px 0}
+ .card.yes{border-left:3px solid #3aa06a}.card.no{border-left:3px solid #c9463f}
+ .card.warn{border-left:3px solid #c9a24b}.card.info{border-left:3px solid #3a6a90}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 6px;border-radius:4px}
+ pre{background:#0a0a0a;border:1px solid #262626;border-radius:7px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#c8d6dd;line-height:1.6}
+ pre .c{color:#6a7a82}.pre .k{color:#6FC3DF}
+ table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:8px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:8px 9px;color:#c5d0d6;vertical-align:top}
+ td.k{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;white-space:nowrap}
+ ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+ ol{margin:8px 0;padding-left:22px}
+ .foot{margin-top:30px;border-top:1px solid #222;padding-top:15px;color:#5f6f77;font-size:11.5px}
+ .big{font-size:18px;color:#fff;font-weight:600;margin:0 0 6px}
+ .tok{color:#7CFFB2;font-weight:700}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">doculink &middot; DIA spec</span>
+<span class="p">2026-07-21 17:00 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/f2297cd2-aab4-4465-8558-3bbff6308a24/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>DIA Spec &mdash; how to generate a card</h1>
+<p class="lede">Everything a session needs to write a Salesforce DIA that <code>pi_run</code> will load
+without refusing it. Grammar, the per-demand allow/ignore/options contract, and the checks that fail you.</p>
+<p class="sub">This is the spec, not an example to copy blindly. Every rule below is what the C parser and
+<code>dia_verify</code> actually enforce &mdash; matched against <code>dia.c</code>, not from memory.</p>
+
+<h2>0 &middot; What you produce</h2>
+<div class="lk-sec" data-cm="0-what-you-produce"><div class="card info">
+<p>A DIA card is a <b>cortex</b> of three files that share a base name:</p>
+<table>
+<tr><th>File</th><th>Is</th><th>Who writes it</th></tr>
+<tr><td class="k">&lt;card&gt;.pi</td><td>THE DEMAND and THE WORDS &mdash; what must happen and what we say. Human/operator intent.</td><td><b>You generate this.</b></td></tr>
+<tr><td class="k">&lt;card&gt;.si</td><td>THE PLAN &mdash; the units that enact each demand, each bound to one C micro-op.</td><td><b>You generate this.</b></td></tr>
+<tr><td class="k">nous.sm</td><td>THE SKILLS catalog &mdash; the C micro-ops available, with their in/out signatures.</td><td><b>You already have this.</b> You bind to it; you do not write it.</td></tr>
+</table>
+<p>The two you generate must agree with each other and with the <code>.sm</code>, or the card is refused
+at load. That agreement &mdash; called <b>biRT</b> &mdash; is the whole point of Section 4.</p>
+<p class="sub">Naming: the three files sit in one directory and share the base name exactly (e.g.
+<code>sfdc-lead-triage.pi</code> / <code>.si</code>, alongside <code>nous.sm</code>).</p>
+</div></div>
+<h2>1 &middot; The .pi &mdash; demand and words</h2>
+<div class="lk-sec" data-cm="1-the-pi-demand-and"><p>Header lines, then sections opened by exact tokens. The parser opens a section only on these literal
+starts: <span class="tok">demand:</span> &nbsp; <span class="tok">words &lt;name&gt;:</span> &nbsp;
+<span class="tok">config:</span> &nbsp; and the header <span class="tok">card:</span>.
+<code>owner:</code> and <code>env:</code> are frontmatter, not section tokens (see the note below the example).</p>
+
+<pre><span class="c"># sfdc-lead-triage.pi   ·   PURE INTENT   ·   owner: jc   ·   env: sandbox</span>
+card:   sfdc-lead-triage
+owner:  jc
+env:    sandbox
+
+<span class="c"># ---- THE DEMAND -----------------------------------------------------------</span>
+demand:
+
+  D1   Every inbound lead is read and understood before it is routed or scored.
+
+  D2   A lead already carrying our handled marker is skipped — we have processed it.
+
+  D3   Score the lead's fit from its own fields, never from an enriched guess.
+
+     allow:  score.model = vertex/gemini-2.5-pro, vertex/gemini-2.5-flash
+     allow:  score.model requires="BYOK — data leaves the Google boundary" =
+             byok/gpt-5.5, byok/o3
+     owner:  score.model = it
+
+  D4   Route a qualified lead to the owning team; leave an unqualified one for nurture.
+
+     allow:  route.threshold = 60, 70, 80
+     owner:  route.threshold = ops
+
+  D5   Never write to a lead flagged Do-Not-Contact.
+
+     ignore: lead.status = do_not_contact
+     ignore: lead.region = EU  until=2026-09-01
+
+<span class="c"># ---- THE WORDS  (what we say; sealed by hash at load) ---------------------</span>
+words route-note:
+  | Lead {lead_id} scored {score} — routing to {team}.
+  | Basis: {reason}
+
+<span class="c"># ---- CONFIG  (declared values pi_run hands to the jackets) ----------------</span>
+config:
+  crm.system:  salesforce  "SFDC prod org"   <span class="c"># D1</span></pre>
+
+<h3>The rules the parser actually applies</h3>
+<ul>
+<li>A <b>demand line starts with <code>D</code> then a digit</b> (<code>D1</code>, <code>D2</code>&hellip;).
+Any indented line under it that does <i>not</i> start <code>D&lt;digit&gt;</code> is <b>continuation of that
+demand</b> &mdash; including the <code>allow:</code>, <code>ignore:</code>, <code>owner:</code> lines.</li>
+<li>A <b>words block</b> is <code>words &lt;name&gt;:</code> followed by pipe-prefixed lines
+(<code>&nbsp;&nbsp;| text</code>). The <code>| </code> prefix is stripped; <code>{placeholders}</code> are
+filled at run time from ledger keys.</li>
+<li><b>config</b> lines are <code>key: value "label"  # D#</code>. These are values pi_run hands to the C
+jackets &mdash; and <b>the trailing <code>#&nbsp;D#</code> comment is load-bearing</b>: it is how a config
+line <i>realizes</i> a demand (Section 4, coverage-down). A demand satisfied by a fixed config value, not a
+unit, cites itself in that comment. The same is true of a header line like <code>env: sandbox  # D14</code>.</li>
+</ul>
+<p class="sub"><code>owner:</code> and <code>env:</code> are <b>not</b> section tokens &mdash; the parser
+only opens sections on <code>demand:</code>, <code>config:</code>, <code>words&nbsp;</code>, and the header
+<code>card:</code>. <code>env:</code> is read as frontmatter; a top-level <code>owner:</code> is ignored by
+the runtime. Do not expect a section to start on them.</p>
+<div class="card warn">
+<p><b>Keep each demand tight.</b> The runtime holds a demand's full text &mdash; the D# line, its
+continuation, and its allow/ignore/owner lines &mdash; in a fixed <b>512-byte</b> buffer. Past that it
+<b>truncates silently</b>. The reference card's D4 allow list alone exceeds 512 bytes. Write demands as one
+or two sentences and let the allow lists be the structured part.</p>
+<p><b>Indentation is structural.</b> Every allow/ignore/owner line must be <i>indented</i> under its
+demand. An unindented, non-token line inside <code>demand:</code> ends the section &mdash; and every
+indented demand line after it is <b>silently dropped</b>. One stray flush-left line can quietly delete
+half your demands.</p>
+</div></div>
+<h2>2 &middot; The allow / ignore / options contract &mdash; per D#</h2>
+<div class="lk-sec" data-cm="2-the-allow-ignore-options"><p>This is the part the operator asked for by name: <b>every demand carries its allows, its ignores, and
+the options that are configurable under it.</b> Statements indent under the demand they belong to.</p>
+<table>
+<tr><th>Statement</th><th>Means</th><th>Shape</th></tr>
+<tr><td class="k">allow: KEY = a, b, c</td><td>the <b>permitted value set</b> for a setting this demand governs</td><td>comma list</td></tr>
+<tr><td class="k">allow: KEY requires="…" = …</td><td>a <b>gated subset</b> &mdash; permitted only with a human step; the <code>requires=</code> text is the reason, shown verbatim</td><td>attribute + comma list</td></tr>
+<tr><td class="k">ignore: KEY = VALUE</td><td>an <b>intake skip</b> &mdash; do not act when this matches</td><td>exact value</td></tr>
+<tr><td class="k">ignore: KEY = VALUE until=YYYY-MM-DD</td><td>a <b>dated</b> skip &mdash; inert after the date</td><td>value + until</td></tr>
+<tr><td class="k">owner: KEY = ops | it</td><td>who may change it &mdash; <b>see the honesty box: no code reads this line today</b></td><td>one role</td></tr>
+</table>
+<p><b>The &ldquo;options&rdquo; for a demand ARE its declared settings:</b> each <code>allow:</code> key is
+a configurable option and its comma list is the choices. A demand with no <code>allow:</code> declares
+nothing configurable &mdash; fixed behaviour. That is a valid, common case; do not invent options a demand
+does not have.</p>
+
+<div class="card no">
+<p class="big">Be precise about what reads these lines today. Most of it, nothing does &mdash; yet.</p>
+<p>To <code>pi_run</code> these are demand-continuation text, full stop &mdash; it parses none of them into
+structured data. And the app layer reads far less than you would expect:</p>
+<table>
+<tr><th>Statement</th><th>Read by, today</th></tr>
+<tr><td class="k">allow: models = &hellip;</td><td>The Argus bake, but <b>only this one key</b> &mdash; a regex matches <code>allow: models</code> and nothing else. An <code>allow: score.model</code> or <code>allow: route.threshold</code> is read by <b>no code at all</b> right now.</td></tr>
+<tr><td class="k">ignore: &hellip;</td><td><b>Nothing.</b> Not implemented anywhere.</td></tr>
+<tr><td class="k">owner: KEY = &hellip;</td><td><b>Nothing.</b> Edit rights are a hardcoded map in the Argus bake (<code>bake-runbooks.py</code>); a per-demand <code>owner:</code> line is not read. To grant edit rights for a new card, that map is updated &mdash; not this line.</td></tr>
+</table>
+<p><b>Write them anyway, correctly and completely</b> &mdash; they are the versioned, human-owned contract
+the operator and the tooling will grow into, and the design intent is that a card declares its own options.
+<b>But do not tell anyone the runtime enforces them, and do not write a demand that depends on it.</b> In
+particular: keep each <code>.si set:</code> value inside its demand's <code>allow:</code> set <i>yourself</i>
+&mdash; nothing cross-checks it for you.</p>
+</div></div>
+<h2>3 &middot; The .si &mdash; the plan</h2>
+<div class="lk-sec" data-cm="3-the-si-the-plan"><p>Opens with <span class="tok">plan:</span>; each unit opens with <span class="tok">- unit: NAME  why: D#</span>.
+Fields are one per line.</p>
+<pre>plan:
+
+<span class="c"># The run starts with exactly ONE key in the ledger: `ticket`. It is the only seed.</span>
+<span class="c"># The first unit MUST read [ticket]; everything else is produced by an earlier out:.</span>
+- unit: read_lead            why: D1
+  skill: sfread   slot: inbound-lead
+  bind: http.read_lead              <span class="c"># PLACEHOLDER — must exist in YOUR nous.sm, marked pub</span>
+  in:  [ticket]                     <span class="c"># the seed — a bare Salesforce card still starts from `ticket`</span>
+  out: [lead.id, lead.fields, lead.status, lead.region]
+  gate: auto     fail: abort
+
+- unit: gate_handled         why: D2
+  skill: sfread   slot: already-handled
+  bind: http.tag_claim
+  in:  [ticket]
+  out: [handled.already:bool]
+  set: gate.tag = argus_lead_handled
+  gate: exit     fail: abort         <span class="c"># exit ends the run when out[0] is "true"</span>
+
+- unit: score_lead           why: D3
+  skill: ai-panel   slot: fit-score
+  bind: http.score_panel
+  in:  [lead.fields]                 <span class="c"># produced by read_lead above — valid key-flow</span>
+  out: [score:int, score.reason]
+  set: score.model = vertex/gemini-2.5-pro    <span class="c"># keep inside D3's allow set YOURSELF</span>
+
+- unit: route_lead           why: D4,D5
+  skill: sfwrite   slot: assign-owner
+  bind: http.route_lead
+  in:  [score, lead.status]          <span class="c"># both produced earlier</span>
+  out: [routed.team]
+  words: route-note
+  set: route.threshold = 70
+  idem: route-{env}-{lead.id}        <span class="c"># never route the same lead twice</span>
+  gate: auto     fail: abort</pre>
+<table>
+<tr><th>Field</th><th>Rule</th></tr>
+<tr><td class="k">why: D#[,D#…]</td><td>which demand(s) this unit realizes. <b>Required.</b> Every D# named must exist in the <code>.pi</code>.</td></tr>
+<tr><td class="k">bind:</td><td>the C micro-op. <b>Must be in <code>nous.sm</code> and marked <code>pub</code>.</b></td></tr>
+<tr><td class="k">in: / out:</td><td>ledger keys, optionally typed (<code>:int :bool :float</code>). Every <code>in:</code> key must be produced by an <b>earlier</b> unit &mdash; except the one seed, <code>ticket</code>, which the run supplies. There are no other root inputs; the first unit reads <code>[ticket]</code>.</td></tr>
+<tr><td class="k">idem:</td><td>an idempotency key (e.g. <code>route-{env}-{lead.id}</code>) &mdash; the mechanism that stops a re-run repeating a side effect. Use it on any unit that writes or sends.</td></tr>
+<tr><td class="k">res:</td><td>names a resource file the unit reads (a vault, a template store). Optional.</td></tr>
+<tr><td class="k">set:</td><td>a policy value pi_run injects into the ledger (e.g. the model, the threshold, the tag).</td></tr>
+<tr><td class="k">words:</td><td>names a words block in the <code>.pi</code>. Required if the bind's signature expects words.</td></tr>
+<tr><td class="k">gate:</td><td><code>auto</code> (proceed), <code>exit</code> (end the run when the unit's first out key is <code>"true"</code>), <code>hold</code>, <code>fire</code>.</td></tr>
+<tr><td class="k">fail:</td><td><code>abort</code> (stop the run), <code>hold</code>, <code>continue</code>. On error, what the run does.</td></tr>
+</table></div>
+<h2>4 &middot; biRT &mdash; the checks that refuse your card</h2>
+<div class="lk-sec" data-cm="4-birt-the-checks-that"><p><code>dia_verify</code> runs at load and <b>refuses the whole card</b> on the first failure. These are
+the actual messages; satisfy every one or the card never runs:</p>
+<table>
+<tr><th>If you…</th><th>REFUSE</th></tr>
+<tr><td>write a unit with no <code>bind:</code></td><td>unit has no bind</td></tr>
+<tr><td>bind a micro-op not in <code>nous.sm</code></td><td>binds '…' — not in .sm</td></tr>
+<tr><td>bind one that is not <code>pub</code></td><td>binds '…' which is priv, not pub</td></tr>
+<tr><td>list a different number of <code>out:</code> keys than the <code>.sm</code> signature declares</td><td>writes N out keys but its .sm out-sig arity is M</td></tr>
+<tr><td>bind a words-taking op with no <code>words:</code></td><td>&hellip;in-sig names 'words' but declares no words: &mdash; it would silently run the jacket's baked copy</td></tr>
+<tr><td>write a unit with no <code>why:</code></td><td>cites no why: — unauthorized mechanism</td></tr>
+<tr><td>cite a <code>why:D#</code> that is not a real demand</td><td>cites why:D# — not a demand (dangling)</td></tr>
+<tr><td>name a <code>words:</code> block not present in the <code>.pi</code></td><td>speaks words '…' — not in .pi</td></tr>
+<tr><td>read an <code>in:</code> key nothing earlier produces</td><td>reads in:… — no earlier unit produces it (broken key-flow)</td></tr>
+<tr><td><b>leave a demand with no unit and no config realizing it</b></td><td>demand D# is unrealized</td></tr>
+</table>
+<div class="card yes">
+<p><b>The two directions to check yourself before you hand it over:</b></p>
+<ul>
+<li><b>Coverage-up:</b> every unit's <code>why:</code> points at a demand that exists. No unit acts
+without a demand authorizing it.</li>
+<li><b>Coverage-down:</b> every demand is realized by at least one unit (or a config line). No demand is
+written and then ignored.</li>
+</ul>
+<p>A card that passes both, binds only real <code>pub</code> skills, and has clean key-flow will load.</p>
+</div></div>
+<h2>5 &middot; The seal</h2>
+<div class="lk-sec" data-cm="5-the-seal"><p>On first load, <code>pi_run</code> writes <code>&lt;card&gt;.pi.seal</code> &mdash; a hash of each
+<b>words block</b> (words only; not demands, not config, not the allow lists). After that, any change to a
+words block is refused until the seal is regenerated (<code>rm</code> the seal and reload). <b>You do not
+write the seal</b> &mdash; the runtime does, trust-on-first-use. Just know that editing a words block later
+requires re-sealing.</p></div>
+<h2>6 &middot; Generation checklist</h2>
+<div class="lk-sec" data-cm="6-generation-checklist"><ol>
+<li>Confirm you have <code>nous.sm</code> and can read every skill's name, visibility (<code>pub</code>),
+and in/out signature. <b>Bind only to what is in it.</b></li>
+<li>Write the <code>.pi</code>: <code>card/owner/env</code>, then <code>demand:</code> with each
+<code>D#</code> one or two sentences, its <code>allow:/ignore:/owner:</code> lines, the
+<code>words</code> blocks, the <code>config</code>.</li>
+<li>Write the <code>.si</code>: one unit per mechanism, each <code>why:</code>-cited, each
+<code>bind:</code> a real pub skill, <code>in:/out:</code> keys typed, <code>set:</code> values inside
+their demand's <code>allow:</code> set, <code>words:</code> where the signature needs it.</li>
+<li>Self-check biRT both directions (Section 4). Trace key-flow: every <code>in:</code> comes from an
+earlier <code>out:</code> or a root input.</li>
+<li>Keep each demand under the 512-byte line. Keep <code>.si set:</code> inside <code>.pi allow:</code>.</li>
+<li>Do <b>not</b> claim the runtime enforces allow/ignore &mdash; it is app-layer intent today.</li>
+</ol></div>
+<h2>What this spec deliberately does not cover</h2>
+<div class="lk-sec" data-cm="what-this-spec-deliberately-does"><ul>
+<li>The C skills themselves &mdash; you have the <code>.sm</code>; writing new micro-ops is a substrate
+change, out of scope for generating a card. <b>Every <code>bind:</code>, <code>skill:</code> and
+<code>slot:</code> name in the Salesforce example above is a placeholder</b> &mdash; a wrong
+<code>bind:</code> is refused loudly at load, but a wrong <code>skill:</code>/<code>slot:</code> is not
+checked and will persist silently. Substitute all of them from your real <code>nous.sm</code>.</li>
+<li>Deploy &mdash; getting the three files onto a running prime is a separate, manual step.</li>
+<li>Runtime enforcement of allow/ignore/options &mdash; not built; declare them as intent, honestly.</li>
+</ul>
+
+<div class="foot">
+Generated 2026-07-21 17:00 &middot; v0 &middot; doculink &middot; DIA spec<br>
+Grammar verified against <code>dia.c</code> &mdash; the parser's section tokens and every
+<code>dia_verify</code> REFUSE check &mdash; and against a live reference card. Comment on any section below.
+</div>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"f2297cd2-aab4-4465-8558-3bbff6308a24"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

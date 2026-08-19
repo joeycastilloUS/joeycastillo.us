@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~p~e — Status Bridge full dyno (plan + estimate)</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  nav.bar { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  nav.bar .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  nav.bar .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:800px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:25px; margin:.2em 0 .1em; }
+  h2 { font-size:19px; color:var(--accent); margin-top:1.9em; border-bottom:1px solid #262626; padding-bottom:5px; }
+  h3 { font-size:15px; margin:1.3em 0 .3em; color:#cfcfcf; }
+  .sub { color:var(--mut); margin-top:0; }
+  .banner { background:#191712; border-left:3px solid var(--warn); padding:10px 14px; border-radius:6px; margin:14px 0; font-size:14px; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  .lead { border-left:3px solid var(--accent); padding-left:12px; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13px; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid #242424; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  .lock { color:var(--warn); }
+  ul { margin:.4em 0; padding-left:20px; } li { margin:.28em 0; }
+  ol { padding-left:20px; } ol li { margin:.45em 0; }
+  .tri { font-size:12.5px; color:#cfe8ef; }
+  .pts { color:var(--accent); font-weight:600; }
+  .foot { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #242424; padding-top:12px; }
+</style>
+</head>
+<body>
+<nav class="bar"><span class="brand">Be</span><span class="pub">Published 2026-07-18 13:33 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/7128940e-4709-4bae-a537-522d139ec2d1/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+
+<h1>~p~e — Status Bridge, full dyno</h1>
+<p class="sub">Plan + estimate &middot; paired (planner + estimator, reconciled) &middot; from design <code>1127</code> (v2) &middot; project: argus / Purcius substrate</p>
+
+<div class="banner"><b>AWAITING APPROVAL.</b> Boards are laid in <code>board.md</code> as Ready but not pulled. The build runs <b>in-VPC on the Linux mesh nodes</b> &mdash; the other pair&rsquo;s plane. This artifact is their build sheet. <span class="lock">Note: a concurrent session advanced argus r707&rarr;r709 mid-authoring &mdash; rebase before building.</span></div>
+
+<h2>Intent</h2>
+<p>Make the status bridge <b>sense the mesh instead of memorizing it</b>. Turn a node on and it appears on <code>status.purcius.net</code> within minutes; turn it off and it&rsquo;s sensed gone &mdash; with <b>no recompile</b>, exactly like the relay fabric. Discover membership from the mesh&rsquo;s own operator-signed DNS TXT, emit raw observations, and let the app layer decide what &ldquo;not seen&rdquo; means &mdash; all while keeping the leak-proof guarantee strictly intact under now-untrusted input.</p>
+
+<h2>Scope</h2>
+<p><b>In:</b> replace the baked <code>NODES[]</code> with DNS-TXT discovery + the operator-Ed25519 verify gate; the closed-schema projection; <code>seen_cache</code> + observation emit; verdict-field removal; the build recipe + 60s push + <code>status.purcius.net</code> bind. The one upstream relay fix that discovery depends on.<br>
+<b>Out:</b> per-prime direct probing (primes stay relay-counted); a human-readable public-name protocol (named as Kaizen); any change to the cloudflare-bridge itself (reused as-is, project <code>ai-metal-net</code> already allow-listed).</p>
+
+<h2>Approach</h2>
+<p><b>Reuse, then close.</b> The dynamic mechanism already exists &mdash; lift <code>dns_discover_primes()</code> into <code>dns_discover_relays()</code> (retarget <code>_relay.3-nous.net</code>, <code>role=='r'</code>, same Ed25519 gate). The security work is not <i>adding</i> a guard but <b>separating dynamic input from a closed output schema</b>: discovered fields land in named locals, the publish struct is filled field-by-field from an allowlist, and <code>addr</code>/<code>pubkey</code> are structurally never assigned to output. Then the DIA-DRAIN split: the bridge emits facts, the app owns the verdict. Ship the smallest slice that renders one discovered, verified, address-free record live before fanning out.</p>
+
+<h2>Phases (Rule&nbsp;11 order: flow up first)</h2>
+<ol data-cm="intent">
+<li><b>Phase&nbsp;UP &mdash; the relay, upstream (<span class="lock">in-VPC only</span>).</b> The bridge cannot trust a relay roster until relays keep their <code>_relay</code> record alive. Fix <code>dns_announce_self()</code> into <code>periodic_refresh()</code> (re-announce &lt; 300s TTL), and confirm by peer-node <code>curl</code> that relays serve plain HTTP <code>/status</code> on <code>:8080</code> in-VPC (Rule&nbsp;13). <b>Everything downstream blocks on this.</b></li>
+<li><b>Phase&nbsp;CORE &mdash; the bridge read side.</b> The First Move + fan-out: <code>dns_discover_relays()</code> + verify gate &rarr; kill <code>NODES[]</code>, wire the per-cycle roster &rarr; closed-schema projection (id=hash, per-string allowlist, no addr/pubkey out) &rarr; <code>seen_cache</code> + observation emit + <code>recently_departed[]</code> &rarr; strip verdict fields to counts + <code>discovery{}</code>. Tests-ahead at each step; the keystone test is <i>address-in&rarr;address-never-out</i> and <i>bad-sig&rarr;dropped</i>.</li>
+<li><b>Phase&nbsp;PUSH &mdash; build, schedule, go live (<span class="lock">in-VPC</span> + external proof).</b> <code>build-status.sh</code> (mirror <code>build-enact.sh</code>, Linux) &rarr; systemd 60s timer POSTing to <code>cloudflare-bridge /pages-deploy-site</code> (<code>ai-metal-net</code>) &rarr; <code>pages-add-domain status.purcius.net</code> &rarr; <b>Rule&nbsp;9 proof</b>: <code>dig</code> resolves + <code>curl https://status.purcius.net/mesh.json</code> = 200, address-free.</li>
+</ol>
+
+<h2>Estimate &mdash; 44 pts, 3 boards</h2>
+<table data-cm="estimate-44-pts-3-boards">
+<tr><th>Board</th><th>Title</th><th>Pts</th><th>Block</th></tr>
+<tr><td><b>SBDYN-UP</b></td><td>upstream must-solves (relay + protocol) &middot; <span class="lock">🔒 in-VPC</span></td><td class="pts">8</td><td>&mdash;</td></tr>
+<tr><td><b>SBDYN-CORE</b></td><td>bridge read side (dynamic + closed schema)</td><td class="pts">21</td><td>⛔ after UP</td></tr>
+<tr><td><b>SBDYN-PUSH</b></td><td>build, schedule, publish live</td><td class="pts">15</td><td>⛔ after CORE</td></tr>
+<tr><td colspan="2"><b>Grand total</b></td><td class="pts">44</td><td></td></tr>
+<tr><td>SBDYN-K</td><td>Kaizen: signed public-name field (page shows a name, not a hash)</td><td>?</td><td>opt-in</td></tr>
+</table>
+
+<h3>SBDYN-UP &middot; 8 pts &middot; <span class="lock">in-VPC only</span></h3>
+<ul class="tri">
+<li>{dns_announce_self into periodic_refresh (re-announce &lt; 300s TTL, no flap-out), fix in, relay_server.c} &middot; <span class="pts">5</span> &middot; ~f~t</li>
+<li>{relays serve plain HTTP /status on :8080 in-VPC (peer-node curl confirms probe plane, not wire-TLS), test, relay probe protocol} &middot; <span class="pts">3</span> &middot; ~t</li>
+</ul>
+<h3>SBDYN-CORE &middot; 21 pts &middot; ⛔ after UP</h3>
+<ul class="tri">
+<li>{dns_discover_relays() lifted from dns_discover_primes — _relay.3-nous.net + role=='r' + operator-Ed25519 gate (bad-sig dropped), add to, status_bridge.c} &middot; <span class="pts">5</span> &middot; ~a~t</li>
+<li>{kill NODES[]; wire discover &rarr; roster (per-cycle, held one probe then dropped), update with, status_bridge.c} &middot; <span class="pts">3</span> &middot; ~u~t</li>
+<li>{closed-schema projection — field-by-field allowlist, id=8hex(sha256(pubkey)), per-string word-allowlist for region/transport, addr+pubkey never emitted, add to, status_bridge.c} &middot; <span class="pts">5</span> &middot; ~a~t</li>
+<li>{seen_cache {pubkey_hash: first_seen,last_seen} + emit first_seen/last_seen/last_probe/reachable + recently_departed[], add to, status_bridge.c} &middot; <span class="pts">5</span> &middot; ~a~t</li>
+<li>{remove verdict fields (up/down/stale/health) &rarr; discovery{records_seen,records_verified} + counts only, update with, status_bridge.c} &middot; <span class="pts">3</span> &middot; ~u~t</li>
+</ul>
+<h3>SBDYN-PUSH &middot; 15 pts &middot; ⛔ after CORE</h3>
+<ul class="tri">
+<li>{build-status.sh — mirror build-enact.sh (POSIX, on node: gcc status_bridge.c + dns/ed25519/hash deps) + build on bridge-los-angeles, add to, build recipe} &middot; <span class="pts">3</span> &middot; ~a~t</li>
+<li>{external 60s scheduler (systemd timer) + POST emit to cloudflare-bridge /pages-deploy-site project ai-metal-net (no public port), add to, bridge-los-angeles} &middot; <span class="pts">5</span> &middot; ~a~t</li>
+<li>{pages-add-domain status.purcius.net + external verify (dig + curl 200, address-free, Rule 9), test, status.purcius.net} &middot; <span class="pts">5</span> &middot; ~t</li>
+</ul>
+
+<div class="card lead"><b>Week-one interim slice &mdash; 18 pts.</b> SBDYN-UP fully (8) + the two CORE keystones: <code>dns_discover_relays</code> with the verify gate (5) + the closed-schema projection (5). That is the design&rsquo;s own First Move &mdash; one discovered, verified relay renders with an <code>id</code> and <b>no address anywhere in the JSON</b>, bad-sig dropped. When it proves out, <code>NODES[]</code> is dead and the rest is fan-out. <code>seen_cache</code>, verdict-strip, and the live push land week two.</div>
+
+<h2>Constraints</h2>
+<ul data-cm="constraints">
+<li><b>C99 only</b> for everything we own; the bridge + relay build and run <b>on the Linux mesh nodes in-VPC</b>, never the Windows dev box.</li>
+<li><b>Tests-ahead</b> (Rule 7): each item is a verify loop; the allowlist and bad-sig tests gate the projection.</li>
+<li><b>Done = production, externally verifiable</b> (Rule 9): <code>status.purcius.net/mesh.json</code> = 200 with address-free fields from a third-party vantage.</li>
+<li><b>Rule 13 vantage:</b> the two UP items are peer-node work; a dev-box <code>curl</code> proves nothing.</li>
+<li>cloudflare-bridge reused unchanged; <code>ai-metal-net</code> already allow-listed; <code>purcius.net</code> already in the CF account.</li>
+</ul>
+
+<h2>Unknowns (named, not hidden)</h2>
+<ul data-cm="unknowns-named-not-hidden">
+<li><b>Probe protocol.</b> Does <code>:8080</code> serve plain HTTP <code>/status</code> in-VPC, or is it wire-over-TLS? The v1 code assumes HTTP; the design prose says wire-native. SBDYN-UP item 2 resolves it &mdash; and if it&rsquo;s wire, the probe step in CORE grows (swap to <code>wire_request</code>). <b>This is the single biggest sizing risk.</b></li>
+<li><b>Public name.</b> Nothing baked means the page shows an opaque <code>id</code> until the signed-name Kaizen lands. Acceptable for v1; confirm the operator is fine with hashes first.</li>
+<li><b>Cloudflare account membership.</b> Design asserts <code>purcius.net</code> is in account <code>7c605ea0…</code>; edge-confirmed but not dashboard-confirmed from outside. <code>pages-add-domain</code> fails if it&rsquo;s a different account.</li>
+<li><b>Relay identity carries region but not a name</b> in <code>/status</code>/TXT &mdash; the projection must source region from the signed record or a word-allowlist, not free text.</li>
+</ul>
+
+<h2>When To Revisit (the signal that triggers a v2 of this plan)</h2>
+<ul data-cm="when-to-revisit-the-signal">
+<li>SBDYN-UP item 2 shows relays speak <b>wire-over-TLS on :8080</b> &rarr; re-plan the probe step (CORE grows; the estimate moves).</li>
+<li>The mesh outgrows a handful of nodes &rarr; DNS-TXT discovery gets slow/impractical &rarr; revisit toward a signed gossip/registry read (the design&rsquo;s named escape route).</li>
+<li><code>pages-add-domain status.purcius.net</code> is rejected (account mismatch) &rarr; re-plan the surface (fallback <code>purcius.net/status/</code> path, per the design).</li>
+<li>The operator rejects opaque <code>id</code>s on the page &rarr; the signed-name Kaizen is pulled forward into v1 scope.</li>
+</ul>
+
+<h2>Definition of Done &mdash; this ~p~e artifact</h2>
+<ul data-cm="definition-of-done-this-p">
+<li class="ok">&#10003; A-D-D verified &mdash; sized against design 1127 + the live mechanism; supersedes 0015</li>
+<li class="ok">&#10003; Required plan sections present incl. <b>Unknowns</b> + <b>When To Revisit</b> (Rule 6)</li>
+<li class="ok">&#10003; Every item is a verify loop (Rule 7 paired <code>~verb~t</code>); board triples match argus sizing</li>
+<li class="ok">&#10003; Boards laid in <code>board.md</code> as Ready, AWAITING APPROVAL &mdash; not pulled, not built</li>
+<li class="ok">&#10003; Rule-11 dependency order explicit (UP &rarr; CORE &rarr; PUSH); in-VPC items flagged (Rule 13)</li>
+<li class="ok">&#10003; Publication date top-right &middot; committed + pushed &middot; published as a cap-URL for review</li>
+</ul>
+
+<div class="foot">metal console &middot; Be &middot; v0 &middot; r709 &middot; 2026-07-18 &middot; 1863 pts &middot; Purcius &mdash; ~p~e status bridge full dyno (awaiting approval)</div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"7128940e-4709-4bae-a537-522d139ec2d1"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

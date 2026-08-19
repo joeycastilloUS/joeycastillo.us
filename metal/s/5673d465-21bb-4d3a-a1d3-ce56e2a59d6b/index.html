@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Case Patterns &mdash; How the Classification Works, and How Accurate It Is</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#e2e6e8;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:8px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:40px}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:11px 22px;display:flex;align-items:baseline;gap:12px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:13px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:820px;margin:0 auto;padding:8px 24px 60px}
+ h1{font-size:22px;margin:20px 0 4px;color:#fff;font-weight:700}
+ .sub{color:#8a949b;font-size:13px;margin:0 0 6px}
+ .meta{color:#6a7a82;font-size:12px;margin:0 0 20px}
+ h2{font-size:12px;color:#6FC3DF;margin:30px 0 8px;letter-spacing:.08em;text-transform:uppercase}
+ h3{font-size:14px;color:#cfcfcf;margin:20px 0 4px}
+ p{font-size:14px;margin:8px 0}
+ ol,ul{font-size:14px;margin:8px 0;padding-left:22px}
+ li{margin:6px 0}
+ a{color:#6FC3DF}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 5px;border-radius:4px}
+ pre{background:#0a0d0f;border:1px solid #1e2a30;border-radius:10px;padding:14px;overflow:auto;font-size:12px;color:#9fb3bd;font-family:Consolas,monospace;line-height:1.5}
+ .note{color:#8a949b;font-size:12.5px;margin-top:12px}
+ .tag{display:inline-block;border-radius:20px;padding:2px 11px;font-size:11px;font-weight:700;margin-right:8px;vertical-align:middle}
+ .t-ok{background:#0c1c14;border:1px solid #1f5f47;color:#7CFFB2}
+ .t-bad{background:#1c1212;border:1px solid #5f2020;color:#ff9b9b}
+ .t-warn{background:#1c1a12;border:1px solid #5f4f20;color:#f0c674}
+ table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+ td,th{border-bottom:1px solid #1e1e1e;padding:9px 8px;vertical-align:top;text-align:left}
+ th{color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+ td.k{color:#7d8894;white-space:nowrap;width:150px}
+ td.n{text-align:right;font-family:Consolas,monospace;color:#9fe0f2;white-space:nowrap}
+ .obs{border-left:3px solid #6FC3DF;background:#141414;padding:12px 16px;margin:12px 0;font-size:14px;border-radius:0 8px 8px 0}
+ .obs.warn{border-left-color:#f0c674}
+ .obs.bad{border-left-color:#ff9b9b}
+ .obs.ok{border-left-color:#7CFFB2}
+ .q{color:#9fb3bd;font-style:italic}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved &middot; Confidential</div>
+<nav><span class="b">CASE PATTERNS &middot; METHOD &amp; ACCURACY</span><span class="p">2026-07-27</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/5673d465-21bb-4d3a-a1d3-ce56e2a59d6b/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+<h1>How the case classification works &mdash; and how accurate it actually is</h1>
+<p class="sub">The full method behind the Case Patterns tab, the audit that was run against it, and the defect the audit found</p>
+<p class="meta">Method note &middot; written to be checked, not believed &middot; 2026-07-27</p>
+
+<div class="obs bad">
+<b>Read this first.</b> The audit found a real defect and the numbers moved. The tab showed <b>1,578 matched cases</b>. After the fix it shows <b>933</b> &mdash; a 41% reduction. The removed 645 were noise: price-change approval letters, routine ticket correspondence, and in one case a marketing email. <b>Ground truth did not move</b> (4 of 6), which is the evidence that noise came out and signal stayed in.
+</div>
+
+<h2>1. What the classifier actually does</h2>
+<div class="lk-sec" data-cm="1-what-the-classifier-actually"><p>It is a <b>deterministic literal string matcher</b>. There is no model, no embedding, no scoring heuristic, no LLM anywhere in it. Given the same corpus and the same signal list it produces byte-identical output every time. That is deliberate: a classifier you cannot audit is a classifier you cannot trust.</p>
+<pre>for each pattern (10 of them):
+    for each signal term (a literal string, with a weight of 1 or 2):
+        ask the store: which distinct strings contain this term, case-insensitively?
+        take every fact whose subject / predicate / object is one of those strings
+        keep only the facts whose subject is a case
+        every such case scores += the signal's weight
+
+    a case MATCHES the pattern when its score reaches 2
+        -> one weight-2 signal on its own, OR two weight-1 signals together</pre>
+<p>Then, separately, the <b>ground-truth check</b>: each library pattern that cites a real case number is asked whether its own signals find that case. That number is not a target to optimise. It is a control.</p></div>
+<h2>2. Where the signal terms come from &mdash; the one rule</h2>
+<div class="lk-sec" data-cm="2-where-the-signal-terms"><div class="obs">
+<b>Signals are written from each pattern's SYMPTOM section, never from its ROOT CAUSE.</b>
+</div>
+<p>This is the rule the whole thing hangs on, and it comes from a fact about the data rather than a preference. We hold each case's <b>subject and description</b> &mdash; the opening message and nothing after it. The reply thread, where diagnosis happens, is not readable by this integration.</p>
+<p>Three of the library's own example cases prove it. Their root causes never appear in the case text at all:</p>
+<table>
+<tr><th>Library root cause</th><th>What the case actually says</th></tr>
+<tr><td>"Publisher paused since 4/3"</td><td class="q">"We have a new issue for doordash. We are not receiving the full orders and have a delivery line with a $ amount&hellip;"</td></tr>
+<tr><td>"Drive mapping set to D: instead of C:"</td><td class="q">Subject: "Menu Sync". Body: a routine request to sync two item categories before 11am.</td></tr>
+<tr><td>"Print on Held checked on affected items"</td><td class="q">A forwarded internal note looping support in.</td></tr>
+</table>
+<p>So <code>chowly publisher paused</code> matches nothing, while <code>not receiving the full order</code> matches. <b>The symptom is in the case. The cause is in the thread.</b></p>
+<div class="obs warn">
+<b>What was deliberately not done:</b> tune the terms until all six known cases lit up. That is scoring against the answer key. It produces a better-looking number that means nothing, because the terms would then be fitted to six cases rather than describing a symptom. The rule stays principled and the score is whatever the rule produces.
+</div></div>
+<h2>3. The audit</h2>
+<div class="lk-sec" data-cm="3-the-audit"><p>Three checks were run against the classifier itself, not against its output summary.</p>
+
+<h3><span class="tag t-ok">PASS</span>Check 1 &mdash; do matched cases really contain their signal?</h3>
+<p>Sampled matched cases, pulled each one's real subject and description back out of the store, and looked for the term. <b>Every sampled case genuinely contained it.</b> No phantom matches, no indexing error.</p>
+
+<h3><span class="tag t-ok">PASS</span>Check 2 &mdash; does substring matching create false hits?</h3>
+<p>Matching is substring, not whole-word, so <code>seat 1</code> would also match "seat 10" through "seat 19". Tested directly: <code>seat 10</code> and <code>seat 11</code> return <b>zero</b> matches in this corpus, so the exposure is real in principle and empirically nil here. Worth re-testing on any future corpus rather than assuming.</p>
+
+<h3><span class="tag t-bad">FAIL</span>Check 3 &mdash; are the matched cases actually <i>about</i> the pattern?</h3>
+<p>Eight matched cases per pattern were sampled and read by hand. This is where it broke.</p>
+<p>Weight 2 is supposed to mean <i>"distinctive enough to classify a case on its own."</i> Nine ordinary English phrases had been given weight 2 &mdash; <code>menu sync</code>, <code>open ticket</code>, <code>not printing</code>, <code>does not print</code>, <code>missing item</code>, <code>item missing</code>, <code>items not showing</code>, <code>duplicate item</code>, <code>seat 1</code>. One unremarkable sentence was therefore enough to classify a case. What came in as a result:</p>
+<table>
+<tr><td class="k">CP-004 sync failure</td><td>four of eight sampled cases were <span class="q">"Price Change Request_ Approval/Denial Letter"</span> &mdash; they merely used the words "menu sync"</td></tr>
+<tr><td class="k">CP-002 open-ticket failure</td><td><span class="q">"SFG open tickets"</span>, <span class="q">"RE: one dine ticket"</span> &mdash; ordinary correspondence</td></tr>
+<tr><td class="k">CP-008 bump-to-print</td><td><span class="q">"Receipt not printing order details"</span> &mdash; a printing complaint, but not this failure</td></tr>
+<tr><td class="k">CP-001 overpayment</td><td><span class="q">"Backdated refunds available &mdash; don't delay"</span> &mdash; a marketing email</td></tr>
+</table>
+<p>Meanwhile the distinctive technical tokens behaved exactly as intended throughout: <code>pos_failure</code>, <code>com_error_code</code>, <code>chowly</code>, <code>expo printer</code>, <code>price discrepancy</code>, <code>menu.zip</code>, <code>eod sync</code>. <b>The rule was sound; the weights were wrong.</b></p></div>
+<h2>4. The fix and what it changed</h2>
+<div class="lk-sec" data-cm="4-the-fix-and-what"><p>All nine generic phrases demoted to weight 1, so they now require corroboration from a second signal before a case is classified.</p>
+<table>
+<tr><th>Pattern</th><th>Before</th><th>After</th><th></th></tr>
+<tr><td>CP-001 overpayment after check change</td><td class="n">140</td><td class="n">140</td><td></td></tr>
+<tr><td>CP-002 system-wide open ticket failure</td><td class="n">49</td><td class="n">10</td><td>&minus;80%</td></tr>
+<tr><td>CP-003 KDS routing failure</td><td class="n">102</td><td class="n">72</td><td>&minus;29%</td></tr>
+<tr><td>CP-004 menu / EOD sync failure</td><td class="n">322</td><td class="n">3</td><td>&minus;99%</td></tr>
+<tr><td>CP-005 menu price discrepancy</td><td class="n">94</td><td class="n">62</td><td>&minus;34%</td></tr>
+<tr><td>CP-006 check paid during payment</td><td class="n">14</td><td class="n">14</td><td></td></tr>
+<tr><td>CP-007 delivery publishing paused</td><td class="n">428</td><td class="n">428</td><td></td></tr>
+<tr><td>CP-008 bump-to-print failure</td><td class="n">285</td><td class="n">155</td><td>&minus;46%</td></tr>
+<tr><td>CP-009 equal pay split</td><td class="n">69</td><td class="n">43</td><td>&minus;38%</td></tr>
+<tr><td>STAGED item missing / wrong price</td><td class="n">145</td><td class="n">25</td><td>&minus;83%</td></tr>
+<tr><td><b>Total matched cases</b></td><td class="n"><b>1,578</b></td><td class="n"><b>933</b></td><td><b>&minus;41%</b></td></tr>
+<tr><td><b>Ground truth</b></td><td class="n"><b>4 / 6</b></td><td class="n"><b>4 / 6</b></td><td>unchanged</td></tr>
+</table>
+<div class="obs ok">
+Ground truth holding at 4/6 through a 41% cut is the whole argument. If the removed cases had contained signal, the proven cases would have fallen out with them. They didn't. <b>A big number nobody trusts is worth less than a small number somebody acts on.</b>
+</div>
+<p>CP-004 is the clearest case: 322 down to 3, and re-reading those three, all of them are genuine sync failures &mdash; a missing menu file, an EOD sync tool not working, an EOD reset &mdash; instead of price-change letters.</p></div>
+<h2>5. What this number is, and what it is not</h2>
+<div class="lk-sec" data-cm="5-what-this-number-is"><div class="obs warn">
+<b>It is a symptom-level triage filter, not a root-cause classifier.</b> A match means: <i>this case speaks the vocabulary of this pattern.</i> It does not mean the pattern's root cause has been confirmed on that case. The library itself draws exactly this line &mdash; a pattern only earns its number once a real case is worked end to end and the cause is confirmed. This tool finds candidates for that work; it does not do that work.
+</div>
+<p>Even after the fix, precision varies by pattern, and it varies with one thing: how distinctive the vocabulary is. Patterns anchored on technical tokens read clean. Patterns that can only be described in ordinary English still pull in neighbours. CP-008 remains the weakest &mdash; "device group" appears in configuration requests as readily as in bump-to-print failures.</p></div>
+<h2>6. Known limits, stated rather than buried</h2>
+<div class="lk-sec" data-cm="6-known-limits-stated-rather"><ol>
+<li><b>Recall is capped by a bug in the store's search.</b> It stops collecting past roughly 2,000 distinct matched strings, and returns at most 500 results per query, while still reporting a complete-looking answer. Three patterns hit that ceiling. <b>Both ground-truth misses are on patterns that hit it</b> &mdash; a measured cost, not a mystery. The fix is written and committed; it is not deployed, because rebuilding that service needs a library snapshot that is not on this machine.</li>
+<li><b>We only see the opening message.</b> 87% of cases arrive by email and we hold 0.39 comments per case. Everything above is what the first message alone can tell you.</li>
+<li><b>Matching is substring, not whole-word.</b> Harmless on this corpus, verified, not guaranteed on the next one.</li>
+<li><b>Precision was estimated by reading samples</b> &mdash; eight per pattern, by hand. It is an informed estimate, not a measured rate. A real number needs a labelled set, and the honest way to get one is to work cases through the patterns and record the outcome, which is what the library's own confidence rule already prescribes.</li>
+<li><b>The corpus is 16 days stale</b> and there is no automated refresh yet.</li>
+</ol></div>
+<h2>7. How to check any of this yourself</h2>
+<div class="lk-sec" data-cm="7-how-to-check-any"><ul>
+<li>Open the tab, click any pattern. It lists <b>every signal, its weight, how many cases it hit, and whether it hit the recall ceiling</b> &mdash; then the matched cases. Click a case to open it in the raw drill and read the actual text.</li>
+<li>Signals returning zero are shown as zero rather than dropped, so a pattern with no evidence in the corpus looks empty, because it is.</li>
+<li>The tab leads with <b>what it does not cover</b> before showing a single match.</li>
+<li>The matcher is one file, one pass, no hidden state. Same input, same output, every time.</li>
+</ul>
+<p class="meta" style="margin-top:16px">Comments are open below. If a matched case looks wrong, say which one &mdash; that is exactly the feedback that improves the signal list.</p>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved &middot; Confidential</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"5673d465-21bb-4d3a-a1d3-ce56e2a59d6b"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

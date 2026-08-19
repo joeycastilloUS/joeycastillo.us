@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estimate &mdash; DIA hit count</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 4px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 18px 20px; margin: 14px 0; }
+  .board { border-left: 3px solid #6FC3DF; }
+  ul { margin: 8px 0 8px 20px; } li { margin: 6px 0; }
+  code { background: #222; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; color: #6FC3DF; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid #333; font-size: 13.5px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .est { color:#6FC3DF; font-weight:700; text-align:center; }
+  .reuse { color:#22c55e; } .new { color:#e8c95c; }
+  .total { color:#22c55e; font-weight:700; }
+  .strike { color:#e06c6c; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 40px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~e &mdash; DIA hit count</span>
+  <span class="pub">Published 2026-07-19 02:52 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/cb9a071b-f800-4476-a363-4f41e0b76fb6/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Estimate &mdash; DIA hit count</h1>
+<p style="color:#999;">From <code>plan/dia-hit-count</code>. <span class="strike">42 pts / 3 boards</span> &rarr; <span class="total">19 pts / 1 board</span>. Re-sized against the C-skill library (Opus + Fable5): ~80% is clone-and-rewire of code that already shipped. Every item cites what it reuses.</p>
+
+<h2>Why it shrank &mdash; it's mostly already built</h2>
+<div class="lk-sec" data-cm="why-it-shrank-it-s"><div class="section">
+  <table>
+    <tr><th>Piece I first sized as new</th><th>Already exists</th></tr>
+    <tr><td>Atomic tag write on a ticket (read&rarr;merge&rarr;PUT full array)</td><td class="reuse">Jacket <code>internal_alert</code>, <code>Program.cs ~336-371</code> &mdash; the live #530 tag-merge fix. The bump is that code + an int parse.</td></tr>
+    <tr><td>pi_run jacket call for the count</td><td class="reuse"><code>http_resolve_name</code> (<code>pi_run.c:232</code>) &mdash; a 15-line GET clone.</td></tr>
+    <tr><td><code>dedup:</code> policy grammar</td><td class="reuse"><code>dia.c:129</code> &mdash; one more <code>else if</code> in the <code>idem:</code> parse chain.</td></tr>
+    <tr><td>The gate unit</td><td class="reuse"><code>gate_handled</code> (<code>pi_run.c:358</code>) + its <code>nous.sm</code> bind &mdash; a body swap, not a new unit.</td></tr>
+    <tr><td>A separate <code>count-read</code> endpoint</td><td class="reuse">Folded out &mdash; the bump response returns the count. Read-and-claim is one call (Fable). Nothing today needs a read without a claim.</td></tr>
+  </table>
+</div></div>
+<h2>Board DHC &mdash; DIA hit count <span class="total">(19)</span></h2>
+<div class="lk-sec" data-cm="board-dhc-dia-hit-count"><div class="section board">
+  <table>
+    <tr><th>Item {what, verb, context}</th><th>Est</th><th>Cmd</th></tr>
+    <tr><td>{count-claim endpoint &mdash; read tags, incr <code>dia:&lt;id&gt;</code>, atomic PUT, returns <code>created</code>+count, add to, zendesk-bridge}<br><span class="reuse">reuses:</span> Program.cs ~336-371 tag-merge + SendJsonAsync &middot; <span class="new">new:</span> parse/incr the int + <code>safe_update</code>/<code>updated_stamp</code> &rarr; 409 = lost race = <code>created:false</code></td><td class="est">5</td><td><code>~a~t</code></td></tr>
+    <tr><td>{count-claim call &mdash; bump returns <code>created</code>+count into the ledger, add to, pi_run}<br><span class="reuse">reuses:</span> <code>http_resolve_name</code> pattern (pi_run.c:232) &middot; <span class="new">new:</span> put <code>claim.created</code> on the ledger</td><td class="est">3</td><td><code>~a~t</code></td></tr>
+    <tr><td>{<code>dedup:</code> field + act-iff-<code>created</code> branch, add to, dia.c parser + biRT}<br><span class="reuse">reuses:</span> dia.c:129 <code>idem:</code> else-if chain &middot; <span class="new">new:</span> one field + one gate branch (always-on DIAs skip it)</td><td class="est">3</td><td><code>~a~t</code></td></tr>
+    <tr><td>{<code>gate_handled</code>, rewire in, pi_run.c:358 + mendo-nps .pi/.si}<br><span class="reuse">reuses:</span> the existing <code>zread/already-handled</code> unit + its bind &middot; <span class="new">new:</span> swap the search call for count-claim, act iff <code>created</code>, reseal</td><td class="est">3</td><td><code>~u~t</code></td></tr>
+    <tr><td>{exactly-once under two racing sweeps, prove in, live Zendesk + retire the <code>requester:</code> search}<br><span class="reuse">reuses:</span> sweep-overlap harness + Full-Cycle Test Host &middot; <span class="new">new:</span> <strong>force the interleave</strong> (updated_stamp is second-granular &mdash; make both sweeps PUT on the same stamp), then delete the guest-search lane</td><td class="est">5</td><td><code>~t</code></td></tr>
+  </table>
+  <p><strong>Total: 19 pts.</strong> The two 5s are the only genuinely-new engineering: the atomic-claim semantics in the jacket, and the live race proof that forces the exact interleave. The three 3s are clone-and-rewire.</p>
+</div></div>
+<h2>Trade to bank in the design</h2>
+<div class="lk-sec" data-cm="trade-to-bank-in-the"><div class="section">
+  <p><strong>Claim-then-act is at-most-once, not exactly-once end-to-end</strong> (Fable). If a sweep wins the claim (<code>created:true</code>) then dies before sending, the count says handled and nothing went out. For a dedup follow-up that is the <em>correct</em> failure &mdash; a silent miss beats a double-coupon to the guest, and <code>send</code> is <code>fail:hold</code> so it surfaces. Stated so it's a chosen trade, not a surprise.</p>
+</div></div>
+<h2>Value + Dependencies</h2>
+<div class="lk-sec" data-cm="value-dependencies"><div class="section">
+  <ul>
+    <li>One board, so no cross-board blockers. Internal order: item 1 (the claim) unblocks 2&ndash;4; item 5 proves + retires last.</li>
+    <li>The two unknowns from the plan collapse into item 1 (storage primitive + atomic claim) and item 5 (force the race) &mdash; they're work, not open questions.</li>
+    <li>Every build item ships paired with <code>~t</code> (kernel rule 7).</li>
+  </ul>
+</div></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><div class="section">
+  <ul>
+    <li>&#10003; Estimate committed (HTML) &middot; hash in telemetry &middot; index updated &middot; pushed</li>
+    <li>&#10003; Every item a triple with a 3 or 5; board 13&ndash;21 (19); every item cites what it reuses</li>
+    <li>&#10003; Re-sized against the C-skill library &mdash; new-build only where genuinely new</li>
+    <li>&#10003; <code>be/board.md</code> updated to the one 19-pt board</li>
+  </ul>
+</div>
+
+</div></div>
+<footer>v0 &middot; r733 &middot; 2026-07-19 &middot; Be &middot; Argus &mdash; DIA hit count (estimate, re-sized 42&rarr;19)</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"cb9a071b-f800-4476-a363-4f41e0b76fb6"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

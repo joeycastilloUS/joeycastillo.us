@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~d DIA-DRAIN Remaining — re-review verdict + fold-in-C cutover</title>
+<style>
+  body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.55}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:10px 20px;display:flex;justify-content:space-between;align-items:baseline;z-index:9}
+  nav .brand{color:#6FC3DF;font-weight:bold;font-size:1.1em}
+  nav .pub{color:#888;font-size:.78em}
+  main{max-width:800px;margin:0 auto;padding:24px 20px 60px}
+  h1{color:#6FC3DF;font-size:1.5em;margin:.4em 0}
+  h2{color:#6FC3DF;font-size:1.15em;border-bottom:1px solid #333;padding-bottom:4px;margin-top:2em}
+  h3{color:#9fd8ea;font-size:1em;margin-top:1.4em}
+  .card{background:#1A1A1A;border:1px solid #2a2a2a;border-radius:6px;padding:14px 16px;margin:12px 0}
+  table{border-collapse:collapse;width:100%;font-size:.86em;margin:10px 0}
+  th,td{border:1px solid #333;padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:#1A1A1A;color:#6FC3DF}
+  code{background:#1c1c1c;color:#9fd8ea;padding:1px 5px;border-radius:3px;font-size:.92em}
+  .ok{color:#7fd48a}.bad{color:#e07a7a}.warn{color:#e0c67a}.mut{color:#888}
+  .pill{display:inline-block;border:1px solid #6FC3DF;color:#6FC3DF;border-radius:10px;padding:0 8px;font-size:.75em;margin-right:6px}
+  ul{margin:.4em 0 .4em 1.2em;padding:0}
+  li{margin:.3em 0}
+  .dod li{list-style:none}
+  footer{color:#666;font-size:.8em;border-top:1px solid #333;margin-top:40px;padding-top:10px}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-16 21:31 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/56eec626-9fe5-44c8-b9ef-a2a7d494e803/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~d DIA-DRAIN Remaining</h1>
+<p class="mut">Fable5 adversarial re-review of the round-2 fixes (metal <code>a70517f</code>) + the sequenced design for the remaining DIA-DRAIN work. Reviewed: <code>pirun_run.c</code>, <code>dia.c/dia.h</code>, gcp-bridge <code>Program.cs</code>, the live card triplet <code>mendo-nps-detractor-triage.pi/.si/.sm</code>, board DIA-DRAIN.</p>
+
+<h2>Part 1 — Re-review verdict: the round-2 fixes HELD. No new P0/P1.</h2>
+
+<table data-cm="part-1-re-review-verdict">
+<tr><th>Round-2 fix</th><th>Verdict</th><th>Evidence</th></tr>
+<tr><td>P0 <code>dia_render</code> OOB</td><td class="ok">HELD</td><td><code>pirun_run.c:68-81</code>. The loop guard <code>o&lt;cap-1</code> makes <code>cap-o&ge;2</code> at every snprintf; the clamp <code>w=cap-1-o</code> bounds <code>o&le;cap-1</code>; the terminator writes at most <code>out[cap-1]</code>. <code>cap-o&le;0</code> is unreachable; <code>o</code> cannot land past the buffer. (Degenerate <code>cap&le;1</code> never occurs — every call site passes <code>sizeof</code> of a static &ge;320-byte array.)</td></tr>
+<tr><td>P0 hash is self-attestation</td><td class="ok">HELD (re-scoped honestly)</td><td><code>Program.cs:2056-2069</code>: when <code>prompt</code> is present, <code>prompt_hash</code> is REQUIRED (400 <code>prompt-hash-required</code>) and re-computed FNV-1a over UTF-8 must match (400 <code>prompt-seal-mismatch</code>). The comment states its true scope — transport integrity, not hostile-caller proof; verified==executed lives upstream in the biRT seal (<code>dia.c:323-341</code>). Canary-proven live.</td></tr>
+<tr><td>P1 zora words sealed-but-not-executed</td><td class="ok">HELD</td><td><code>pirun_run.c:570-584</code>: compose reads <code>words.zora-reply</code>/<code>words.zora-subject</code> from the biRT-verified ledger, <code>dia_render</code> fills {name}{empathy}{amount}{code}; the run log names the source (".pi word zora-reply").</td></tr>
+<tr><td>P1 silent baked fallbacks</td><td class="ok">HELD at read time</td><td>Escape overflow hard-fails, never downgrades: <code>pirun_run.c:417</code> (panel prompt), <code>:495/:498</code> (note/subject). Missing feedback hard-fails (<code>:404</code>). See N1 — the declaration-time cousin survives.</td></tr>
+<tr><td>P1 illness fails to escalate on overflow</td><td class="ok">HELD</td><td>Request overflow → hard-fail (<code>:421</code>); malformed-note risk → hard-fail before POST (<code>:495</code>); disarmed still exits, never falls to recovery (<code>:455-461</code>); non-ok note post → run fails (<code>:517-519</code>).</td></tr>
+</table>
+
+<h3>New findings (none block; all fold into the plan below)</h3>
+<div class="card">
+<p><span class="pill">N1 · P2</span><b>The baked fallback moved from read time to declaration time.</b> Delete the <code>words:</code> line from a unit in the (unsealed) <code>.si</code> and biRT still passes — check 3 (<code>dia.c:301-306</code>) validates only <em>declared</em> words; nothing requires a drain-aware unit to declare any. pi_run then silently reverts: illness_check sends the no-prompt JSON (<code>pirun_run.c:419-420</code>) → the jacket's baked instruction (<code>Program.cs:2071-2079</code>); compose falls to the slot twin (<code>:580</code>); escalate posts the no-note JSON (<code>:511-516</code>). The fix moved the bug up one level; it didn't kill it. Kill shot is cheap: the <code>.sm</code> in-sig for <code>http.illness_panel</code> ALREADY lists <code>words</code> — add the biRT rule "bound in-sig names <code>words</code> ⇒ the unit MUST declare <code>words:</code>". Lands in DRAIN-5.</p>
+<p><span class="pill">N2 · P2 latent</span><b>The <code>strstr("subject")</code> role heuristic</b> (<code>pirun_run.c:490</code>, <code>:576</code>). Word ROLE is inferred from a name substring: two note-class words → last-wins silent overwrite; a rename that puts "subject" into a note word's name misroutes it into the 320-byte subject buffer and un-drains the note. A rename does force a reseal — but the approver can't know the router keys off a substring. Fix: role-tagged words in the <code>.si</code> (<code>words: note=escalation-note, subject=escalation-subject</code>), biRT-checked. Lands in DRAIN-4. Today's five word names are unambiguous — latent, not live.</p>
+<p><span class="pill">N3 · P2</span><b>Parse-time word truncation is attested by the whole seal chain.</b> A words body &gt;2048 bytes is silently truncated at load (<code>dia.c:230-231</code>), THEN hashed (<code>:245</code>) — the TOFU seal is created from the truncated body, and the wire hash matches the truncated bytes. Every integrity check co-signs the truncation. Loud-fail belongs in the parser. Lands in DRAIN-5.</p>
+<p><span class="pill">N4 · P3</span><b>Escalation-note tail loss.</b> <code>note[4096]</code> receives template (&le;2048) + <code>{feedback}</code> (&le;4095) + <code>{reason}</code> (&le;1023); <code>dia_render</code> truncates silently (void return) — a long guest feedback can push <code>{reason}</code> off the internal alert. Make <code>dia_render</code> return truncation; callers hard-fail. Lands in DRAIN-5.</p>
+<p><span class="pill">confirmed residuals</span> <code>grab_str</code> still mangles <code>\uXXXX</code> → <code>uXXXX</code> inside <code>illness.reason</code> (<code>pirun_run.c:155</code>). ANSI/CP-1252 <code>.pi</code> currently fails LOUD (invalid UTF-8 → jacket 400) but with a misleading message. TOFU seal unchanged (<code>dia.c:326-329</code>).</p>
+<p><span class="pill">observation</span> The runway for fold-in-C is already paved in the shipped files: the <code>.si</code> declares <code>out: illness.verdicts</code> (unwritten by C today), the <code>.sm</code> carries the pub <code>pantheon.fold</code> row, and the jacket already dual-emits raw <code>verdicts[]</code> (<code>Program.cs:2118/2150/2170</code>). Also: <code>dia.c:139-147</code> parses <code>set:</code> pairs that nothing consumes yet — DRAIN-3's hook is pre-built.</p>
+</div>
+
+<h2>Part 2 — The design: drain what's left, in risk order</h2>
+
+<h3>Need</h3>
+<p>The WORDS drain proved the pattern: the operator's sealed bytes run on the wire; the jacket is transport. Three things still live in C# that belong to the operator or to C: <b>the fold</b> (the guest-safety law itself), <b>the roster + tag/priority</b> (policy values), and <b>the .sm's honesty</b> (hand-drafted today — the catalog could lie). Plus the loud-fail hygiene Part 1 sharpened.</p>
+
+<h3>Sourced solution — what already helps (REUSE)</h3>
+<ul>
+<li>Jacket already emits raw <code>verdicts[]</code> per model with verdict-line + error — the dual-emit half of the cutover is LIVE.</li>
+<li>The fold law is 40 lines of C# (<code>Program.cs:2116-2159</code>) with a mechanical C99 translation; <code>grab_str</code>/strstr response parsing already exists in pi_run.</li>
+<li><code>.sm</code> row <code>pantheon.fold</code> (pub), <code>.si</code> key <code>illness.verdicts</code>, and <code>set: panel.models / panel.fold / escalation.tag / escalation.priority</code> are all pre-declared; <code>dia.c</code> parses <code>set:</code> into <code>set_k/set_v</code> today.</li>
+<li>The prompt-drain pattern (ship value + reject-when-absent-from-a-drained-caller) is the template for tag/priority/roster.</li>
+<li>biRT (<code>dia_verify</code>) is the natural home for the N1/N2 teeth — both are &lt;15-line checks against data it already loads.</li>
+</ul>
+
+<h3>Literal naming</h3>
+<p><code>pantheon_fold()</code> in <code>intelligence/pantheon/pantheon.c</code> — the unanimous-safe fold, pure C, named for what it is. Sequence items named DRAIN-1..5.</p>
+
+<h3>Shape — the sequence (risk + value + dependency)</h3>
+
+<table>
+<tr><th>#</th><th>Item</th><th>REUSE / NEW</th><th>Pts</th><th>Why this slot</th></tr>
+<tr><td>1</td><td><b>DRAIN-2a — <code>pantheon_fold</code> in C, SHADOW mode</b>: split illness into two .si units (panel → <code>illness.verdicts</code>; fold binds <code>pantheon.fold</code>, why:D5). C folds the raw verdicts AND compares to the jacket's fold; ANY divergence → <code>detected=true</code> + <code>fold.mismatch</code> in the ledger.</td><td>REUSE: verdicts[] live, fold law is a translation, .sm/.si rows pre-declared. NEW: pantheon.c (~80 LoC), verdict parse, the .si split.</td><td>3</td><td>THE centerpiece, and shadow mode is zero-risk: divergence can only make the outcome MORE conservative. Everything else queues behind it.</td></tr>
+<tr><td>2</td><td><b>DRAIN-2b — canary + writer-stop</b>: planted-divergence test proves the hold; N green sandbox runs with <code>fold.src=C</code>; THEN gcp-bridge demotes its folded fields (advisory one rev, deleted next). Jacket returns RAW only.</td><td>REUSE: the dianoia e2e harness + canary discipline from the prompt drain.</td><td>3</td><td>Reader is proven before the writer stops — the no-gap law (below).</td></tr>
+<tr><td>3</td><td><b>DRAIN-3 — <code>set:</code> → wire</b>: pi_run injects <code>set:</code> pairs into unit payloads. <code>panel.models</code> ships to gcp-bridge (kills the <code>Program.cs:2108</code> roster hardcode); <code>escalation.tag/priority</code> ship to zendesk-bridge (kills its last hardcodes). Drained caller omitting them → 400, same law as the prompt. <code>panel.fold</code> never rides the wire — after DRAIN-2 the fold is local C reading its own <code>.si</code>. <b>Rider (+1):</b> note/subject wire hash for the Zendesk leg — symmetric with the panel leg, ~18 lines both ends, do it while both payloads are open.</td><td>REUSE: set_k/set_v parsed; prompt-drain reject pattern. NEW: payload injection + two jacket reads.</td><td>3</td><td>Low risk; rides the same wire surfaces DRAIN-2 just touched; jackets become pure transport.</td></tr>
+<tr><td>4</td><td><b>DRAIN-5 — loud-fail hygiene + biRT tooth</b>: (a) N1 rule — in-sig names <code>words</code> ⇒ unit must declare <code>words:</code>; (b) <code>dia_load_pi</code> REFUSES a &gt;cap words body (N3); (c) <code>dia_render</code> returns truncation, callers hard-fail (N4); (d) <code>grab_str</code> stops mangling <code>\u</code>; (e) pi_run validates the <code>.pi</code> is UTF-8 at load, refuses with a clear message (CP-1252 guard).</td><td>REUSE: all point-edits to existing functions.</td><td>3</td><td>Kills the moved-bug (N1) and every silent-truncation edge cheaply, before the generator work.</td></tr>
+<tr><td>5</td><td><b>DRAIN-4 — <code>.sm</code> generated from C headers</b>: C99 build tool (no .py) scans skill headers — pub from the .h, priv from <code>static</code> — emits nous.sm rev-stamped; pi_run refuses <code>.sm</code> rev != binary rev. Include N2 here: role-tagged words syntax (<code>note=</code>/<code>subject=</code>) in .si + biRT check, killing the substring router.</td><td>REUSE: .sm format + parser exist; header conventions. NEW: the generator + rev handshake + role tags.</td><td>5</td><td>Protective, not blocking — the catalog can't lie, but nothing upstream waits on it. Largest item, last.</td></tr>
+</table>
+
+<h3>The fold-in-C cutover — no window where nobody (or both, leniently) folds</h3>
+<div class="card">
+<table>
+<tr><th>Phase</th><th>Jacket</th><th>pi_run (C)</th><th>Who decides <code>detected</code></th></tr>
+<tr><td><b>A — today (LIVE)</b></td><td>Folds + already emits raw verdicts[]</td><td>Reads folded fields only</td><td>Jacket</td></tr>
+<tr><td><b>B — shadow (DRAIN-2a)</b></td><td>Unchanged</td><td>Runs <code>pantheon_fold</code> on verdicts[]; compares to jacket's fold; divergence ⇒ <code>detected=true</code> + fail:hold; missing/unparseable verdicts[] ⇒ hard-fail</td><td>Both must agree, disagreement escalates — strictly more conservative than either alone</td></tr>
+<tr><td><b>C — canary</b></td><td>Unchanged</td><td>Planted-divergence run proves the hold; N green sandbox e2e with <code>fold.src=C</code> in the ledger</td><td>Proof gate, no behavior change</td></tr>
+<tr><td><b>D — writer stops (DRAIN-2b)</b></td><td>Rev 1: folded fields demoted to advisory. Rev 2: raw only</td><td>C fold authoritative; absence of verdicts[] stays a hard-fail</td><td>C — the .si names the fold, biRT verifies the bind, why:D5 attaches to the fold unit</td></tr>
+</table>
+<p><b>Deploy order (reader before writer-stops):</b> pi_run Phase B ships FIRST against the unchanged live jacket; only after Phase C's green streak does a gcp-bridge rev demote/remove its fold. <b>No-gap proof:</b> at every instant at least one party computes <code>detected</code>; in the overlap the divergence-escalates rule means "both fold" can never be more lenient than either alone; "nobody folds" is impossible because pi_run hard-fails (fail:hold, D5) when verdicts[] is absent — an old jacket + new pi_run degrades to shadow mode, a new jacket + old pi_run cannot be deployed (writer-stop is gated on Phase C). <b>Rollback at any phase:</b> pi_run prefers the jacket's fold again; the jacket keeps dual-emitting until C's fold owns a green streak.</p>
+</div>
+
+<h3>First move</h3>
+<p><b>DRAIN-2a — shadow <code>pantheon_fold</code> (3 pts).</b> The runway is pre-paved (.sm row, .si key, live verdicts[]), the translation is mechanical, and shadow mode cannot make the guest-safety path more lenient — only louder. It unblocks the writer-stop, and DRAIN-3's fold-law question answers itself once the fold is local.</p>
+
+<h3>Escape routes — what we're honestly skipping</h3>
+<ul>
+<li><b>TOFU seal out-of-band pin — SKIP for now.</b> The .seal guards accidental edits; an adversary who writes the .pi writes the .seal. Pinning buys nothing until a partial-write threat model exists. Natural revisit: the D14 moment (jc arms prod).</li>
+<li><b>Zendesk note-leg hash as its own item — SKIP;</b> demoted to a +1 rider on DRAIN-3. A corrupted internal note is read by a human and loud by nature; symmetry is worth 18 lines in a commit already touching both payloads, not a board item.</li>
+<li><b><code>grab_str</code> full JSON decoding — SKIP;</b> just stop the <code>\u</code> mangle (preserve or minimally decode). A real parser is over-tooling for service-built responses.</li>
+<li><b>Retro-editing the legacy .pi path — SKIP.</b> It stays byte-for-byte until the dianoia path retires it.</li>
+</ul>
+
+<h2>DoD — this artifact</h2>
+<ul data-cm="part-2-the-design-drain" class="dod">
+<li><span class="ok">✓</span> A-D-D verified (re-review performed against the shipped code, findings cite file:line; design mined from board DIA-DRAIN + the live .pi/.si/.sm triplet)</li>
+<li><span class="ok">✓</span> Part-1 verdict delivered: 5/5 round-2 fixes HELD; no new P0/P1; N1-N4 named with evidence</li>
+<li><span class="ok">✓</span> All remaining work factored: 5 sequenced items, REUSE cited, Fibonacci-estimated (3+3+3+3+5), risk-ordered</li>
+<li><span class="ok">✓</span> Fold-in-C cutover designed concretely: 4 phases, reader-before-writer-stop, no-gap proof, rollback</li>
+<li><span class="ok">✓</span> The ONE next move named: DRAIN-2a shadow fold, 3 pts</li>
+<li><span class="ok">✓</span> Honest skip list (TOFU pin, note-hash-as-item, full JSON decode)</li>
+<li><span class="mut">—</span> Read-only session: no code changed; board updates belong to the executing session</li>
+</ul>
+
+<footer>Generated 2026-07-16 21:31 · Be · Fable5 re-review + ~d · sources: metal a70517f, pirun_run.c, dia.c/dia.h, gcp-bridge Program.cs, argus board DIA-DRAIN, mendo-nps-detractor-triage.pi/.si/.sm</footer>
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"56eec626-9fe5-44c8-b9ef-a2a7d494e803"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

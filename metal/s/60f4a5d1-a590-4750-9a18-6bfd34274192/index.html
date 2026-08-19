@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research — How Internal Comments Are Really Made on Prod NPS Tickets</title>
+<style>
+  body { background:#111111; color:#ddd; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+         margin:0; line-height:1.55; }
+  .nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF;
+         display:flex; justify-content:space-between; align-items:center; padding:10px 24px; }
+  .nav .brand { color:#6FC3DF; font-weight:bold; font-size:18px; }
+  .nav .pub { color:#777; font-size:12px; }
+  main { max-width:800px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { color:#6FC3DF; font-size:24px; }
+  h2 { color:#6FC3DF; font-size:18px; margin-top:32px; border-bottom:1px solid #2a2a2a; padding-bottom:6px; }
+  .card { background:#1A1A1A; border-radius:6px; padding:14px 18px; margin:14px 0; }
+  code, pre { font-family:Consolas,monospace; font-size:13px; }
+  pre { background:#0c0c0c; border:1px solid #2a2a2a; border-radius:4px; padding:12px; overflow-x:auto; color:#bbb; }
+  .good { color:#7fd47f; } .bad { color:#e07070; } .muted { color:#888; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  td, th { border:1px solid #2a2a2a; padding:6px 10px; text-align:left; vertical-align:top; }
+  th { color:#6FC3DF; background:#161616; }
+  footer { color:#666; font-size:12px; text-align:center; padding:20px; border-top:1px solid #2a2a2a; }
+</style>
+</head>
+<body>
+<nav class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-16 · Argus / Purcius</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/60f4a5d1-a590-4750-9a18-6bfd34274192/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>How Internal Comments Are Really Made on Prod NPS Tickets</h1>
+<p class="muted">Read-only forensics against live production Zendesk (mendocinofarms tenant) via zendesk-bridge.
+190 unique NPS tickets pulled: 100 &ldquo;Follow Up On Your Mendo Feedback&rdquo; + 80 &ldquo;Guest Alert &ndash; Detractor&rdquo;
+(plus 10 alert-family overlap in the first sweep). Every comment on every ticket inspected:
+<code>public</code>, <code>via.channel</code>, <code>via.source</code>, <code>author_id</code>, ticket
+<code>email_cc_ids</code>/<code>collaborator_ids</code>/<code>follower_ids</code>. Staff and guest names redacted per Rule 8.</p>
+
+<h2>1 · The counts</h2>
+<div data-cm="1-the-counts" class="card">
+<table>
+<tr><th>Family</th><th>Tickets</th><th>&ge;1 internal comment (public=false)</th></tr>
+<tr><td>Follow Up On Your Mendo Feedback</td><td>100</td><td>17 (17%)</td></tr>
+<tr><td>Guest Alert &ndash; Detractor</td><td>80</td><td>4 (5%) &mdash; 68/80 are single-comment (alert lands, worked silently)</td></tr>
+</table>
+<br>
+Internal-comment channel histogram (all internal comments in sample):
+<code>api</code> = 11 &nbsp;·&nbsp; <code>email</code> = 10 &nbsp;·&nbsp; <code>web</code> = 6 &nbsp;·&nbsp;
+<span class="bad"><code>side_conversation</code> = 0</span>.
+Side conversations were checked across <b>every</b> comment (public and private) in the sample: <b>zero</b>.
+</div>
+
+<h2>2 · The three real mechanisms (evidence, not guesses)</h2>
+<div data-cm="2-the-three-real-mechanisms" class="card">
+<b>A &mdash; API tool note (&ldquo;Recovered by Shredder&rdquo;) &mdash; 10 tickets, the most common.</b><br>
+<code>via.channel=api</code>, <code>public=false</code>, body is exactly <code>Recovered by Shredder</code>.
+Authors are real Guest Relations agents (one author id resolves as assignee on 10,184 tickets, another on 1,138 &mdash;
+only agents can be assignees). A recovery tool posts a private audit note on the ticket through the API under the
+agent&rsquo;s identity. Examples: tickets 440806, 435485, 429999, 428581, 423532.
+</div>
+<div class="card">
+<b>B &mdash; CC&rsquo;d staff replying by email &rarr; Zendesk auto-converts to internal note &mdash; 7 tickets.</b><br>
+The Guest Relations agent sends the public recovery reply to the guest with field management on
+<code>email_ccs</code> (store manager, ops leadership). When one of those CC&rsquo;d staff members hits reply-all from
+their inbox, Zendesk ingests the email into the ticket as a comment with <code>via.channel=email</code> and marks it
+<code>public=false</code> (comment metadata shows <code>trusted:false</code>, flags <code>[15,2]</code>).
+This is Zendesk&rsquo;s documented CCs-and-followers rule: replies from CC&rsquo;d <i>staff</i> become internal notes;
+replies from the CC&rsquo;d <i>guest</i> (end user) stay public &mdash; both behaviors observed on the same ticket (454047).
+Smoking gun on 454047: a staff member&rsquo;s user id sits in the ticket&rsquo;s <code>email_cc_ids</code>, their
+reply-all landed as <code>public=false</code> with internal store addresses in
+<code>via.source.from.original_recipients</code>, and the guest&rsquo;s next public reply thanks that person by first name.
+Examples: tickets 454047, 448850, 443210, 441745, 450763, 444462.
+</div>
+<div class="card">
+<b>C &mdash; Agent-typed internal note in the agent UI &mdash; 6 comments.</b><br>
+<code>via.channel=web</code>, <code>public=false</code>, author is a Guest Relations agent. Bodies are short
+agent-to-agent working notes: <code>Dupe</code> (tickets 455091, 435800), an order number (385745), and a four-message
+internal dialogue on alert ticket 437895 where an ops leader&rsquo;s <i>email</i> replies (mechanism B) interleave with the
+agent&rsquo;s <i>web</i> notes.
+</div>
+
+<h2>3 · Verdict on the hypothesis</h2>
+<div data-cm="3-verdict-on-the-hypothesis" class="card">
+<b>jc was right that the internal comment is not &ldquo;a CC.&rdquo;</b> No internal comment is created <i>by</i> the CC
+mechanism, and none is a side conversation (0 in 190 tickets). Every internal comment is an <b>internal note on the same
+ticket</b> &mdash; posted via API (tool), via ingestion of a CC&rsquo;d staff email reply, or typed in the agent UI.
+CCs are heavily used (63/100 follow-ups, 47/80 alerts carry <code>email_cc_ids</code>) but only as the <i>transport</i>
+that loops field management into the guest-facing reply &mdash; their responses then land as internal notes.
+No group reassignment observed either: all 190 tickets sit in the same Guest Relations group.
+</div>
+
+<h2>4 · Implication for illness_escalate</h2>
+<div data-cm="4-implication-for-illness-escalate" class="card">
+Match prod practice: <b>post an internal note (<code>public=false</code>) on the alert ticket via the API</b> &mdash;
+exactly the pattern the existing machine partner (&ldquo;Shredder&rdquo;) already uses and agents already read.
+Not a side conversation (never used here), not a CC (that is the guest-facing loop-in channel, and an illness
+escalation must not ride a guest-visible reply), not a group reassign (single-group shop).
+If field management must additionally be pulled in, the prod-native follow-up is the CC on the eventual public
+recovery reply &mdash; but the escalation artifact itself is the private API note.
+</div>
+
+<h2>DoD</h2>
+<div data-cm="dod" class="card">
+<pre>
+✓ Read-only (GET only; zero writes to prod or sandbox)
+✓ Sample size (190 unique tickets, both families, ~286 comments inspected)
+✓ Evidence per claim (counts + ticket ids + via/public/author fields)
+✓ Rule 8 (staff/guest names + emails redacted from this artifact)
+✓ Hypothesis settled (internal note, three creation paths; CC ruled out as the mechanism; side conversation ruled out)
+</pre>
+</div>
+
+</main>
+<footer>metal console · Be · v0 · r647 · 2026-07-16 · Argus — prod internal-comment forensics</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"60f4a5d1-a590-4750-9a18-6bfd34274192"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

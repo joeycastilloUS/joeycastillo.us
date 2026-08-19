@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~d~p~e — deterministic recover-guest .pi — Argus</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111111; color:#ddd; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  .nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  .nav .brand { color:#6FC3DF; font-weight:bold; font-size:18px; }
+  .nav .pub { color:#777; font-size:12px; font-weight:normal; }
+  .wrap { max-width:800px; margin:0 auto; padding:32px 24px 64px; }
+  h1 { color:#6FC3DF; font-size:26px; margin:8px 0 4px; }
+  h2 { color:#6FC3DF; font-size:20px; margin:36px 0 12px; border-bottom:1px solid #2a2a2a; padding-bottom:6px; }
+  h3 { color:#eee; font-size:15px; margin:20px 0 8px; }
+  p, li { font-size:14px; color:#ccc; }
+  ul, ol { margin:6px 0 12px 22px; }
+  .sub { color:#888; font-size:13px; margin-bottom:24px; }
+  .card { background:#1A1A1A; border:1px solid #2a2a2a; border-radius:6px; padding:16px 18px; margin:12px 0; }
+  code, .mono { font-family:Consolas,Menlo,monospace; font-size:13px; color:#9fd8ea; }
+  pre { background:#0c0c0c; border:1px solid #2a2a2a; border-radius:6px; padding:14px; overflow-x:auto; font-size:12.5px; line-height:1.5; color:#bbb; margin:10px 0 16px; }
+  table { width:100%; border-collapse:collapse; margin:10px 0 16px; font-size:13.5px; }
+  th { text-align:left; color:#6FC3DF; border-bottom:1px solid #333; padding:6px 8px; }
+  td { border-bottom:1px solid #222; padding:6px 8px; vertical-align:top; }
+  .k { color:#6FC3DF; }
+  .hard { color:#e08080; font-weight:bold; }
+  .ok { color:#7fd48a; }
+  .badge { display:inline-block; background:#0c2a33; color:#6FC3DF; border:1px solid #6FC3DF; border-radius:4px; font-size:11px; padding:1px 8px; margin-right:8px; vertical-align:middle; }
+  .footer { color:#666; font-size:12px; margin-top:48px; border-top:1px solid #2a2a2a; padding-top:14px; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <span class="brand">Be</span>
+  <span class="pub">Published 2026-07-15 · Argus / Purcius</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/4de4e300-fcfb-44e4-a8a8-efaa2c2ba299/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+
+<h1>Deterministic recover-guest .pi</h1>
+<p class="sub">~d + ~p + ~e · NPS-detractor guest recovery: scan &rarr; identify &rarr; react · card: <code>C:\argus\be\pi\recover-guest.pi</code> (v4, pirun protocol[] form) · env: sandbox · prod disarmed</p>
+
+<!-- ================= ~d DESIGN ================= -->
+<h2><span class="badge">~d</span>DESIGN</h2>
+
+<h3>Need</h3>
+<p>Detractor Guest Experience Alerts land in Zendesk and wait on a human. The recovery reply is
+already a fixed house artifact (the "Digital I'm Sorry" macro, Tyler's voice, an IMSORRY code) —
+it should fire itself, deterministically, at $0, the moment a clean detractor appears. Same input
+&rarr; same output, always. Illness never gets a reply. That is the whole need.</p>
+
+<h3>Raw User Stories</h3>
+<div class="card">
+<ul>
+  <li>"This Guest Experience Alert NPS-detractor event is the first event we key from to then auto-reply to the guest. Generate this auto response and post it to zendesk and zd sends the email and it looks handled."</li>
+  <li>"we just quite simply need scan, identify, react all based on defined .pi"</li>
+  <li>"I want .pi and i want it deterministic and i want it now."</li>
+</ul>
+</div>
+
+<h3>Sourced Solution</h3>
+<p>Nothing invented — every part exists and gets wired:</p>
+<ul>
+  <li><span class="k">pirun</span> (<code>src/sdk/nous/action/skill/pirun</code>) — the .pi step runtime. Policy as data: the card's protocol[] drives everything; the run ledger (nous IDS) carries all state; crash-safe, one unit per advance.</li>
+  <li><span class="k">nous understand / reason / restate</span> — pure C99, 28 invariant operators, cannot hallucinate. IDENTIFY rules, classification, name/audit reasoning, byte-verbatim skeleton assembly.</li>
+  <li><span class="k">zendesk-bridge</span> (C# jacket) — <code>zread</code> (alert fetch, handled-check, guest name) + <code>reply_send</code> (FollowUpTicket write, the proven lane: new ticket, requester = guest, PUBLIC comment &rarr; ZD emails the guest — receipt: guest Lara on #456251).</li>
+  <li><span class="k">gcp-bridge Firestore vault</span> (standalone GCP, never Firebase) — <code>claim_code</code>: atomic, idempotent IMSORRY claim, synced from the brand's Sheet.</li>
+  <li><span class="k">corpus / IDS (deatomizer)</span> — <code>corpus_match</code>: closest past real reply, shown as the MATCH beside the .pi output. Display only; .pi stays authoritative.</li>
+  <li><span class="k">vertex_panel</span> — the gang of three: 3 Vertex models, panel, agreement-gated. Bounded to one job: the empathy sentence when the deterministic map misses. The only non-$0 line.</li>
+</ul>
+
+<h3>Naming</h3>
+<p>Literal, no themes: card <code>recover-guest.pi</code>; units <code>scan_alert, gate_illness,
+gate_not_detractor, gate_handled, classify, resolve_name, claim_code, empathy_map, empathy_panel,
+compose, corpus_match, send, audit</code>; skills <code>zread, understand, reason, restate,
+claim_code, vertex_panel, corpus_match, reply_send</code>. Every name says exactly what it does.</p>
+
+<h3>Shape — the protocol[] and where determinism is enforced</h3>
+<pre>
+ 1  scan_alert          zread          alert fields -> ledger                    auto/abort
+ 2  gate_illness        understand     HARD LAW: illness -> exit (escalate only) exit/abort
+ 3  gate_not_detractor  understand     nps<=6 + event rule, else exit            exit/abort
+ 4  gate_handled        zread          follow-up exists -> exit (idempotency)    exit/abort
+ 5  classify            understand     complaint -> fixed category set           auto/abort
+ 6  resolve_name        zread          ZD profile -> local-part -> "there"       auto/hold
+ 7  claim_code          claim_code     atomic vault claim; empty -> HOLD         auto/hold
+ 8  empathy_map         restate        fixed category->dialect map (Tyler)       auto/abort
+ 9  empathy_panel       vertex_panel   BOUNDED fallback; $0 passthrough on hit   auto/continue
+10  compose             restate        byte-verbatim skeleton + slots            auto/abort
+11  corpus_match        corpus_match   MATCH view, never blocks                  auto/continue
+12  send                reply_send     sandbox auto (Q2) — PROD flips to fire    auto/hold
+13  audit               reason         react record + run.cost_usd               auto/continue
+</pre>
+<p><b>Determinism is enforced at three points.</b> (1) IDENTIFY = pure rules over understand()'s
+28 invariant operators — units 2–4 are exit gates, no inference. (2) REACT assembly = fixed
+byte-verbatim skeleton + slots read straight from the alert (units 6, 7, 10). (3) The empathy is
+chosen deterministically by the category&rarr;dialect map (unit 8); the 3-Vertex panel (unit 9)
+exists <em>only</em> behind a map miss, and its 3-way agreement gate makes even that path
+effectively deterministic — disagreement falls back to the safe generic empathy, never a coin
+flip. Data-flow law: everything moves through the run ledger; operator edits are authoritative.</p>
+
+<h3>First Move</h3>
+<p>Build the C99 pirun host: register <code>PIRUN_SKILLS[]</code> with the three nous skills plus
+stubs, load <code>recover-guest.pi</code>, run a real alert to slice-end, and read the ledger
+trace. Everything after that is filling in skills.</p>
+
+<h3>Escape Routes</h3>
+<ul>
+  <li><span class="hard">Illness</span> — exit gate, host escalates to the manager lane. No draft, no code, ever.</li>
+  <li><b>Vault empty</b> — <code>claim_code</code> fails to <code>hold</code>; operator refills; never invent a code.</li>
+  <li><b>Panel disagreement / Vertex outage</b> — safe generic empathy, <code>fail: continue</code>; the send still goes.</li>
+  <li><b>Webhook drop</b> — the 15-minute sweep reconciles; <code>gate_handled</code> makes the overlap idempotent.</li>
+  <li><b>Prod</b> — the <code>send</code> unit flips <code>gate: auto</code> &rarr; <code>gate: fire</code>: runtime stops AWAIT_FIRE, armed, visible, DISARMED. Only jc arms prod.</li>
+</ul>
+
+<!-- ================= ~p PLAN ================= -->
+<h2><span class="badge">~p</span>PLAN</h2>
+
+<h3>Intent</h3>
+<p>Make <code>recover-guest.pi</code> v4 actually run end-to-end in the brand sandbox: dual-trigger
+scan, deterministic identify + react, auto-respond (Q2), cost reported, MATCH shown.</p>
+
+<h3>Scope</h3>
+<p>In: the pirun host, the eight skills in the card, the category&rarr;empathy map, the determinism
+replay test, sandbox send. Out: prod arming (jc only), Q6 (deferred), any UI beyond the MATCH
+side-by-side view.</p>
+
+<h3>Approach</h3>
+<p>Host first, then skills in dependency order, deterministic path before the bounded fallback.
+Each phase is a paired verify loop (<code>~b~t</code>): the phase ships with its test green or it
+isn't done.</p>
+
+<h3>Phases</h3>
+<table>
+<tr><th>#</th><th>Phase</th><th>Build step</th></tr>
+<tr><td>P1</td><td>pirun host</td><td>C99 exe: <code>PIRUN_SKILLS[]</code> with understand/reason/restate registered + stubs; <code>pirun_load</code> the v4 card; run to slice-end; trace renders.</td></tr>
+<tr><td>P2</td><td>zread</td><td>Wire zendesk-bridge reads: <code>scan_alert</code> fields, <code>gate_handled</code> lookup, <code>resolve_name</code> fallback chain (profile &rarr; local-part &rarr; "there").</td></tr>
+<tr><td>P3</td><td>claim_code</td><td>gcp-bridge Firestore vault: Sheet sync, atomic per-ticket claim, spent-once, empty &rarr; hold.</td></tr>
+<tr><td>P4</td><td>deterministic empathy + compose</td><td>Derive the category&rarr;dialect map from Tyler's 5 real replies; <code>empathy_map</code> + <code>compose</code>; byte-test: skeleton reproduces a real reply byte-identical.</td></tr>
+<tr><td>P5</td><td>vertex_panel</td><td>3 Vertex models, agreement gate, $0 passthrough on map hit, generic on disagreement, <code>empathy.cost_usd</code> reported.</td></tr>
+<tr><td>P6</td><td>corpus_match</td><td>Precedent match from the IDS history corpus; MATCH rendered side-by-side with <code>reply.body</code>.</td></tr>
+<tr><td>P7</td><td>send + triggers + determinism proof</td><td><code>reply_send</code> sandbox; webhook + 15-min sweep both calling <code>pirun_start</code>; replay test: same alert &rarr; identical <code>reply.body</code> bytes; overlap test: sweep after webhook &rarr; <code>gate_handled</code> exits.</td></tr>
+</table>
+
+<h3>Constraints</h3>
+<ul>
+  <li>Owned code C99; C# only for the zendesk-bridge / gcp-bridge jackets; no Python in production.</li>
+  <li>Never Firebase — Firestore via standalone GCP only.</li>
+  <li>Illness = detection/escalation only. Hard law, unit 2, exit gate.</li>
+  <li>Sandbox only (<code>mendocinofarms1781637851</code>); prod send is a disarmed fire gate; jc arms.</li>
+  <li>Deterministic &gt; clever. Same input &rarr; same output is the acceptance test, not a nice-to-have.</li>
+</ul>
+
+<h3>Unknowns</h3>
+<ul>
+  <li>Sandbox webhook payload shape for the detractor trigger — assumed to carry ticket_id; verify at P7.</li>
+  <li>Map coverage: what fraction of real feedback classifies into a clean category (drives how often the panel fires).</li>
+  <li>Panel agreement rate across the 3 Vertex models on real complaints.</li>
+  <li>$10 vs $20 selection policy — vault-driven today; jc may want a severity rule.</li>
+</ul>
+
+<h3>When To Revisit</h3>
+<p>After the first sandbox week of real alerts: if map-miss rate &gt; 20%, expand the map (drive the
+panel toward $0); if panel disagreement &gt; 10%, revisit the panel prompt or widen the generic;
+when jc says "arm prod", flip <code>send</code> to <code>gate: fire</code> and hand him the trigger.</p>
+
+<!-- ================= ~e ESTIMATE ================= -->
+<h2><span class="badge">~e</span>ESTIMATE</h2>
+<table data-cm="ddesign">
+<tr><th>Phase</th><th>What</th><th>Points</th></tr>
+<tr><td>P1</td><td>pirun host + card loads + slice-end</td><td>3</td></tr>
+<tr><td>P2</td><td>zread (scan / handled / name)</td><td>3</td></tr>
+<tr><td>P3</td><td>claim_code vault</td><td>5</td></tr>
+<tr><td>P4</td><td>empathy map + compose + byte-test</td><td>5</td></tr>
+<tr><td>P5</td><td>vertex_panel agreement gate</td><td>3</td></tr>
+<tr><td>P6</td><td>corpus_match MATCH view</td><td>3</td></tr>
+<tr><td>P7</td><td>send + dual-trigger + determinism proof</td><td>5</td></tr>
+<tr><td colspan="2"><b>Total</b></td><td><b>27</b></td></tr>
+</table>
+<p><b>Critical path:</b> P1 &rarr; P2 &rarr; P4 &rarr; P7 (16 pts) — host, reads, the deterministic
+reply, the proven send. P3, P5, P6 hang off it in parallel. <span class="ok">Cost at runtime:
+$0.00 per react on a map hit; est. &le; ~$0.003 on a panel fallback — the only non-$0 line,
+reported per run as <code>run.cost_usd</code>.</span></p>
+
+<div class="footer">metal console · Be · v0 · r628 · 2026-07-15 · Argus — deterministic recover-guest .pi</div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"4de4e300-fcfb-44e4-a8a8-efaa2c2ba299"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

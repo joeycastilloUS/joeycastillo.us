@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~i — Network drift detection: the ground</title>
+<style>
+  :root { --bg:#111111; --surface:#1A1A1A; --accent:#6FC3DF; --fg:#e8e8e8; --muted:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; background:#000; border-bottom:2px solid var(--accent);
+        padding:.7rem 1.2rem; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  nav .brand { color:var(--accent); font-weight:700; letter-spacing:.08em; }
+  nav .pub { color:var(--muted); font-size:.72rem; }
+  main { max-width:800px; margin:0 auto; padding:2rem 1.2rem 4rem; }
+  h1 { font-size:1.7rem; margin:.2rem 0 .3rem; }
+  h2 { font-size:1.15rem; margin:2.4rem 0 .7rem; color:var(--accent);
+       border-bottom:1px solid #2a2a2a; padding-bottom:.35rem; }
+  h3 { font-size:.98rem; margin:1.5rem 0 .4rem; color:#cfe9f3; }
+  .sub { color:var(--muted); font-size:.85rem; margin-bottom:1.6rem; }
+  .box { background:var(--surface); border:1px solid #262626; border-radius:6px;
+         padding:1rem 1.1rem; margin:1rem 0; }
+  .verdict { border-left:3px solid var(--accent); }
+  table { width:100%; border-collapse:collapse; margin:1rem 0; font-size:.82rem; }
+  th, td { text-align:left; padding:.45rem .55rem; border-bottom:1px solid #262626; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; font-size:.74rem; text-transform:uppercase; letter-spacing:.05em; }
+  code { background:#000; padding:.1rem .35rem; border-radius:3px; font-size:.85em; color:#bfe9f7; }
+  pre { background:#000; padding:.8rem 1rem; border-radius:5px; overflow-x:auto; font-size:.78rem; }
+  .yes { color:#7ddf8f; font-weight:600; }
+  .no { color:#e07b7b; font-weight:600; }
+  .part { color:#e0c97b; font-weight:600; }
+  ul { padding-left:1.3rem; } li { margin:.3rem 0; }
+  ol { padding-left:1.3rem; } ol li { margin:.45rem 0; }
+  .split { background:#1d1614; border-left:3px solid #e0a07b; }
+  .agree { background:#141c17; border-left:3px solid #7ddf8f; }
+  .corr { background:#1a1420; border-left:3px solid #b48fd9; }
+  footer { color:var(--muted); font-size:.78rem; border-top:1px solid #262626;
+           margin-top:3rem; padding-top:1rem; }
+  .dod li { font-size:.83rem; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-08-01 16:15 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/9e8f6eb2-3962-44e3-9b75-fc19c51e5275/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~i — Network drift detection: the ground</h1>
+<div class="sub">Argus &middot; acmedevUS/argus &middot; v0 &middot; r1014 &middot; 2026-08-01<br>
+Operator ask: <i>"detect drift when any network changes."</i><br>
+Paired per Kernel Rule 1 — Opus driver + Fable5 navigator, concurrent independent passes, reconciled in &sect;9.
+Navigator corrected the driver's central lean; the correction is recorded in full.</div>
+
+<div class="box verdict">
+<b>Bottom line.</b> Roughly 80% of what drift detection needs already exists in this repo — and none
+of it is wired together. Meraki emits a 365-day change ledger that a shipped bridge route already
+proxies and <b>nothing consumes</b>. The scheduler → deterministic-classify → Firestore →
+open-endpoint → console-tab rail is built and running in production as <b>Watch</b>. Firestore is
+already bound inside meraki-bridge. The audit already does a sliver of template-drift. What is
+genuinely missing is small: a stored prior snapshot, a diff, an Accept gesture, and a tab.
+<br><br>
+But the change feed <b>cannot</b> be the whole answer — the original 2026-06-10 inspect recorded
+that Meraki logs only <b>~75-80%</b> of config changes, and presence drift (a device appearing, a
+MAC moving) never appears in it at all. The design must consume the feed <i>and</i> snapshot.
+</div>
+
+<h2>1. What the Network tab actually pulls</h2>
+<div class="lk-sec" data-cm="1-what-the-network-tab"><p>One route: <code>/meraki/portmap</code> (<code>bridge/Program.cs:546</code>), called by
+<code>fetchPorts()</code> at <code>web/app/index.html:1264</code>. Shape:</p>
+
+<pre>{ network, name,
+  boundTemplate: { id, name } | null,
+  devices:  [ { serial, name, model, mac } ],
+  switches: [ { serial, name, ports: [ {
+      port, name, vlan, allowedVlans, type, status,
+      poeEnabled, poeDraw,
+      clients: [ { ip, mac, name, lastSeen, status } ]
+  } ] } ] }</pre>
+
+<p>Backing records in <code>bridge/Meraki.cs</code>:</p>
+<pre>SwitchPort(PortId, Name, Enabled, Vlan, Type, AllowedVlans, PoeEnabled)      :12
+SwitchPortStatus(PortId, Status, ClientCount, PowerUsageInWh)                :13
+NetworkInfo(Id, Name, ConfigTemplateId, IsBound)                             :14
+ConfigTemplate(Id, Name)                                                     :15
+WirelessSsid(Number, Name, Enabled)                                          :16</pre>
+
+<p>Clients come from <code>networks/{id}/clients?timespan=86400</code> —
+a <b>24-hour window</b> (<code>Meraki.cs:177</code>). That window is itself a design constraint:
+"this MAC disappeared" only means anything within 24h.</p>
+
+<div class="box split">
+<b><code>portmap</code> drops <code>Enabled</code>.</b> <code>SwitchPort.Enabled</code> is parsed
+(<code>Meraki.cs:204</code>) but is <b>not projected</b> into the port row
+(<code>Program.cs:577</code>). A port being administratively disabled — a classic accidental or
+malicious change — is invisible in the payload the Network tab receives.
+<b>Navigator's catch:</b> <code>/meraki/verify</code> (<code>:528</code>) <i>does</i> return the raw
+port records including <code>Enabled</code>, plus device names. So the data is one route away, not
+one API call away. Driver had the gap; navigator found the existing escape hatch.
+</div></div>
+<h2>2. Meraki already emits a change ledger — and nothing reads it</h2>
+<div class="lk-sec" data-cm="2-meraki-already-emits-a"><p><code>/meraki/changes</code> (<code>Program.cs:429</code>) proxies
+<code>organizations/{org}/configurationChanges</code>. Fields the route's own filter proves are
+present: <code>label</code>, <code>page</code>, <code>oldValue</code>, <code>newValue</code>
+(<code>:451</code>), plus Meraki's timestamp and admin. Params: <code>timespan</code> default 30d,
+clamped 1min–365d; <code>perPage</code> ≤ 1000; optional <code>networkId</code> filter (validated
+<code>L_</code>/<code>N_</code>); optional substring <code>q</code>.</p>
+
+<p><code>/meraki/apirequests</code> (<code>:465</code>) proxies <code>organizations/{org}/apiRequests</code>,
+<b>31-day hard cap</b>. Its own comment calls it the <i>"API vs dashboard-UI oracle"</i>: a matching
+entry means the change was made via API; no entry means someone clicked in the Meraki dashboard.</p>
+
+<div class="box split">
+<b>Neither route has a consumer.</b> <code>grep</code> over
+<code>web/app/index.html</code> finds zero calls to <code>/meraki/changes</code> or
+<code>/meraki/apirequests</code>. They shipped as "unbind forensics" and are used ad hoc from the
+command line. The console calls <code>/meraki/portmap</code> and nothing else for this tab.
+</div>
+
+<p><b>Limits that matter:</b> the route is <b>single-page and cursor-less</b> — no pagination, no
+"since last seen" bookmark. DR5's "cursor" is still real work. And
+<code>availabilities/changeHistory</code> — the second half of the design's cheap gate — has
+<b>no bridge route at all</b> (zero matches across <code>bridge/*.cs</code>).</p></div>
+<h2>3. The Watch rail is the drift loop, built for a different subject</h2>
+<div class="lk-sec" data-cm="3-the-watch-rail-is"><p>Board WATCH1, complete 2026-07-07:</p>
+<pre>Cloud Scheduler (*/5)
+  -> POST gcp-bridge /watch/run  (bearer-gated)
+       -> read watch.pi  (instruction as data)
+       -> call meraki-bridge /meraki/map + /meraki/events
+       -> Watch.cs  deterministic classify  (OK / FLAPPING / OFFLINE, no model)
+       -> Firestore  watch_state   (changedAt moves only on a flip)
+  -> GET /watch/state  (open)
+       -> console Watch tab, 45s poll, 15-min staleness banner</pre>
+
+<p>Stated cost: <b>$0/cycle, no model.</b> That is Tier-0 in production today.</p>
+
+<p><b>Reusable:</b> the entire operational skeleton — scheduler tick, <code>.pi</code>
+instruction-as-data, Firestore state doc with flip-only dedup, open read endpoint, console tab with
+a staleness cue.</p>
+
+<p><b>Not reusable:</b> the comparison. Watch compares live metrics against <i>thresholds</i>, not
+against a <i>stored prior snapshot</i>. There is no fingerprint, no baseline, no before→after.
+Drift needs a genuinely new diff engine — but it should be a sibling job on the same rail, not a
+second rail.</p>
+
+<p><b>Constraint:</b> <code>gcp-bridge</code> source is not in this repo and is <b>not cloned on
+this box</b> (<code>C:\gcp-bridge</code> does not exist). Everything above comes from
+<code>be/builds/2026-07-07-1619-report-device-watch-llm-free.html</code> and the console consumer at
+<code>index.html:9454</code>, not from reading <code>Watch.cs</code>.</p></div>
+<h2>4. Persistence already exists inside meraki-bridge</h2>
+<div class="lk-sec" data-cm="4-persistence-already-exists-inside"><p>Named Firestore DB <code>argus</code> (<code>Program.cs:54-57</code>). Collections written today:
+<code>members/{idKey}</code> and <code>sessions/{sid}</code> (auth, <code>:255</code>,
+<code>:391</code>), and <code>settings/argus</code> — a single shared JSON blob with
+<code>updatedAt</code> (<code>:685-701</code>). The established pattern is a document of
+<code>Dictionary&lt;string,object?&gt;</code> via <code>SetAsync</code>, with a <b>server-side
+re-read as the write-gate authority</b> (<code>:711-724</code>) — the browser is never trusted.
+A <code>baselines/{network}</code> + <code>drift/{id}</code> pair drops straight into this shape.
+DR1's "Firestore model" is a collection, not a service.</p></div>
+<h2>5. The Save button is not a snapshot</h2>
+<div class="lk-sec" data-cm="5-the-save-button-is"><p><code>saveMenu(scope)</code> at <code>index.html:9724</code>, engine at <code>:9626</code>.
+Google Sheets (clipboard TSV + <code>sheets.new</code>), Excel (hand-rolled xlsx zip), JSON, CSV,
+Printable HTML, PDF. Data is scraped <b>from the rendered DOM</b> (<code>tableData()</code>,
+<code>:9667</code>) — except the audit tab, which exports the bridge's structured object
+(<code>:9689</code>). Browser download, no server round-trip, no Firestore write, no history.
+Pull timestamps live only in an in-memory JS slot (<code>newSlot()</code>, <code>:1253</code>) and
+die on reload.</p>
+<p><b>No snapshot mechanism exists anywhere in Argus.</b> Save is not a half-built drift feature —
+but its export engine makes DR8 (drift report export) nearly free.</p></div>
+<h2>6. Template-as-baseline: already started, narrower than it looks</h2>
+<div class="lk-sec" data-cm="6-template-as-baseline-already"><p>The audit computes <code>runOverrides</code> for template-bound networks
+(<code>Program.cs:1072</code>) and ships four checks (<code>:1264-1306</code>):</p>
+<table>
+<tr><th>Check</th><th>Compares</th><th>Depth</th></tr>
+<tr><td><code>OVR-IDS</code></td><td>network IDS/IPS mode vs template</td><td>flags only when <i>weaker</i></td></tr>
+<tr><td><code>OVR-AMP</code></td><td>network AMP vs template</td><td>flags only when <i>disabled</i> vs enabled</td></tr>
+<tr><td><code>OVR-SPOOF</code></td><td>IP spoofing mode vs template</td><td>flags only when <i>weaker</i></td></tr>
+<tr><td><code>OVR-L3</code></td><td>L3 firewall vs template</td><td><b>rule COUNT only</b> (<code>:1302</code>) — not content, not order</td></tr>
+</table>
+<p><code>OVR-L3</code>'s own remediation string says <i>"it may be intentional or drift."</i> The
+code already uses the word. But this is appliance-security only — <b>nothing compares switch ports,
+VLANs, or SSIDs to a template.</b></p>
+<div class="box corr">
+<b>Navigator sharpened this.</b> The driver found the OVR-* block and flagged template-drift as
+"partly built." The navigator read further and established <code>OVR-L3</code> is a
+<i>count</i> comparison — meaning a swap of one rule for another, same count, is invisible. Without
+that catch the design would have over-credited existing coverage.
+</div>
+<p><b>The distinction that matters:</b> the audit answers <i>"is this misconfigured against
+policy?"</i> Drift answers <i>"is this different from yesterday?"</i> They overlap only where
+policy happens to equal yesterday. Both are wanted; neither subsumes the other.</p></div>
+<h2>7. Change-class coverage — what "any network changes" can actually mean today</h2>
+<div class="lk-sec" data-cm="7-change-class-coverage-what"><table>
+<tr><th>Change class</th><th>Detectable?</th><th>Via</th><th>Gap</th></tr>
+<tr><td>Port native VLAN</td><td class="yes">YES</td><td>portmap <code>vlan</code> + <code>/meraki/changes</code></td><td>no stored prior</td></tr>
+<tr><td>Allowed-VLAN list</td><td class="yes">YES</td><td>portmap <code>allowedVlans</code></td><td>no stored prior</td></tr>
+<tr><td>PoE toggle</td><td class="yes">YES</td><td>portmap <code>poeEnabled</code></td><td>no stored prior</td></tr>
+<tr><td>Port enable/disable</td><td class="part">PARTIAL</td><td><code>/meraki/verify</code> has it; portmap omits it</td><td>one-line projection fix</td></tr>
+<tr><td>Port name / description</td><td class="yes">YES</td><td>portmap <code>name</code></td><td>—</td></tr>
+<tr><td>Device rename</td><td class="yes">YES</td><td>portmap <code>devices[].name</code></td><td>—</td></tr>
+<tr><td>Device added / removed</td><td class="yes">YES</td><td>portmap/map <code>devices</code></td><td>presence-only; <b>never in the change feed</b></td></tr>
+<tr><td>SSID enable / name</td><td class="yes">YES</td><td><code>/meraki/wireless</code></td><td>—</td></tr>
+<tr><td>SSID auth / encryption</td><td class="part">PARTIAL</td><td>ISource raw <code>wireless-ssids</code> (<code>MerakiSource.cs:29</code>)</td><td>no shaped route</td></tr>
+<tr><td>Firewall rule change</td><td class="no">WEAK</td><td>OVR-L3 count only; feed <code>label</code></td><td><b>no route returns raw L3 rules</b> — content diff impossible</td></tr>
+<tr><td>Template bind / unbind</td><td class="yes">YES</td><td>portmap <code>boundTemplate</code>; <code>/meraki/changes?q=template</code></td><td>—</td></tr>
+<tr><td>Client MAC appears / vanishes</td><td class="yes">YES</td><td>portmap <code>clients[]</code></td><td>24h window; <b>churn source</b></td></tr>
+<tr><td>MAC moved to another port</td><td class="yes">YES</td><td>client <code>Switchport</code> + <code>RecentDeviceSerial</code></td><td>churn source</td></tr>
+<tr><td>Sticky-MAC / access policy</td><td class="part">PARTIAL</td><td>raw <code>switch/ports</code> has <code>accessPolicyType</code>; audit reads it, portmap doesn't project it</td><td>extend projection; <b>no <code>stickyMac</code> field in <code>Meraki.cs</code> at all</b></td></tr>
+<tr><td>VLANs / fixedIp / group policies</td><td class="no">NO</td><td>nothing reads <code>appliance/vlans</code></td><td>DR6 territory, unbuilt</td></tr>
+</table></div>
+<h2>8. The boards vs the design they came from</h2>
+<div class="lk-sec" data-cm="8-the-boards-vs-the"><p>DR1–DR8 = 39 pts, 8 boards, <b>zero items Done, zero In Progress, nothing built in seven weeks.</b></p>
+
+<div class="box split">
+<b>The board contradicts its own design's locked decision.</b> The 2026-06-10 inspect locked six
+decisions. Decision 6 reads, verbatim: <i>"Cadence — change-feed-driven / near-real-time: poll
+Meraki's configurationChanges + events + availabilities/changeHistory; do a full re-snapshot only
+when something actually changed."</i> The design's loop puts <b>GATE first</b>, sweep second.
+<br><br>
+The estimate then split it into two boards and pushed the change-feed gate into Board 2 — its own
+sizing note says Board 2 <i>"widens entity coverage, makes it cheap (the change-feed gate)."</i>
+So DR5 sits blocked behind DR1→DR4, and the cheapness that Decision 6 made structural becomes an
+optimisation you reach fifth.
+<br><br>
+That was defensible in June, when the gate had to be built from scratch and value-proof-first was
+the right call. <b>It is not defensible now:</b> <code>/meraki/changes</code> already ships. The
+sequencing rationale has expired.
+</div>
+
+<h3>What else in the 2026-06-10 design has gone stale</h3>
+<ol>
+<li><b>"The bridge stays a single-purpose read door" is dead.</b> meraki-bridge now has six gated
+    write paths (name, device-name, port-vlan, port-poe, template, remediate ×3) with a settled
+    server-side gate. The argument for a sibling service must be re-made on different grounds
+    (scheduling and diffing are not proxying) — the conclusion may still hold, the reason doesn't.
+    <span class="tag">navigator-only catch</span></li>
+<li><b>DR4/DR8 target <code>/mendo/argus</code></b>, a retired surface. The product is the console
+    with <code>#meraki/&lt;tab&gt;</code> deep links. Drift should be a tab, like Watch.</li>
+<li><b>DR1's "service skeleton" largely duplicates the Watch rail</b>, built a month after the design.</li>
+<li><b>DR5's bridge half already exists</b> — only the cursor/gate logic remains.</li>
+<li><b>Firestore moved into the bridge itself</b>; the design's "cadence stack in
+    acmedev-platform-hq" framing predates that.</li>
+<li><b>The audit's OVR-* checks landed</b> — a live-vs-template comparison the design didn't have.</li>
+</ol>
+<p><b>Still load-bearing and correct:</b> the baseline-scope split, accept-to-re-baseline, the
+fingerprint model, binary severity, the First-Move loop, and the nightly full-reconcile backstop.</p></div>
+<h2>9. Pair reconcile (Rule 1)</h2>
+<div class="lk-sec" data-cm="9-pair-reconcile-rule-1"><div class="box agree">
+<b>Agreed independently, both passes:</b> <code>/meraki/changes</code> wraps
+<code>configurationChanges</code> and has no consumer &middot; Save is export-only with no
+persistence &middot; <code>portmap</code> drops <code>Enabled</code> &middot; Firestore is already
+bound in the bridge with an established pattern &middot; the Watch rail is the reusable skeleton but
+its comparison is threshold-based, not snapshot-based &middot; <code>gcp-bridge</code> is not in this
+repo &middot; DR1–DR8 are entirely unbuilt &middot; <code>/mendo/argus</code> is retired &middot;
+<code>availabilities/changeHistory</code> has no route &middot; <code>WirelessSsid</code> carries no
+auth or encryption fields &middot; the audit's OVR-* checks are partial template drift.
+</div>
+
+<div class="box corr">
+<b>The navigator corrected the driver's central lean. This is the most important line in the document.</b>
+<br><br>
+The driver's pass concluded that because Meraki already emits a change log, drift should
+<b>consume the feed rather than snapshot-and-diff</b> — and framed that as the design pivot.
+<br><br>
+The navigator went back to the 2026-06-10 inspect and found its Escape Routes section already
+recorded that <b>Meraki logs only ~75-80% of config changes</b>, which is precisely why the original
+design mandated a nightly full-reconcile backstop. It further established that the feed has
+<b>no state</b>: it cannot answer "is the network as it should be <i>right now</i>," it misses a
+change that was made and reverted inside the window, and <b>presence drift — a device appearing, a
+MAC moving — never appears in <code>configurationChanges</code> at all.</b>
+<br><br>
+<b>Verdict: consume-AND-snapshot.</b> The feed is the cheap gate and the evidence enricher
+(who/when/old→new). The snapshot-diff is the ground truth. The driver's framing would have shipped
+a detector that silently misses a quarter of config drift and 100% of presence drift.
+<b>Navigator's position stands.</b>
+</div>
+
+<div class="box split">
+<b>Other splits, none resolved silently:</b>
+<ul>
+<li><b><code>OVR-L3</code> is count-only</b> — navigator-only. Driver saw the check and would have
+    over-credited template coverage.</li>
+<li><b><code>/meraki/verify</code> already returns <code>Enabled</code></b> — navigator-only.
+    Driver found the gap but not the existing route that closes it.</li>
+<li><b>ISource raw <code>wireless-ssids</code> entry</b> (<code>MerakiSource.cs:29</code>) —
+    navigator-only. A path to full SSID config the driver missed.</li>
+<li><b><code>accessPolicyType</code> readable but unprojected</b> — navigator-only.</li>
+<li><b>Save scrapes the rendered DOM, except the audit tab</b> — navigator-only, a sharper read
+    than the driver's "it's export-only."</li>
+<li><b>Rate-limit headroom is unquantified</b> — navigator-only. <code>portmap</code> fans out
+    N+2 Meraki calls per network per pull; a 5-minute sweep across 5 networks needs budget maths
+    that exist nowhere in this repo.</li>
+<li><b>The board-vs-Decision-6 contradiction</b> — driver-only. The navigator transcribed DR1–DR8
+    and listed DR5 as blocked, but did not surface that the blocking order contradicts the design's
+    own locked cadence decision.</li>
+<li><b>The six locked decisions, transcribed</b> — driver-only.</li>
+<li><b>The console calls neither <code>/meraki/changes</code> nor <code>/meraki/apirequests</code></b>
+    — driver verified directly by grep; navigator implied it.</li>
+<li><b><code>C:\gcp-bridge</code> does not exist on this box</b> — driver-only. Navigator
+    established it is not in <i>this repo</i>; the driver established it is not cloned <i>anywhere
+    locally</i>, which is the stronger constraint for any plan to extend Watch.</li>
+</ul>
+<b>Navigator verdict: GO</b> — with the consume-AND-snapshot correction binding on the design.
+</div></div>
+<h2>10. Open questions the design must answer</h2>
+<div class="lk-sec" data-cm="10-open-questions-the-design"><ul>
+<li><b>"Any change" invites alert fatigue.</b> Binary severity only works if baseline scope is
+    chosen well. Client MACs on a 24h window will churn constantly. What is baselined vs
+    history-only?</li>
+<li><b>Where does the engine live?</b> New <code>argus-drift</code> service (DR1 + one-service-per-source),
+    a second <code>.pi</code> job on the Watch rail, or inside meraki-bridge (which already holds
+    Firestore and the Meraki key)?</li>
+<li><b>Does <code>configurationChanges</code> record template-bound settings under the network's id
+    or the template's?</b> Unanswered by the code; it determines whether the per-network filter works.</li>
+<li><b>Rate-limit budget</b> for a 5-minute sweep across 5 networks.</li>
+<li><b>Is <code>/meraki/apirequests</code> attribution worth v1?</b> It answers "API or someone
+    clicking in the dashboard" — high operator value, 31-day ceiling.</li>
+<li><b>Accept: per-item or per-field?</b></li>
+<li><b>Firewall content-diff needs a route that doesn't exist</b> — no bridge route returns raw L3 rules.</li>
+</ul></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><ul class="dod">
+<li>&#10003; A-D-D read first — <code>ARCHITECTURE.md</code>; central a-d-d confirmed absent on this box</li>
+<li>&#10003; Paired per Rule 1 — concurrent independent passes, reconciled in &sect;9</li>
+<li>&#10003; Navigator owns the verdict — driver's central lean corrected and the correction recorded verbatim</li>
+<li>&#10003; Every disagreement surfaced, none resolved silently (&sect;9)</li>
+<li>&#10003; Grounded in code — file:line throughout; design docs cited only where labelled</li>
+<li>&#10003; Rule 14 respected — no liveness probes run</li>
+<li>&#10003; Board-vs-design contradiction surfaced (&sect;8)</li>
+<li>&#10003; Artifact rendered + saved with datetime stamp</li>
+<li>&#10003; Committed to the project repo, not metal-console (Rule 3)</li>
+<li>&#10003; Published + externally reachable at its cap-URL (Rule 10)</li>
+<li>&#10003; Read-only inspect — nothing modified</li>
+</ul></div>
+<footer>
+Generated 2026-08-01 16:15 &middot; v0 &middot; r1014 &middot; Argus &middot; ~i paired (Opus + Fable5) &middot; next: ~d
+</footer>
+
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"9e8f6eb2-3962-44e3-9b75-fc19c51e5275"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zendesk NPS-Detractor Workflow — Drill-Down + Complexity Assessment</title>
+<style>
+  :root{ --bg:#101215;--surf:#171a1f;--surf2:#0c0f12;--accent:#6FC3DF;--ink:#e7edf1;--mut:#93a3ab;--line:#26313a;--ok:#7CFFB2;--warn:#f0c674;--bad:#f0997d;--copilot:#f0c674; }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.55;font-size:15px}
+  code{font-family:Consolas,ui-monospace,monospace;font-size:12px;color:#9fe0f2;background:#0b1418;padding:1px 5px;border-radius:4px;word-break:break-word}
+  .nav{position:sticky;top:0;background:#000;border-bottom:2px solid var(--accent);display:flex;justify-content:space-between;align-items:center;padding:10px 20px;z-index:10}
+  .nav .brand{font-weight:700;color:var(--accent)} .nav .pub{font-size:12px;color:var(--mut)}
+  .wrap{max-width:920px;margin:0 auto;padding:24px 20px 80px}
+  h1{font-size:25px;margin:8px 0 4px;line-height:1.25} .sub{color:var(--mut);font-size:14px;margin-bottom:18px}
+  h2{font-size:19px;color:var(--accent);margin:32px 0 8px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  h3{font-size:15px;margin:18px 0 6px;color:#dfeaef}
+  .aud{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#04121a;background:var(--accent);border-radius:20px;padding:2px 10px;margin-left:8px}
+  .lede{font-size:14.5px;color:#eef4f7;background:var(--surf);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px}
+  .lede ul{margin:8px 0 0;padding-left:18px} .lede li{margin:4px 0}
+  .hint{font-size:12.5px;color:var(--mut);margin:6px 0 12px}
+  /* drill-down */
+  details{border:1px solid var(--line);border-radius:9px;margin:8px 0;background:var(--surf2);overflow:hidden}
+  details>summary{cursor:pointer;padding:11px 14px;list-style:none;font-size:14px;user-select:none;display:flex;align-items:flex-start;gap:9px}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary::before{content:"\25B8";color:var(--accent);font-size:12px;flex:none;margin-top:3px;transition:transform .12s}
+  details[open]>summary::before{transform:rotate(90deg)}
+  details>summary:hover{background:#12161b}
+  .block{border-left:4px solid var(--accent)}
+  .block>summary{font-weight:700;font-size:15px}
+  .block .bd{padding:2px 14px 12px 32px}
+  .step{border-left:3px solid #3a4650;margin:8px 0;background:#0e1216}
+  .step.trigger{border-left-color:var(--ok)} .step.code{border-left-color:#6FC3DF} .step.classifier{border-left-color:var(--copilot)} .step.manual{border-left-color:var(--copilot)} .step.stock{border-left-color:#c3a6ea} .step.vendor{border-left-color:var(--bad)}
+  .step>summary{font-size:13px}
+  .step .l3{padding:6px 14px 12px 30px}
+  .badge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.03em;padding:1px 7px;border-radius:20px;margin-right:2px;flex:none}
+  .b-trig{background:#7CFFB2;color:#04121a} .b-code{background:#6FC3DF;color:#04121a} .b-ai{background:#f0c674;color:#04121a} .b-stock{background:#c3a6ea;color:#04121a} .b-vendor{background:#f0997d;color:#04121a}
+  /* the three-part card contract */
+  .plain{background:#0e1a1f;border-left:3px solid var(--accent);border-radius:6px;padding:7px 11px;margin:0 0 8px;font-size:13.5px;color:#dceff6}
+  .plain b{color:var(--accent);text-transform:uppercase;font-size:10px;letter-spacing:.06em;display:block;margin-bottom:2px}
+  .mini{font-family:Consolas,ui-monospace,monospace;font-size:11px;color:#9fe0f2;background:#0a1216;border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:0 0 8px;white-space:pre-wrap;line-height:1.6}
+  ul.tech{margin:0 0 4px;padding-left:16px} ul.tech li{margin:3px 0;font-size:12.5px;color:#c8d4da}
+  ul.tech li b{color:#dfeaef}
+  .tlab{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:6px 0 2px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin:2px 0 6px} th,td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top} th{color:var(--accent);font-size:10px;text-transform:uppercase}
+  .cite{font-size:11px;color:#5f6f77;font-family:Consolas,monospace;margin-top:6px}
+  .arrow{text-align:center;color:#3a4650;font-size:15px;line-height:1;margin:-2px 0}
+  .num{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+  .num .k{flex:1;min-width:110px;background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:12px 13px}
+  .num .n{font-size:27px;font-weight:800;color:var(--accent);line-height:1} .num .l{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin-top:6px}
+  .callout{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:8px;background:#1a150c;padding:12px 15px;margin:12px 0;font-size:13.5px;color:#f0e4c9}
+  .callout.bad{border-left-color:var(--bad);background:#1c1210;color:#f2d6cd}
+  .callout b{display:block;margin-bottom:4px} .callout ul{margin:2px 0 0;padding-left:18px} .callout li{margin:3px 0}
+  b.ok{color:var(--ok)} b.warn{color:var(--warn)} b.bad{color:var(--bad)}
+  ol li,ul li{margin:5px 0}
+  .foot{color:#5f6f77;font-size:12px;margin-top:30px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="nav"><span class="brand">Be</span><span class="pub">Platform Assessment · 2026-07-26</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/281bb09a-df10-4094-be0a-e64cfe49e16d/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+  <h1>Zendesk NPS-Detractor Automation — Drill-Down + Complexity Assessment</h1>
+  <div class="sub">One production workflow: auto-recover NPS detractors with a food-illness safety gate. Every figure below is verbatim from the live configuration. Click a block to see its steps; click a step for the exact trigger conditions. Each card is plain-terms first, then a bulleted technical spec.</div>
+
+  <div class="lede">
+    Zendesk can run this natively. At this depth it takes:
+    <ul>
+      <li>7 custom triggers (33 conditions, 12 actions), 2 authenticated webhooks, 2 hardcoded custom fields, 1 group, a 9-tag free-text state machine.</li>
+      <li>4 setup steps with no API on any stack.</li>
+      <li>No config-as-code, no versioning, no diff, no rollback, no master on/off.</li>
+      <li>3 steps with no native path — the only reason custom code exists.</li>
+    </ul>
+  </div>
+
+  <h2>The workflow — click any block to drill in <span class="aud">All</span></h2>
+<div class="lk-sec" data-cm="the-workflow-click-any-block"><div class="hint">▸ click a block → its steps · ▸ click a step → the exact conditions. Colour = what runs it: <b class="ok">Zendesk trigger</b> · <b style="color:#6FC3DF">our code</b> · <b style="color:#f0c674">Copilot / manual</b> · <b style="color:#c3a6ea">stock / vendor</b>.</div>
+
+  <!-- B1 -->
+  <details class="block"><summary>B1 · Intake &amp; Scope &mdash; the survey alert lands; only NPS-body mail is scoped in</summary>
+    <div class="bd">
+      <details class="step stock"><summary><span class="badge b-stock">STOCK</span> Intake address (D1)</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>The mail lands in the brand's normal support inbox. Nothing new was set up to receive it.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>Address: <code>support@guestrelationstestv2.zendesk.com</code> (existing)</li>
+            <li>NPS mail is told apart by <b>body content</b>, not a dedicated address (no <code>nps@</code>, no forwarding)</li>
+            <li>Read-only presence check &mdash; nothing created</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:21-25</div>
+        </div>
+      </details>
+      <details class="step trigger"><summary><span class="badge b-trig">T1 · TRIGGER</span> Scope &mdash; tag <code>nps_detractor_mail</code> at create</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Stamp every NPS survey email with a tag so the rest of the flow can find it.</div>
+          <div class="tlab">Conditions &mdash; argus: NPS mail scope (S1) · active: true</div>
+          <table><tr><th>Block</th><th>Field</th><th>Op</th><th>Value</th></tr>
+            <tr><td>ALL</td><td>update_type</td><td>is</td><td>Create</td></tr>
+            <tr><td>ALL</td><td>recipient</td><td>is</td><td>support@guestrelationstestv2.zendesk.com</td></tr>
+            <tr><td>ANY</td><td>comment_includes_word</td><td>is</td><td>"NPS Score"</td></tr>
+            <tr><td>ANY</td><td>comment_includes_word</td><td>is</td><td>"Guest Experience Alert"</td></tr></table>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li><b>Action:</b> add tag <code>nps_detractor_mail</code></li>
+            <li><b>Gotcha:</b> <code>is</code> = contains-the-phrase; <code>includes</code> = any-of-words and would fire on a stray "Score"/"Alert"</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:69-81</div>
+        </div>
+      </details>
+    </div>
+  </details>
+  <div class="arrow">&darr;</div>
+
+  <!-- B2 -->
+  <details class="block"><summary>B2 · Classify &mdash; Copilot intelligent triage labels the ticket (async, after create)</summary>
+    <div class="bd">
+      <details class="step manual"><summary><span class="badge b-ai">MANUAL</span> Enable Copilot intelligent triage</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Turn on Zendesk's AI-triage add-on. It's a manual switch.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>Admin-Center toggle &mdash; <b>no API</b></li>
+            <li>Required to use the AI's labels inside triggers (gated by the Copilot add-on)</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:13-15</div>
+        </div>
+      </details>
+      <details class="step manual"><summary><span class="badge b-ai">MANUAL</span> Custom Topic (food-illness) &mdash; no create API</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Teach the AI what "food illness" looks like by writing a description in the admin UI. No code, no API &mdash; and it can't be versioned or promoted between environments.</div>
+          <div class="mini">Admin UI  →  Topic (Name + Description + Category)  →  AI writes label into "Intent" field  →  pinned into T3</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>A <b>Name + plain-English Description + Category</b> &mdash; <b>no generative prompt</b></li>
+            <li>Steers an ML classifier; label lands in the ticket field still literally named <b>Intent</b> (<code>50360055285652</code>)</li>
+            <li>Then pinned into T3 via <code>config-apply?pin=</code> &mdash; must exact-match a live option or it 409s (<code>pin-not-in-taxonomy</code>); implies force; arm preserved</li>
+            <li>We built <code>/intent-status</code> to report state (not-applied | unset | <b>stale</b> | pinned-disarmed | pinned-armed) &mdash; the platform has no such check</li>
+          </ul>
+          <div class="cite">Program.cs:707-739, 826-887; ConfigCatalog.cs:107-110</div>
+        </div>
+      </details>
+      <details class="step classifier"><summary><span class="badge b-ai">COPILOT · CLASSIFIER</span> Async classification write</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Seconds to minutes after the ticket lands, the AI labels it. That delay is what forces most of the safety plumbing.</div>
+          <div class="mini">create  →  (seconds–minutes)  →  classifier writes Intent field  →  every gate re-evaluates</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>Zendesk <b>Copilot intelligent triage</b> &mdash; an ML <b>classifier</b> (predictive, not generative; not the reply bot)</li>
+            <li>Writes the Intent field <b>asynchronously, post-create</b></li>
+            <li>Root cause of: T4's present-gate, T6's no-Create condition, the service-side illness re-check</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:126-129</div>
+        </div>
+      </details>
+    </div>
+  </details>
+  <div class="arrow">&darr; &nbsp;<span style="color:var(--mut);font-size:12px">illness? &mdash; caught by T2 at create, or T3 after classification</span></div>
+
+  <!-- B3 -->
+  <details class="block" style="border-left-color:var(--bad)"><summary>B3 · Illness &rarr; Escalate (STOP) &mdash; tag it, hand to a human, loop in the DO; no reply, no code</summary>
+    <div class="bd">
+      <details class="step code"><summary><span class="badge b-code">APPLY</span> Escalation group</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Create the human queue before any rule tries to send tickets to it.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>Object: group <code>NPS Escalation (human)</code></li>
+            <li><code>{{group_id:NAME}}</code> resolved against the live account at apply time &mdash; unresolvable = <b>409</b>, never a garbage POST</li>
+            <li>The raw API would accept a dangling id and silently misroute</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:43-45; Program.cs:781-799</div>
+        </div>
+      </details>
+      <details class="step trigger"><summary><span class="badge b-trig">T2 · TRIGGER</span> Keyword floor &mdash; 87 words, at create</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>If the email uses any sick-word, stop the AI reply and hand it to a human &mdash; immediately, before the AI even runs.</div>
+          <div class="tlab">Conditions &mdash; argus: illness skip_ai_reply · active: true</div>
+          <table><tr><th>Block</th><th>Field</th><th>Op</th><th>Value</th></tr>
+            <tr><td>ALL</td><td>update_type</td><td>is</td><td>Create</td></tr>
+            <tr><td>ALL</td><td>recipient</td><td>is</td><td>intake address</td></tr>
+            <tr><td>ANY</td><td>comment_includes_word</td><td>includes</td><td><b>87 space-separated words</b>, 60 EN + 27 ES (sick, nausea, vomit, diarrhea, hospital, poisoning, allergic… enfermo, vómito, intoxicación…)</td></tr></table>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li><b>Actions:</b> add <code>skip_ai_reply nps_illness_detected</code>; assign group <code>{{group_id:NPS Escalation (human)}}</code></li>
+            <li>Deliberately <b>no</b> "NPS Score" condition &mdash; the illness net must be wider than the reply net</li>
+            <li>Word-match grammar verified against a live account trigger, not docs</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:47-100</div>
+        </div>
+      </details>
+      <details class="step trigger"><summary><span class="badge b-trig">T3 · TRIGGER</span> Semantic net &mdash; catches paraphrase (disarmed until pinned)</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Catch illness that's described without any sick-word, using the AI's label. Off until the Topic is pinned.</div>
+          <div class="tlab">Conditions &mdash; argus: Triage intent illness tag (S2) · active: false</div>
+          <table><tr><th>Block</th><th>Field</th><th>Op</th><th>Value</th></tr>
+            <tr><td>ALL</td><td>recipient</td><td>is</td><td>intake address</td></tr>
+            <tr><td>ALL</td><td>custom_fields_50360055285652 (Intent)</td><td>is</td><td>&lt;food-illness value — placeholder until pinned&gt;</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>not_includes</td><td>nps_illness_detected</td></tr></table>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li><b>Actions:</b> add <code>nps_illness_detected skip_ai_reply</code>; assign human group</li>
+            <li>Ships disarmed; pinned + armed last, post-gauntlet</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:111-124</div>
+        </div>
+      </details>
+      <details class="step trigger"><summary><span class="badge b-trig">T6 · TRIGGER &rarr; WEBHOOK</span> DO loop-in</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>When a ticket is flagged illness, ping our service to CC the store's District Operator.</div>
+          <div class="tlab">Conditions &mdash; argus: NPS CC on create (D5 deterministic) · active: true</div>
+          <table><tr><th>Block</th><th>Field</th><th>Op</th><th>Value</th></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>not_includes</td><td>nps_do_cc_sent (once-marker; also breaks the webhook re-eval loop)</td></tr>
+            <tr><td>ALL</td><td>recipient</td><td>is</td><td>intake address</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>includes</td><td>nps_illness_detected</td></tr></table>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li><b>Actions:</b> <code>notification_webhook</code> &rarr; W1 with <code>{"ticket_id":"{{ticket.id}}","env":"sandbox-b"}</code>; add <code>nps_do_cc_sent</code></li>
+            <li>Deliberately <b>no</b> <code>update_type=Create</code> &mdash; the semantic tag lands on the async update; a Create gate would miss every paraphrase-caught illness</li>
+            <li>Marker set on <b>fire</b>, not success</li>
+          </ul>
+          <div class="cite">Program.cs:1687-1711</div>
+        </div>
+      </details>
+      <details class="step code"><summary><span class="badge b-code">WEBHOOK W1</span> &rarr; our <code>/zendesk/nps-cc</code></summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>The secure call-out that carries the ticket to our service.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>"argus: NPS CC (D5 deterministic)" &rarr; <code>/zendesk/nps-cc</code>, POST/json, active</li>
+            <li>Auth: <b>bearer_token</b> header = <code>BRIDGE_TOKEN</code> (from env at apply, never in source)</li>
+            <li>Subscriptions: [conditional_ticket_events]</li>
+          </ul>
+          <div class="cite">Program.cs:1640-1673</div>
+        </div>
+      </details>
+      <details class="step code"><summary><span class="badge b-code">OUR CODE</span> <code>/nps-cc</code> &mdash; look up the DO, CC them</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Figure out who runs that store and CC them. Zendesk can't look up data that lives outside Zendesk.</div>
+          <div class="mini">webhook → GET ticket → LaneGuard → parse Store line → Firestore lookup
+        ├─ resolved  → PUT email_ccs [DO + store inbox] + tag nps-cc-sent
+        └─ unresolved→ tag nps-cc-unresolved, 200 ok:false (no retry)</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>env-required (prod always 403) &rarr; canonicalize id &rarr; GET ticket &rarr; LaneGuard (never touch the other arm's tickets)</li>
+            <li>Regex the <code>Store</code> line from the body &rarr; Firestore lookup</li>
+            <li><b>Resolved:</b> PUT <code>email_ccs</code> [DO <b>+ store inbox when the row has one</b>] + tag <code>nps-cc-sent</code>, one event</li>
+            <li><b>Unresolved</b> (no Store line / no row / no DO email): tag <code>nps-cc-unresolved</code>, 200 ok:false (countable, no retry)</li>
+            <li>Failed Zendesk PUT &rarr; <b>502</b> &rarr; webhook retry engages</li>
+            <li><b>Data:</b> Firestore project <code>acmedev-platform-hq</code>, db <code>argus</code>, collection <code>store_do_map</code></li>
+            <li><b>Secrets:</b> <code>BRIDGE_TOKEN</code> (inbound) · <code>ZENDESK_SANDBOX_B_TOKEN</code> (write-back)</li>
+          </ul>
+          <div class="cite">Program.cs:1043-1119; StoreDoMap.cs:20-80</div>
+        </div>
+      </details>
+      <details class="step" style="border-left-color:var(--bad)"><summary><span class="badge b-vendor">STOP</span> A human owns it</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Sick guest = human only. No auto-reply, no coupon, ever.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>T4 is permanently blocked by the illness tag &rarr; <code>ai_reply_ok</code> never granted &rarr; recovery can't fire</li>
+            <li>The vendor AI reply is blocked by its injected condition</li>
+            <li>Zero automated guest contact</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </details>
+  <div class="arrow">&darr; &nbsp;<span style="color:var(--mut);font-size:12px">clean detractor</span></div>
+
+  <!-- B4 -->
+  <details class="block"><summary>B4 · Reply Gate &mdash; the single fail-closed allowlist</summary>
+    <div class="bd">
+      <details class="step trigger"><summary><span class="badge b-trig">T4 · TRIGGER</span> ai_reply_ok gate</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>The one permission slip: allow a reply only when the ticket is scoped, classified, and illness-clean. Default is no.</div>
+          <div class="tlab">Conditions &mdash; argus: ai_reply_ok gate (S4 fail-closed) · active: false</div>
+          <table><tr><th>Block</th><th>Field</th><th>Op</th><th>Value</th></tr>
+            <tr><td>ALL</td><td>recipient</td><td>is</td><td>intake address</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>includes</td><td>nps_detractor_mail</td></tr>
+            <tr><td>ALL</td><td>custom_fields_50360055285652 (Intent)</td><td>present</td><td>&mdash;</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>not_includes</td><td>nps_illness_detected</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>not_includes</td><td>skip_ai_reply</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>not_includes</td><td>ai_reply_ok (own re-fire guard)</td></tr></table>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li><b>Action:</b> add <code>ai_reply_ok</code></li>
+            <li>Closes the async race: no classification &rarr; no tag &rarr; no reply</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:130-143</div>
+        </div>
+      </details>
+    </div>
+  </details>
+  <div class="arrow">&darr;</div>
+
+  <!-- B5 -->
+  <details class="block"><summary>B5 · Mint the $10 code &mdash; trigger &rarr; our service (Zendesk can't compute a secret-keyed value)</summary>
+    <div class="bd">
+      <details class="step trigger"><summary><span class="badge b-trig">T7 · TRIGGER &rarr; WEBHOOK</span> Code claim</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Clean detractor with no code yet &rarr; ask our service to mint one.</div>
+          <div class="tlab">Conditions &mdash; argus: recovery code claim (S5a) · active: false</div>
+          <table><tr><th>Block</th><th>Field</th><th>Op</th><th>Value</th></tr>
+            <tr><td>ALL</td><td>brand_id</td><td>is</td><td>51641701238548</td></tr>
+            <tr><td>ALL</td><td>recipient</td><td>is</td><td>intake address</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>includes</td><td>ai_reply_ok</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>not_includes</td><td>skip_ai_reply / nps_illness_detected / recovery_sent / code_claimed</td></tr></table>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li><b>Actions:</b> <code>notification_webhook</code> &rarr; W2; add <code>code_claimed</code> (marker-on-fire; the service PUT never touches tags)</li>
+            <li>Ships disarmed; arm state preserved on re-apply</li>
+          </ul>
+          <div class="cite">Program.cs:1793-1817</div>
+        </div>
+      </details>
+      <details class="step code"><summary><span class="badge b-code">WEBHOOK W2</span> &rarr; our <code>/zendesk/promo-fulfill</code></summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>The same kind of secure call-out, for the coupon service.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>"argus: NPS recovery fulfill (S5)" &rarr; <code>/zendesk/promo-fulfill</code></li>
+            <li>Same shape as W1; bearer <code>BRIDGE_TOKEN</code></li>
+          </ul>
+          <div class="cite">Program.cs:1746-1779</div>
+        </div>
+      </details>
+      <details class="step code"><summary><span class="badge b-code">OUR CODE</span> <code>/promo-fulfill</code> &mdash; re-check illness, mint code, write it back</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Make one $10 code for this ticket and write it on the ticket. Zendesk can't compute a secret-keyed code, so our service does it and writes it back.</div>
+          <div class="mini">webhook → illness re-check (live tags) → derive HMAC code → PUT SorryCodes + internal note
+                                              └─ fail → 502 → Zendesk retries</div>
+          <div class="tlab">Technical &mdash; flow</div>
+          <ul class="tech">
+            <li>Guards: 503 until <code>PROMO_SECRET</code> seeded; env-required (prod 403); GET ticket; LaneGuard</li>
+            <li><b>Fail-closed illness re-check</b> on live tags (<code>nps_illness_detected</code> OR <code>skip_ai_reply</code> &rarr; refuse) &mdash; the last defense, no native equivalent</li>
+            <li><b>Exactly-once:</b> field already set &rarr; no-op</li>
+            <li><b>Write:</b> PUT <code>custom_fields</code> [SorryCodes = code] + a private internal note (full rendered reply); <b>tags never touched</b> (can't clobber the async illness tag)</li>
+            <li><b>On failure:</b> 502 on purpose &rarr; one of the two deliberate 502-retry paths (the other: nps-cc's failed-PUT)</li>
+          </ul>
+          <div class="tlab">Technical &mdash; the code</div>
+          <ul class="tech">
+            <li><code>HMAC-SHA256(PROMO_SECRET, env + ":" + ticket_id)</code> &rarr; <code>MENDO-XXXXXXXX</code></li>
+            <li>Alphabet drops 0/O/1/I/L/U &mdash; readable over the phone</li>
+            <li>Same ticket = same code forever; two tickets can't share one; env keeps arm A / arm B distinct</li>
+            <li><b>Secrets:</b> <code>PROMO_SECRET</code> · <code>BRIDGE_TOKEN</code> · <code>ZENDESK_SANDBOX_B_TOKEN</code></li>
+          </ul>
+          <div class="cite">Program.cs:943-1010; PromoCode.cs:16-40</div>
+        </div>
+      </details>
+    </div>
+  </details>
+  <div class="arrow">&darr;</div>
+
+  <!-- B6 -->
+  <details class="block"><summary>B6 · Recovery Reply &mdash; the fixed template emails the guest the code, exactly once</summary>
+    <div class="bd">
+      <details class="step trigger"><summary><span class="badge b-trig">T5 · TRIGGER</span> Recovery reply &mdash; self-delivering</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Once the code is on the ticket, email the guest the fixed apology + code. The trigger sends it itself.</div>
+          <div class="tlab">Conditions &mdash; argus: NPS recovery reply (S5 deterministic) · active: false</div>
+          <table><tr><th>Block</th><th>Field</th><th>Op</th><th>Value</th></tr>
+            <tr><td>ALL</td><td>brand_id</td><td>is</td><td>51641701238548</td></tr>
+            <tr><td>ALL</td><td>recipient</td><td>is</td><td>intake address</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>includes</td><td>ai_reply_ok</td></tr>
+            <tr><td>ALL</td><td>current_tags</td><td>not_includes</td><td>skip_ai_reply / nps_illness_detected / recovery_sent</td></tr>
+            <tr><td>ALL</td><td>custom_fields_50360163920916 (SorryCodes)</td><td>present</td><td>&mdash;</td></tr></table>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li><b>Actions:</b> <code>notification_user</code> &rarr; [requester, "Follow Up On Your Mendo Feedback", fixed body]; add <code>recovery_sent</code></li>
+            <li>The trigger's own <code>notification_user</code> sends the email &mdash; <b>no dependency on any stock trigger</b></li>
+            <li>The AI never composes; the body is fixed Liquid (a plain-text twin in code is kept in sync by hand)</li>
+          </ul>
+          <div class="cite">ConfigCatalog.cs:145-207</div>
+        </div>
+      </details>
+      <details class="step stock"><summary><span class="badge b-stock">STOCK · TEST RAIL ONLY</span> "Notify requester of public comment"</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>A stock trigger used only by the test bench &mdash; not part of the live reply.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>The live S5 reply self-delivers (above)</li>
+            <li>This stock trigger is only the delivery rail of the sandbox test bench &mdash; <code>/zendesk/recovery-send</code> posts a <code>public:true</code> comment that this emails</li>
+            <li>Not a production dependency</li>
+          </ul>
+          <div class="cite">Program.cs:299-303 (test rail); ConfigCatalog.cs:190 (S5 self-delivers)</div>
+        </div>
+      </details>
+    </div>
+  </details>
+
+  <!-- B7 -->
+  <details class="block" style="border-left-color:var(--bad)"><summary>B7 · Guard &amp; Arm &mdash; the one generative component, gated off; and the scattered arm state</summary>
+    <div class="bd">
+      <details class="step vendor"><summary><span class="badge b-vendor">VENDOR · AI AGENT</span> Ultimate reply trigger &mdash; disabled by design</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>Zendesk's own AI reply bot &mdash; the only thing that would free-write a reply to a guest. Kept off.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>The Zendesk <b>AI agent ("Ultimate")</b> auto-reply &mdash; a separate product from Copilot; default id <code>51721419477268</code></li>
+            <li><b>No config API</b> (created by the AI-agent integration in Admin Center)</li>
+            <li><b>Gate (Option A):</b> fetch the live trigger, keep all its conditions/actions, append exactly one &mdash; <code>current_tags | not_includes | skip_ai_reply</code> &mdash; re-PUT the whole record (Zendesk rejects a partial update)</li>
+            <li><b>Blunt kill:</b> flip its <code>active</code> flag (stops all AI replies on the arm)</li>
+          </ul>
+          <div class="cite">Program.cs:1535-1624</div>
+        </div>
+      </details>
+      <details class="step code"><summary><span class="badge b-code">ARM STATE</span> 8 scattered on/off flags, no master arm</summary>
+        <div class="l3">
+          <div class="plain"><b>Plain terms</b>8 separate on/off switches and no master. Easy to leave one half-armed.</div>
+          <div class="tlab">Technical</div>
+          <ul class="tech">
+            <li>7 owned trigger <code>active</code> flags + the vendor flag = <b>8 independent switches</b></li>
+            <li>4 ship disarmed: T3, T4, T5, T7</li>
+            <li>Re-applying config needs special logic in <b>two</b> code paths so a re-apply doesn't silently disarm a live trigger</li>
+            <li>Safe-direction fallback on unreadable state = <b>disarmed</b></li>
+          </ul>
+          <div class="cite">Program.cs:770-780, 1783-1791</div>
+        </div>
+      </details>
+    </div>
+  </details></div>
+<h2 id="hard">Why this is hard to run &mdash; and what has no native path <span class="aud">CIO / Director / IT Manager</span></h2>
+<div class="lk-sec" data-cm="hard"><div class="num">
+    <div class="k"><div class="n">7</div><div class="l">owned triggers (+ vendor trigger modified)</div></div>
+    <div class="k"><div class="n">33</div><div class="l">conditions to keep correct</div></div>
+    <div class="k"><div class="n">9</div><div class="l">free-text tags = the whole safety model</div></div>
+    <div class="k"><div class="n">8</div><div class="l">on/off flags, no master arm</div></div>
+    <div class="k"><div class="n">4</div><div class="l">setup steps with no API at all</div></div>
+    <div class="k"><div class="n">3</div><div class="l">steps with no native path (forced code)</div></div>
+  </div>
+  <p>Correctness of "never auto-reply to a guest reporting illness," "exactly one $10 code per ticket," and "never touch the other arm's tickets" is spread across seven trigger records, one external service, and nine untyped strings. No single place defines or validates any of it: no config-as-code, no versioning, no diff, no staging promotion, no rollback, no test harness, no master switch. Changes are made live.</p>
+
+  <h3>Manual setup: 7 steps, 4 with no API on any stack</h3>
+  <ol>
+    <li>Create + train the custom food-illness <b>Topic</b> (Intelligent triage) &mdash; <b>no create API</b>.</li>
+    <li>Enable <b>Copilot intelligent triage</b> (the add-on) &mdash; Admin-Center only.</li>
+    <li>Configure the <b>AI agent</b> + its auto-reply trigger &mdash; <b>no config API</b>.</li>
+    <li>Build the promo custom-action + tone personalization &mdash; Admin-Center only. <span class="hint" style="display:inline">(Legacy of the pre-Option-A design; the deterministic lane <b>retired</b> this in favour of the S5a trigger &rarr; service path.)</span></li>
+    <li>Provision the escalation group <b>before</b> the triggers that reference it (our tooling 409s a dangling reference; the raw API would misroute).</li>
+    <li>Create + authenticate the 2 webhooks with bearer tokens.</li>
+    <li>Seed 3 secrets: <code>BRIDGE_TOKEN</code>, <code>PROMO_SECRET</code>, <code>ZENDESK_SANDBOX_B_TOKEN</code>.</li>
+  </ol>
+
+  <h3>Nine standing hazards</h3>
+  <table>
+    <tr><th>Hazard</th><th>What actually bites</th></tr>
+    <tr><td>Object ordering</td><td>Group must exist before the triggers that assign it, or (raw API) a dangling id silently misroutes.</td></tr>
+    <tr><td>Position-ordered re-run loop</td><td>Zendesk re-runs the whole trigger list after any fire. Correctness needs you to hold that loop in your head &mdash; and nothing warns you when a reorder changes intermediate tag states.</td></tr>
+    <tr><td>Async classification races</td><td>Three safeguards exist only because the classifier lands after create (T4 present-gate, T6 no-Create, service illness re-check). Miss one and a sick guest can get a coupon.</td></tr>
+    <tr><td>Marker-on-fire</td><td>Every once-only guarantee is a tag set at fire time, not success. The only retries are two deliberate 502-webhook paths (promo-fulfill and nps-cc's failed-PUT); nps-cc's resolution miss never retries.</td></tr>
+    <tr><td>Tag clobber</td><td>A single-ticket PUT replaces the whole tag list &mdash; the service never touches tags on the code write, or it could erase a concurrently-landed illness tag.</td></tr>
+    <tr><td>Scattered arm state</td><td>8 independent flags, no master arm; re-apply needs special logic in two paths just to not silently disarm a live trigger.</td></tr>
+    <tr><td>Whole-record edits</td><td>Adding one condition to the vendor trigger means re-PUTting its entire definition; a sloppy edit deletes its actions.</td></tr>
+    <tr><td>Silent staleness</td><td>Delete the Topic and the S2 trigger stays armed against a value that no longer exists &mdash; undetectable natively. Our <code>/intent-status</code> "stale" probe exists only because the platform has none.</td></tr>
+    <tr><td>No test / diff / rollback</td><td>No native preview, staging diff, rollback, or environment promotion. Live only.</td></tr>
+  </table>
+
+  <h3>What has no native path &mdash; the code that cannot be removed on any Zendesk</h3>
+  <div class="callout bad"><b>Limit 1 &mdash; trigger webhooks are one-way.</b>
+    <ul>
+      <li>A trigger can call out but can never use the response.</li>
+      <li>"Compute a value, put it on the ticket" is natively impossible &mdash; an external service must write it back.</li>
+      <li>That write re-enters the trigger engine as a new update (the loop the once-markers break).</li>
+      <li>ZIS can consume a response, but a ZIS flow is itself hand-authored code with no secret store or crypto &mdash; it relocates the code, doesn't remove it.</li>
+    </ul>
+  </div>
+  <div class="callout bad"><b>Limit 2 &mdash; no compute or secret primitive.</b>
+    <ul>
+      <li>Triggers can't hash, hold a secret, or query a table.</li>
+      <li><b>Coupon mint:</b> HMAC(secret, env:ticket) &rarr; unforgeable without the key, identical per ticket, never shared.</li>
+      <li><b>DO resolution:</b> parse the store, look it up in an external map, CC the DO + store inbox &mdash; data lives outside Zendesk, and the native CC action takes only a fixed user id, not a data-driven recipient.</li>
+    </ul>
+  </div>
+  <div class="callout bad"><b>Limit 3 &mdash; no create/config API for the AI layer.</b>
+    <ul>
+      <li>Custom Topics and the AI agent + its reply trigger are permanently manual.</li>
+      <li>That's why the semantic detector ships as a placeholder with a whole pin-and-validate code lane built around the hole.</li>
+    </ul>
+  </div>
+
+  <div class="callout"><b>Bottom line.</b> Zendesk can be configured to do this &mdash; at this depth it is a hand-built, unversioned distributed system behind a helpdesk UI, and three steps can only exist as external code.</div>
+
+  <div class="foot">Ground-truth platform assessment · NPS-detractor recovery + illness-safety workflow · 2026-07-26 · every figure and condition verbatim from the live configuration · paired: navigator-led line-by-line code audit (Fable) + build (Opus), reconciled.</div>
+
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"281bb09a-df10-4094-be0a-e64cfe49e16d"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

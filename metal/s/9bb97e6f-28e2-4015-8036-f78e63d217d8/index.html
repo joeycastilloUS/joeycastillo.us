@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan · Purcius Bridge Auth — the simplest pure build</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#111;color:#e0e0e0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:11px 20px;display:flex;align-items:center;gap:12px;z-index:10}
+  nav .b{color:#6FC3DF;font-weight:700;font-size:17px}
+  nav .pub{margin-left:auto;color:#888;font-size:11px}
+  main{max-width:820px;margin:0 auto;padding:28px 20px 80px}
+  h1{color:#fff;font-size:24px;line-height:1.25;margin-bottom:6px}
+  .sub{color:#9fe0f2;font-size:14px;margin-bottom:6px}
+  .kv{color:#888;font-size:12px}
+  a{color:#6FC3DF}
+  h2{color:#6FC3DF;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:32px 0 12px;border-bottom:1px solid #222;padding-bottom:6px}
+  p{margin:10px 0;color:#cfcfcf}
+  ul,ol{margin:10px 0 10px 22px}li{margin:6px 0;color:#cfcfcf}
+  code{background:#0a0a0a;border:1px solid #2a2a2a;border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2}
+  pre{background:#0a0a0a;border:1px solid #2a2a2a;border-left:3px solid #6FC3DF;border-radius:6px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#cfe6df;white-space:pre;margin:12px 0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #222;vertical-align:top}
+  th{color:#6FC3DF;text-transform:uppercase;font-size:11px;letter-spacing:.05em}
+  .keep{color:#7CFFB2;font-weight:700}.mod{color:#f0c674;font-weight:700}.rev{color:#ff8a8a;font-weight:700}
+  .step{background:#161616;border:1px solid #2a2a2a;border-radius:8px;padding:13px 16px;margin:10px 0}
+  .step .n{color:#6FC3DF;font-weight:700;font-size:14px}
+  .step .g{color:#f0c674;font-size:12px;margin-top:5px}
+  .good{color:#7CFFB2}.warn{color:#f0c674}.bad{color:#ff8a8a}
+  .foot{color:#666;font-size:12px;text-align:center;border-top:1px solid #222;margin-top:40px;padding-top:16px;font-family:Consolas,monospace}
+  .dod li{list-style:none;margin-left:-14px}
+</style>
+</head>
+<body>
+<nav><span class="b">Be</span><span class="kv">plan</span><span class="pub">Published 2026-07-20 · PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/9bb97e6f-28e2-4015-8036-f78e63d217d8/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>The simplest pure build</h1>
+<div class="sub">Purcius bridge auth — ship the approved pure design with the least machinery.</div>
+<div class="kv">~p (re-run) · paired: Opus + Fable · design approved → <a href="https://ai-metal.net/s/468e4852-aa67-4d6d-bb48-43d62ffd7ba0/">v3 PURE</a> · <a href="https://ai-metal.net/s/6a8de687-d875-4887-b5e8-c70441a33504/">diagram</a></div>
+
+<h2>Intent</h2>
+<div class="lk-sec" data-cm="intent"><p>The design is locked: Ed25519, the bridge holds only public keys, the private key never leaves the prime, the signature binds the whole request. This plan is the <b>simplest build that keeps every one of those properties</b> — we shed the fiddliest parts (native P/Invoke, the shared-state nonce ring, redundant canonical fields) and refuse the one "simplification" that would quietly reopen a hole.</p></div>
+<h2>What we simplified — and the one we refused (paired verdicts)</h2>
+<div class="lk-sec" data-cm="what-we-simplified-and-the"><table>
+  <tr><th>Cut</th><th>Verdict</th><th>The guard rail</th></tr>
+  <tr><td><b>Collapse the canonical</b> — bind <code>domain ∥ audience ∥ sha256(req) ∥ ts ∥ nonce ∥ key_id</code>; verb/tenant/ticket ride inside the hashed request</td><td class="mod">MODIFY</td><td><b>Length-frame every field</b> (8-byte LE prefix, not NUL-sep — a body can contain NUL). Authorize <b>only on signed bytes</b> (ticket parsed from the signed path/body, never an unsigned header).</td></tr>
+  <tr><td><b>Drop the nonce ring</b> — don't wire in auth.c's process-local ring (it dies on every Cloud Run cold start = false comfort)</td><td class="mod">MODIFY</td><td>Replace with a <b>durable nonce-seen check on mutating verbs only</b> (reuse the idempotency store, key on the sig/nonce, TTL = 2× window). Reads skip it. Window <b>±5s</b> (NTP-synced), not 30s.</td></tr>
+  <tr><td><b>C# verifies with NSec/libsodium</b>, C signs with Monocypher — no native <code>.so</code> + P/Invoke marshaling</td><td class="keep">KEEP</td><td>One honest signer + one verifier = no consensus-drift attack surface (you can't forge without the key). Gate with a committed <b>cross-language KAT + must-reject corpus</b> in CI; pin both versions; plain <code>Ed25519</code> (no ctx/prehash).</td></tr>
+  <tr><td><b>One shared HK+Vegas key</b></td><td class="rev">REVERT</td><td class="bad">Refused. One secret on two boxes, no independent revocation, no attribution — for ~zero simplicity. <b>Per-prime keypairs stay</b> (2 keys, 2 pubkeys, a <code>key_id</code> you already carry — near-free).</td></tr>
+  <tr><td><b>3 phases + gcp-bridge twin as fast-follow</b></td><td class="keep">KEEP</td><td><b>Time-box the gap</b> to the same change window (days, not "eventually") and <b>spend-cap/rate-limit the Vertex lane</b> while it still accepts the daily token.</td></tr>
+</table></div>
+<h2>The signed pre-image (final, simplified)</h2>
+<div class="lk-sec" data-cm="the-signed-pre-image-final"><pre>preimage = LF("purcius-bridge-v1")   <span class="kv">domain sep</span>
+         ∥ LF(audience)               <span class="kv">"zendesk-bridge" | "gcp-bridge"</span>
+         ∥ LF( sha256(method | rawpath+query | body) )
+         ∥ LF(ts, 8 bytes LE)
+         ∥ LF(nonce, 16 bytes)
+         ∥ LF(key_id)                 <span class="kv">"hk-01" | "vegas-01"</span>
+   where LF(x) = uint64_LE(len(x)) ‖ x     <span class="kv">length-framed — unambiguous, NUL-safe</span>
+sig = Ed25519_sign(prime_private_key, preimage)     <span class="kv">64 bytes</span></pre>
+<p>The bridge rebuilds this pre-image from the <b>exact received wire bytes</b>, verifies the sig against the <code>key_id</code>'s pubkey, checks <code>|now−ts| ≤ 5s</code>, and (mutating verbs) the durable nonce-seen. It authorizes only on fields present in the pre-image.</p></div>
+<h2>Build order (ship this)</h2>
+<div class="lk-sec" data-cm="build-order-ship-this"><div class="step"><span class="n">1 · Signer (pi_run, C99)</span> Vendor Monocypher (<code>ed25519.c</code> beside <code>crypt.c</code>, pinned). Build the length-framed pre-image + sign. Generate <b>per-prime</b> keypairs; private key <code>0600</code>, never leaves the box; extract pubkeys.<div class="g">done = a prime prints a sig a throwaway verifier accepts.</div></div>
+<div class="step"><span class="n">2 · KAT (CI)</span> Commit the cross-language vector test — Monocypher signs the RFC-8032 vectors, NSec verifies — plus a must-reject corpus (<code>S≥L</code>, non-canonical R, wrong length, all-zeros). Pin both library versions.<div class="g">done = KAT green + every bad vector rejected, in CI.</div></div>
+<div class="step"><span class="n">3 · Verifier (bridge, C# + NSec)</span> Load the pubkey allowlist by <code>key_id</code>. Rebuild the pre-image from received wire bytes (hash the <b>raw</b> body before ASP.NET re-serializes; raw path+query). Verify sig → ts window → durable nonce-seen on mutating verbs. Authorize only on signed bytes.<div class="g">done = a real prime sig passes; a forged/replayed/tampered one fails.</div></div>
+<div class="step"><span class="n">4 · Phase A — additive + telemetry</span> Bridge accepts <b>sig OR daily</b>. Emit <code>auth_method</code>, verify pass/fail, ts-skew, replay-hit, <b>path-skew</b> (catches any GFE path normalization) — never the sig. Deploy. The daily sweep never notices.<div class="g">gate: telemetry live; watch sig-present climb.</div></div>
+<div class="step"><span class="n">5 · Phase B — flip pi_run to signing</span> HK first behind a <b>pre-flight 200 probe</b> (a read call must return <code>auth_method=sig</code> before any mutating traffic relies on it), bake a UTC-midnight cycle, then Vegas.<div class="g">gate: both primes on <code>sig</code>, zero <code>daily</code>, a full day.</div></div>
+<div class="step"><span class="n">6 · Phase C — fail closed</span> Rip the daily branch on zendesk-bridge + <code>daily_key()</code> from pi_run (all sites). Refuse all without a valid sig.<div class="g">done = a forged <code>yyyyMMdd~go</code> is rejected, verified from outside.</div></div>
+<div class="step"><span class="n">7 · Fast-follow — gcp-bridge twin</span> Repeat A→C for gcp-bridge (own audience + pubkeys). <b>Time-boxed</b> to this change window; <b>spend-cap the Vertex lane</b> until its daily branch is gone.<div class="g">done = both services reject the daily key.</div></div></div>
+<h2>Constraints</h2>
+<div class="lk-sec" data-cm="constraints"><ul>
+  <li>Monocypher vendored (pinned version+SHA); NSec pinned; plain Ed25519 both sides.</li>
+  <li>Authorize only on signed bytes — never an unsigned header.</li>
+  <li>Per-prime keys; private key <code>0600</code>, never transmitted, never logged; pubkeys committed to the repo.</li>
+  <li>Trust root is now the <b>signed-commit + deploy gate</b> (Project-DoD P4/P5) — it must not weaken.</li>
+  <li>Never break the 15s sweep: additive-first, pre-flight probe, HK before Vegas, fail-closed only after zero-daily proven.</li>
+</ul></div>
+<h2>Unknowns (named, per Rule 6)</h2>
+<div class="lk-sec" data-cm="unknowns-named-per-rule-6"><ul>
+  <li><b>GFE path/body normalization</b> — does Cloud Run's front end rewrite <code>%2F</code>/<code>//</code>/<code>%7E</code> or the body before C# sees it? If so the hash skews. <i>Mitigation:</i> hash received wire bytes; Phase-A path-skew telemetry surfaces it before cutover.</li>
+  <li><b>Raw-body capture in the C# jacket</b> — must read the stream before model-binding; unverified until we wire it.</li>
+  <li><b>NSec availability</b> in the jacket's .NET target — assumed clean; confirm at step 3 (fallback: BouncyCastle, heavier).</li>
+</ul></div>
+<h2>When to revisit (the v2 triggers)</h2>
+<div class="lk-sec" data-cm="when-to-revisit-the-v2"><ul>
+  <li>Phase-A telemetry shows <b>path-skew verify-fails</b> → canonicalization needs pinning before Phase B.</li>
+  <li>A new <b>non-idempotent mutating verb</b> is added → it must be added to the durable nonce-seen set (or it's replayable in-window).</li>
+  <li>The cross-language KAT ever reveals drift → revert S3 to P/Invoke the one C verify.</li>
+</ul></div>
+<h2>Estimate (~e, simplified)</h2>
+<div class="lk-sec" data-cm="estimate-e-simplified"><table>
+  <tr><th>Work</th><th>pts</th></tr>
+  <tr><td>Signer: vendor Monocypher + length-framed pre-image + sign; per-prime keygen + custody</td><td>4</td></tr>
+  <tr><td>KAT + must-reject corpus in CI, pinned</td><td>2</td></tr>
+  <tr><td>Verifier: NSec verify, raw-body/path hashing, pubkey allowlist, ts window, durable nonce-seen (reuse idempotency store)</td><td>4</td></tr>
+  <tr><td>Phase A telemetry (auth_method / skew / replay / path-skew) + log-scrub</td><td>2</td></tr>
+  <tr><td>Phase B rollout (pre-flight probe, HK→Vegas) + Phase C fail-closed + rip daily</td><td>3</td></tr>
+  <tr><td>gcp-bridge fast-follow (own audience/pubkeys) + Vertex spend-cap during gap</td><td>3</td></tr>
+  <tr><td><b>Total — simplest pure build</b></td><td class="good"><b>~18 pts</b></td><td class="kv">(was ~27 in the full design)</td></tr>
+</table></div>
+<h2>DoD</h2>
+<div class="lk-sec" data-cm="dod"><ul class="dod">
+  <li class="good">✓ Pure design preserved — bridge holds only public keys, per-prime, private key never leaves the prime</li>
+  <li class="good">✓ 4 simplifications kept (each guard-railed), 1 refused (shared key) — paired verdicts recorded</li>
+  <li class="good">✓ Length-framed request-binding retained (Fable's insist); authorize-only-on-signed-bytes</li>
+  <li class="good">✓ Migration telemetry-gated, sweep-safe; twin time-boxed + spend-capped</li>
+  <li class="warn">◻ Not built — first move: steps 1–3 (signer + KAT + verifier) then Phase A (changes nothing live)</li>
+</ul>
+
+<div class="foot">v0 · r754 · 2026-07-20 · Purcius bridge auth — simplest pure build · Opus 4.8 + Fable 5</div></div>
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"9bb97e6f-28e2-4015-8036-f78e63d217d8"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

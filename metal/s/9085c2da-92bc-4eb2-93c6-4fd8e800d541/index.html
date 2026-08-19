@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~laf — Port config + Host firewall</title>
+<style>
+  :root { --bg:#111111; --surface:#1A1A1A; --accent:#6FC3DF; --fg:#e8e8e8; --muted:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav.top { position:sticky; top:0; background:#000; border-bottom:2px solid var(--accent);
+        padding:.7rem 1.2rem; display:flex; justify-content:space-between; align-items:center; z-index:100; }
+  nav.top .brand { color:var(--accent); font-weight:700; letter-spacing:.08em; }
+  nav.top .pub { color:var(--muted); font-size:.72rem; }
+  main { max-width:1000px; margin:0 auto; padding:1.3rem 1.1rem 4rem; }
+  h1 { font-size:1.5rem; margin:.2rem 0 .3rem; }
+  h2 { font-size:1.05rem; margin:1.9rem 0 .5rem; color:var(--accent);
+       border-bottom:1px solid #2a2a2a; padding-bottom:.3rem; }
+  h3 { font-size:.92rem; margin:1.2rem 0 .35rem; color:#cfe9f3; }
+  .sub { color:var(--muted); font-size:.83rem; margin-bottom:1rem; }
+  .box { background:var(--surface); border:1px solid #262626; border-radius:6px;
+         padding:.85rem 1rem; margin:.85rem 0; }
+  .verdict { border-left:3px solid var(--accent); }
+  .stop { background:#241414; border-left:3px solid #e07b7b; }
+  .agree { background:#141c17; border-left:3px solid #7ddf8f; }
+  .corr { background:#1a1420; border-left:3px solid #b48fd9; }
+  .ask { background:#14202a; border-left:3px solid #6FC3DF; }
+  .split { background:#1d1614; border-left:3px solid #e0a07b; }
+  table.doc { width:100%; border-collapse:collapse; margin:.7rem 0; font-size:.78rem; }
+  table.doc th, table.doc td { text-align:left; padding:.38rem .5rem; border-bottom:1px solid #262626; vertical-align:top; }
+  table.doc th { color:var(--accent); font-weight:600; font-size:.69rem; text-transform:uppercase; letter-spacing:.05em; }
+  code { background:#000; padding:.08rem .3rem; border-radius:3px; font-size:.85em; color:#bfe9f7; }
+  pre { background:#000; padding:.7rem .9rem; border-radius:5px; overflow-x:auto; font-size:.74rem; line-height:1.5; }
+  ul { padding-left:1.2rem; } li { margin:.22rem 0; }
+  ol { padding-left:1.2rem; } ol li { margin:.32rem 0; }
+  footer { color:var(--muted); font-size:.77rem; border-top:1px solid #262626; margin-top:2.4rem; padding-top:1rem; }
+  .dod li { font-size:.82rem; }
+  .dtabs { display:flex; gap:6px; border-bottom:1px solid #2a2a2a; margin:1.1rem 0 1.3rem; flex-wrap:wrap; }
+  .dtab { background:transparent; border:1px solid transparent; border-bottom:none; color:var(--muted);
+          padding:.45rem .95rem; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer;
+          border-radius:6px 6px 0 0; margin-bottom:-1px; }
+  .dtab:hover { color:var(--fg); background:#181818; }
+  .dtab.on { color:var(--accent); background:#0d1a20; border-color:#2a3f48; border-bottom-color:#0d1a20; }
+  .dpane { display:none; } .dpane.on { display:block; }
+
+  /* ============ PROTOTYPE — console-faithful, scoped under #screen ============ */
+  #screen { --bg:#0a0a0a; --surface:#141414; --line:#262626; --accent:#6FC3DF; --text:#e8e8e8;
+            --dim:#888; --ok:#7CFFB2; --off:#777; --warn:#ffce85; --bad:#ff6b6b;
+            background:var(--bg); color:var(--text); border:1px solid #333; border-radius:10px;
+            overflow:hidden; font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
+            line-height:1.5; font-size:14px; margin:1rem 0 .4rem; }
+  #screen .snav { background:#000; border-bottom:2px solid var(--accent); padding:5px 16px;
+                  display:flex; justify-content:space-between; align-items:center; letter-spacing:.5px; }
+  #screen .be { color:var(--accent); font-weight:800; font-size:1.05rem; letter-spacing:3px; }
+  #screen .navsub { color:var(--dim); font-size:.58rem; letter-spacing:1.5px; text-transform:uppercase; }
+  #screen .navsub b { color:var(--accent); font-weight:800; }
+  #screen .ropill { color:var(--dim); font-size:.6rem; letter-spacing:1.5px; text-transform:uppercase;
+                    border:1px solid var(--line); border-radius:20px; padding:3px 11px; }
+  #screen .swrap { padding:14px 16px 22px; }
+  #screen .rb { display:inline-block; font-size:.6rem; font-weight:800; letter-spacing:.09em;
+                border-radius:5px; padding:2px 9px; background:#332608; color:#ffd479; border:1px solid #5a4410; }
+  #screen .nethead { font-size:1.02rem; font-weight:800; margin:10px 0 2px; }
+  #screen .nethead b { color:var(--accent); }
+  #screen .tmpl { color:var(--dim); font-size:12px; margin-bottom:3px; }
+  #screen .tmpl .bound { color:var(--ok); font-weight:700; }
+  #screen .stamp { color:#6b7a82; font-size:11.5px; margin-bottom:12px; }
+  #screen .secth { color:var(--accent); font-size:.95rem; font-weight:700; margin:14px 0 7px; }
+  #screen table.pt { width:100%; border-collapse:collapse; font-size:.83rem; }
+  #screen table.pt th { text-align:left; color:var(--dim); font-size:.68rem; text-transform:uppercase;
+                        letter-spacing:.05em; font-weight:700; padding:4px 8px; border-bottom:1px solid var(--line); }
+  #screen table.pt td { padding:5px 8px; border-bottom:1px solid #1c1c1c; vertical-align:top; }
+  #screen td.port { color:var(--accent); font-weight:700; white-space:nowrap; }
+  #screen tr.disc td { color:var(--off); }
+  #screen tr.admdown td { opacity:.55; }
+  #screen .st-conn { color:var(--ok); } #screen .st-disc { color:var(--off); }
+  #screen .st-off { color:#777; }   /* admin-down: same grey family, DIFFERENT WORD -- never red */
+  #screen .ip { font-family:ui-monospace,Consolas,monospace; white-space:nowrap; }
+  #screen .nw { white-space:nowrap; } #screen .av { color:var(--dim); }
+  /* --- the new bit: port-posture badges, living INSIDE the Port cell --- */
+  #screen .lvl { display:inline-block; font-size:.58rem; font-weight:800; letter-spacing:.5px;
+                 text-transform:uppercase; border-radius:4px; padding:1px 5px; border:1px solid var(--line);
+                 color:var(--dim); margin-left:5px; vertical-align:1px; }
+  #screen .lvl-def { }                                                   /* default state -> stays quiet */
+  #screen .lvl-set { background:#0e1a1f; color:var(--accent); border-color:#2a3f48; }  /* non-default */
+  #screen .lvl-trunk { background:#1a1407; color:var(--warn); border-color:var(--warn); }
+  #screen .lvl-down { background:#1a0f0f; color:var(--bad); border-color:var(--bad); }
+  #screen .poeon { color:var(--ok); } #screen .poepow { color:var(--ok); font-weight:700; }
+  #screen .dcell { display:flex; flex-direction:column; gap:4px; }
+  #screen .cline { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  #screen .hfw { background:none; border:1px solid var(--line); color:var(--dim); border-radius:5px;
+                 padding:0 6px; font-size:.72rem; cursor:pointer; font-family:inherit; }
+  #screen .hfw:hover { color:var(--accent); border-color:var(--accent); }
+  #screen .fw { display:inline-flex; align-items:center; gap:6px; font-size:.72rem; font-weight:800;
+                letter-spacing:.04em; border-radius:5px; padding:1px 7px; border:1px solid; }
+  #screen .fw-on { background:#06251a; color:var(--ok); border-color:#17513a; }
+  #screen .fw-off { background:#3a1212; color:#ff9b9b; border-color:#6b2b2b; }
+  #screen .fw-unk { background:#332608; color:#ffd479; border-color:#5a4410; border-style:dashed; }
+  #screen .fw.inferred { border-style:dashed; }
+  #screen .prov { color:#6b7a82; font-size:.68rem; font-style:italic; }
+  #screen .fwnote { color:#9aa7b0; font-size:.7rem; }
+  #screen .legend { background:#0e1418; border:1px solid #1e2a31; border-radius:7px;
+                    padding:8px 11px; margin:10px 0 0; color:#9aa7b0; font-size:11.5px; line-height:1.55; }
+  #screen .legend b { color:#cfe9f3; }
+  #screen .smnote { background:#0e1418; border:1px solid #2a3f48; border-radius:7px; padding:8px 11px;
+                    margin-bottom:11px; color:#9fb4bf; font-size:12px; }
+  #screen .smnote b { color:var(--accent); }
+  #screen .spin { display:inline-block; width:9px; height:9px; border:2px solid #2a343b;
+                  border-top-color:var(--accent); border-radius:50%; animation:sp .7s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  .protonote { color:var(--muted); font-size:.77rem; margin:.2rem 0 1.3rem; }
+</style>
+</head>
+<body>
+<nav class="top"><span class="brand">Be</span><span class="pub">Published 2026-08-04 00:55 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/9085c2da-92bc-4eb2-93c6-4fd8e800d541/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~laf — Port config + Host firewall</h1>
+<div class="sub">Argus &middot; acmedevUS/argus &middot; v0 &middot; r1045 &middot; 2026-08-04<br>
+Design: <code>2026-08-04-0010-design-host-firewall-v2-port-config.html</code> (cap <code>7242e1d0</code>)<br>
+Paired per Kernel Rule 1 — Opus driver + Fable5 navigator, concurrent independent passes.</div>
+
+<div class="dtabs">
+  <button class="dtab on" data-p="p-proto">Mockup</button>
+  <button class="dtab" data-p="p-pos">Positions</button>
+  <button class="dtab" data-p="p-laf">Look &amp; Feel</button>
+  <button class="dtab" data-p="p-rec">Reconcile</button>
+</div>
+
+<!-- ================== MOCKUP ================== -->
+<div class="dpane on" id="p-proto">
+<div class="box verdict">
+<b>Zero new columns — and the navigator did the arithmetic.</b> The nine existing columns floor at about
+<b>1090px</b>; the console's content width on a 1366px laptop is about <b>1106px</b>
+(<code>min(1600px, 100vw−220px)</code> minus padding, <code>index.html:95</code>). That is ~16px of
+headroom. Three new columns would cost ~290px — <b>guaranteed sideways scroll on exactly the machine this
+gets used on</b>, breaking the law Drift established.
+<br><br>
+So one badge per port rides <b>inside the VLAN cell</b>, where Meraki's own editor already groups policy
+with VLAN — the same grouping your screenshot shows. <b>Exception-first:</b> a trunk shows
+<span style="font-size:.72rem;font-weight:800;color:#ffce85;border:1px solid #ffce85;background:#1a1407;border-radius:4px;padding:1px 5px">TRUNK</span>;
+an access port shows its policy chip. A chip <i>is</i> the access marker, so nothing is spent marking the
+90% default.
+<br><br>
+Click <b>Host firewall?</b> on the Injest row. Use the buttons under the frame for the other answers.
+</div>
+
+<div id="screen">
+  <div class="snav">
+    <div><span class="be">ARGUS</span> <span class="navsub">Meraki &middot; <b>Network</b></span></div>
+    <div><span class="ropill">read-only</span></div>
+  </div>
+  <div class="swrap">
+    <span class="rb">&#9888; DEMO &mdash; NOT REAL DATA</span>
+    <div class="nethead">Network: <b>073 - Davis</b></div>
+    <div class="tmpl">Config template: <span class="bound">1 PRODUCTION - Global Firewall MX67 MX64</span></div>
+    <div class="stamp">Switch pulled 2026-08-04 00:52 PDT &middot; connected-now only</div>
+    <div id="smnote"></div>
+    <div class="secth">Switch: KITCHEN</div>
+    <div id="tbl"></div>
+    <div class="legend">
+      <b>One badge per port, in the VLAN cell.</b>
+      <span class="lvl lvl-trunk">Trunk</span> carries tagged VLANs &middot;
+      <span class="lvl lvl-def">Open</span> Meraki's default access policy &middot;
+      <span class="lvl lvl-set">Sticky MAC</span> a non-default policy is configured.
+      A chip means the port is <b>access</b>; <span class="lvl lvl-trunk">Trunk</span> means it isn't.
+      <br><b>Quiet = default, lit = someone configured it.</b> A report of what differs, not a judgement of
+      what is safe &mdash; the Security Audit owns judgement.
+      <br><b>&#8998; Disabled</b> in the Status column means administratively down. Grey, not red: a disabled
+      unused port is good hygiene. <b>Status now says one thing at a time</b> &mdash; admin state when it
+      applies, link state otherwise.
+    </div>
+  </div>
+</div>
+<div class="protonote">Host-firewall answers:
+  <button class="dtab" style="padding:.22rem .65rem;font-size:.76rem" onclick="setFw('ask')">unasked</button>
+  <button class="dtab" style="padding:.22rem .65rem;font-size:.76rem" onclick="setFw('on')">firewall ON (matched by IP)</button>
+  <button class="dtab" style="padding:.22rem .65rem;font-size:.76rem" onclick="setFw('off')">firewall OFF</button>
+  <button class="dtab" style="padding:.22rem .65rem;font-size:.76rem" onclick="setFw('unk')">can't tell</button>
+  <button class="dtab" style="padding:.22rem .65rem;font-size:.76rem" onclick="setSm()">toggle: org has no SM</button>
+</div>
+
+<h3>What each part is doing</h3>
+<table class="doc">
+<tr><th>Element</th><th>Answers</th><th>Lifted from</th></tr>
+<tr><td><b>Port-cell badges</b></td><td>your screenshot's Trunk/Access radio + Access policy, with no new columns</td>
+    <td><code>.lvl</code> + <code>.lvl-network</code>/<code>-template</code>/<code>-override</code> <code>:337-339</code></td></tr>
+<tr><td><b>Quiet vs lit</b></td><td>which ports someone has actually configured</td><td>net-new rule; colours from <code>--accent</code>/<code>--warn</code></td></tr>
+<tr><td><b>DISABLED badge + dimmed row</b></td><td>admin-down, which <code>Status</code> cannot express</td>
+    <td><code>.lvl-override</code> red family; <code>tr.disc</code> dim precedent <code>:141</code></td></tr>
+<tr><td><b>VLAN column</b></td><td>unchanged — your screenshot's third field was already here</td><td>shipped</td></tr>
+<tr><td><b>Host firewall? button</b></td><td>the ask, on the client line where the server actually is</td>
+    <td><code>.renameit</code>/<code>.vlanedit</code> ghost button <code>:420</code></td></tr>
+<tr><td><b>Solid vs dashed pill</b></td><td><b>two axes:</b> the pill says the firewall state, the border says whether we're sure it's the right host</td>
+    <td>Drift's solid=evidenced / dashed=inferred law</td></tr>
+<tr><td><b>SM note (top, once)</b></td><td>an org-level fact stated once instead of 48 disabled buttons</td><td>net-new; <code>.d-cov</code> coverage-note pattern from Drift</td></tr>
+<tr><td><b>DEMO badge</b></td><td>this is a prototype and says so</td><td><code>realBadge("demo")</code> <code>:718</code></td></tr>
+</table>
+</div>
+
+<!-- ================== POSITIONS ================== -->
+<div class="dpane" id="p-pos">
+<h2>1. Does <code>Access policy: Open</code> get a warning?</h2>
+<div class="lk-sec" data-cm="1-does-access-policy-open"><div class="box verdict">
+<b>No. This surface reports; the audit judges.</b>
+<br><br>
+Open is the least locked-down option and on a kitchen-server port that matters — but
+<code>SW-PORTSEC</code> already owns that verdict, and it counts access ports without a policy today. If
+this table <i>also</i> renders an opinion, two surfaces can disagree about the same port and the operator
+has to work out which one is lying.
+<br><br>
+So the visual rule is <b>quiet = Meraki's default, lit = somebody configured it</b>. That reports
+<i>deviation</i>, which is a fact, without ranking safety, which is a judgement. The audit's verdict stays
+one click away in its own tab.
+</div></div>
+<h2>2. Admin-disabled vs link-down</h2>
+<div class="lk-sec" data-cm="2-admin-disabled-vs-link"><p><code>Status</code> today shows Meraki's live link state. A port that is administratively
+<code>enabled:false</code> reads exactly like one that's merely unplugged — <b>"Disconnected"</b> — and
+that is true but misleading.</p>
+<div class="box corr">
+<b>Position (navigator's, adopted — it corrected the driver): a different WORD in the Status cell, same
+grey. Not a coloured badge.</b>
+<br><br>
+The driver's first pass put a <b>red <code>DISABLED</code> badge</b> in the Port cell. That was wrong, and
+wrong by this document's own rule: <b>a disabled unused port is good hygiene</b>, and painting it red is
+exactly the judgement &sect;1 forbids. The driver argued "report, don't judge" and then judged.
+<br><br>
+So: <code>&#8998; Disabled</code> in the Status cell, in the same <code>#777</code> grey family as
+<code>Disconnected</code> — different word and glyph, because "administratively off" and "unplugged" must
+never be confusable. <b>Admin state overrides link state</b> in that cell, because it is the causal root: a
+disabled port cannot link.
+</div></div>
+<h2>3. Finding the kitchen server among 24–48 ports</h2>
+<div class="lk-sec" data-cm="3-finding-the-kitchen-server"><div class="box agree">
+<b>Already solved — the console has known this host all along.</b>
+<code>index.html:1112</code>:
+<pre>"Injest\t10.90.100.101", "Bread Printer\t10.90.100.70", "Salad Printer\t10.90.100.71", …</pre>
+<b>Your kitchen server is in the roster NAMEMAP by name and static IP.</b> That does three things at once:
+it answers "how do we find it" (the roster already names it), it supplies <b>the exact join key the
+Systems Manager lookup needs</b> — the v2 design's IP-match fallback for a wired host — and it means the
+Host firewall button can render on roster-matched hosts rather than guessing from a fingerprint.
+<i>Navigator's find; the driver missed it entirely.</i>
+</div>
+<p><b>Position: invent nothing further.</b> One ghost button in a 48-row table <i>is</i> the landmark — the
+eye finds the only interactive element in the Description column immediately. A filter for a one-row result
+is machinery; a pin invents a persistence feature nobody asked for. Ctrl+F covers the rest.</p></div>
+<h2>4. The three answers, and provenance</h2>
+<div class="lk-sec" data-cm="4-the-three-answers-and"><div class="box corr">
+<b>There are two independent axes, and collapsing them would be dishonest.</b>
+<ol>
+<li><b>Did we find the right host?</b> A <code>wifiMac</code> match is deterministic. An <b>IP match is a
+    heuristic</b> — right in practice for a static-IP server, but still an inference.</li>
+<li><b>What did that host report?</b> Firewall on, off, or nothing.</li>
+</ol>
+<b>So: the pill text carries the state, the border style carries the identity confidence.</b> A firewall
+that is definitely ON, on a host we matched by IP, renders as a <b>green pill with a dashed border</b> and
+the words <i>matched by IP</i> — certain state, inferred identity. Collapsing that into one solid green
+badge would launder a guess into a fact.
+</div>
+<p>Every answer is stamped with <code>lastConnected</code>, because this is <b>last-reported state, never
+live state</b> — the agent's word, relayed.</p>
+<p>Before click: a quiet ghost button, shown only when the OS fingerprint says Windows —
+<b>the fingerprint decides whether the button appears, never what the answer is</b>. While loading: the
+console's existing <code>.spin</code>.</p></div>
+<h2>5. Where the ⛔ Systems Manager gate shows</h2>
+<div class="lk-sec" data-cm="5-where-the-systems-manager"><div class="box verdict">
+<b>Position: if the org has no SM, the button does not render at all</b> — and one line at the top of the
+pane says why, once.
+<br><br>
+A disabled button on every Windows row is <b>48 pieces of noise repeating a single org-level fact</b>.
+State a fact at the level it is true. Toggle it in the mockup to see both.
+</div></div>
+<h2>6. What this must not become</h2>
+<div class="box stop">
+The new ACCESS POLICY badge lands <b>directly beside VLAN cells that already carry live write pencils</b>
+(<code>.vlanedit</code>, <code>:1571-1572</code>), backed by a working <code>POST /meraki/port-vlan</code>.
+It is one "just make it a dropdown" from writable.
+<br><br>
+<b>Blast radius:</b> re-VLANing or policy-flipping the kitchen server's port takes <b>POS and KDS down
+mid-service</b>. A MAC-allow-list write that omits the server's own MAC is a <b>lockout that survives a
+reboot</b>.
+<br><br>
+So the badges render with <b>no <code>data-target</code>, no button class, nothing the delegated click
+handlers can find</b>. Read-only here is the posture, not a phase.
+</div>
+</div>
+
+<!-- ================== LAF ================== -->
+<div class="dpane" id="p-laf">
+<h2>1. Intent</h2>
+<div class="lk-sec" data-cm="1-intent"><p>Two read-only additions to a nine-column table that is already dense, in a console whose established law
+is that <b>nothing scrolls sideways</b>. The axes resolve exactly as they did for Drift — <b>serious,
+dense, abstract, bold-by-colour, responsive, restrained</b> — because this is the same product and the same
+operator. Top two traits: <b>dense</b> and <b>serious</b>. The one real contradiction is dense &times; the
+need for three new facts per row; it resolves the way the console already resolves everything:
+<b>badges carrying weight, not columns carrying width.</b></p></div>
+<h2>2. System rules</h2>
+<div class="lk-sec" data-cm="2-system-rules"><h3>Colour</h3>
+<p>Inherited verbatim from the live <code>:root</code> (<code>index.html:10</code>).
+<b>No new base colours.</b> <code>--bg #0a0a0a</code> · <code>--surface #141414</code> ·
+<code>--line #262626</code> · <code>--accent #6FC3DF</code> · <code>--dim #888</code> ·
+<code>--ok #7CFFB2</code> · <code>--warn #ffce85</code> · <code>--bad #ff6b6b</code>.</p>
+<p><b>The one new rule</b> is semantic, not chromatic: <b>dim = default, accent = configured, warn = trunk,
+bad = admin-down.</b> Four states, four existing hues, zero invention.</p>
+
+<h3>Spacing &amp; type</h3>
+<p>Base 4px. Badge geometry is the shipped <code>.lvl</code> exactly — <code>font-size:.58rem</code>,
+<code>font-weight:800</code>, <code>letter-spacing:.5px</code>, <code>padding:1px 5px</code>,
+<code>border-radius:4px</code> — plus <code>margin-left:5px</code> so badges sit off the port number without
+a new cell. Table cell padding stays <code>5px 8px</code>. Machine values stay
+<code>ui-monospace, Consolas</code>; prose stays the system stack.</p>
+
+<h3>Density</h3>
+<p>Target: <b>a 24-port switch still fits one viewport</b>, unchanged from today. Badges add zero row
+height because they are inline at a smaller font than the cell. Zero new columns means zero new horizontal
+pressure — the constraint is satisfied by construction, not by tuning.</p>
+
+<h3>Depth</h3>
+<p>Flat. Borders and surface value only. The badges are 1px outlines, not chips with shadows.</p></div>
+<h2>3. Component behaviour</h2>
+<div class="lk-sec" data-cm="3-component-behaviour"><p><b>Badges</b> — inline in the Port cell, never wrapping to their own line on a 24-port table; uppercase,
+800-weight, tiny. <b>Not interactive</b>, deliberately: no hover promotion, no cursor change, nothing a
+click handler can select.</p>
+<p><b>The Host firewall button</b> — the console's ghost button (<code>.renameit</code>/<code>.vlanedit</code>
+recipe: transparent, 1px <code>--line</code>, hover promotes border and text to accent). It sits on the
+<code>.cline</code> client row, inheriting the flex-wrap that already keeps a name and its pencil together.</p>
+<p><b>Result pills</b> — replace the button in place. State in the text, identity confidence in the border
+style, provenance in a dim italic suffix, freshness always present.</p>
+<p><b>The legend</b> — one block under the table, in the coverage-note treatment Drift uses, explaining the
+quiet/lit rule. Without it, "lit" is decoration; with it, it is information.</p></div>
+<h2>4. Interaction</h2>
+<p><b>Transitions 120–150ms</b>, matching the shipped values, and only on the button's hover. <b>Badges
+never animate</b> — they are state, not events; motion on state teaches you to watch for motion.</p>
+<p><b>Feedback:</b> hover promotes border+text to accent (buttons only). Focus is the console's existing
+<code>:focus-visible</code> 2px accent outline. Loading is <code>.spin</code> plus "asking…". Failure keeps
+the button and appends a dim reason — it never silently reverts to unasked, which would read as "nothing
+happened".</p>
+<p><b>The click is a read.</b> Nothing here mutates, so nothing needs a confirm step — which is precisely
+why the badges must stay unclickable: the moment one of them is interactive, someone will reasonably assume
+this table edits.</p>
+</div>
+
+<!-- ================== RECONCILE ================== -->
+<div class="dpane" id="p-rec">
+<h2>Pair reconcile (Rule 1)</h2>
+<div class="lk-sec" data-cm="pair-reconcile-rule-1"><div class="box agree">
+<b>Converged independently:</b> zero new columns &middot; the no-sideways-scroll law governs &middot; badges
+reusing the shipped <code>.lvl</code> chassis and its existing tints &middot; Open renders but recessive
+&middot; report-vs-judge boundary — the audit owns severity &middot; solid=evidenced / dashed=inferred
+carried over from Drift, applied to <code>matchedBy</code> so a green-but-dashed pill means "certain state,
+inferred identity" &middot; every answer stamped with its report time &middot; the OS gate decides whether
+the button appears, never what it says &middot; the badges must be inert because live write pencils sit
+one cell away.
+</div>
+
+<div class="box corr">
+<b>Where the navigator beat the driver — all adopted, and the mockup was rebuilt to match:</b>
+<ol>
+<li><b>The roster already knows the kitchen server.</b> <code>"Injest\t10.90.100.101"</code> at
+    <code>index.html:1112</code>. That is the landmark <i>and</i> the SM join key the v2 design needed.
+    The driver designed around a host the console could already name.</li>
+<li><b>Exception-first badges, one per port.</b> The driver rendered <code>ACCESS</code> +
+    <code>OPEN</code> on every access port — 96 badges of mostly-default on a 48-port switch. The
+    navigator's scheme shows <b>one</b>: trunk gets <code>TRUNK</code>, access gets its policy chip — and
+    since a chip only ever appears on an access port, <b>the chip is the access marker</b>. Denser, and
+    still complete.</li>
+<li><b>Badges belong in the VLAN cell, not the Port cell.</b> Meraki's own editor groups Access policy with
+    VLAN — <i>which is exactly what the operator's screenshot shows</i>. The driver put them by the port
+    number on "it's the emptiest cell" grounds, which is a layout argument where a semantic one was
+    available.</li>
+<li><b>Admin-down is a word, not a red badge.</b> The driver painted it <code>--bad</code> red — a
+    judgement, in a document whose own &sect;1 forbids judging. A disabled unused port is good hygiene.
+    <code>&#8998; Disabled</code>, grey.</li>
+<li><b>The width budget, quantified:</b> ~1090px of existing columns against ~1106px available on a 1366px
+    laptop. The driver asserted "no sideways scroll"; the navigator proved the margin is ~16px.</li>
+<li><b>SM gating is subtler than the driver had it.</b> Hide the button when SM is <i>known absent</i>; but
+    when SM presence is <i>unknown</i> (catalog unfetched, older bridge), render it and let the first click
+    resolve to <code>CAN'T TELL — org has no Systems Manager</code>. Never render an enabled-looking control
+    that always fails; equally, never hide on an assumption.</li>
+</ol>
+</div>
+
+<div class="box split">
+<b>Driver-only kept:</b> the explicit blast-radius statement for read-only posture (POS/KDS down
+mid-service; a MAC-allow-list write omitting the server's own MAC is a lockout surviving reboot), and the
+markup-level guardrail that the badges carry no <code>data-target</code> and no button class.
+<br><br>
+<b>No unresolved splits.</b> Every driver/navigator disagreement resolved in the navigator's favour on the
+merits, and the mockup above is the navigator's scheme.
+</div>
+
+<h3>Carried risks for the build</h3>
+<ul>
+<li><b>Column sorting.</b> The VLAN cell gains badge text, and <code>SORTSTATE</code>
+    (<code>index.html:771</code>) may sort that column on whole-cell text. Either append the chip after the
+    number so a numeric parse still wins, or give the cell a <code>data-</code> sort key. <b>Verify at
+    <code>~b</code></b> — this is the most likely thing to break quietly.</li>
+<li><b>Does Meraki's port-status endpoint already return a literal <code>Disabled</code></b> for admin-down
+    ports? If so, <code>.st-off</code> becomes pure styling over data we already have, and the
+    <code>enabled</code> projection is belt-and-braces rather than the source.</li>
+<li><b><code>Custom access policy #N</code></b> ships unexercised — no port in this org has been observed
+    using one. The first <code>#N</code> that renders is the Rule-7 trigger for the name-resolve call.</li>
+<li><b>Trunk native VLAN.</b> Meraki's editor labels the number "Native VLAN" on trunks; our column shows a
+    bare number. A tooltip fix if operators ask.</li>
+</ul></div>
+<h2>Definition of Done</h2>
+<ul class="dod">
+<li>&#10003; Paired per Rule 1 — navigator spawned concurrently; verdict section held open, not predicted</li>
+<li>&#10003; Existing UI mined before inventing — every value traced to <code>web/app/index.html</code></li>
+<li>&#10003; 6 axes resolved with reasons; the density contradiction named and resolved</li>
+<li>&#10003; 4-section <code>~laf</code> output present</li>
+<li>&#10003; The no-sideways-scroll law honoured by construction — zero new columns</li>
+<li>&#10003; Report-vs-judge boundary stated, so this surface can't contradict the audit</li>
+<li>&#10003; Working clickable mockup; vanilla HTML/CSS/JS, no framework, no CDN, no build</li>
+<li>&#10003; Mockup carries the console's own DEMO badge</li>
+<li>&#10003; Read-only posture specified at the markup level (no <code>data-target</code>, no button class)</li>
+<li>&#10003; Published + externally reachable at its cap-URL (Rule 10)</li>
+<li>&#10003; Reconcile complete — six navigator wins adopted, the mockup rebuilt to its scheme, and one driver self-contradiction (red admin-down badge) corrected</li>
+</ul>
+</div>
+
+<footer>
+Generated 2026-08-04 00:55 &middot; v0 &middot; r1045 &middot; Argus &middot; ~laf paired (Opus + Fable5)
+</footer>
+</main>
+
+<script>
+document.querySelectorAll(".dtab[data-p]").forEach(function(b){
+  b.addEventListener("click", function(){
+    document.querySelectorAll(".dtab[data-p]").forEach(x=>x.classList.remove("on"));
+    document.querySelectorAll(".dpane").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); document.getElementById(b.dataset.p).classList.add("on");
+    window.scrollTo({top:0,behavior:"instant"});
+  });
+});
+
+/* ---- prototype ---- */
+var FW="ask", HASSM=true;
+var PORTS=[
+ {p:1,  type:"access", pol:"Open", en:true,  vlan:100, av:"1-1000", poe:1, st:"Disconnected"},
+ {p:2,  type:"access", pol:"Open", en:true,  vlan:100, av:"1-1000", poe:1, st:"Disconnected"},
+ {p:3,  type:"access", pol:"Open", en:true,  vlan:90,  av:"1-1000", poe:1, st:"Connected", srv:true,
+  cl:{name:"Injest", ip:"10.90.100.101", mac:"1c:1a:1b:ec:ed:30", ls:"08-04, 00:51", os:"Windows"}},
+ {p:4,  type:"access", pol:"Open", en:true,  vlan:100, av:"1-1000", poe:2, st:"Connected",
+  cl:{name:"Bread Printer", ip:"10.90.100.70", mac:"1c:1a:1b:cb:85:0c", ls:"08-04, 00:51", os:"—"}},
+ {p:7,  type:"access", pol:"Open", en:false, vlan:20,  av:"1-1000", poe:1, st:"Disconnected"},
+ {p:11, type:"access", pol:"Sticky MAC allow list", en:true, vlan:90, av:"1-1000", poe:2, st:"Connected",
+  cl:{name:"Salad Printer", ip:"10.90.100.71", mac:"1c:1a:1b:ec:e5:7e", ls:"08-04, 00:51", os:"—"}},
+ {p:24, type:"trunk",  pol:"", en:true, vlan:1, av:"1-1000", poe:0, st:"Connected"}
+];
+function badge(cls,txt){ return "<span class='lvl "+cls+"'>"+txt+"</span>"; }
+function poeCell(v){ return v===2?"<span class='poepow'>On &#9889;</span>":v===1?"<span class='poeon'>On</span>":"<span class='av'>Off</span>"; }
+
+function fwCell(){
+  if(!HASSM) return "";
+  if(FW==="ask")  return "<button class='hfw' onclick=\"setFw('on')\">Host firewall?</button>";
+  if(FW==="load") return "<span class='fwnote'><span class='spin'></span> asking Systems Manager&hellip;</span>";
+  if(FW==="on")   return "<span class='fw fw-on inferred'>FIREWALL ON</span>"+
+                         "<span class='prov'>matched by IP &middot; Defender &middot; reported 14m ago</span>";
+  if(FW==="off")  return "<span class='fw fw-off'>FIREWALL OFF</span>"+
+                         "<span class='prov'>matched by Wi-Fi MAC &middot; reported 3h ago</span>";
+  return "<span class='fw fw-unk'>CAN'T TELL</span>"+
+         "<span class='prov'>this host is not enrolled in Systems Manager</span>";
+}
+
+function render(){
+  document.getElementById("smnote").innerHTML = HASSM ? "" :
+    "<div class='smnote'><b>Host firewall state is unavailable for this organization.</b> It requires Meraki "+
+    "Systems Manager, and no device here is enrolled. Stated once rather than as a dead button on every row.</div>";
+
+  var h="<table class='pt'><thead><tr><th>Port</th><th>Status</th><th>VLAN</th><th>Allowed VLANs</th>"+
+        "<th>PoE</th><th>Description</th><th>IP address</th><th>MAC address</th><th>Last seen (PT)</th></tr></thead><tbody>";
+  PORTS.forEach(function(p){
+    var conn=p.st==="Connected" && p.en;
+    // EXCEPTION-FIRST: exactly one badge per port, in the VLAN cell where Meraki's own editor groups
+    // policy with VLAN. Trunk gets TRUNK; access gets its policy chip -- so a chip IS the access marker
+    // and absence-of-chip means trunk. Nothing is spent on marking the 90% default type.
+    var b = p.type==="trunk"
+      ? badge("lvl-trunk","Trunk")
+      : badge(p.pol==="Open"?"lvl-def":"lvl-set", p.pol==="Open"?"Open":"Sticky MAC");
+    // Admin-down is a WORD in the Status cell, not a coloured badge. A disabled unused port is good
+    // hygiene -- painting it red would be a judgement, and this surface reports.
+    var stTxt = p.en ? p.st : "⊘ Disabled";
+    var stCls = p.en ? (conn?"st-conn":"st-disc") : "st-off";
+    var desc="", ip="", mac="", ls="";
+    if(conn && p.cl){
+      var btn = (p.cl.os==="Windows") ? fwCell() : "";
+      desc="<div class='dcell'><div class='cline'>"+p.cl.name+" "+btn+"</div></div>";
+      ip=p.cl.ip; mac=p.cl.mac; ls=p.cl.ls;
+    }
+    h+="<tr class='"+(conn?"":"disc")+(p.en?"":" admdown")+"'>"+
+       "<td class='port'>"+p.p+"</td>"+
+       "<td class='"+stCls+"'>"+stTxt+"</td>"+
+       "<td class='nw'>"+p.vlan+" "+b+"</td><td class='av nw'>"+p.av+"</td>"+
+       "<td class='nw'>"+poeCell(p.poe)+"</td>"+
+       "<td>"+desc+"</td><td class='ip'>"+ip+"</td><td class='ip'>"+mac+"</td><td class='av nw'>"+ls+"</td></tr>";
+  });
+  document.getElementById("tbl").innerHTML=h+"</tbody></table>";
+}
+function setFw(s){ if(s==="on"&&FW==="ask"){ FW="load"; render(); setTimeout(function(){ FW="on"; render(); },700); return; } FW=s; render(); }
+function setSm(){ HASSM=!HASSM; render(); }
+render();
+</script>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"9085c2da-92bc-4eb2-93c6-4fd8e800d541"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~i — Purcius Mesh Status Bridge (paired inspection)</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  .nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  .nav .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  .nav .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:800px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:26px; margin:.2em 0 .1em; }
+  h2 { font-size:19px; color:var(--accent); margin-top:1.9em; border-bottom:1px solid #262626; padding-bottom:5px; }
+  h3 { font-size:15px; margin:1.3em 0 .3em; color:#cfcfcf; }
+  .sub { color:var(--mut); margin-top:0; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:13px; }
+  pre { background:#000; border:1px solid #242424; border-radius:6px; padding:12px; overflow:auto; font-size:12.5px; color:#cfe8ef; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13px; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid #242424; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  .tag { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; border:1px solid #333; color:var(--mut); }
+  ul { margin:.4em 0; padding-left:20px; } li { margin:.25em 0; }
+  .foot { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #242424; padding-top:12px; }
+  .big { font-size:15px; }
+  .risk { border-left:3px solid var(--bad); padding-left:12px; }
+  .lead { border-left:3px solid var(--accent); padding-left:12px; }
+</style>
+</head>
+<body>
+<div class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-18 11:19 PDT</span></div>
+<div class="wrap">
+
+<h1>~i — Purcius Mesh Status Bridge</h1>
+<p class="sub">Paired inspection (two blind passes, reconciled) &middot; for the building pair &middot; project: <b>argus</b> / Purcius substrate</p>
+
+<div class="card lead big">
+<b>Verdict in one line:</b> the <b>allowlist-projection core is real, clean C99, committed &amp; pushed, and its relay contract genuinely matches</b> &mdash; but it is a <b>core-only artifact</b>. The entire <b>push half</b> (build recipe, scheduler, the code that POSTs to Cloudflare, the custom-domain bind) is <b>unbuilt</b>. Two things could make the build silently wrong; both are named below and both are resolvable before the first commit.
+</div>
+
+<h2>What It Is</h2>
+<p><b>Intent</b> &mdash; expose Purcius mesh health on a stable public URL without leaking any internal topology.
+<b>Purpose</b> &mdash; an <i>inverted Hollow Edge</i>: probe inward from in&#8209;VPC, publish outward as a static, allowlist&#8209;projected contract. <b>What</b> &mdash; a C99 node process (<code>status_bridge</code>) on <code>bridge-los-angeles</code> that probes each mesh node, projects the result into a <b>fixed publishable struct</b> (a field not in the struct cannot leak), and emits <code>mesh.json</code> + <code>index.html</code>. A separate push step ships those to <b>Cloudflare Pages</b>; the node serves <b>no public port</b>. Public face: <code>status.purcius.net</code> (page) + <code>/mesh.json</code> (machine contract). Per Rule&nbsp;5 that <code>.net</code> surface is correct (platform/machine contract).</p>
+
+<h2>Structure &mdash; what exists, verified</h2>
+<table data-cm="what-it-is">
+<tr><th>Artifact</th><th>Path</th><th>State</th></tr>
+<tr><td>Design</td><td><code>argus/be/designs/2026-07-18-0015-design-mesh-status-bridge.html</code> (doculink 89ee1d90)</td><td class="ok">committed + pushed (argus <code>6fa045b</code>, 3-rev history &rarr; push model)</td></tr>
+<tr><td>Core code</td><td><code>metal/src/sdk/nous/comms/skill/status-bridge/status_bridge.c</code> (202 lines)</td><td class="ok">committed + pushed (metal <code>9779312</code>, ancestor of HEAD, on origin/main)</td></tr>
+<tr><td>Build recipe</td><td>&mdash;</td><td class="bad">DOES NOT EXIST (no <code>build-status.sh</code>, no Makefile target, no test)</td></tr>
+<tr><td>Push / scheduler</td><td>&mdash;</td><td class="bad">DOES NOT EXIST (no code POSTs to cloudflare-bridge; binary runs once, no loop)</td></tr>
+<tr><td>Public surface</td><td><code>status.purcius.net</code></td><td class="bad">NXDOMAIN &mdash; never created (<code>purcius.net</code> itself is on Cloudflare, 200)</td></tr>
+</table>
+
+<h3>The baked mesh (source-of-truth is the C file only)</h3>
+<table>
+<tr><th>name</th><th>role</th><th>region</th><th>probe IP (never emitted)</th><th>probe</th></tr>
+<tr><td>relay-los-angeles</td><td>relay</td><td>us-west2</td><td>10.168.0.2</td><td>HTTP GET /status :8080</td></tr>
+<tr><td>relay-hong-kong</td><td>relay</td><td>asia-east2</td><td>10.170.0.5</td><td>HTTP GET /status :8080</td></tr>
+<tr><td>bridge-los-angeles</td><td>bridge</td><td>us-west2</td><td>127.0.0.1</td><td>self = up</td></tr>
+</table>
+<p class="sub">Primes (e.g. <code>mendo-zendesk</code>) are <b>not probed directly</b> by design &mdash; internal-only, firewall-gated to their relay; reported at mesh level via each relay&rsquo;s <code>peers</code> count (<code>primes_connected</code>). Consistent with the design.</p>
+
+<h2>Stack</h2>
+<ul data-cm="stack">
+<li><b>Core:</b> C99, <code>_GNU_SOURCE</code> + raw BSD sockets, non-blocking connect + <code>select</code> timeout. <span class="ok">Roll-your-own clean</span> &mdash; no curl/popen/posix_spawn/system, no <code>comms/skill/http</code> dependency. Self-contained (<code>gcc status_bridge.c -o status_bridge</code>, no nous DEPS needed).</li>
+<li><b>Output:</b> writes <b>both</b> <code>mesh.json</code> and <code>index.html</code> to <code>outdir</code> (<code>argv[1]</code>, default <code>.</code>). JSON: <code>as_of</code>, <code>nodes[]{name,role,region,state}</code> (+ relay-up <code>{uptime,sessions,peers,transport}</code>), <code>mesh{nodes_up,nodes_total,primes_connected,health}</code>. HTML is a static Be-styled shell that fetches <code>mesh.json</code> client-side and re-renders every 60s.</li>
+<li><b>Push path (reuse, proven):</b> <code>cloudflare-bridge</code> (the sanctioned C# vendor jacket) on Cloud Run <code>acmedev-platform-hq</code>/us-west1. Endpoints <code>/cloudflare/pages-deploy</code>, <code>/pages-deploy-site</code>, <code>/pages-add-domain</code>. Auth: <code>BRIDGE_TOKEN</code> or daily <code>&lt;yyyyMMdd&gt;~go</code> passphrase. CF key <code>CLOUDFLARE_API_TOKEN</code> (server-side). Live-proven today: every <code>ai-metal.net/s/&lt;token&gt;</code> and the <code>ai-doculink.net</code> custom-domain bind ran through it. CF account <code>7c605ea0&hellip;</code>.</li>
+</ul>
+
+<h2>Patterns Found</h2>
+<ul data-cm="patterns-found">
+<li><b>Allowlist projection (verified, not asserted):</b> the <code>ip</code> field is in the <code>Node</code> struct but <b>no emit statement references it</b> &mdash; provable by reading the JSON build (only name/role/region/state[+relay counts] are written). Genuine allowlist, not a blocklist filter. This is the whole security thesis and it holds in code.</li>
+<li><b>Relay contract MATCHES:</b> <code>relay_server.c</code> <code>handle_status()</code> serves <code>GET /status</code> emitting <code>{role,sessions,peers,uptime,transport,region,identity}</code>. The bridge parses <code>uptime/sessions/peers</code> (ints) + <code>transport/region</code> (strings) &mdash; all five names match; <code>identity</code> is correctly NOT projected out.</li>
+<li><b>Deploy template exists:</b> <code>metal/src/sdk/nous/action/skill/pirun/build-enact.sh</code> is the proven &ldquo;C99-on-prime&rdquo; pattern to mirror (<code>BUILD_DIR=/opt/nous/build</code>, <code>find -type d</code> &rarr; <code>-I</code> harvest, <code>gcc -std=gnu99 -O2 -w -D_GNU_SOURCE</code>, DISARMED-by-default). status_bridge needs no DEPS list &mdash; simpler.</li>
+</ul>
+
+<h2>Open Questions &mdash; the two that could make the build silently wrong</h2>
+
+<div data-cm="open-questions-the-two-that" class="card risk">
+<b>RISK 1 (highest) &mdash; relay probe protocol: HTTP vs wire-over-TLS on :8080.</b><br>
+The committed code probes relays with <b>plain HTTP/1.0 GET /status on :8080</b>. Pass&nbsp;A read <code>relay_server.c</code> and found a matching plain-HTTP <code>/status</code> handler &mdash; so it likely works. But Rule&nbsp;13 warns the relay speaks <b>wire-over-TLS</b> and returns <code>000</code> to plain HTTP, and the design prose says &ldquo;wire_request / wire-native.&rdquo; <b>If :8080 is the wire-TLS port and /status is served elsewhere, every relay shows <code>down</code>.</b> <span class="warn">Resolve by one live in-VPC smoke</span> (<code>curl :8080/status</code> from a peer node) <b>before</b> trusting the probe. Do not conclude from this dev box (home-router high-port block &mdash; Rule 13).
+</div>
+
+<div class="card risk">
+<b>RISK 2 &mdash; Cloudflare Pages allow-list does not contain a Purcius project.</b><br>
+<code>cloudflare-bridge</code> <code>Program.cs:42</code> hardcodes <code>{argus-app, argus-net, ai-metal-net}</code> and rejects any other project with <code>400 project-not-allowed</code>. There is no <code>purcius</code>/<code>status-purcius</code> project anywhere. <b>Plan of record (from the design): deploy <code>mesh.json</code>+<code>index.html</code> to the already-allow-listed <code>ai-metal-net</code> project, then <code>pages-add-domain?project=ai-metal-net&amp;domain=status.purcius.net</code></b> &mdash; the exact path that already bound <code>ai-doculink.net</code>. Requires <code>purcius.net</code> to be a zone in CF account <code>7c605ea0&hellip;</code> (design asserts &ldquo;confirmed in-account 2026-07-18&rdquo;; edge-confirmed same 104.21.x edge as ai-metal.net; account-membership itself unverifiable from outside &mdash; confirm in the CF dashboard). Alternative: add a dedicated project to the <code>CLOUDFLARE_BRIDGE_PAGES_ALLOW</code> env var (one-env change, no code deploy).
+</div>
+
+<h3>Secondary gaps (expected &mdash; the &ldquo;fan-out&rdquo; half)</h3>
+<ul>
+<li><b>Binary runs ONCE, no loop.</b> The &ldquo;every 60s push&rdquo; must be an external systemd timer / cron on the node. The 60s in the HTML is only the browser&rsquo;s client re-fetch.</li>
+<li><b>No code posts to the cloudflare-bridge.</b> <code>status_bridge.c</code> writes local files only &mdash; the push step is 100% unwritten.</li>
+<li><b>No build recipe, no test.</b> Design promised tests-ahead (IP/pubkey-in &rarr; neither-out; timeout &rarr; <code>state:"down"</code>). Write <code>build-status.sh</code> + the test.</li>
+<li><b>Field shortfall vs design:</b> code omits <code>last_seen</code>, <code>stale</code>, <code>regions</code>, prime <code>facts/sources</code>. Decide: ship lean-as-coded or grow to the design&rsquo;s must-haves.</li>
+<li><b>GCP project for bridge/relay nodes is not in the repos</b> (cloudflare-bridge is in <code>acmedev-platform-hq</code>, a different node). Get it from live <code>gcloud</code>/operator.</li>
+<li><b>Baked IPs are single-sourced</b> (only in <code>status_bridge.c</code>) &mdash; no <code>mesh.json</code>/<code>mesh.sealed</code> to cross-check. Validate against live VPC.</li>
+<li><b>Minor:</b> design diagram says <code>relay-hong-kong-b</code>; code says <code>relay-hong-kong</code>. Reconcile the real public role-name. HTTP body buffer capped at 4KB (fine for ~200-byte relay JSON); JSON parse is naive substring pluck (brittle but OK for trusted flat JSON).</li>
+</ul>
+
+<h2>Build order for the pair (smallest real path to 200)</h2>
+<ol data-cm="build-order-for-the-pair">
+<li><b>Confirm RISK 1</b> from in-VPC: <code>curl http://10.168.0.2:8080/status</code> on a peer. Green &rarr; probe is correct. Red &rarr; switch the probe to <code>wire_request</code> before anything else.</li>
+<li><b>Write <code>build-status.sh</code></b> (mirror build-enact; simpler, no DEPS) + a <code>status_bridge_test.c</code> proving the allowlist. Build on the node, run once, eyeball <code>mesh.json</code> for zero addresses.</li>
+<li><b>Write the push step:</b> POST <code>index.html</code> (+ <code>mesh.json</code>) to <code>cloudflare-bridge /cloudflare/pages-deploy-site</code>, project <code>ai-metal-net</code>. Add a systemd timer (60s).</li>
+<li><b>Bind the domain:</b> <code>pages-add-domain?project=ai-metal-net&amp;domain=status.purcius.net</code>. Verify <code>dig status.purcius.net</code> resolves + <code>curl https://status.purcius.net/mesh.json</code> = 200 with clean fields. That is Done (Rule 9).</li>
+</ol>
+
+<h2>Definition of Done &mdash; this ~i artifact</h2>
+<ul data-cm="definition-of-done-this-i">
+<li class="ok">&#10003; A-D-D verified &mdash; inspection read against the design (89ee1d90) + code; discrepancies flagged, not smoothed over</li>
+<li class="ok">&#10003; Evidence-first &mdash; every claim carries a file/commit/line or is marked UNCERTAIN; two independent passes reconciled</li>
+<li class="ok">&#10003; Sections present (What It Is / Structure / Stack / Patterns Found / Open Questions) + build order</li>
+<li class="ok">&#10003; Publication date top-right of nav</li>
+<li class="warn">&#9679; External production verification &mdash; N/A for an inspect report; the two build risks explicitly require in-VPC verification by the building pair (Rule 13)</li>
+<li class="ok">&#10003; Be index update + commit + push on save</li>
+</ul>
+
+<div class="foot">metal console &middot; Be &middot; v0 &middot; r706 &middot; 2026-07-18 &middot; 1819 pts &middot; Purcius &mdash; ~i status bridge (paired inspection, for the building pair)</div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"905a721d-8301-42ab-9562-0c66e58fb958"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

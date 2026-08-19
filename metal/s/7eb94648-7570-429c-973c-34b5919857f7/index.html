@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~i — How the Card Shipped, and Where allow: Went</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;position:sticky;top:0;z-index:9;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:800px;margin:0 auto;padding:8px 22px 70px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:40px}
+ h1{font-size:25px;margin:20px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:15px;color:#6FC3DF;margin:36px 0 10px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:7px}
+ h3{font-size:15px;color:#fff;margin:20px 0 7px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 6px}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 18px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:15px 17px;margin:13px 0}
+ .card.yes{border-left:3px solid #3aa06a}.card.no{border-left:3px solid #c9463f}
+ .card.warn{border-left:3px solid #c9a24b}.card.info{border-left:3px solid #3a6a90}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 6px;border-radius:4px}
+ pre{background:#0a0a0a;border:1px solid #262626;border-radius:7px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#c8d6dd;line-height:1.55}
+ table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:8px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:9px;vertical-align:top;color:#c5d0d6}
+ td.k{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;white-space:nowrap}
+ ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+ .foot{margin-top:30px;border-top:1px solid #222;padding-top:15px;color:#5f6f77;font-size:11.5px}
+ .big{font-size:18px;color:#fff;font-weight:600;margin:0 0 6px}
+ .ok{color:#7CFFB2;font-weight:700}.bad{color:#ff9b93;font-weight:700}.amb{color:#f0c674;font-weight:700}
+ .tag{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:4px;letter-spacing:.04em}
+ .t-s{background:#0f2318;color:#7CFFB2;border:1px solid #2a5a38}
+ .t-p{background:#1a140f;color:#f0c674;border:1px solid #4a3a20}
+ .t-u{background:#2a1210;color:#ff9b93;border:1px solid #5a2a26}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">~i &middot; inspect</span>
+<span class="p">Published 2026-07-21 07:45 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/7eb94648-7570-429c-973c-34b5919857f7/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>How the card shipped &mdash; and where <code>allow:</code> went</h1>
+<p class="lede">Two questions. The second has an answer nobody expected.</p>
+<p class="sub">Paired concurrent per Rule 1. Both passes converged; the load-bearing measurement was then
+re-run independently by the driver against the real files.</p>
+
+<h2>Q2 first, because it changes the plan</h2>
+<div class="card no">
+<p class="big">The <code>allow:</code> lists never reach the runtime. Not ignored &mdash; <b>destroyed.</b></p>
+<pre>dia.h:14   typedef struct DiaClause { char id[8];   char text[512]; } DiaClause;</pre>
+<p>The demand parser (<code>dia.c:212-226</code>) appends any indented line that doesn't start
+<code>D&lt;digit&gt;</code> onto the clause text. There is no <code>allow:</code> branch, no
+<code>ignore:</code> branch, and <b>no field on any struct</b> for options. So the lists become prose
+&mdash; and then the 512-byte buffer truncates them away. Measured against the real card:</p>
+<pre>D4    len= 1583  *** TRUNCATED -- 1071 bytes DISCARDED ***
+      allow: begins at offset 693  -> PAST THE CUT, never reaches the runtime
+      cut lands: ...under the vendor's terms, so guest data | LEAVES that boundary...
+
+      allow entries in the file : 28
+      allow entries the C sees  :  0</pre>
+<p><b>Zero bytes of either allow block exist in memory when the card runs.</b> The commit that added them
+(<code>389d608</code>) said so in its own message &mdash; <i>"parses as demand continuation, words seal
+untouched"</i> &mdash; which is why it was safe to land, and exactly why it is inert.</p>
+</div>
+
+<div class="card warn">
+<h3>Three more findings that follow from it</h3>
+<p><b>1. Nothing enforces the allow list.</b> What actually picks the models is the plan:
+<code>.si:55 &mdash; set: panel.models = vertex-gemini, vertex-gemini-pro</code>. That IS parsed. <b>Nothing
+cross-checks it against D4's allow set.</b> Point the <code>.si</code> at an unlisted BYOK model and it
+runs clean &mdash; biRT passes, seal passes, no murmur. "Fail-closed on drift" is currently decoration.</p>
+<p><b>2. <code>ignore:</code> does not exist in a single card.</b> Grepped both repos: zero hits outside
+the design document. It is design prose only &mdash; and it <i>cannot</i> be implemented console-side,
+because "skip this ticket at intake, expire on <code>until=</code>" is runtime behaviour. A regex cannot
+skip a ticket.</p>
+<p><b>3. Three cards are one edit from silent data loss.</b> This is a latent bug independent of the
+feature:</p>
+<pre>mendo-nps-sweep      D1  len=481   31 bytes from the cliff
+mendo-nps-detractor  D2  len=445   67 bytes from the cliff
+purcius-mesh-status  D5  len=422   90 bytes from the cliff</pre>
+<p>Add two sentences to any of those demands and it truncates mid-word, silently, with no error.</p>
+</div>
+
+<h3>Where <code>allow:</code> <i>does</i> live &mdash; and how many copies exist</h3>
+<table>
+<tr><th>Copy</th><th>Read by</th><th>Enforces?</th></tr>
+<tr><td class="k">the .pi (canonical)</td><td>a Python regex in <code>bake-runbooks.py</code></td><td><span class="bad">no</span></td></tr>
+<tr><td class="k">web/app/runbooks.json</td><td>the console, for display chips</td><td><span class="bad">no</span></td></tr>
+<tr><td class="k">bridge-postman.html, inline CFG</td><td>the demo page, hand-pasted</td><td><span class="bad">no</span> &mdash; and this copy carries the staff emails the bake redacts</td></tr>
+<tr><td class="k">the card on the primes</td><td>the runtime</td><td><span class="bad">no</span> &mdash; and it is the <b>07-19</b> card, without D4's allow lists at all</td></tr>
+</table>
+<p><b>Four states of truth, four days after the feature was designed.</b> The bake and the C parser already
+disagree about reality: the Python deliberately mirrors dia.c's continuation rule but has <i>no 512-byte
+cap</i>, so it sees text the runtime provably cannot.</p>
+
+<h2>Q1 &mdash; how the first card reached production</h2>
+<div class="card warn">
+<p class="big">Exactly one step of the deployment is a committed script.</p>
+<p>Everything else is English prose in a report, a default constant in C, or pure node state. This is the
+write-list for any change-travel mechanism.</p>
+<table>
+<tr><th>Step</th><th>State</th><th>Evidence</th></tr>
+<tr><td>Source tree &rarr; node</td><td><span class="tag t-u">NOTHING</span></td><td>no scp/tar/clone targeting a prime, repo-wide</td></tr>
+<tr><td><b>Compile on node</b></td><td><span class="tag t-s">SCRIPTED</span></td><td><code>build-enact.sh</code> &mdash; the one real artifact</td></tr>
+<tr><td>Card files placed</td><td><span class="tag t-u">UNKNOWN</span></td><td>path lives only inside node-local <code>tenants.tsv</code></td></tr>
+<tr><td><code>/var/nous/cap.root</code></td><td><span class="tag t-u">UNKNOWN</span></td><td>32-byte HMAC root, read by three binaries; generation unrecorded</td></tr>
+<tr><td><code>enact/tenants.tsv</code></td><td><span class="tag t-u">UNKNOWN</span></td><td>format in a C comment; the actual rows nowhere</td></tr>
+<tr><td><code>lb/sweep.token</code>, <code>slots/</code>, <code>run/</code>, wordnet</td><td><span class="tag t-u">UNKNOWN</span></td><td>paths only, as C defaults</td></tr>
+<tr><td>systemd <code>enact.service</code></td><td><span class="tag t-u">NOT IN GIT</span></td><td>named twice in prose; no <code>.service</code> file committed anywhere</td></tr>
+<tr><td>Capability mint</td><td><span class="tag t-s">IN CODE</span></td><td>per-request in <code>legacy_bridge.c</code>; depends on the unknown root</td></tr>
+<tr><td>4 Scheduler jobs</td><td><span class="tag t-p">PROSE</span></td><td>zero <code>jobs create</code> commands recorded</td></tr>
+<tr><td><b>Verification</b></td><td><span class="tag t-s">EXCELLENT</span></td><td>tickets 615&rarr;616, 632&rarr;633, sha256 <code>e18de99b&hellip;</code>, 10/10 drifts REFUSED</td></tr>
+</table>
+<p><b>The structural reason the provenance is missing:</b> the written plans describe a path that was not
+taken. The 07-17 design targets a Zendesk webhook into a prime named <code>mendo-zendesk</code> &mdash; a
+VM already terminated. What shipped on 07-19 was Cloud Scheduler &rarr; <code>/sweep</code> &rarr; relay
+&rarr; HK prime. <b>The taken path was never planned in writing, so nothing captured it.</b></p>
+<p class="sub">Consequence: prime-hong-kong cannot be rebuilt from this repository. You would get two
+binaries, then stop at four undocumented <code>/var/nous</code> files, an uncommitted unit file, and four
+Scheduler jobs whose creation parameters were never written down. The standby seat, prime-las-vegas, has
+<b>no provisioning record at all</b> &mdash; that it matches HK is inference from two words ("Seats:").</p>
+</div>
+
+<h2>What has to change for options to travel with the DIA</h2>
+<p>A sidecar file was considered and <b>rejected by both passes</b>: the wire cannot carry a file, card
+placement is already the broken step, and the seal would not cover it &mdash; an unsealed sidecar holding
+a <i>permission list</i> is the one file you would most want tamper-evident. The <code>.sm.add</code>
+precedent is the cautionary tale: mesh-status's binds sit unfolded in one, and the card is
+non-runnable while the console renders it as a peer.</p>
+<p>The <code>.pi</code> is already the thing that provably travels. Put them in it, in dependency order:</p>
+<table>
+<tr><th>#</th><th>File</th><th>Change</th></tr>
+<tr><td>1</td><td class="k">dia.h</td><td>A <code>DiaOption</code> struct (kind allow/ignore, key, values[], <code>requires</code>, <code>until</code>) attached to <code>DiaClause</code></td></tr>
+<tr><td>2</td><td class="k">dia.h</td><td><b>Fix the 512-byte cap</b> &mdash; or stop concatenating options into it. Independent live bug.</td></tr>
+<tr><td>3</td><td class="k">dia.c</td><td>Match <code>allow:</code>/<code>ignore:</code> <i>before</i> the continuation fallthrough; parse key, value list, <code>requires=</code>, <code>until=</code>; handle multi-line bodies</td></tr>
+<tr><td>4</td><td class="k">dia.c</td><td><b>Check 6</b>, as the design specified &mdash; and the one nobody has named crisply: <b>every <code>.si set:</code> value must be a member of its demand's allow set, or REFUSE.</b> This is the check that makes fail-closed true.</td></tr>
+<tr><td>5</td><td class="k">pi_run.c</td><td>Evaluate <code>ignore:</code> in the intake gate only &mdash; never downstream of the illness check</td></tr>
+<tr><td>6</td><td class="k">.pi.seal</td><td>Extend to hash option lines, not just words &mdash; else a permission list is editable undetected</td></tr>
+<tr><td>7</td><td class="k">bake-runbooks.py</td><td>Consume the same structure the C produces, so console and runtime cannot disagree</td></tr>
+<tr><td>8</td><td class="k">deploy</td><td>None of it ships until card placement is a script. The primes run a card two days stale.</td></tr>
+</table>
+
+<h2>For today &mdash; what you can and cannot show</h2>
+<div class="card info">
+<p><b>You can demo the options surface today.</b> The console path is real end to end: the
+<code>.pi</code> holds the lists, the bake extracts them, <code>runbooks.json</code> carries them, and the
+pane renders 26 Vertex chips plus 8 BYOK behind the verbatim <code>requires=</code> sentence. Every
+number on that screen is read from your file.</p>
+<p><b>What is not true yet, if anyone asks:</b> the runtime does not know about any of it, nothing stops a
+plan from using an unlisted model, and <code>ignore:</code> has never existed. The screen shows
+<i>declared</i> intent, and today that is a document rather than a control.</p>
+</div>
+
+<h2>Definition of Done</h2>
+<ul>
+<li>&#10003; Paired concurrent; both passes converged on Q2's truncation finding independently</li>
+<li>&#10003; The load-bearing measurement re-run by the driver against the real files &mdash; 1583 vs 512, offset 693, 28 entries vs 0</li>
+<li>&#10003; Struct and parse loop quoted from source, not summarised</li>
+<li>&#10003; <code>ignore:</code> absence proven by grep across both repos, not assumed</li>
+<li>&#10003; Every provenance step labelled SCRIPTED / PROSE / UNKNOWN &mdash; that labelling is the write-list</li>
+<li>&#10003; A latent bug found that is independent of the feature (three cards near the 512 cliff)</li>
+<li>&#10003; Read-only &mdash; nothing modified</li>
+</ul>
+
+<div class="foot">
+Generated 2026-07-21 07:45 &middot; v0 &middot; ~i &middot; inspect<br>
+Sources: <code>dia.c</code>, <code>dia.h</code>, <code>pi_run.c</code>, <code>enact_server.c</code>,
+<code>legacy_bridge.c</code>, <code>build-enact.sh</code>, <code>bake-runbooks.py</code>,
+<code>mendo-nps-detractor-triage.pi/.si/.pi.seal</code>,
+<code>designs/2026-07-20-1828-design-clarify-skill.html</code>
+</div>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+</body></html>

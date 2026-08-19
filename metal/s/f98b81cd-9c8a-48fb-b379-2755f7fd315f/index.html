@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~d — "Host firewall?" button for Ingest devices</title>
+<style>
+  :root { --bg:#111111; --surface:#1A1A1A; --accent:#6FC3DF; --fg:#e8e8e8; --muted:#8a8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; background:#000; border-bottom:2px solid var(--accent);
+        padding:.7rem 1.2rem; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  nav .brand { color:var(--accent); font-weight:700; letter-spacing:.08em; }
+  nav .pub { color:var(--muted); font-size:.72rem; }
+  main { max-width:820px; margin:0 auto; padding:2rem 1.2rem 4rem; }
+  h1 { font-size:1.55rem; margin:.2rem 0 .3rem; }
+  h2 { font-size:1.08rem; margin:2.1rem 0 .5rem; color:var(--accent);
+       border-bottom:1px solid #2a2a2a; padding-bottom:.3rem; }
+  h3 { font-size:.94rem; margin:1.3rem 0 .35rem; color:#cfe9f3; }
+  .sub { color:var(--muted); font-size:.84rem; margin-bottom:1rem; }
+  .box { background:var(--surface); border:1px solid #262626; border-radius:6px;
+         padding:.9rem 1.05rem; margin:.9rem 0; }
+  .verdict { border-left:3px solid var(--accent); }
+  .stop { background:#241414; border-left:3px solid #e07b7b; }
+  .agree { background:#141c17; border-left:3px solid #7ddf8f; }
+  .corr { background:#1a1420; border-left:3px solid #b48fd9; }
+  .ask { background:#14202a; border-left:3px solid #6FC3DF; }
+  .split { background:#1d1614; border-left:3px solid #e0a07b; }
+  table { width:100%; border-collapse:collapse; margin:.8rem 0; font-size:.8rem; }
+  th, td { text-align:left; padding:.42rem .55rem; border-bottom:1px solid #262626; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; font-size:.71rem; text-transform:uppercase; letter-spacing:.05em; }
+  code { background:#000; padding:.1rem .32rem; border-radius:3px; font-size:.85em; color:#bfe9f7; }
+  pre { background:#000; padding:.75rem .95rem; border-radius:5px; overflow-x:auto; font-size:.76rem; line-height:1.5; }
+  ul { padding-left:1.25rem; } li { margin:.25rem 0; }
+  ol { padding-left:1.25rem; } ol li { margin:.35rem 0; }
+  .story { border-left:2px solid #333; padding-left:.85rem; margin:.6rem 0; color:#d8d8d8; font-size:.88rem; }
+  footer { color:var(--muted); font-size:.78rem; border-top:1px solid #262626;
+           margin-top:2.6rem; padding-top:1rem; }
+  .dod li { font-size:.83rem; }
+  .no { color:#ff9b9b; font-weight:700; } .yes { color:#7CFFB2; font-weight:700; }
+  .amb { color:#ffd479; font-weight:700; }
+  .chip { display:inline-block; font-size:.72rem; font-weight:800; letter-spacing:.04em;
+          border-radius:5px; padding:1px 8px; border:1px solid; }
+  .c-on { background:#06251a; color:#7CFFB2; border-color:#17513a; }
+  .c-off { background:#3a1212; color:#ff9b9b; border-color:#6b2b2b; }
+  .c-unk { background:#332608; color:#ffd479; border-color:#5a4410; border-style:dashed; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-08-03 23:05 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/f98b81cd-9c8a-48fb-b379-2755f7fd315f/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~d — "Host firewall?" button for Ingest devices</h1>
+<div class="sub">Argus &middot; acmedevUS/argus &middot; v0 &middot; r1041 &middot; 2026-08-03<br>
+Paired per Kernel Rule 1 — Opus driver + Fable5 navigator, concurrent independent designs, reconciled at the end.</div>
+
+<h2>Feasibility verdict — read this first</h2>
+<div class="lk-sec" data-cm="feasibility-verdict-read-this-first"><div class="box stop">
+<b>Only-if.</b> Meraki can answer "is Windows Firewall enabled on this device?" <b>only if that device is
+enrolled in Meraki Systems Manager with the desktop agent installed.</b> Without SM, no Meraki-native path
+sees host firewall state, and the only honest button is one that says so.
+<br><br>
+<b>There is no Systems Manager anywhere in this repo</b> — not in the bridge, not in the console, not in the
+ISource catalog. So whether Mendo licenses it, and whether the ingest boxes are enrolled, is an <i>open
+question</i>. The First Move below answers it with production evidence before a single line of UI is built.
+</div>
+
+<div class="box agree">
+<b>If SM is present, the answer is a first-class documented field — not an inference.</b>
+The navigator verified this against Meraki's published API docs rather than reasoning from memory:
+<pre>GET /networks/{networkId}/sm/devices/{deviceId}/securityCenters
+  -> isFireWallEnabled     bool    "device has a Firewall enabled"
+     hasFireWallInstalled  bool
+     fireWallName          string  (Defender, or a third-party product)
+     hasAntiVirus / antiVirusName / isDiskEncrypted
+
+GET /networks/{networkId}/sm/devices?wifiMacs=&lt;mac&gt;&amp;fields=fwName,hasDesktopAgent,lastConnected</pre>
+That <code>wifiMacs=</code> filter is the load-bearing detail: it joins a MAC we <b>already show in the
+SSIDs view</b> to an SM device record. Without it there'd be no way to get from a client row to a host.
+<br><br>
+<b>Inference, labelled as such:</b> the data comes from Windows Security Center via the SM agent, so it
+reflects whatever firewall product Windows registers, as of the agent's last check-in. It is
+<b>last-reported state, never live state.</b>
+</div>
+
+<div class="box stop">
+<b>Two paths are closed, and both passes closed them independently.</b>
+<ul>
+<li><b>Everything else Meraki-native: no.</b> Group policy, adaptive policy, L3/L7 rules, Umbrella, and the
+    client <code>Os</code> fingerprint are network-side enforcement or passive fingerprinting. The
+    <code>Os</code> field says "Windows 10" — it says <i>nothing</i> about Defender. Presenting a
+    fingerprint as posture would be fabrication.</li>
+<li><b>Active port-probing (445/139/3389, RST-vs-drop): no, twice.</b> <i>Not reachable</i> — the bridge
+    runs on Cloud Run; the clients sit on <code>10.100.9.x</code> behind the MX NAT, and Cloud Run egress
+    cannot route there without a connector we do not have. <i>Not advisable even if it could</i> — Argus is
+    read-only by contract, probing is active traffic into a live restaurant network, and RST-vs-drop is
+    unreliable evidence anyway: AP client isolation, Windows profile rules and MX policy all mimic
+    "firewalled". Rule 14 in product form — a probe from the wrong vantage returns a confident wrong answer.</li>
+</ul>
+</div></div>
+<h2>1. Need</h2>
+<div class="lk-sec" data-cm="1-need"><p>You need to know whether specific Windows clients — the ones you call the <b>Ingest devices</b> — are
+safely postured, per device, from the console you already have open. The named instrument is Windows
+Firewall; the need underneath it is <b>"prove these boxes aren't exposed"</b> without walking someone at a
+store through Control Panel.</p>
+<p><b>Open question:</b> "Ingest devices" appears nowhere in this repo — the only <code>ingest</code> hits
+are the nous corpus pipeline, unrelated. It is live-network vocabulary for a device class the code has never
+modelled. The design keys off the per-client row, so the exact name doesn't block the build, but naming the
+checks concretely needs your answer.</p></div>
+<h2>2. Raw user stories</h2>
+<div class="lk-sec" data-cm="2-raw-user-stories"><div class="story">As the operator, I want a button on a client row in the SSIDs view that answers "is Windows
+Firewall on?", so I can check an ingest box without phoning the store.</div>
+<div class="story">As the operator, I want the button to say <b>"can't tell — not enrolled"</b> when Meraki
+can't see the host, so I never act on a fabricated answer.</div>
+<div class="story">As the operator, I want the answer stamped with when the device last reported, so I know
+how stale it is.</div>
+<div class="story">As the operator, I want the device's network-side exposure next to the host answer, so
+"safe" doesn't hinge on one setting on one box.</div></div>
+<h2>3. Sourced solution — mined before invented</h2>
+<div class="lk-sec" data-cm="3-sourced-solution-mined-before"><table>
+<tr><th>Candidate</th><th>Source</th><th>Fit</th></tr>
+<tr><td><code>securityCenters</code> SM endpoint</td><td>Meraki Dashboard API v1 (verified)</td>
+    <td>THE data source. Per-device booleans, no inference.</td></tr>
+<tr><td><code>sm/devices?wifiMacs=</code></td><td>Meraki API v1 (verified)</td>
+    <td>Joins our SSID row's MAC to an SM device. The mechanic that makes the button possible.</td></tr>
+<tr><td><code>GetJsonAsync</code> raw GET + 429 retry</td><td><code>bridge/Meraki.cs:37</code></td>
+    <td>New SM reads are three methods on the existing client. Zero new plumbing.</td></tr>
+<tr><td><code>GetTpl</code> null-on-<code>MerakiException</code></td><td><code>bridge/Program.cs</code> audit helper</td>
+    <td>Exactly the degrade pattern for "no SM network here".</td></tr>
+<tr><td>ISource catalog raw passthrough</td><td><code>bridge/MerakiSource.cs:19</code></td>
+    <td>One catalog line proves SM presence <i>before</i> any UI exists. This is the First Move.</td></tr>
+<tr><td>Per-row <code>.renameit</code> button pattern</td><td><code>web/app/index.html:449</code></td>
+    <td>The button's home and its exact markup precedent; rows already carry MAC, OS, VLAN.</td></tr>
+<tr><td>Drift's honesty copy + dashed "inferred" treatment</td><td>Drift pane, shipped 2026-08-02</td>
+    <td>The voice for "can't tell" and for the staleness stamp. Same discipline, same vocabulary.</td></tr>
+<tr><td>Audit checks <code>WIFI-01/02/05/07</code>, <code>SW-PORTSEC</code></td><td><code>bridge/Program.cs</code></td>
+    <td>The network-side exposure line — already computed, just not surfaced here.</td></tr>
+<tr><td><code>woprGated</code> write gate</td><td><code>index.html:854</code></td>
+    <td><b>Deliberately NOT used</b> — this is a pure GET. Nothing to intercept.</td></tr>
+</table></div>
+<h2>4. Naming</h2>
+<div class="lk-sec" data-cm="4-naming"><table>
+<tr><th>Name</th><th>Why</th></tr>
+<tr><td><code>GET /meraki/host-firewall?mac=</code></td>
+    <td><b>Collision flagged:</b> do NOT call it <code>/meraki/firewall</code> — the audit's <code>FW-*</code>
+    checks already mean the <i>MX</i> firewall. <code>host-</code> is the literal distinction.</td></tr>
+<tr><td>Button label: <b>"Host firewall?"</b></td><td>A question, because the answer may legitimately be "can't tell".</td></tr>
+<tr><td><code>SmNetworksAsync</code> · <code>SmDeviceByMacAsync</code> · <code>SmSecurityCentersAsync</code></td><td>Literal; one per API hop.</td></tr>
+<tr><td>Catalog: <code>sm-networks</code>, <code>sm-devices</code>, <code>sm-security-centers</code></td><td>Match the Meraki nouns.</td></tr>
+</table></div>
+<h2>5. Shape</h2>
+<div class="lk-sec" data-cm="5-shape"><h3>Bridge — one read-only route (C# jacket; Meraki is the foreign API, so this is jacket-legitimate)</h3>
+<pre>GET /meraki/host-firewall?mac=&lt;mac&gt;
+  1. org networks -> keep productTypes contains "systemsManager"
+  2. sm/devices?wifiMacs=&lt;mac&gt;&amp;fields=fwName,hasDesktopAgent,lastConnected
+  3. hit? -> sm/devices/{id}/securityCenters
+
+  -> { state:"enabled"|"disabled", fireWallName, lastConnected }
+  -> { state:"unknown", reason:"no-sm-network"|"not-enrolled"|"no-agent-report" }</pre>
+<p>No writes. Not <code>woprGated</code> (nothing to gate). Degrades on <code>MerakiException</code> the
+same way the audit already does.</p>
+
+<h3>Console — the button lives on the client row</h3>
+<p>Rendered next to the rename pencil in the SSID sections, <b>only when the row's <code>Os</code>
+fingerprint says Windows</b>. Critical distinction: <b>the fingerprint chooses whether the button appears,
+never what the answer is.</b> Three result states, rendered inline:</p>
+<p>
+<span class="chip c-on">FIREWALL ON</span> &nbsp;<code>Defender · reported 14m ago</code><br><br>
+<span class="chip c-off">FIREWALL OFF</span> &nbsp;<code>reported 3h ago</code><br><br>
+<span class="chip c-unk">CAN'T TELL</span> &nbsp;<i>Not enrolled in Systems Manager — Meraki has no
+visibility into this host.</i> Plus one line naming what would make it answerable.
+</p>
+<p>The dashed border on "can't tell" is the same law Drift ships: <b>solid = evidenced, dashed = we are
+telling you what we don't know.</b></p>
+
+<h3>Out of scope</h3>
+<p>SM enrolment itself. Any remediation or toggling of a host firewall — that's a write to a machine we do
+not manage. Probing. AV / disk-encryption columns (the same endpoint offers them; later, if the button earns
+its keep). Non-Windows clients.</p></div>
+<h2>6. First Move</h2>
+<div class="lk-sec" data-cm="6-first-move"><div class="box verdict">
+<b>One catalog line and one click. No route, no UI, no deploy risk beyond a bridge rebuild.</b>
+<pre>new("sm-networks", "SM networks (org)",
+    $"organizations/{orgId}/networks?productTypes[]=systemsManager", Array.Empty&lt;string&gt;()),</pre>
+Deploy, then open it from the <b>API Browser tab that already ships</b>.
+<br><br>
+<b>Empty array ⇒ the org has no Systems Manager</b>, the button's only honest state today is "can't tell",
+and the real conversation becomes <i>"do we enrol the ingest boxes, or posture them network-side?"</i> —
+settled with production evidence rather than argument.
+<br><br>
+<b>Non-empty ⇒ build the route.</b> Either way you learn the deciding fact for the cost of one line.
+</div></div>
+<h2>Choices + consequences</h2>
+<div class="lk-sec" data-cm="choices-consequences"><ol>
+<li><b>Ship the button with "can't tell" as a first-class state</b> <i>(pick)</i> vs. wait for SM enrolment.
+    Consequence: it lands now, tells the truth now, and becomes the standing argument for enrolment. Waiting
+    ships nothing and leaves you phoning stores.</li>
+<li><b>SM <code>securityCenters</code></b> <i>(pick)</i> vs. active probing (rejected — unreachable,
+    unreliable, and it breaks the read-only contract) vs. OS-fingerprint inference (rejected — that is
+    fabrication wearing a badge).</li>
+<li><b>Ship the literal button AND the better instrument together</b> <i>(pick)</i>. See below — the ask
+    points at the host, but the durable answer is network-side. Both passes reached this independently.</li>
+</ol>
+
+<div class="box ask">
+<b>The instrument question — my recommendation, stated plainly.</b>
+<br><br>
+You asked how to read the host firewall. That's a reasonable thing to want, and there are real reasons for
+it (compliance evidence, troubleshooting a specific box). <b>But if the goal is "these ingest devices are
+safe," the host firewall is the weaker instrument</b> — it depends on a setting on a machine you don't
+manage, reported by an agent that may not exist.
+<br><br>
+Meraki's <i>strong</i> lever is network-side: put the ingest devices on a dedicated VLAN with a group policy
+that denies lateral movement and restricts egress to only what ingest needs. Then their exposure <b>does not
+depend</b> on whether someone left Defender off. And that posture is continuously verifiable with machinery
+you already own — the audit's <code>WIFI-*</code> and <code>SW-PORTSEC</code> checks read it today, and
+<b>Drift would tell you the moment it changed.</b>
+<br><br>
+So: the result popover carries the device's network-side exposure line (VLAN, applied policy, SSID
+isolation) right next to the host answer — the better instrument visible exactly where the question gets
+asked.
+</div></div>
+<h2>What the button must NOT claim</h2>
+<div class="lk-sec" data-cm="what-the-button-must-not"><ul>
+<li>Never render enabled/disabled for a non-enrolled device. No defaulting, no "probably", no inferring from
+    the OS fingerprint.</li>
+<li>Never present last-reported state as live state. Always stamp <code>lastConnected</code>.</li>
+<li>Never say "this device is safe." It answers exactly one question, about one setting, at one reported moment.</li>
+<li>Never imply Meraki "checked the device" — Meraki relayed what the SM agent last said.</li>
+</ul></div>
+<h2>Pair reconcile (Rule 1)</h2>
+<div class="lk-sec" data-cm="pair-reconcile-rule-1"><div class="box agree">
+<b>Converged independently:</b> Meraki cannot answer this without SM &middot; port-probing is closed on
+<i>topology</i> (Cloud Run cannot reach <code>10.100.9.x</code>) before you even reach the reliability
+argument &middot; the <code>Os</code> fingerprint must never become the answer &middot; "can't tell" is a
+first-class state, not an error &middot; "ingest" is absent from the repo &middot; the network-side flip is
+the better instrument for the underlying need.
+</div>
+<div class="box corr">
+<b>Where the navigator beat the driver — adopted:</b>
+<ol>
+<li><b>It verified the actual field</b> against Meraki's published docs instead of reasoning about it:
+    <code>isFireWallEnabled</code>, <code>hasFireWallInstalled</code>, <code>fireWallName</code>. The driver
+    had "SM probably exposes something."</li>
+<li><b><code>sm/devices?wifiMacs=</code></b> — the join from an SSID-row MAC to an SM device. Without this
+    there is no path from the view to the host, and the driver did not have it.</li>
+<li><b>The First Move.</b> One catalog line + the shipped API Browser answers the deciding question with
+    zero UI and zero new route. The driver's version was a vaguer "capability check".</li>
+<li><b>The naming collision</b> — <code>/meraki/firewall</code> would collide with the audit's
+    <code>FW-*</code> MX-firewall meaning.</li>
+<li><b>Fingerprint gates button visibility, never the answer</b> — a sharp distinction the driver had left implicit.</li>
+</ol>
+</div>
+<div class="box split">
+<b>Driver-only contributions kept:</b> the specific audit check IDs (<code>WIFI-01/02/05/07</code>,
+<code>SW-PORTSEC</code>) that make the network-side option concrete rather than aspirational &middot; the
+verified absence of any SM reference anywhere in the repo, which is what makes the First Move necessary
+rather than optional.
+<br><br>
+<b>No unresolved splits.</b> Both designs are the same design.
+</div>
+
+<div class="box ask">
+<b>Two things from you would sharpen this:</b>
+<ol>
+<li><b>What are the Ingest devices?</b> Which sites, which SSID, and what do they talk to? It changes the
+    network-side checks from generic to specific.</li>
+<li><b>Does Mendo license Systems Manager?</b> If you already know, it saves the First Move. If you don't,
+    the First Move tells us both.</li>
+</ol>
+</div></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><ul class="dod">
+<li>&#10003; Paired per Rule 1 — concurrent independent designs, reconciled above</li>
+<li>&#10003; Navigator owns the verdict; five of its findings adopted, including the verified API field</li>
+<li>&#10003; Feasibility stated in the first line, not buried — the ask's premise is corrected up front</li>
+<li>&#10003; API capability <b>verified against published docs</b>, with inference labelled as inference</li>
+<li>&#10003; Six-section spine present and sized to the work</li>
+<li>&#10003; Sourced before invented — every candidate names its file or its doc</li>
+<li>&#10003; Names literal; the <code>FW-*</code> collision flagged and avoided</li>
+<li>&#10003; First Move genuinely smallest and genuinely deciding; externally verifiable (Rule 10)</li>
+<li>&#10003; Rule 14 respected — no probes; the topology blocker is reasoned from config, not tested</li>
+<li>&#10003; What the button must not claim is specified, not assumed</li>
+<li>&#10003; Design only — no code written</li>
+</ul></div>
+<footer>
+Generated 2026-08-03 23:05 &middot; v0 &middot; r1041 &middot; Argus &middot; ~d paired (Opus + Fable5) &middot; next: the one-line First Move
+</footer>
+
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"f98b81cd-9c8a-48fb-b379-2755f7fd315f"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~d — Scope In Every NPS Alert</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;position:sticky;top:0;z-index:9;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:800px;margin:0 auto;padding:8px 22px 70px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:40px}
+ h1{font-size:25px;margin:20px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:15px;color:#6FC3DF;margin:34px 0 10px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:7px}
+ h3{font-size:15px;color:#fff;margin:20px 0 7px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 6px}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 18px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:15px 17px;margin:13px 0}
+ .card.yes{border-left:3px solid #3aa06a}.card.no{border-left:3px solid #c9463f}
+ .card.warn{border-left:3px solid #c9a24b}.card.info{border-left:3px solid #3a6a90}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 6px;border-radius:4px}
+ pre{background:#0a0a0a;border:1px solid #262626;border-radius:7px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#c8d6dd;line-height:1.55}
+ table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:8px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:9px;vertical-align:top;color:#c5d0d6}
+ td.k{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;white-space:nowrap}
+ ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+ blockquote{border-left:3px solid #3a4a52;margin:10px 0;padding:2px 0 2px 14px;color:#b9c6cd;font-style:italic}
+ .foot{margin-top:30px;border-top:1px solid #222;padding-top:15px;color:#5f6f77;font-size:11.5px}
+ .big{font-size:18px;color:#fff;font-weight:600;margin:0 0 6px}
+ .bad{color:#ff9b93;font-weight:700}.ok{color:#7CFFB2;font-weight:700}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">~d &middot; design</span>
+<span class="p">Published 2026-07-21 09:30 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/c0650414-3627-4cfc-8a0c-66c2378a1f85/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>Scope in every NPS alert &mdash; guest-originated first</h1>
+<p class="lede">Four real detractor alerts were dropped and can never be recovered. This designs the change
+that stops it.</p>
+<p class="sub">Paired serial &mdash; driver writes, navigator reviews with authority to block.
+<b>Nothing is built.</b> A prototype was written to test feasibility, was reviewed, and has been
+<b>reverted</b>; <code>pi_run.c</code> is untouched. What it proved is recorded below as evidence for the
+design, not as work in progress.</p>
+
+<h2>1 &middot; The need</h2>
+<div class="card no">
+<p class="big">Tickets #730&ndash;733 are real guest complaints. Nobody answered them, and nobody ever will.</p>
+<p>Guest Relations alerts, created 2026-07-21 04:37&ndash;04:44Z. <b>0 of 4 carry
+<code>argus_nps_handled</code></b> twelve hours later. They failed at unit 0, were counted into
+<code>sweep.errors</code> and swallowed, and have aged out of the sweep window (60 seconds by code default). There is no
+retry and no alarm. <b>The failure mode is not "delayed" &mdash; it is "gone."</b></p>
+<p>One of them reads <i>"My soup had a hair in it."</i> Another, <i>"The food was okay but I got sick
+afterwards"</i> &mdash; a phrase that should have triggered the illness path.</p>
+</div>
+
+<h3>Why they were dropped</h3>
+<p><code>scan_alert</code> qualifies a ticket by <code>strstr</code> for five literal strings. The two
+brands render alerts differently, and <b>all five miss</b> on Guest Relations:</p>
+<table>
+<tr><th>Literal required</th><th>Default brand (API-created)</th><th>Guest Relations (email-in)</th></tr>
+<tr><td class="k">"NPS Score "</td><td class="ok">match</td><td class="bad">✗ <code>**NPS Score**</code></td></tr>
+<tr><td class="k">"Store "</td><td class="ok">match</td><td class="bad">✗ bold, value on the <i>next</i> line</td></tr>
+<tr><td class="k">"Order ID "</td><td class="ok">match</td><td class="bad">✗ bold</td></tr>
+<tr><td class="k">"Guest Email "</td><td class="ok">match</td><td class="bad">✗ bold &mdash; <b>this one is the gate</b></td></tr>
+<tr><td class="k">"Guest Feedback "</td><td class="ok">match</td><td class="bad">✗ the field is named <b>"Guest Comments"</b></td></tr>
+<tr><td class="k">&mdash;</td><td>absent</td><td>adds a <b>"Guest Name"</b> field &mdash; any prefix-tolerant matcher must not let it satisfy a "Guest&nbsp;N&hellip;" alias</td></tr>
+</table>
+<p><b>Four distinct differences, not one.</b> Stripping asterisks alone still loses the Store value and
+all of the feedback text.</p>
+
+<h2>2 &middot; Raw user stories</h2>
+<blockquote>
+As the operator, every NPS detractor alert gets handled, whichever brand it arrives on and whatever the
+template looks like.<br><br>
+As the operator, an alert that arrives <b>from the guest directly</b> is the most important one in the
+queue &mdash; that is a person who took the trouble to write to us.<br><br>
+As the operator, when an alert cannot be handled I find out. It does not evaporate.
+</blockquote>
+
+<h2>3 &middot; The shape &mdash; and the decision that matters</h2>
+<div class="card yes">
+<p class="big">Parse the comment body. Stop parsing the whole HTTP response.</p>
+<p>Today every field read runs <code>strstr</code> across the <b>entire raw JSON blob</b> &mdash; which
+contains the body, <i>and</i> <code>html_body</code>, <i>and</i> the <code>via.source.from</code> sender
+metadata. That is the actual defect; the markdown is only how it surfaced.</p>
+<p><b>The prototype proved this the hard way.</b> A first cut that simply tolerated bold extracted the
+feedback for ticket #733 as the single word <code>"Test"</code>. Why: the requester's Zendesk profile name
+is <i>"Guest Feedback Test"</i>, which appears in the sender metadata. The alias
+<code>"Guest Feedback"</code> matched <i>there</i> &mdash; thousands of bytes away from the real
+<code>**Guest Comments**</code> field &mdash; and captured the next word.</p>
+<p>That is not a markdown bug. It is a whole class: any label can collide with any guest's name, subject
+line, signature, or the HTML twin of the body. <b>Extract comment 0's <code>body</code> span first, then
+read fields only within it.</b> That closes the <i>metadata</i> class outright. The remaining in-body class
+is closed separately, by ordering &mdash; see the rule below.</p>
+</div>
+
+<h3>Then, inside the body, read tolerantly</h3>
+<table>
+<tr><th>Rule</th><th>Handles</th></tr>
+<tr><td>Match the label bare or bold; step over <code>*</code>, <code>:</code>, spaces</td><td><code>**Guest Email**</code></td></tr>
+<tr><td>If the value is empty on that line, take the next non-empty line</td><td><code>**Store**\n\n9 - Westlake Village</code></td></tr>
+<tr><td>Accept field aliases, resolved by <b>earliest position in the body</b>, not first alias tried</td><td>"Guest Feedback" / "Guest Comments"</td></tr>
+<tr><td>Within the body, the <b>first occurrence of each label wins</b></td><td>free text that happens to contain a label word</td></tr>
+</table>
+<div class="card warn">
+<p><b>The in-body rule rests on an invariant worth stating out loud:</b> in both live templates the free-text
+field is always <b>last</b>, so every genuine label precedes any guest-written prose. That is what makes
+first-occurrence-wins safe. <b>A template that ever places free text above other fields re-opens the
+collision class</b> &mdash; a guest who writes "my Guest Email never got the receipt" would otherwise poison
+the extraction. Carried into When To Revisit.</p>
+</div>
+<p class="sub">The blob is raw JSON, so a line break is the two-character escape <code>\n</code> &mdash;
+never a real newline. Any next-line rule has to step over that pair. The current
+<code>grab()</code> already stops at <code>\\</code> for this reason.</p>
+
+<h3>How loose is "less strict"?</h3>
+<div class="card warn">
+<p>Your instruction was "pretty much any NPS is scoped in." The first draft of this section argued there
+was a tension &mdash; that looser qualification costs model calls and vault codes, so the email gate should
+stay. <b>That was a false dichotomy and it under-delivered on the instruction.</b> Qualification and
+email-extraction can fail separately, at the same zero cost, with different visibility.</p>
+<p><b>The two-stage predicate:</b></p>
+<table>
+<tr><th>Stage</th><th>Test</th><th>On failure</th></tr>
+<tr><td><b>Is this ours?</b></td><td>the body contains <code>## Guest Experience Alert</code> &mdash; verbatim in <b>both</b> brands, verified on all five live tickets. (An NPS-Score marker, bare or bold, is an equally good alternate.)</td><td>silent skip &mdash; correctly "not ours"</td></tr>
+<tr><td><b>Can we answer it?</b></td><td>a guest email was extracted</td><td><b>loud, counted failure</b> &mdash; never the silent "not ours" path</td></tr>
+</table>
+<p><b>This costs nothing.</b> Both tests sit at unit 0, before any model call and before any vault code is
+claimed &mdash; exactly where today's single gate already sits. No code is ever spent on a ticket we cannot
+answer. The email stays required to <b>answer</b>; it stops being required to <b>see</b>.</p>
+<p>That matters because today's failure mode is the silent one. An alert whose template drifts &mdash; a
+renamed field, a new brand, a malformed address &mdash; vanishes into "not ours" with no trace. Under the
+two-stage predicate it lands as a visible failure with a ticket number attached, which is the whole point
+of "monitor and handle all NPS."</p>
+</div>
+
+<h2>4 &middot; "Especially from guest" &mdash; the part this change does NOT fix</h2>
+<div class="card no">
+<p class="big">Getting them seen is not getting them answered.</p>
+<p>The two brands' alerts are structurally different, and it changes what a correct reply even is:</p>
+<table>
+<tr><th></th><th>Default brand</th><th>Guest Relations</th></tr>
+<tr><td>Created by</td><td>API, by the NPS system</td><td><b>The guest, by email</b></td></tr>
+<tr><td>Requester</td><td>the neutral NPS identity</td><td><b>the guest themselves</b></td></tr>
+<tr><td>Alert comment</td><td>private</td><td><b>public</b></td></tr>
+<tr><td>Correct reply</td><td>a new follow-up ticket</td><td><b>a public comment on this ticket</b></td></tr>
+</table>
+<p>The recovery send posts <code>{guest_email, subject, body, draft_id}</code> &mdash; <b>no brand</b>; the alert ticket id survives only inside the
+<code>draft_id</code> idempotency key, which the bridge does not use to pick a brand or a thread. So a
+guest who wrote to
+<code>hello@guestrelationstest.zendesk.com</code> would get a reply from the <i>default</i> brand's
+address, in a brand-new ticket, while their own ticket sits unanswered. <b>Fixing detection without this
+means the most critical alerts get the most confusing response.</b></p>
+<p><b>So this is two changes, and they should be sequenced deliberately:</b></p>
+<table>
+<tr><th></th><th>Change</th><th>Delivers</th></tr>
+<tr><td>A</td><td>Body-scoped tolerant parse (this design) <b>plus a send guard</b>: when the alert's brand is not the default &mdash; equivalently, when the requester is not the NPS-system identity &mdash; stop after triage. Do <b>not</b> run the recovery send, and mark the ticket distinctly rather than letting <code>argus_nps_handled</code> imply it was answered. The guard is removed when B lands.</td><td>guest alerts are <b>seen and triaged</b>, and visibly awaiting a correct reply</td></tr>
+<tr><td>B</td><td>Carry the alert's <code>brand_id</code> and requester through to the send; reply as a public comment when the requester is the guest</td><td>guest alerts are <b>answered correctly</b></td></tr>
+</table>
+<p><b>A without the guard is actively worse than today.</b> The alert would be tagged
+<code>argus_nps_handled</code>, a wrong-brand reply would appear in a brand-new thread, and the guest's own
+public ticket would sit unanswered <i>while monitoring reports it handled</i>. A silent drop at least leaves
+the failure visible as an unhandled ticket. That is why the guard is part of change A rather than a caveat
+attached to it &mdash; and why this design does not lean on <code>PIRUN_ARM_SEND</code> being 0 by default.
+A build flag is not a design.</p>
+<p>The illness escalation is unaffected: it posts to an internal lane, recipients come only from the
+operator-set escalation list, and the guest is never addressed. One caveat for honesty &mdash; the
+<code>public=false</code> on that note is enforced by the bridge jacket, not by <code>pi_run.c</code>
+itself.</p>
+</div>
+
+<h2>5 &middot; What it costs, and the deploy reality</h2>
+<div class="card warn">
+<p>This is <code>pi_run.c</code> &mdash; C99 in the metal substrate, running <b>on a live cadence against
+real tickets</b>. It is not a console change.</p>
+<ul>
+<li><b>Change A</b> is roughly 40 lines: a body-span extractor, a tolerant field read, earliest-match
+aliases. Provable offline against the real bodies before anything is deployed.</li>
+<li><b>The deploy is the risk, not the code.</b> The path is manual, undocumented, and targets live
+traffic. Unit 0 sits on the path every brand's traffic takes &mdash; a regression there breaks the pipeline
+that currently works.</li>
+<li><b>The test must run against the live bodies, not hand-written fixtures.</b> The prototype's fixtures
+passed while the real ticket #733 failed, precisely because the fixtures omitted the metadata the bug
+lived in. Any test for this must pull the real bridge response for 728 and 730&ndash;733 and assert on
+that.</li>
+</ul>
+<p><b>Recommendation: do not deploy on demo day.</b> Build it, prove it against all five live tickets,
+deploy after. The four dropped tickets are already unrecoverable; a fifth hour changes nothing, and a
+broken unit 0 in front of an audience changes a lot.</p>
+</div>
+
+<h2>Unknowns</h2>
+<ul>
+<li>Whether the four dropped tickets should be <b>manually replayed</b> once the fix lands. They are
+outside every future sweep window, so nothing will pick them up on its own. A guest with a hair in their
+soup is still waiting.</li>
+<li>Whether other brands will introduce further template variants &mdash; IT Support and Marketing are
+active with live support addresses and zero alerts today. The bug class is "any non-default brand."</li>
+<li>Whether sweep errors should raise something. Today a unit-0 failure is silent by design (it is the
+"not ours" path), which is exactly why this went unnoticed for half a day.</li>
+<li>Whether the illness path should treat guest-originated alerts differently &mdash; the guest is on the
+ticket, and the alert comment is public.</li>
+</ul>
+
+<h2>When to revisit</h2>
+<p>Immediately, if any template moves its free-text field above the labelled fields &mdash; that breaks the
+first-occurrence-wins invariant the in-body parse depends on. Immediately too if a fifth brand appears or a
+template changes &mdash; the fix is tolerant, not universal.
+When change B lands, revisit whether the follow-up-ticket shape should exist at all for guest-originated
+alerts. And whenever the deploy path stops being a manual scp, because the "don't deploy today" advice is
+entirely about that.</p>
+
+<h2>Definition of Done</h2>
+<ul>
+<li>&#10003; Paired &mdash; navigator owns the verdict</li>
+<li>&#10003; Root cause traced to a class (whole-blob parsing), not just the symptom (markdown)</li>
+<li>&#10003; The prototype's own failure recorded as evidence, and the prototype reverted &mdash; <code>pi_run.c</code> is untouched</li>
+<li>&#10003; The loosening question answered with a real two-stage predicate &mdash; the first draft's "tension" was a false dichotomy and the navigator rejected it</li>
+<li>&#10003; The send guard is part of change A, not a caveat &mdash; A alone would mark guest tickets handled while answering them wrongly</li>
+<li>&#10003; What this change does <b>not</b> fix stated plainly, and sequenced as change B</li>
+<li>&#10003; Deploy risk separated from code risk</li>
+<li>&#10003; Unknowns + When To Revisit present (Rule 7)</li>
+<li>&#10007; Not built. This is the <code>~d</code>.</li>
+</ul>
+
+<div class="foot">
+Generated 2026-07-21 09:30 &middot; v0 &middot; ~d &middot; design<br>
+Evidence: live sandbox tickets 728, 730&ndash;733 &middot; <code>pi_run.c:334-350, 387-412</code> &middot;
+<code>grab()</code> at <code>:208</code>
+</div>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+</body></html>

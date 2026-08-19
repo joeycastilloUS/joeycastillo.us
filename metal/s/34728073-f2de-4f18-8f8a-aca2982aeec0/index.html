@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tracer &times; Argus &mdash; Cross-Read, What's Worth Taking, and the Collision</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#e2e6e8;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:8px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:40px}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:11px 22px;display:flex;align-items:baseline;gap:12px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:13px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:820px;margin:0 auto;padding:8px 24px 60px}
+ h1{font-size:22px;margin:20px 0 4px;color:#fff;font-weight:700}
+ .sub{color:#8a949b;font-size:13px;margin:0 0 6px}
+ .meta{color:#6a7a82;font-size:12px;margin:0 0 20px}
+ h2{font-size:12px;color:#6FC3DF;margin:30px 0 8px;letter-spacing:.08em;text-transform:uppercase}
+ p{font-size:14px;margin:8px 0}
+ ol,ul{font-size:14px;margin:8px 0;padding-left:22px}
+ li{margin:6px 0}
+ a{color:#6FC3DF}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 5px;border-radius:4px}
+ pre{background:#0a0d0f;border:1px solid #1e2a30;border-radius:10px;padding:16px;overflow:auto;font-size:12px;color:#9fb3bd;font-family:Consolas,monospace;line-height:1.45}
+ blockquote{border-left:3px solid #2a3b40;margin:10px 0;padding:2px 0 2px 14px;color:#9fb3bd;font-size:13.5px;font-style:italic}
+ .note{color:#8a949b;font-size:12.5px;margin-top:12px}
+ .tag{display:inline-block;border-radius:20px;padding:2px 11px;font-size:11px;font-weight:700;margin-right:8px;vertical-align:middle}
+ .t-done{background:#0c1c14;border:1px solid #1f5f47;color:#7CFFB2}
+ .t-today{background:#1c1a12;border:1px solid #5f4f20;color:#f0c674}
+ .t-block{background:#1c1212;border:1px solid #5f2020;color:#ff9b9b}
+ .t-take{background:#0e2029;border:1px solid #1f5568;color:#7fd6ea}
+ table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+ td,th{border-bottom:1px solid #1e1e1e;padding:9px 8px;vertical-align:top;text-align:left}
+ th{color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+ td.k{color:#7d8894;white-space:nowrap;width:180px}
+ td.n{text-align:right;font-family:Consolas,monospace;color:#9fe0f2;white-space:nowrap}
+ .obs{border-left:3px solid #6FC3DF;background:#141414;padding:12px 16px;margin:12px 0;font-size:14px;border-radius:0 8px 8px 0}
+ .obs.warn{border-left-color:#f0c674}
+ .obs.block{border-left-color:#ff9b9b}
+ .obs.ok{border-left-color:#7CFFB2}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved &middot; Confidential</div>
+<nav><span class="b">TRACER &times; ARGUS &middot; CROSS-READ</span><span class="p">2026-07-26</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/34728073-f2de-4f18-8f8a-aca2982aeec0/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+<h1>Tracer &times; Argus: what we read, what's worth taking, and the one collision</h1>
+<p class="sub">A read of the Tracer status page against the OneDine corpus work in Argus &mdash; two builds pointed at the same OneDine case data from opposite ends</p>
+<p class="meta">Cross-read &middot; findings only, no code taken &middot; 2026-07-26</p>
+
+<h2>0. How this was read &mdash; and under whose name</h2>
+<div class="lk-sec" data-cm="0-how-this-was-read"><div class="obs block">
+<b>Read this part first.</b> <code>tracer-b2s.pages.dev</code> is behind Cloudflare Access (team <code>lbkdotdev.cloudflareaccess.com</code>). Every path &mdash; <code>/status</code>, <code>/</code>, <code>/robots.txt</code>, <code>/api/health</code> &mdash; 302s to a sign-in. There is no public surface. Access was obtained via <code>cloudflared access login</code>, and the token came back for <b><code>scott.ledell@gmail.com</code></b>: the browser on the Argus workstation already held a live Access session, so the flow completed with no sign-in step.
+<div class="note">Two consequences worth stating plainly. <b>(1)</b> Everything below was read under Scotty's identity, not Joey's &mdash; Joey's own identity remains unverified against that Access policy. <b>(2)</b> A 24-hour Access token for Scotty's identity is now cached on the Argus workstation at <code>~/.cloudflared</code>. It should be purged once this read is done.</div>
+</div>
+<p>Per the standing instruction, this was <b>inspection only</b> &mdash; the status page was read; no Tracer code was pulled, cloned, or copied. Everything taken below is a <i>finding</i>, not an implementation.</p></div>
+<h2>1. Where Tracer stands</h2>
+<div class="lk-sec" data-cm="1-where-tracer-stands"><p>Tracer is a support-triage tool for OneDine, built deterministic-first &mdash; in its own words, <i>"zero LLM in the plumbing; the only model call is the triage itself."</i> Its status page reports this session's work as:</p>
+<table>
+<tr><td class="k"><span class="tag t-done">SHIPPED</span></td><td>Email thread wired into every triage &mdash; <code>fetchCase</code> pulls the <code>EmailMessage</code> thread (quote-stripped, direction-labeled, chronological) into evidence. Verified live on case 00052959.</td></tr>
+<tr><td class="k"><span class="tag t-done">SHIPPED</span></td><td>Email-thread cleanup &mdash; auto-acknowledgements filtered, duplicate case-description echo deduped. Measured: 5 messy messages down to 3 clean ones.</td></tr>
+<tr><td class="k"><span class="tag t-done">SHIPPED</span></td><td>Payment-trace knowledge block, with an explicit "known-gap" honesty clause on money cases.</td></tr>
+<tr><td class="k"><span class="tag t-done">SHIPPED</span></td><td>Case-history mining, Phase 0 probes &mdash; a source census establishing that the resolution lives in email, readable, at 100% coverage.</td></tr>
+<tr><td class="k"><span class="tag t-today">WAITING</span></td><td>Phase 1 thread-retrieval index &mdash; blocked on a privacy sign-off.</td></tr>
+<tr><td class="k"><span class="tag t-block">BLOCKED</span></td><td>Omnivore agent-status check &mdash; the vendor API key isn't self-serve; the proposed route around it is a peek at the OneDine portal's Sensors tab.</td></tr>
+</table></div>
+<h2>2. The headline: <code>EmailMessage</code> is already granted &mdash; over there</h2>
+<div class="lk-sec" data-cm="2-the-headline-emailmessage-is"><div class="obs ok">
+Tracer reads the <code>EmailMessage</code> thread on <b>100% of cases, ~25k characters each</b>. Argus queries the same OneDine org and gets <b>HTTP 400 on <code>SELECT Id FROM EmailMessage LIMIT 1</code></b> &mdash; the response Salesforce gives when the object isn't visible to the integration user.
+<div class="note">Same org. Different credential. One of them has the grant.</div>
+</div>
+<p>This resolves the open question in the <b>OneDine Case Data</b> brief published earlier today. That document asks OneDine to grant read on <code>EmailMessage</code> as an open request. It is not an open request &mdash; the capability exists in this org and is in production use. The ask shrinks from <i>"is this possible?"</i> to <i>"align the Argus integration user with the permission set the Tracer integration already holds."</i></p>
+<p class="note">Not yet reflected in that published brief. Naming another team's capability in a document addressed to the OneDine administrator is Scotty's disclosure to make, not ours &mdash; flagged for his call before that edit lands.</p></div>
+<h2>3. What's worth taking &mdash; four findings, no code</h2>
+<div class="lk-sec" data-cm="3-what-s-worth-taking"><p><span class="tag t-take">TAKE</span><b>3.1 &mdash; Clean resolutions are rare. Don't build around extracting them.</b></p>
+<p>Tracer probed exactly the question the Argus pattern-KB plan was about to assume an answer to, and the answer is uncomfortable:</p>
+<blockquote>Clean, machine-extractable "resolutions" are rare (~5%, and noisy) &mdash; but the threads are gold. Support emails are conversations (announcements, evidence requests, instructions, findings), not tidy "here's the fix" fields.</blockquote>
+<p>Their example: case 00052959 resolved with <i>"a menu sync has just completed."</i> A real fix, and not something a scorer extracts cleanly. Their reframe &mdash; <b>retrieve the similar past threads and let the analyst read them</b> &mdash; is the correct correction, and it applies to the Argus KB design unchanged. Half of the proposed "cluster by root cause, score the extraction" approach should be dropped on the strength of this.</p>
+<div class="obs">
+<b>What Argus adds back.</b> Tracer's reframe has no label spine. Argus has one: the <code>Reason</code> field is filled in across the corpus and is already a human-authored root-cause taxonomy &mdash; Escalated to Customer/Vendor/IT (3,704), No Solution (2,907), Training / How-to (1,868), Reboot/Restart (1,534), Resolved By Development (1,381), Configuration Change (1,188), Resolved itself (945). Retrieval finds the neighbours; <code>Reason</code> tells you what <i>kind</i> of neighbour, and gives a scoreboard: <b>3,852 cases (9%) where root cause was never established</b>. That is the number a KB should be measured against, and it is a contribution back, not a borrow.
+</div>
+
+<p style="margin-top:22px"><span class="tag t-take">TAKE</span><b>3.2 &mdash; The thread-cleaning recipe, already verified</b></p>
+<p>Quote-strip, direction-label, order chronologically, filter auto-acknowledgements, dedupe the duplicated case-description echo. Measured effect: five messy messages reduced to three clean ones on a real case. Every one of those steps would otherwise be rediscovered from scratch the first week Argus has email threads in hand. Take the <b>recipe</b>; the implementation stays theirs.</p>
+<p class="note">Their own "still to build" list flags what the recipe does <i>not</i> yet handle: signature and PII blocks repeating per message, closure-notification templates, and classic Salesforce thread tokens. Inheriting the recipe means inheriting that known remainder &mdash; worth knowing before it looks like a new bug.</p>
+
+<p style="margin-top:22px"><span class="tag t-take">TAKE</span><b>3.3 &mdash; Two traps, named by someone who already stepped in them</b></p>
+<ul>
+<li><b>Pagination truncation that drops the payload you came for.</b> Their probe silently lost the exact resolution emails it was scoring, until a pagination/truncation fix landed. Any Argus email or comment pull will paginate the same way against the same API. Assume this bug exists until a count proves it doesn't.</li>
+<li><b>An invisible-character bypass that faked "good" resolutions.</b> Caught in review before it shipped. This is a scoring-integrity failure, not a formatting one: it makes a quality metric report success it didn't earn. Any KB coverage or hit-rate number Argus publishes needs a guard against it on day one, because the failure mode is a number that looks right.</li>
+</ul>
+
+<p style="margin-top:22px"><span class="tag t-take">TAKE</span><b>3.4 &mdash; The working method, which is already ours</b></p>
+<p>Tracer's builds ran as an Opus + Fable pair &mdash; one drives, one reviews the diff and owns the verdict. Their own accounting of what that caught: the invisible-character bypass, the pagination bug, a dedupe seed mismatch, and two URL bugs. Convergent evidence for a practice both sides already run; worth recording that it paid out on a second, independent codebase.</p></div>
+<h2>4. The collision</h2>
+<div class="lk-sec" data-cm="4-the-collision"><p>Tracer's next build and the Argus pattern KB are <b>the same product</b>, approached from opposite ends:</p>
+<table>
+<tr><th></th><th>Tracer &mdash; Phase 1</th><th>Argus &mdash; OneDine corpus</th></tr>
+<tr><td class="k">Shape</td><td>symptom-keyed thread-retrieval index (error codes, POS, brand, keywords) feeding a prior-art panel</td><td>sealed corpus + ranked retrieval over the full case history</td></tr>
+<tr><td class="k">Scale</td><td>~1&ndash;2K cases</td><td><b>42,402</b> cases &middot; 16,385 comments &middot; 634,907 facts</td></tr>
+<tr><td class="k">Store</td><td>D1 <code>case_index</code>, distilled + PII-scrubbed</td><td>sealed immutable triple store, full fidelity, checksummed, archived</td></tr>
+<tr><td class="k">Fetch model</td><td>live per-case fetch</td><td>read once, replay forever &mdash; source untouched after the pull</td></tr>
+<tr><td class="k">Ranking engine</td><td>to be built</td><td>already in production on a sibling corpus of <b>431,534</b> tickets / <b>17.0M</b> facts &mdash; a port, not a build</td></tr>
+<tr><td class="k">Has email threads</td><td class="n">yes</td><td class="n">no &mdash; blocked</td></tr>
+<tr><td class="k">Has label spine</td><td class="n">no</td><td class="n">yes &mdash; <code>Reason</code></td></tr>
+</table>
+<div class="obs warn">
+Each side holds exactly what the other is missing. Tracer has the email threads and the hard-won lesson about what's in them; Argus has the full corpus, the label spine, and a ranking engine already running at ten times the scale. Building both indexes separately means two half-products and two privacy footprints over the same customer data.
+</div></div>
+<h2>5. The privacy asymmetry</h2>
+<div class="lk-sec" data-cm="5-the-privacy-asymmetry"><p>Tracer's Phase 1 is gated on a sign-off: a stored, distilled index of roughly <b>1&ndash;2K</b> customer cases, plus a heads-up to the pilot's sanctioner. That is the right instinct.</p>
+<p>It is also worth putting next to the current state: Argus already holds <b>42,402</b> OneDine cases &mdash; full fidelity, not distilled &mdash; sealed and archived to cloud storage since 2026-07-10. The stricter review is being applied to the smaller, more redacted footprint.</p>
+<p><b>One standard, applied to both.</b> Whatever the answer is &mdash; both proceed, both pause, or both get a defined retention and scrub policy &mdash; it should be one decision covering both stores, made deliberately. Right now the difference is an accident of which one asked.</p></div>
+<h2>6. What's on the table</h2>
+<div class="lk-sec" data-cm="6-what-s-on-the"><p><b>Waiting on Joey, from Tracer's side:</b></p>
+<ol>
+<li>Green-light the mining reframe and Phase 1 thread-retrieval &mdash; carries the privacy call above.</li>
+<li>Peek at the OneDine portal's <b>Sensors</b> tab (DevTools &rarr; Network, capture endpoint + payload) to route around the missing Omnivore vendor key.</li>
+<li>Optional: re-run the resolution probe now that the truncation fix is in, for a trustworthy number.</li>
+</ol>
+<p><b>Raised by this cross-read:</b></p>
+<ol start="4">
+<li><b>Consolidate the index</b>, or deliberately choose not to, before both sides build it. This is the decision with the shortest fuse &mdash; Tracer's Phase 1 is the next thing off its roadmap.</li>
+<li><b>Align the Argus integration user</b> with the OneDine permission set Tracer's already holds &mdash; pending Scotty's call on disclosing that in the OneDine-facing brief.</li>
+<li><b>One privacy standard</b> across both stores.</li>
+<li><b>Purge the cached Access token</b> on the Argus workstation.</li>
+</ol></div>
+<h2>7. Recommendation</h2>
+<div class="lk-sec" data-cm="7-recommendation"><p>Take the findings, not the architecture. The reframe (&sect;3.1), the cleaning recipe (&sect;3.2) and the two traps (&sect;3.3) are worth more than any code and cost nothing to adopt. Do not port Tracer's index into Argus or rebuild the Argus stager inside Tracer &mdash; instead settle &sect;6.4 first, because the cheapest version of this is one index, fed by Tracer's email access and the Argus corpus, measured against the <code>Reason</code> spine. Everything else is downstream of that one conversation.</p>
+<p class="meta" style="margin-top:16px">Comments are open below. Corrections and additions welcome &mdash; particularly from the Tracer side, where this is a reading of a status page, not of the system itself.</p>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved &middot; Confidential</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"34728073-f2de-4f18-8f8a-aca2982aeec0"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Purcius Bridge Auth — Pure (diagram)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d0d0d;color:#e0e0e0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.5}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:10px 20px;display:flex;gap:12px;align-items:center;z-index:10}
+  nav .b{color:#6FC3DF;font-weight:700;font-size:16px}nav .s{color:#888;font-size:12px}
+  nav .pub{margin-left:auto;color:#777;font-size:11px}
+  main{max-width:1040px;margin:0 auto;padding:24px 18px 70px}
+  h1{color:#fff;font-size:21px;margin-bottom:3px}
+  .sub{color:#9fe0f2;font-size:13px;margin-bottom:22px}
+  mono,code{font-family:Consolas,monospace}
+  /* zone banners */
+  .zones{display:grid;grid-template-columns:1fr 130px 1fr;gap:0;margin-bottom:6px}
+  .zbanner{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:5px;text-align:center;font-weight:700}
+  .ztrust{background:#0e1a12;color:#7CFFB2;border:1px solid #245}
+  .zmid{background:transparent;color:#666;display:flex;align-items:center;justify-content:center}
+  .zexp{background:#1a1210;color:#ffab8a;border:1px solid #633}
+  /* main flow grid */
+  .flow{display:grid;grid-template-columns:1fr 130px 1fr;gap:0;align-items:stretch}
+  .col{display:flex;flex-direction:column;gap:12px}
+  .node{border-radius:9px;padding:13px 15px;border:1px solid #2a2a2a;background:#161616}
+  .node .h{font-weight:700;font-size:13px;color:#6FC3DF;display:flex;align-items:center;gap:7px;margin-bottom:8px}
+  .node .h .tag{margin-left:auto;font-size:10px;color:#777;font-weight:400;text-transform:uppercase;letter-spacing:.05em}
+  .prime{border-color:#245;background:#0e1512}
+  .prime .h{color:#7CFFB2}
+  .bridge{border-color:#5a3020;background:#160f0d}
+  .bridge .h{color:#ffab8a}
+  .line{font-family:Consolas,monospace;font-size:11.5px;color:#bbb;padding:2px 0}
+  .key-priv{background:#0a1a0e;border:1px solid #2a5a35;border-radius:6px;padding:7px 10px;font-family:Consolas,monospace;font-size:11.5px;color:#7CFFB2;margin:2px 0}
+  .key-pub{background:#12100a;border:1px solid #4a4020;border-radius:6px;padding:7px 10px;font-family:Consolas,monospace;font-size:11.5px;color:#f0c674;margin:2px 0}
+  .step{color:#9fe0f2;font-family:Consolas,monospace;font-size:11.5px}
+  .pass{color:#7CFFB2;font-weight:700}.rej{color:#ff8a8a;font-weight:700}
+  /* the wire channel */
+  .wire{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+  .wire .lbl{font-size:9.5px;color:#6FC3DF;text-transform:uppercase;letter-spacing:.08em;writing-mode:horizontal-tb}
+  .arrow{color:#6FC3DF;font-size:26px;line-height:1}
+  .wire .pkt{font-family:Consolas,monospace;font-size:9.5px;color:#888;text-align:center;border:1px dashed #333;border-radius:5px;padding:4px 5px;background:#0a0a0a}
+  .wire .pkt b{color:#9fe0f2}
+  /* signed-bytes strip */
+  .sig{margin-top:20px;border:1px solid #2a4a2a;background:#0c140e;border-radius:9px;padding:14px 16px}
+  .sig .t{color:#7CFFB2;font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:9px}
+  .fields{display:flex;flex-wrap:wrap;gap:6px;font-family:Consolas,monospace;font-size:11.5px}
+  .f{background:#12261a;border:1px solid #2a5a38;color:#b8f0cc;border-radius:5px;padding:3px 9px}
+  .f .why{color:#6a9a7a;font-size:10px}
+  .op{color:#6FC3DF;align-self:center;font-weight:700}
+  .f.sign{background:#0a1a2a;border-color:#245a7a;color:#9fe0f2}
+  /* forgery line */
+  .forge{margin-top:16px;display:flex;align-items:center;gap:14px;background:#160b0b;border:1px solid #4a2020;border-radius:9px;padding:12px 16px;flex-wrap:wrap}
+  .forge .k{font-family:Consolas,monospace;font-size:13px;color:#ff8a8a;text-decoration:line-through}
+  .forge .arw{color:#ff8a8a;font-size:20px}
+  .forge .r{color:#ff8a8a;font-weight:700;font-size:13px}
+  .forge .n{color:#999;font-size:12px}
+  .note{color:#777;font-size:11.5px;margin-top:8px}
+  .foot{color:#666;font-size:11px;text-align:center;border-top:1px solid #222;margin-top:34px;padding-top:14px;font-family:Consolas,monospace}
+  @media(max-width:720px){
+    .zones,.flow{grid-template-columns:1fr}
+    .wire{flex-direction:row;padding:8px 0}
+    .arrow{transform:rotate(90deg)}
+    .zmid{display:none}
+  }
+</style>
+</head>
+<body>
+<nav><span class="b">Be</span><span class="s">Purcius bridge auth · pure</span><span class="pub">2026-07-20</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/6a8de687-d875-4887-b5e8-c70441a33504/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+  <h1>Pure asymmetric auth — the bridge holds no secret</h1>
+  <div class="sub">The private key never leaves the prime. The exposed bridge holds only public keys — it can verify, it can never mint.</div>
+
+  <div class="zones">
+    <div class="zbanner ztrust">trusted · primes · kastil-systems</div>
+    <div class="zbanner zmid"></div>
+    <div class="zbanner zexp">exposed · Cloud Run · public</div>
+  </div>
+
+  <div class="flow">
+    <!-- LEFT: primes -->
+    <div class="col">
+      <div class="node prime">
+        <div class="h">🔑 PRIME · HK <span class="tag">signer hk-01</span></div>
+        <div class="key-priv">hk-01 <b>private</b> — 0400 · mlock · never transmitted</div>
+        <div class="step">pi_run:</div>
+        <div class="step">&nbsp;&nbsp;build canonical (below)</div>
+        <div class="step">&nbsp;&nbsp;→ Ed25519 <b>sign</b> → 64-byte sig</div>
+      </div>
+      <div class="node prime">
+        <div class="h">🔑 PRIME · Vegas <span class="tag">signer vegas-01</span></div>
+        <div class="key-priv">vegas-01 <b>private</b> — its own keypair</div>
+        <div class="line" style="color:#8aa">independent revocation · per-prime attribution</div>
+      </div>
+    </div>
+
+    <!-- MIDDLE: the wire -->
+    <div class="wire">
+      <div class="lbl">the wire · HTTPS</div>
+      <div class="arrow">→</div>
+      <div class="pkt">request body<br><b>X-Metal-Key:</b> hk-01<br><b>sig:</b> &lt;64 bytes&gt;</div>
+      <div class="lbl" style="color:#555">no secret on the wire</div>
+    </div>
+
+    <!-- RIGHT: bridges -->
+    <div class="col">
+      <div class="node bridge">
+        <div class="h">🔓 zendesk-bridge <span class="tag">C# jacket</span></div>
+        <div class="key-pub">holds ONLY public keys: hk-01.pub · vegas-01.pub</div>
+        <div class="step" style="color:#ffcaa8">verify with the ONE <code>ed25519.c</code> (P/Invoke)</div>
+        <div class="line">✓ sig + fresh ts + ticket match → <span class="pass">PASS</span> → Zendesk</div>
+        <div class="line">a leak of everything here = <span class="pass">non-event</span></div>
+      </div>
+      <div class="node bridge">
+        <div class="h">🔓 gcp-bridge <span class="tag">twin · own audience</span></div>
+        <div class="key-pub">own pubkey set · audience="gcp-bridge"</div>
+        <div class="line">a zendesk sig can't be replayed here</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- signed bytes -->
+  <div class="sig">
+    <div class="t">what the signature commits to — the whole request</div>
+    <div class="fields">
+      <span class="f">"purcius-bridge-v1"<br><span class="why">domain sep</span></span>
+      <span class="op">∥</span>
+      <span class="f">audience<br><span class="why">which bridge</span></span>
+      <span class="op">∥</span>
+      <span class="f">verb ∥ tenant ∥ ticket<br><span class="why">the action</span></span>
+      <span class="op">∥</span>
+      <span class="f">sha256(method│path+query│body)<br><span class="why">the exact call</span></span>
+      <span class="op">∥</span>
+      <span class="f">ts<br><span class="why">±30s</span></span>
+      <span class="op">∥</span>
+      <span class="f">nonce<br><span class="why">single-use</span></span>
+      <span class="op">∥</span>
+      <span class="f">key_id<br><span class="why">binds signer</span></span>
+      <span class="op">→</span>
+      <span class="f sign">Ed25519 sig (64B)</span>
+    </div>
+    <div class="note">Bound this tightly, a captured signature can't be redirected: a read can't become a write, one bridge's sig can't cross to the other, the body can't be swapped.</div>
+  </div>
+
+  <!-- forgery rejected -->
+  <div class="forge">
+    <span class="k">Authorization: Bearer 20260720~go</span>
+    <span class="arw">→</span>
+    <span class="r">✗ REJECTED</span>
+    <span class="n">— no signature, no key. The forgeable date string is gone.</span>
+  </div>
+
+  <div class="foot">v0 · r753 · 2026-07-20 · Purcius bridge auth v3 PURE · diagram</div>
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"6a8de687-d875-4887-b5e8-c70441a33504"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

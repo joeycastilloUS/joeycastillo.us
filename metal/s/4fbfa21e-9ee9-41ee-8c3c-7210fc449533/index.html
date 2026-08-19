@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~i — Argus Login Lockdown (paired inspection)</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  .nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  .nav .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  .nav .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:800px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:26px; margin:.2em 0 .1em; }
+  h2 { font-size:19px; color:var(--accent); margin-top:1.9em; border-bottom:1px solid #262626; padding-bottom:5px; }
+  h3 { font-size:15px; margin:1.3em 0 .3em; color:#cfcfcf; }
+  .sub { color:var(--mut); margin-top:0; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:13px; }
+  pre { background:#000; border:1px solid #242424; border-radius:6px; padding:12px; overflow:auto; font-size:12.5px; color:#cfe8ef; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13px; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid #242424; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  .tag { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; border:1px solid #333; color:var(--mut); }
+  ul { margin:.4em 0; padding-left:20px; } li { margin:.25em 0; }
+  .foot { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #242424; padding-top:12px; }
+  .big { font-size:15px; }
+  .risk { border-left:3px solid var(--bad); padding-left:12px; }
+  .warnrail { border-left:3px solid var(--warn); padding-left:12px; }
+  .lead { border-left:3px solid var(--accent); padding-left:12px; }
+  .keep { color:var(--ok); font-weight:600; } .kill { color:var(--bad); font-weight:600; } .ask { color:var(--warn); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-24 17:02 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/4fbfa21e-9ee9-41ee-8c3c-7210fc449533/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+<h1>~i — Argus Login Lockdown</h1>
+<p class="sub">Paired inspection (two blind passes, reconciled) &middot; driver Opus / navigator Fable5 &middot; project: <b>argus</b> (acmedevUS) &middot; r881</p>
+
+<div class="card lead big">
+<b>Verdict in one line:</b> Argus opens <b>four</b> login doors today; you want <b>two</b>. Closing the login plane is a <b>small, clean change</b> &mdash; delete one provider row, set the crew to a single exact email, rotate one key. But the login plane <b>is not the whole building</b>: the console's data lanes (five services, <b>including write endpoints</b>) authenticate with a <b>guessable, comment-documented daily Bearer</b> &mdash; <code>yyyymmdd~go</code>. Weld the front door shut and the loading dock still opens with today's date.
+</div>
+
+<h2>What It Is</h2>
+<div class="lk-sec" data-cm="what-it-is"><p><b>Intent</b> &mdash; the operator wants Argus login locked to exactly two doors: the operator passcode in use today, and Google restricted to a <b>single identity</b>, <code>jcastillo@mendocinofarms.com</code>. Every other way in must be closed.
+<b>Purpose</b> &mdash; reduce the console's authenticated surface to the smallest defensible shape before it carries live customer data.
+<b>What</b> &mdash; the auth core is the C# <code>meraki-bridge</code> jacket (multi-auth OIDC + Overlord key seam), fronted first-party by a Cloudflare Worker (<code>web/_worker.js</code>) so the <code>argus_session</code> cookie is same-origin. Access control is a server-side <b>Crew Allow-list</b>. Login proves <i>who</i>; the crew decides <i>what</i>.</p></div>
+<h2>The Four Doors — current state, verified</h2>
+<div class="lk-sec" data-cm="the-four-doors-current-state"><table>
+<tr><th>#</th><th>Door</th><th>Mechanism (file:line)</th><th>Gated by</th><th>Call</th></tr>
+<tr><td>A</td><td><b>Operator password</b></td><td><code>gpw</code> field &rarr; <code>PW</code> &rarr; <code>Authorization: Bearer &lt;PW&gt;</code> &middot; <code>web/app/index.html:8375</code>; checked vs <code>BRIDGE_TOKEN</code> <code>bridge/Program.cs:86</code></td><td>shared machine token</td><td class="keep">KEEP &mdash; this is "the passcode we have today"</td></tr>
+<tr><td>B</td><td><b>Google</b> OIDC</td><td><code>/auth/google/login</code> &rarr; callback <code>Program.cs:216</code> &middot; provider row <code>providers.json:13</code></td><td>Crew Allow-list</td><td class="keep">KEEP &mdash; lock to one email</td></tr>
+<tr><td>C</td><td><b>Slack</b> OIDC</td><td><code>/auth/slack/login</code> &middot; provider row <code>providers.json:5</code> &middot; button <code>index.html:548</code></td><td>Crew Allow-list</td><td class="kill">REMOVE</td></tr>
+<tr><td>D</td><td><b>Purcius / Overlord key</b></td><td>ed25519 device + warrant &rarr; <code>/auth/key/challenge</code>+<code>/verify</code> <code>Program.cs:305,317</code> &middot; button <code>index.html:556</code>, shown only if <code>/auth/key/status.skill</code> true <code>index.html:8483</code></td><td class="bad">NOTHING &mdash; bypasses the crew (see R5)</td><td class="ask">YOUR CALL (Decision&nbsp;1)</td></tr>
+</table>
+<p class="sub">Access enforcement: on every OIDC login the callback re-reads the crew from settings server-side &mdash; <code>Auth.EmailAllowed(await SettingsJsonAsync(), email)</code> <code>Program.cs:252</code>, redirect <code>access=denied</code> <code>:257</code>. An allow entry is <b>either an exact email OR a whole <code>@domain</code></b> <code>Auth.cs:105-106</code>.</p></div>
+<h2>The Lockdown — gap &rarr; target</h2>
+<div class="lk-sec" data-cm="the-lockdown-gap-target"><div class="card">
+<b>1. Kill Slack.</b> Delete the <code>slack</code> object from <code>bridge/providers.json</code>. Routes are data-driven (<code>providers.TryGetValue</code> &rarr; 404 on miss, <code>Program.cs:203,219</code>), so that one deletion closes the door server-side. <span class="warn">Caveat (navigator):</span> the table is read <b>once at container startup</b> from <code>AppContext.BaseDirectory</code> <code>Program.cs:192-193</code> &mdash; the edit does nothing until <b>redeploy</b>. Then remove the <code>loginSlack</code> button + handler (<code>index.html:548,8396</code>) and fix "Slack / Google" copy (<code>:603-604,1095</code>). <b>Verify Done:</b> live <code>GET /auth/slack/login</code> &rarr; 404.
+</div>
+<div class="card">
+<b>2. Lock Google to you.</b> Set the crew to <b>exactly</b> <code>["jcastillo@mendocinofarms.com"]</code> &mdash; the <b>exact email</b>, never <code>@mendocinofarms.com</code>. Confirmed both halves: the exact form admits that one identity; the domain form admits <b>any</b> Google account on that domain (<code>Auth.cs:105-106</code>). Editable from the console Crew tab; stored in Firestore settings.
+</div>
+<div class="card">
+<b>3. Keep the operator password.</b> Untouched. (But see R1/R2 &mdash; today it only actually authenticates the Meraki tabs.)
+</div>
+<div class="card warnrail">
+<b>4. Rotate <code>AUTH_SESSION_KEY</code> during the change.</b> Sessions are HMAC-validated only; the Firestore sessions doc is written but <b>never read back</b> (<code>Program.cs:90,270</code>). Tightening the crew does <b>not</b> evict already-signed-in Slack/Google members &mdash; their cookie rides up to <b>12h</b> (<code>MaxAge</code>, <code>:264</code>). Rotating the key kills every live session immediately.
+</div></div>
+<h2>Findings &amp; Risks — reconciled (driver + navigator)</h2>
+<div class="lk-sec" data-cm="findings-risks-reconciled-driver-navigat"><p class="sub">Both passes agreed on the four doors and the lockdown levers. Navigator confirmed all five driver claims against source, corrected two overstatements (Slack removal needs a redeploy; the daily key covers writes too, not just reads), and surfaced five items the driver missed (R1&ndash;R5 below). No disagreements outstanding.</p>
+
+<h3 class="bad">The one most likely to leave a hole</h3>
+<div class="card risk big">
+<b>R0 &mdash; the data plane is wide open with a guessable key.</b> The console's data calls use <code>zrawPass() = UTC yyyymmdd + "~go"</code> (<code>index.html:4694</code>) as the Bearer for <b>five services</b> &mdash; zendesk-raw, zendesk-bridge, gcp-bridge, onedine-raw R2, ZREC. It is <b>not read-only</b>: write lanes ride the same key &mdash; <code>/zendesk/promo-claim</code>, <code>/promo-release</code> (<code>:7208,:7218</code>), <code>/zendesk/config-apply</code> (<code>:7652</code>), <code>/zendesk/sync-object</code> (<code>:8881</code>), <code>/vertex/correction</code> (<code>:3483</code>). The scheme is even documented in a committed comment (<code>:3111</code>). Anyone who knows the pattern reaches these <b>with zero login</b>. <b>Locking the four doors does not touch this.</b> Recommend folding a data-plane key fix into the same lockdown.
+</div>
+
+<h3>Login-plane risks</h3>
+<div class="card risk">
+<b>R1 &mdash; the operator-password gate fails open.</b> Any non-401 failure of <code>loadNetworks()</code> sets <code>bridgeDown=true</code> and opens the console anyway, password <b>unverified</b> (<code>index.html:8377-8390</code>). The Zendesk/GCP/corpus tabs never use <code>PW</code> at all &mdash; only <code>zrawPass()</code>. So door A really only authenticates the Meraki tabs.
+</div>
+<div class="card risk">
+<b>R2 &mdash; <code>BRIDGE_TOKEN</code> fails open.</b> If the env var is empty, the middleware skips auth entirely for all data routes (<code>Program.cs:83</code>, <code>IsNullOrEmpty(bridgeToken)</code> &rarr; <code>next()</code>). A missing secret = no gate, not a locked gate.
+</div>
+<div class="card risk">
+<b>R3 &mdash; any crew member can edit the crew.</b> A member session is an alternative credential to <code>BRIDGE_TOKEN</code> on all gated routes (<code>Program.cs:88-90</code>), which includes <code>POST /settings</code> (proxied, <code>_worker.js:11</code>). One allowed login can invite anyone &mdash; self-escalation. <b>Contained</b> with a one-email crew, but it is the mechanism to watch.
+</div>
+<div class="card risk">
+<b>R4 &mdash; OIDC id_token trust is thin.</b> Confirmed absent in the callback (<code>Program.cs:216-266</code>, <code>Auth.cs:51-71</code>): (a) <b>no JWT signature verification</b> &mdash; <code>DecodeJwtPayload</code> base64-decodes the payload only ("v2 hardening" per the file's own note); (b) <b>no <code>aud</code>/client_id check</b>; (c) <b>no <code>email_verified</code> check</b>; (d) the nonce is signed into the state cookie but <b>never compared</b> to the id_token nonce (<code>:223-224</code>). Trust anchor is the server-side code exchange with <code>client_secret</code> over TLS, so exploitation needs more than a forged token &mdash; but for "all the way big time," add <code>aud</code> + <code>email_verified</code> at minimum.
+</div>
+<div class="card risk">
+<b>R5 &mdash; the key door bypasses the crew entirely.</b> <code>/auth/key/verify</code> never calls <code>EmailAllowed</code>; it mints a session directly with <code>OVERLORD_EMAIL</code> defaulting to <code>overlord@joeycastillo.us</code> (<code>Program.cs:353-365</code>). If the sidecar + <code>PURCIUS_OPERATOR_PUB</code> are configured, a warranted device is a <b>crew-exempt door</b> &mdash; which is exactly why Decision 1 must be explicit.
+</div>
+<p class="sub">Cosmetic: the Slack button is unconditional client-side (<code>index.html:548</code>); after server removal it stays visible and a click just 404s until the UI edit ships.</p></div>
+<h2>Last Security Work (telemetry + mercury)</h2>
+<div class="lk-sec" data-cm="last-security-work-telemetry-mercury"><ul>
+<li><b>2026-07-21</b> &mdash; <code>design-guest-identity</code> ("The guest is not the envelope").</li>
+<li><b>2026-07-20</b> &mdash; <code>plan/design/diagram-purcius-bridge-auth</code> ("the simplest pure build") &mdash; direction: move bridge auth toward a pure-C Purcius identity.</li>
+<li><b>2026-07-17</b> &mdash; <code>design-securing-the-union</code>.</li>
+<li>Earlier: the doors you have now shipped as <b>multi-auth Slack+Google OIDC</b> (commits <code>524b2fb</code> MA&nbsp;P1, <code>10a9247</code> MA&nbsp;P3) + the <b>Overlord key-login seam &amp; Crew Invite surface</b> (<code>1385b0b</code>).</li>
+</ul>
+<p class="sub">Mercury hub (<code>~/metal-telemetry</code>) live &mdash; recent sessions on neo / conan / maximus. (Presence.exe blocked by this box's Application Control policy; hub files readable.)</p></div>
+<h2>Open Questions — decisions that change the build</h2>
+<div class="lk-sec" data-cm="open-questions-decisions-that-change"><div class="card">
+<b>Decision 1 &mdash; the Overlord/Purcius key (door D).</b> Keep it or kill it? It is your own crypto key-login, <b>not</b> the passcode, and it bypasses the crew (R5). "Keep only passcode + Google" reads as <b>kill / prove-503</b>, but it is your key &mdash; explicit yes/no needed.
+</div>
+<div class="card">
+<b>Decision 2 &mdash; harden Google, or just restrict it?</b> Restrict-only = the crew edit alone. Hardened = also add <code>aud</code> + <code>email_verified</code> (+ optional JWKS signature + nonce check) per R4.
+</div>
+<div class="card">
+<b>Decision 3 &mdash; fix the data-plane key (R0) in this pass?</b> Recommended <b>yes</b> &mdash; it is the real hole. Replace <code>yyyymmdd~go</code> with a real per-session/served credential across the five services (writes first).
+</div></div>
+<h2>Recommended next move</h2>
+<div class="lk-sec" data-cm="recommended-next-move"><p><code>~d argus-login-lockdown</code> once Decisions 1&ndash;3 are answered &mdash; a design that scopes: (login) remove slack provider + redeploy-verify 404, crew = single exact email, rotate <code>AUTH_SESSION_KEY</code>, resolve door D; (hardening, if chosen) <code>aud</code>+<code>email_verified</code>; (data plane, if chosen) retire the guessable daily Bearer. Then <code>~p</code>/<code>~e</code> to size, <code>~b~t</code> to build with production verification per Rule 10.</p></div>
+<h2 class="ok">Definition of Done — this artifact</h2>
+<div class="lk-sec" data-cm="definition-of-done-this-artifact"><ul>
+<li>&#10003; Paired (Rule 1): driver Opus + navigator Fable5, two passes, reconciled; navigator owned the verdict</li>
+<li>&#10003; Every claim cited to file:line and read against source (not assumed)</li>
+<li>&#10003; Disagreements surfaced: none outstanding; two navigator corrections folded in</li>
+<li>&#10003; Architecture read first (Rule 11): <code>ARCHITECTURE.md</code> + auth core</li>
+<li>&#10003; Rendered to <code>be/plans/</code>, house style, published datetime in nav</li>
+<li>&#9723; Latchkey published (cap-URL minted on publish)</li>
+<li>&#9723; Committed + pushed; Be index updated; telemetry logged</li>
+<li>&#8213; External production verification: N/A &mdash; inspection artifact (no code shipped); the lockdown build it recommends carries the Rule-10 production gate</li>
+</ul>
+
+<div class="foot">
+Be &middot; ~i paired inspection &middot; argus &middot; v0 &middot; r881 &middot; 2026-07-24 17:02 PDT<br>
+Driver: Opus 4.8 &middot; Navigator: Fable5 &middot; One signal in, full chain reaction out.
+</div>
+
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"4fbfa21e-9ee9-41ee-8c3c-7210fc449533"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

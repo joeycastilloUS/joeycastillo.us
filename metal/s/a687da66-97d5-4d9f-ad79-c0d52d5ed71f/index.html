@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — Deterministic REACT: understand + translate_strings, data-driven</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111111; color:#ddd; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.6; }
+  .nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  .nav .brand { color:#6FC3DF; font-weight:bold; font-size:18px; }
+  .nav .pub { color:#777; font-size:12px; }
+  .wrap { max-width:800px; margin:0 auto; padding:32px 24px 64px; }
+  h1 { color:#fff; font-size:26px; margin:24px 0 8px; }
+  h2 { color:#6FC3DF; font-size:19px; margin:40px 0 12px; border-bottom:1px solid #2a2a2a; padding-bottom:6px; }
+  h3 { color:#fff; font-size:15px; margin:22px 0 8px; }
+  p { margin:10px 0; }
+  .sub { color:#888; font-size:14px; }
+  .card { background:#1A1A1A; border-left:3px solid #6FC3DF; padding:14px 18px; margin:16px 0; border-radius:0 4px 4px 0; }
+  .warn { border-left-color:#e0a030; }
+  .warn b { color:#e0a030; }
+  pre { background:#1A1A1A; border:1px solid #2a2a2a; border-radius:4px; padding:14px 16px; overflow-x:auto; font-family:Consolas,Menlo,monospace; font-size:12.5px; line-height:1.5; margin:12px 0; color:#c8d8dc; }
+  code { font-family:Consolas,Menlo,monospace; font-size:0.92em; color:#9fd6e8; background:#1A1A1A; padding:1px 5px; border-radius:3px; }
+  table { width:100%; border-collapse:collapse; margin:14px 0; font-size:13.5px; }
+  th { text-align:left; color:#6FC3DF; border-bottom:1px solid #333; padding:6px 10px; }
+  td { border-bottom:1px solid #222; padding:6px 10px; vertical-align:top; }
+  ul, ol { margin:10px 0 10px 24px; }
+  li { margin:5px 0; }
+  .ok { color:#7fd67f; }
+  .no { color:#e07070; }
+  .dim { color:#777; }
+  footer { border-top:1px solid #2a2a2a; margin-top:48px; padding-top:16px; color:#666; font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <span class="brand">Be</span>
+  <span class="pub">Published 2026-07-15 &middot; Argus / Purcius</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/a687da66-97d5-4d9f-ad79-c0d52d5ed71f/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+
+<h1>Deterministic REACT — understand() + translate_strings(), data-driven</h1>
+<p class="sub">~d design &middot; mendo-app-survey-autoresponse.pi v10 &middot; the classify → empathy_map → empathy_fallback → compose units &middot; replaces the rejected hardcoded-classifier plan</p>
+
+<div class="card warn">
+<b>Corrections against the real code (verified, not trusted):</b>
+<ol>
+  <li><b>restate() is NOT in <code>understand.h</code>.</b> That header defines only <code>understand()</code>, <code>understand_atomize()</code>, <code>understand_dice()</code>. The <code>restate(const Fact*, int, const Store*, …)</code> signature exists only as a-d-d spec canon (<code>a-d-d/nous/intelligence/skill/understand/CLAUDE.md</code> § Interface) — it is not built in the metal SDK. The only compiled restate is a <code>static</code> round-trip helper inside <code>understand/atoms.c</code>, private to that test tool.</li>
+  <li><b>The BUILT inverse of understand() is the <code>translate</code> skill</b> — <code>src/sdk/nous/action/skill/translate/translate.h</code>: <code>int translate_strings(Ids *store, const char *dialect, const char *vars[][2], int nvars, char *out, int out_size)</code>. It queries the triple store for <code>(dialect, "template", ?)</code> and fills <code>{name}</code> placeholders. Per a-d-d action canon: translate is <i>"restate() generalized."</i> The card keeps saying <code>skill: restate</code> (intent); the ONE map binds it to <code>translate.translate_strings</code> (the seated muscle). <span class="no">skill_map.tsv's current <code>restate.restate</code> rows point at a micro-op that does not exist in the container — they must be corrected.</span></li>
+  <li><b>Canon already ruled out dice for classify.</b> RESOLVER.md: <code>understand complaint-category → understand.understand</code> (decode only, NOT atomize/dice). So classify matches decoded atoms exactly against a data signature table — no similarity scoring. <code>understand_dice</code> stays reserved for <code>corpus_match</code>, exactly as the map already says.</li>
+  <li><b>suppress_close is a no-op against the v10 template.</b> The byte-verbatim Zora body closes "Best, / Zora" — there is no closing guest name to suppress. compose carries <code>slots.suppress_close</code> through untouched; the mechanism (a <code>{close_name}</code> var that renders empty when suppressed) activates only if a future operator-approved template variant adds a personalized close. The bytes of the canonical template never change.</li>
+</ol>
+</div>
+
+<h2>1 · Need</h2>
+<p>Four REACT units must turn <code>alert.feedback</code> into the real Zora <code>reply.body</code> — deterministic, $0, no LLM — <b>without baking intelligence or intent into the host C</b>. The rejected plan hardcoded a keyword table, an empathy struct array, and template literals into <code>container_dispatch</code>. That violates the a-d-d action principle ("capabilities are not hard-coded — they are dialects") and the IoC contract (RESOLVER.md: the card names, the map binds, the container provides). Everything that varies per deployment — the category set, the category→empathy map, the Zora template — is DATA, like <code>skill_map.tsv</code> itself.</p>
+
+<h2>2 · Raw User Stories</h2>
+<ul data-cm="1-need">
+  <li>As the operator, I edit a text file to add a complaint category or fix an empathy clause — no recompile, no C change, and I can read exactly what the machine will say.</li>
+  <li>As the operator, the reply body is byte-identical for the same feedback, every run, provably — the template bytes are MY bytes.</li>
+  <li>As pirun, I stay skill-agnostic: classify/empathy/compose resolve through the same <code>skill_map.tsv</code> as every other unit.</li>
+  <li>As the offline Vertex loop (card Q3), I author a NEW map row (a category signature + its clause) as a data-file diff the operator approves — never touching a guest reply live.</li>
+  <li>As an auditor, a map miss is visible in the ledger (<code>empathy.source=none</code>) and the guest still gets the fixed safe-generic clause.</li>
+</ul>
+
+<h2>3 · Sourced Solution</h2>
+<p>Everything below reuses muscle that exists today. Nothing new is invented; one map file is corrected and four data files are born.</p>
+<table>
+<tr><th>Source</th><th>What it provides</th></tr>
+<tr><td><code>understand.h</code> — <code>understand()</code></td><td>Deterministic decode: UTF-8 text → WireTriple atoms {word, role, fn}. Lowercased tokens, 7 roles, 28 structure fns, closed vocabulary. Cannot hallucinate. THE classifier engine — it tokenizes and normalizes so "app" never matches inside "happy" the way <code>strstr</code> would.</td></tr>
+<tr><td><code>translate.h</code> — <code>translate_strings()</code></td><td>The built "restate() generalized": store-resident <code>(dialect, "template", ?)</code> + <code>{name}</code> placeholder fill. THE render engine for empathy clauses and the Zora body.</td></tr>
+<tr><td><code>store.h</code> — <code>ids_insert()</code></td><td>Loads each slot's data file into the ledger as a dialect triple, so translate_strings can see it. The ledger is already open in the host.</td></tr>
+<tr><td>RESOLVER.md + skill_map.tsv</td><td>The ONE map: <code>(card.skill, card.slot) → container.micro_op</code>. The card never changes; only map rows and data files do.</td></tr>
+<tr><td>The card (v10 header)</td><td>The byte-verbatim Zora template, the canonical <code>app</code> empathy clause, the safe-generic clause, the draft_id convention. These bytes seed the data files verbatim.</td></tr>
+<tr><td><code>pirun.h</code></td><td>The data-flow law: micro-ops read <code>in:</code> via <code>pirun_get</code>, write <code>out:</code> via <code>pirun_put</code>. Unchanged.</td></tr>
+</table>
+
+<h2>4 · Naming</h2>
+<p>Literal names, no themes. <b>The slot names its data file</b> — <code>slots/&lt;card.slot&gt;.tsv|.txt</code>:</p>
+<pre>src/sdk/nous/action/skill/pirun/slots/
+  complaint-category.tsv     # category  ->  signature atom words   (classify)
+  category-empathy.tsv       # category  ->  byte-verbatim clause   (empathy_map)
+  safe-generic-empathy.txt   # the ONE fixed fallback clause        (empathy_fallback)
+  zora-template.txt          # the byte-verbatim Zora body           (compose)
+  zora-subject.txt           # "Follow Up On Your Mendo Feedback"    (compose)</pre>
+<p>This is a naming convention, not a second map layer — the map still does all name binding; the slot string the card already carries doubles as the data key. One indirection, per jc's rule.</p>
+
+<h2>5 · Shape</h2>
+
+<h3>5.1 The corrected map rows (the only skill_map.tsv change)</h3>
+<pre># card.skill   card.slot               container.micro_op            resource
+understand     complaint-category      understand.understand         decode-only-no-atomize
+restate        category-empathy        translate.translate_strings   map-lookup-$0
+restate        safe-generic-empathy    translate.translate_strings   fixed-clause-$0
+restate        zora-template           translate.translate_strings   template-fill-$0</pre>
+<p class="dim">Card untouched. This is the IoC working as designed: the card's <code>restate</code> intent now binds to the container skill that actually exists.</p>
+
+<h3>5.2 The data files (born from the card's canonical bytes)</h3>
+<pre># slots/complaint-category.tsv — category TAB signature words (atoms, lowercase).
+# Score = count of DISTINCT signature words present in the feedback's content atoms.
+# Highest score wins; tie -> first row; zero -> map_hit=false. DATA: the offline
+# Vertex loop (card Q3) proposes new rows; jc approves; no recompile.
+app	app application phone</pre>
+<pre># slots/category-empathy.tsv — category TAB clause (byte-verbatim, operator-canonical).
+# Only the app clause is canon today (card header). New rows arrive via the
+# offline authoring loop, operator-approved.
+app	you didn't have a better experience with our new Mendo app</pre>
+<pre># slots/safe-generic-empathy.txt (one line, fixed)
+your experience fell short</pre>
+<pre># slots/zora-template.txt — BYTE-IDENTICAL to the card header; only {slots} vary.
+Hi {name},
+
+Thank you for participating in our survey. I'm so sorry to hear {empathy}. Being a Mendo
+fan, I'm sure you know we're capable of so much more!
+
+We would love to make this up to you, so we've included a "We're Sorry" code below. It's
+valid for {amount} towards a future online order - you can redeem the code at
+order.mendocinofarms.com or in the Mendo app. When ordering, simply add the code to the
+Coupon field on the checkout page.
+
+{code}
+
+I hope we get the opportunity to welcome you back and show you how seriously we take our
+guests' happiness. We look forward to welcoming you back soon.
+
+Best,
+Zora</pre>
+
+<h3>5.3 The thin C micro-ops (no intelligence in the container)</h3>
+<p>At host start, <code>load_slots()</code> (mirrors the existing <code>load_map()</code>, ~25 lines) reads the slots/ files and inserts dialect triples into the open ledger: <code>(zora-template, template, &lt;file bytes&gt;)</code>, <code>(zora-subject, template, …)</code>, <code>(safe-generic-empathy, template, …)</code>, and one <code>(category-empathy:&lt;cat&gt;, template, &lt;clause&gt;)</code> per tsv row. Then four dispatch branches:</p>
+<pre>classify   (~40 lines)  understand(alert.feedback, atoms, …)          [the seated decoder]
+                        keep content atoms (ENTITY/ACTION/PROPERTY roles)
+                        score each complaint-category.tsv row: distinct
+                        signature words present among atom words
+                        best&gt;0 -> complaint.category=cat, map_hit=true
+                        else   -> complaint.category="", map_hit=false
+
+empathy_map (~12 lines) translate_strings(L, "category-empathy:"+category, NULL, 0)
+                        hit  -> empathy.text=clause, empathy.source=map
+                        miss -> empathy.text="",     empathy.source=none
+
+empathy_fallback (~10)  source==map  -> empathy.final = empathy.text
+                        source==none -> empathy.final =
+                                        translate_strings(L,"safe-generic-empathy",NULL,0)
+                        empathy.cost_usd = "0.00"   (always; the branch is protocol
+                        logic, the clause is data)
+
+compose    (~15 lines)  vars = {name, empathy, amount, code} from the ledger
+                        reply.body    = translate_strings(L, "zora-template", vars, 4)
+                        reply.subject = translate_strings(L, "zora-subject", NULL, 0)
+                        reply.draft_id = "recovery-&lt;env&gt;-&lt;ticket&gt;"  (sprintf; env
+                        from host config)
+                        suppress_close: carried through, no byte effect on the
+                        v10 template (see Corrections #4)</pre>
+<p><b>Zero keyword literals, zero empathy strings, zero template bytes in C.</b> The only strings the container knows are ledger key names (the card's contract, same as the existing real units) and the slot-derived file paths.</p>
+
+<h3>5.4 Worked trace — ticket 457662, feedback "the phone app sucks"</h3>
+<pre>alert.feedback        = "the phone app sucks"
+understand() atoms    = the/STRUCTURE:specifier  phone/ENTITY  app/ENTITY  sucks/ACTION
+content atoms         = { phone, app, sucks }
+score vs signatures   = app: {app+, application-, phone+} = 2   (all other rows: 0)
+complaint.category    = app        complaint.map_hit = true
+empathy_map           = translate_strings(L,"category-empathy:app")
+empathy.text          = "you didn't have a better experience with our new Mendo app"
+empathy.source        = map
+empathy.final         = (passthrough)                    empathy.cost_usd = 0.00
+slots.name            = Lara   slots.amount = $10   slots.code = IMSORRY-XXXX
+reply.subject         = Follow Up On Your Mendo Feedback
+reply.draft_id        = recovery-sandbox-457662
+reply.body            =
+  Hi Lara,
+
+  Thank you for participating in our survey. I'm so sorry to hear you didn't
+  have a better experience with our new Mendo app. Being a Mendo fan, I'm sure
+  you know we're capable of so much more!
+  ... (template bytes, unaltered) ...
+  IMSORRY-XXXX
+  ...
+  Best,
+  Zora</pre>
+<p class="dim">Replay proof: same feedback → same atoms → same score → same clause → same bytes. Force-replay 3× with a fresh ledger and <code>reply.body</code> is byte-identical, always.</p>
+
+<h2>Choices — the real fork</h2>
+<h3>restate() renders empathy/template vs pure data-fill?</h3>
+<p><b>Honest answer: they are the same operation at different degrees, and <code>translate_strings()</code> IS deterministic data-fill — seated as a skill.</b> Per unit:</p>
+<ul>
+  <li><b>classify genuinely needs understand().</b> Tokenization, lowercasing, role classification, and the closed vocabulary are real machinery a keyword <code>strstr</code> cannot fake (substring false-positives, no normalization, no role filter). The intelligence lives in the decoder + the signature DATA, not in C. <span class="ok">understand() earns its place.</span></li>
+  <li><b>compose is exactly translate_strings' job</b> — store-resident dialect template + placeholder fill is its literal spec. <span class="ok">Earns its place.</span></li>
+  <li><b>empathy_map is a degenerate template call (0 vars) — and that's fine.</b> The alternative (a bespoke tsv-lookup in C) is MORE container code and a second data path, not less. Routing the clause through <code>(category-empathy:&lt;cat&gt;, template, ?)</code> keeps ONE render engine, one loader, and the clause bytes in the store where the operator can inspect them. The card's <code>skill: restate</code> stays truthful: "say it the Zora way" — the map decides how.</li>
+  <li><b>empathy_fallback is honestly NOT restate at all</b> — it is a two-way branch on <code>empathy.source</code> (protocol logic, thin C) whose fallback CLAUSE is data fetched via the same engine. Naming that plainly beats pretending the branch is intelligence.</li>
+</ul>
+<p>So: no unit gets a hardcoded table, and no unit gets ceremony — the one place restate would have been ceremony (the fallback branch) is declared protocol logic instead.</p>
+
+<h2>Escape Routes</h2>
+<ul data-cm="3-sourced-solution">
+  <li><b>Nothing here is irreversible.</b> All four surfaces are reloadable data files + one map edit; the card is untouched at v10.</li>
+  <li><b>If translate_strings proves too narrow</b> (conditional sections, a personalized close), the a-d-d-spec <code>restate(Fact*, …)</code> / full <code>translate()</code> grammar engine is the upgrade seam — swap the map row's micro_op, card and data files unchanged.</li>
+  <li><b>If exact atom-match misclassifies in practice,</b> the map row can rebind classify to a dice-scored micro-op — but that changes the RESOLVER resource ruling (decode-only) and needs jc's approval first. Misses are cheap today: <code>source=none</code> → safe generic → offline authoring grows the signature file.</li>
+</ul>
+
+<h2>First Move</h2>
+<p><b>Create <code>slots/</code> with the two canon-seeded files that unblock the whole chain</b> — <code>zora-template.txt</code> (byte-copied from the card header) and <code>category-empathy.tsv</code> (the one canonical <code>app</code> row) — then correct the three <code>restate.restate</code> map rows to <code>translate.translate_strings</code> and wire <code>load_slots()</code> + the <code>compose</code> branch first. compose is the highest-value unit (it produces <code>reply.body</code>), it exercises loader + store + translate_strings end-to-end, and its output is byte-checkable against the card header in one diff. classify follows (understand() + signature file), then the two ten-line empathy branches.</p>
+
+<h2>DoD — design-stage checklist</h2>
+<pre data-cm="first-move">&#10003; A-D-D verified          (RESOLVER.md, DIAGRAM.md, action CLAUDE.md, intelligence/understand CLAUDE.md read; design conforms to IoC + one-map + decode-only rulings)
+&#10003; Sourced, not invented    (understand.h, translate.h/.c, store.h, pirun.h, pirun_run.c, skill_map.tsv, the v10 card — all read; 4 prompt errors corrected)
+&#10003; No intelligence in C     (category set, empathy map, template = data files; C surface ~100 lines, zero intent literals)
+&#10003; One map layer            (slot names its data file by convention; map binds names to micro-ops; card untouched)
+&#10003; Determinism contract     (same feedback -> same atoms -> same score -> same bytes; worked trace shown)
+&#10003; $0 / no LLM live         (understand + translate_strings in-process; Vertex stays offline, operator-approved)
+&#10007; Built / tested            (design only — First Move names the build order)</pre>
+
+<footer>metal console &middot; Be &middot; v0 &middot; r637 &middot; 2026-07-15 &middot; Argus — deterministic REACT (understand/restate, data-driven)</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"a687da66-97d5-4d9f-ad79-c0d52d5ed71f"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

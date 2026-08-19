@@ -1,0 +1,97 @@
+<meta name="referrer" content="no-referrer">
+<style>
+  body{background:#111111;color:#ddd;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+  .nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;display:flex;justify-content:space-between;align-items:center;padding:10px 24px;z-index:10}
+  .nav .brand{color:#6FC3DF;font-weight:bold;font-size:18px}.nav .pub{color:#777;font-size:12px}
+  main{max-width:800px;margin:0 auto;padding:24px 16px 64px}
+  h1{color:#6FC3DF;font-size:24px;margin-bottom:2px}h2{color:#6FC3DF;font-size:18px;margin-top:30px;border-bottom:1px solid #2a2a2a;padding-bottom:6px}
+  .card{background:#1A1A1A;border-radius:6px;padding:14px 18px;margin:14px 0}
+  .good{color:#7fd47f}.warn{color:#e8c95c}.muted{color:#888}.bad{color:#e06c6c}
+  code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2}
+  pre{background:#0c0c0c;border:1px solid #2a2a2a;border-radius:4px;padding:12px;overflow-x:auto;color:#cfcfcf;font-size:12px}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin:10px 0}td,th{border:1px solid #2a2a2a;padding:6px 9px;text-align:left;vertical-align:top}th{color:#6FC3DF;background:#161616}
+  ul{padding-left:22px}li{margin:5px 0}footer{color:#666;font-size:12px;text-align:center;padding:20px;border-top:1px solid #2a2a2a}
+  .lede{color:#bbb;font-size:15px}
+</style>
+<nav class="nav"><div class="brand">Be · ~b</div><div class="pub">Published 2026-07-19 01:51 PDT</div>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/4714cc42-d77b-4619-8662-7758516ccd61/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+<h1>Build — mendo NPS recovery: real first name + reply Ref id</h1>
+<p class="lede">The recovery reply greeted the guest <span class="bad">"Hi Joey.castillo,"</span>. It now greets
+<span class="good">"Hi Joey,"</span> — the guest's real first name — and carries a <code>Ref: id-&lt;ticket&gt;</code>
+line so a double-reply with different coupons is detectable. Opus did the work, Fable checked it, proven live in sandbox.</p>
+
+<h2>The seam that already existed</h2>
+<p>The <code>.si</code> already bound name resolution to the jacket: <code>resolve_name → bind: http.resolve_name</code>
+(<code>nous.sm</code>: <code>zbridge_user_name @ comms/wire</code>). The intent was right all along — <em>"the jacket
+resolves the guest's name."</em> The only wrong thing was a C99 stub that shortcut the bind with a local-part heuristic
+(chop the email at <code>@</code>, capitalize → "Joey.castillo"). The fix honors the boundary: vendor mapping in the
+jacket, business-blind plumbing in the runtime.</p>
+
+<table>
+<tr><th>Layer</th><th>Change</th><th>Vendor logic?</th></tr>
+<tr><td><strong>Jacket</strong> — zendesk-bridge (C#)</td><td><code>/nps/guest-name</code>: Zendesk user search by email → profile <code>name</code> → <code>FirstName()</code> (token before first space, <code>{{requester.first_name}}</code> semantics). The <code>http.resolve_name</code> op.</td><td class="good">Yes — all of it lives here</td></tr>
+<tr><td><strong>Runtime</strong> — pi_run (C99)</td><td><code>resolve_name</code> un-stubbed: calls <code>http.resolve_name</code>, takes <code>first_name</code> verbatim into <code>slots.name</code>; fail-open to "there".</td><td class="good">None — enacts the bind, that's all</td></tr>
+<tr><td><strong>.pi</strong> — mendo-nps-detractor-triage</td><td><code>Ref: id-{ticket}</code> added to the sealed <code>zora-reply</code> word; <code>{ticket}</code> render wire already in compose.</td><td>Intent only</td></tr>
+</table>
+
+<h2>Fable review — 2 blockers caught before deploy</h2>
+<p>Both put a <span class="bad">wrong name in front of a guest</span> — the exact failure this change exists to kill. No C99 boundary leak; the seal was verified independently.</p>
+<table>
+<tr><th>#</th><th>Finding</th><th>Fix</th></tr>
+<tr><td>1</td><td><span class="warn">fuzzy stranger</span> — Zendesk user search is partial over name+email; a first-contact guest with no user would match a <em>stranger</em> → "Hi Robert," to Maria.</td><td class="good">EXACT email match only; no match → <code>found=false</code> → runtime greets "there"</td></tr>
+<tr><td>2</td><td><span class="warn">mangled accents</span> — default JSON encoder ships "José" as <code>José</code>; the runtime's byte-grab renders <span class="bad">"Hi Josu00e9,"</span>. Mendo has Spanish-speaking guests → when, not if.</td><td class="good">UnsafeRelaxedJsonEscaping → raw UTF-8 on the wire</td></tr>
+<tr><td>+</td><td>email-shape guard (PII-oracle hardening) · <code>eq[]</code> buffer bump</td><td class="good">applied</td></tr>
+</table>
+
+<h2>Proven live — sandbox, armed</h2>
+<div data-cm="the-seam-that-already-existed" class="card">
+Fresh named guest <strong>Maria Garcia</strong> (a clean guest, so dedup didn't mask the greeting). Posted detractor <strong>632</strong>; the 15s sweep found and processed it with <strong>no manual fire</strong>:
+<pre>handled.already=false (guest=maria.garcia.npsdemo@ai-metal.net)      &larr; dedup passed
+REAL resolve_name  slots.name=Maria (via jacket http.resolve_name)    &larr; jacket &rarr; "Maria"
+REAL compose  reply.body=672 bytes (.pi word zora-reply)              &larr; sealed .pi word
+REAL reply_send -> recovery-send  sent.status=sent sent.ticket_id=633 &larr; REAL armed send
+   Ref: id-632
+...next sweep: handled.already=true                                   &larr; no double-send</pre>
+External proof — the actual sent recovery reply, <strong>sandbox ticket 633</strong>:
+<pre>Hi Maria,
+
+Thank you for participating in our survey. I'm so sorry to hear
+your pickup order experience fell short...
+
+$20 towards a future online order...
+IMSORRYLIVELYLONGHORN20
+
+Best,
+Zora
+
+Ref: id-632</pre>
+Your own <code>joey.castillo@acmedev.com</code> correctly <em>deduped</em> (already handled from prior tests) — which is why a clean guest was used to show the greeting end-to-end.
+</div>
+
+<h2>Where it lives</h2>
+<ul data-cm="where-it-lives">
+<li>Jacket: <code>zendesk-bridge</code> Cloud Run <code>ZBR1j</code> rev <code>00041-cg5</code> (acmedev-platform-hq/us-west1); source in GCS run-sources</li>
+<li>Runtime: <code>metal/src/sdk/nous/action/skill/pirun/pi_run.c</code> + <code>build-enact.sh</code> — metal <strong>r2111</strong></li>
+<li>DIA: <code>argus/be/pi/dianoia/mendo-nps-detractor-triage.{pi,pi.seal}</code> — argus <strong>r728</strong> (<code>zora-reply a807b8d9</code>)</li>
+<li>Seats: <code>prime-hong-kong</code> + <code>prime-las-vegas</code>, rebuilt <strong>ARMED</strong> sandbox, seat active</li>
+</ul>
+
+<h2>DoD</h2>
+<ul data-cm="dod">
+<li class="good">✓ A-D-D verified — intent + hookup already in the .pi/.si/.sm; jacket owns the vendor mapping; pi_run business-blind</li>
+<li class="good">✓ Opus authored / Fable checked (2 blockers found + fixed) / jc's boundary honored</li>
+<li class="good">✓ Production-gate: real armed send on the live mesh, externally verifiable in sandbox Zendesk (ticket 633)</li>
+<li class="good">✓ Data round-trip: guest email → jacket first-name → greeting; source ticket 632 → Ref: id-632 in the sent body</li>
+<li class="good">✓ Dedup intact: re-sweep of a handled guest stops before send (handled.already=true)</li>
+<li class="good">✓ Committed + pushed (metal r2111, argus r728)</li>
+<li class="warn">◐ Known: zendesk-bridge jacket source has no git home (GCS run-sources only) — Kaizen: give it a repo</li>
+<li class="warn">◐ Known: sandbox recovery-send has no SentDrafts idempotency — the Ref id is the double-send detector until it's added</li>
+</ul>
+
+<footer>metal console · Be · v0 · r728 · 2026-07-19 · Argus — mendo NPS name fix + reply Ref id (armed, proven live)</footer>
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"4714cc42-d77b-4619-8662-7758516ccd61"};</script>
+<script src="/artifact-comments.js"></script>

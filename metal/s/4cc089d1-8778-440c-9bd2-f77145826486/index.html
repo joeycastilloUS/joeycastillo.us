@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~d — pi_run firmware tracelog</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #ddd; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; line-height: 1.55; }
+  .nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 10px 20px; display: flex; justify-content: space-between; align-items: baseline; z-index: 10; }
+  .nav .brand { color: #6FC3DF; font-weight: bold; font-size: 18px; letter-spacing: 1px; }
+  .nav .pub { color: #777; font-size: 12px; font-weight: normal; }
+  .wrap { max-width: 800px; margin: 0 auto; padding: 30px 20px 60px; }
+  h1 { color: #6FC3DF; font-size: 26px; margin: 10px 0 4px; }
+  h2 { color: #6FC3DF; font-size: 18px; margin: 38px 0 10px; border-bottom: 1px solid #2a2a2a; padding-bottom: 6px; }
+  h3 { color: #aaa; font-size: 14px; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 1px; }
+  p { margin: 10px 0; }
+  .sub { color: #888; font-size: 14px; margin-bottom: 24px; }
+  .card { background: #1A1A1A; border: 1px solid #2a2a2a; border-radius: 6px; padding: 16px 18px; margin: 14px 0; }
+  .mono, pre { font-family: Consolas, "Courier New", monospace; }
+  pre { background: #0c0c0c; border: 1px solid #262626; border-radius: 6px; padding: 14px; overflow-x: auto; font-size: 12px; line-height: 1.5; color: #cfcfcf; margin: 12px 0; }
+  pre .hi { color: #6FC3DF; }
+  pre .dim { color: #666; }
+  pre .warn { color: #e0b050; }
+  pre .bad { color: #e07a7a; }
+  pre .ok { color: #7ac98f; }
+  code { font-family: Consolas, "Courier New", monospace; background: #1e1e1e; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; color: #9fd7ea; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { text-align: left; color: #6FC3DF; border-bottom: 1px solid #333; padding: 6px 8px; font-weight: 600; }
+  td { border-bottom: 1px solid #222; padding: 6px 8px; vertical-align: top; }
+  ul, ol { margin: 8px 0 8px 22px; }
+  li { margin: 5px 0; }
+  .tag { display: inline-block; background: #16323c; color: #6FC3DF; border-radius: 3px; padding: 0 6px; font-size: 11px; font-family: Consolas, monospace; }
+  .correction { border-left: 3px solid #e0b050; }
+  .dod li { list-style: none; margin-left: -18px; }
+  footer { color: #666; font-size: 12px; text-align: center; margin-top: 50px; border-top: 1px solid #2a2a2a; padding-top: 16px; }
+  .quote { color: #9fd7ea; font-style: italic; }
+</style>
+</head>
+<body>
+<nav class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-15 &middot; Argus / Purcius</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/4cc089d1-8778-440c-9bd2-f77145826486/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+
+<h1>~d &mdash; pi_run firmware tracelog</h1>
+<p class="sub">A firmware trace of a <code>.pi</code> as biRT executes it &mdash; the logic-analyzer view of the punch card, cycle by cycle, hop by hop. Every claim below was verified against the source: <code>pirun.c</code> (548 lines), <code>pirun.h</code> (138), <code>pirun_host.c</code> (95), <code>store.h</code> (171), and the 13-unit card <code>mendo-app-survey-autoresponse.pi</code> (v6). No guessing.</p>
+
+<h2>1 &middot; Need</h2>
+<div data-cm="1-need" class="card">
+<p><strong>The trace already exists. Nobody can see it.</strong> Every state change in a pirun run is written to the IDS ledger as a JSON event on <code>run:&lt;id&gt;:trace:&lt;seq&gt;</code> (<code>trace_ev</code>, pirun.c 65&ndash;83), and <code>pirun_trace_json</code> (529&ndash;548) already serves it with a <code>since_seq</code> cursor. But the only view today is the P1 host's <code>printf</code> of RUN codes &mdash; 14 lines of <code>step N &rarr; RUNNING</code>. The in: reads, the out: writes, the gate decisions, the hop each skill takes through the layers &mdash; all recorded, none rendered.</p>
+<p>pirun is firmware and the <code>.pi</code> is its punch card: one <code>pirun_advance()</code> call is one instruction cycle &mdash; FETCH (cursor&rarr;unit) &middot; DECODE (find_skill) &middot; READ (in: keys &larr; ledger) &middot; EXECUTE (SkillFn) &middot; WRITE (out: keys &rarr; ledger) &middot; GATE &middot; ADVANCE. The ledger is the memory bus; every operand fetch and result store is DMA on <code>run:&lt;id&gt;*</code> subjects. What's missing is the <strong>logic analyzer</strong>: the view that shows each cycle with its operands, its bus traffic, and the layer it hopped through. That view is the pi_run tracelog.</p>
+</div>
+
+<h2>2 &middot; Raw User Stories</h2>
+<div data-cm="2-raw-user-stories" class="card">
+<ul>
+<li class="quote">"I want fable5 ~d a pi_run tracelog now."</li>
+<li class="quote">"Essentially a firmware trace as the pi is executed."</li>
+<li class="quote">"I want a complete diagram of the code layers and hops.. break down precisely read the code no guessing."</li>
+</ul>
+<p>Decoded: (1) as operator, when a run walks the card I want to see every cycle &mdash; which unit, which skill, what it read, what it wrote, where it hopped &mdash; so I can trust the run without re-reading C. (2) As operator, I want the layers-and-hops map so a trace line is instantly locatable in the architecture. (3) As Argus, I want the trace to be the audit surface &mdash; "we are firmware / we are the motherboard" made visible.</p>
+</div>
+
+<h2>3 &middot; Sourced Solution</h2>
+<div data-cm="3-sourced-solution" class="card">
+<p>Everything is mined from what exists; the tracelog <strong>renders</strong> what pirun already emits.</p>
+<table>
+<tr><th>Prior art</th><th>Where</th><th>What it gives the tracelog</th></tr>
+<tr><td><code>trace_ev()</code></td><td>pirun.c 65&ndash;83</td><td>The emitter. Bumps <code>run:&lt;id&gt;.seq</code>, writes <code>{"seq","ts","unit","ev","detail"}</code> JSON to <code>run:&lt;id&gt;:trace:&lt;seq&gt;.event</code>. Already fires on every state change.</td></tr>
+<tr><td><code>pirun_trace_json()</code></td><td>pirun.c 529&ndash;548, pirun.h 121&ndash;124</td><td>The read API. Emits events with <code>seq &gt; since_seq</code> as a JSON array, sets <code>*next_seq</code> &mdash; a tail cursor, built for both replay and live-follow.</td></tr>
+<tr><td>IDS ledger</td><td>store.h / store.c</td><td>The bus itself. <code>ids_open / ids_insert / ids_query_strings / ids_get_string / ids_delete</code>; 24-byte Facts, memory-mapped. Source of truth for trace, data plane, and step states.</td></tr>
+<tr><td><code>pirun_load()</code></td><td>pirun.c 135&ndash;216</td><td>The join key. Parses the same card into <code>PiPlaybook</code>, giving the renderer skill/slot/gate/fail/in/out per unit &mdash; fields the trace event doesn't carry and doesn't need to.</td></tr>
+<tr><td><code>pirun_get / pirun_run_field / pirun_step_field</code></td><td>pirun.c 86&ndash;103</td><td>Data-plane and step reads for enrichment (out-value previews beyond 60 chars, <code>empathy.cost_usd</code>, <code>run.cost_usd</code>, attempt counts).</td></tr>
+<tr><td><code>pirun_host.c</code> walk loop</td><td>pirun_host.c 61&ndash;95</td><td>The P1-proven host: real executor + real ledger walked all 13 units to DONE, deterministic, twice. The tracelog's First Move reads the ledger such a run leaves behind.</td></tr>
+<tr><td>metal-live / board renderers</td><td>be/tools (metal)</td><td>Display prior art: dark HTML views regenerated from ledger-shaped state, meta-refresh live-ness. The tracelog's HTML form follows the same pattern.</td></tr>
+</table>
+
+<h3>Code-verified corrections to the brief</h3>
+<div class="card correction">
+<ul>
+<li><strong>The event vocabulary is 19, not 13.</strong> Besides <code>start, run, out, done, slice-end, gated, pass, exit, held, step-hold, fail, fail-hold, fail-continue</code>, <code>pirun_verb</code> (pirun.c 441&ndash;527) emits <code>verb-hold, verb-abort, verb-continue, verb-rerun, verb-add, verb-edit</code>. Operator verbs are trace events too &mdash; the tracelog must render the operator lane, not just the machine lane.</li>
+<li><strong>Trace timestamps are whole unix seconds</strong> (<code>(long)time(NULL)</code>, pirun.c 80). Per-cycle elapsed-ms cannot be derived from today's events; it is a genuine ADD field, not a derive.</li>
+<li><strong>A flow run of the 13-unit card emits exactly 44 events</strong>: 1 start + 10 non-exit units &times; 3 (<code>run/out/done</code>) + 3 exit-gate units &times; 4 (<code>run/out/pass/done</code>) + 1 final <code>done "all units walked"</code> from the 14th advance call (cursor &ge; n_units, pirun.c 278&ndash;281).</li>
+<li><strong>Linking detail for the view tool:</strong> <code>find_skill</code> references <code>extern PIRUN_SKILLS[]</code>, so any binary linking pirun.c &mdash; even a read-only trace viewer &mdash; must define the table. The viewer defines <code>const SkillEntry PIRUN_SKILLS[] = {{NULL,NULL}};</code>.</li>
+<li>Minor: the in:-key resolve reads into <code>char v[8]</code> (pirun.c 308) &mdash; it is a presence check, values are re-read by the skill. The trace's <code>run</code> event detail is the <strong>slot if set, else the skill</strong> (line 337&ndash;338).</li>
+</ul>
+</div>
+</div>
+
+<h2>4 &middot; Naming</h2>
+<div data-cm="4-naming" class="card">
+<p>Literal names for what things are:</p>
+<ul>
+<li><strong>pi_run tracelog</strong> &mdash; the artifact: the rendered firmware trace of one run.</li>
+<li><code>pirun_trace</code> &mdash; the view tool (C99). File: <code>src/sdk/nous/action/skill/pirun/pirun_trace.c</code>, next to the executor it renders.</li>
+<li><strong>cycle</strong> &mdash; one <code>pirun_advance()</code> call. <strong>bus / DMA</strong> &mdash; the IDS ledger and its ids_* ops. <strong>hop</strong> &mdash; a layer crossing (L2&rarr;L3&rarr;L4&rarr;L5, or L4&rarr;L6). No cute names, no "flight recorder", no "black box".</li>
+</ul>
+</div>
+
+<h2>5 &middot; Shape</h2>
+
+<h3>5.1 The code layers + hops (each layer verified against a real file)</h3>
+<pre>
+ L0  TRIGGER        Zendesk webhook ("Tag NPS Detractor &middot; Guest Alert") &mdash;&mdash;&mdash;&#9488;
+                    15-min cadence sweep (reconciles dropped webhooks) &mdash;&mdash;&mdash;&mdash;&#9508;   dual, idempotent
+                                                                          &#9474;   (card header, Q1)
+                                                                          &#9660;
+ HOST               <span class="hi">pirun_host.c</span> (P1, local)          LATER: prime_server.c (mesh prime;
+                    pirun_start(L,&amp;pb,ticket,"flow")          wire actions pi.start / pi.advance
+                    while(...) pirun_advance()                in g_action_table; ledger = g_store.
+                    &mdash; the poll loop IS the clock             Same card, same trace.)
+                                &#9474;
+ L1  CARD (.pi)     <span class="hi">mendo-app-survey-autoresponse.pi</span> v6 &mdash; POLICY AS DATA
+                    13 unit blocks {unit, skill, slot, in[], out[], gate, fail}
+                    parsed once by pirun_load() &rarr; PiPlaybook (pirun.c 135-216)
+                                &#9474;
+ L2  EXECUTOR       <span class="hi">pirun.c</span> &mdash; the firmware instruction cycle, ONE unit per advance:
+                    FETCH &middot; DECODE &middot; READ &middot; EXECUTE &middot; WRITE &middot; GATE &middot; ADVANCE
+                    holds NOTHING between calls &mdash; crash-safe, ledger is all state
+                                &#9474; find_skill(): linear scan          <span class="dim">hop L2&rarr;L3</span>
+ L3  DISPATCH       <span class="hi">PIRUN_SKILLS[]</span> &mdash; host compiled-in table {name &rarr; SkillFn},
+                    {NULL,NULL}-terminated (pirun_host.c 37-47). Not in table = slice-end.
+                                &#9474; rc = sk-&gt;fn(L, run_id, u, err)     <span class="dim">hop L3&rarr;L4</span>
+ L4  SKILLS         P1: stub_skill (writes "false" to every out: key)
+                    P2+: understand / reason / restate  &mdash; in-process, $0        &#9474;
+                         zread / claim_code / reply_send &mdash; http &rarr; L6 &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&#9508;
+                                &#9474; pirun_get / pirun_put               <span class="dim">hop L4&harr;L5</span>  &#9474;
+ L5  LEDGER (BUS)   <span class="hi">IDS triple store</span> (store.c) &mdash; the memory bus / DMA          &#9474;
+                    run:&lt;id&gt;            program|ticket|mode|status|cursor|seq    &#9474;
+                    run:&lt;id&gt;:data       the DATA PLANE (every in:/out: key)      &#9474;
+                    run:&lt;id&gt;:step:&lt;n&gt;   unit|status|attempt|error|edited         &#9474;
+                    run:&lt;id&gt;:trace:&lt;seq&gt; event &rarr; {json}  &larr; THE TRACELOG SOURCE &#9474;
+                    every access = ids_insert/ids_query_strings/ids_delete       &#9474;
+                                                                    <span class="dim">hop L4&rarr;L6</span>  &#9660;
+ L6  FOREIGN EDGES  C# jackets (hard language law &mdash; jackets only):
+                    zendesk-bridge &rarr; Zendesk REST (env=sandbox) &mdash; scan_alert,
+                    gate_handled, resolve_name, reply_send
+                    gcp-bridge &rarr; Firestore vault (standalone GCP) &mdash; claim_code
+</pre>
+<p>The tracelog's ground truth is the boxed line in L5: <code>run:&lt;id&gt;:trace:&lt;seq&gt;</code>. The executor is the only writer; <code>pirun_trace_json</code> is the reader; the tracelog is the renderer. We are the firmware; the ledger is the motherboard's bus; the trace is the logic analyzer clipped onto it.</p>
+
+<h3>5.2 One firmware cycle = one pirun_advance() (verified line numbers)</h3>
+<pre>
+ FETCH    read run:&lt;id&gt;.status (must be "running") + cursor        pirun.c 272-277
+          cursor &ge; n_units &rarr; status=done, ev <span class="hi">done</span> "all units walked", RUN_DONE   278-281
+ GATE-F   gate==fire &rarr; step gated, run await_fire,                 288-293
+          ev <span class="warn">gated</span> "fire gate &mdash; DISARMED, nothing sent", RUN_AWAIT_FIRE (never dispatched)
+ DECODE   find_skill(u-&gt;skill): linear scan of PIRUN_SKILLS[]      264-268, 295
+          miss &rarr; status=done, ev <span class="hi">slice-end</span>, RUN_DONE               296-304
+ READ     each in: key presence-checked on run:&lt;id&gt;:data           306-330
+          missing &rarr; per u-&gt;fail: ev <span class="bad">fail-continue</span> / <span class="warn">fail-hold</span> / <span class="bad">fail</span>
+ EXECUTE  attempt++, step=running, ev <span class="ok">run</span> (slot else skill),        332-341
+          rc = sk-&gt;fn(L, run_id, u, err, ...)
+          rc!=0 &rarr; per u-&gt;fail: ev <span class="bad">fail-continue</span> / <span class="warn">fail-hold</span> / <span class="bad">fail</span> 343-360
+ WRITE    out: keys were written BY the skill (data-flow law);      362-375
+          executor reads them back, ev <span class="ok">out</span> "k=v ..." (&le;60-char preview each)
+          step=done                                                 376
+ ADVANCE  cursor++                                                  378-379
+ GATE     hold &rarr; ev <span class="warn">held</span>, RUN_HELD                                  382-387
+          exit &amp;&amp; out[0]=="true" &rarr; ev <span class="hi">exit</span>, RUN_EXITED; else ev <span class="ok">pass</span> 388-397
+          ev <span class="ok">done</span> ""                                                398
+          mode==step &rarr; ev <span class="warn">step-hold</span>, RUN_HELD                       401-406
+</pre>
+
+<h3>5.3 Anatomy of one tracelog line</h3>
+<p>The renderer joins three sources per line: the trace event (emitted), the card (derived via <code>pirun_load</code>), and a static skill&rarr;hop map (derived). Three fields are genuinely absent today and are the only candidates to ADD.</p>
+<table>
+<tr><th>Field</th><th>Source</th><th>Status</th></tr>
+<tr><td><code>seq</code>, <code>ts</code>, <code>unit</code>, <code>ev</code>, <code>detail</code></td><td>the trace event JSON (trace_ev)</td><td><span class="tag">emitted today</span></td></tr>
+<tr><td>cycle # (= step index), <code>skill</code>, <code>slot</code>, <code>gate</code>, <code>fail</code>, in: keys, out: keys</td><td>join unit name &rarr; PiPlaybook (pirun_load of the same card)</td><td><span class="tag">derived</span></td></tr>
+<tr><td>hop tag (L2&rarr;L3&rarr;L4, L4&rarr;L6 zd/gcp, in-proc)</td><td>static map: skill name &rarr; layer path (zread/reply_send&rarr;L6-zd, claim_code&rarr;L6-gcp, understand/reason/restate&rarr;L4 in-proc, vertex_panel&rarr;L6-vertex)</td><td><span class="tag">derived</span></td></tr>
+<tr><td>RUN code after the cycle</td><td>ev &rarr; code map (gated&rarr;AWAIT_FIRE, held/step-hold/fail-hold&rarr;HELD, exit&rarr;EXITED, slice-end/final done&rarr;DONE, fail&rarr;FAILED, else RUNNING)</td><td><span class="tag">derived</span></td></tr>
+<tr><td>full out: values, <code>attempt</code>, <code>error</code></td><td><code>pirun_get</code> / <code>pirun_step_field</code> enrichment reads</td><td><span class="tag">derived</span></td></tr>
+<tr><td>cost per cycle</td><td><code>empathy.cost_usd</code> + <code>run.cost_usd</code> read from the data plane (only empathy_panel is non-$0; the card contracts it to always write cost)</td><td><span class="tag">derived</span></td></tr>
+<tr><td><strong>elapsed ms</strong></td><td>ts is whole seconds &mdash; not derivable</td><td><span class="tag">ADD later</span> (one field, <code>"ms"</code>, in trace_ev)</td></tr>
+<tr><td><strong>rc</strong> (the skill's return int)</td><td>not in the event (only implied by ev)</td><td><span class="tag">ADD later</span> (optional)</td></tr>
+</table>
+
+<h3>5.4 Worked example &mdash; the 13-unit card, cycle by cycle (P1 proven run)</h3>
+<p>Exactly what the P1 host's run leaves in the ledger: ticket <code>TEST-457662</code>, mode flow, stub skills (every out: value is <code>"false"</code> &mdash; the tracelog shows it honestly). 44 events, seq 1&ndash;44. Exit gates read <code>"false"</code> &rarr; <code>pass</code>. One line per cycle; the ev column shows the cycle's event chain.</p>
+<pre>
+pi_run tracelog &middot; run r20260715-0412xx-9a3f &middot; mendo-app-survey-autoresponse v6 &middot; flow &middot; 44 ev
+<span class="dim">seq    cyc unit               skill@slot                    gate hop            ev-chain            RUN</span>
+1      --  (run)              --                            --   HOST&rarr;L2&rarr;L5    <span class="hi">start</span> units=13      RUNNING
+2-4    00  scan_alert         zread@guest-experience-alert  auto L4&rarr;<span class="warn">L6:zd</span>       <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; ticket=TEST-457662   out&rarr; alert.event alert.nps alert.store
+                                                                alert.order_id alert.guest_email alert.feedback</span>
+5-8    01  gate_illness       understand@food-illness       <span class="hi">exit</span> L4 in-proc      <span class="ok">run&middot;out&middot;pass&middot;done</span>  RUNNING
+                              <span class="dim">in&larr; alert.feedback       out&rarr; illness.excluded=false illness.route
+                              pass: illness.excluded!="true" &mdash; HARD LAW gate did not fire</span>
+9-12   02  gate_not_detractor understand@detractor-rule     <span class="hi">exit</span> L4 in-proc      <span class="ok">run&middot;out&middot;pass&middot;done</span>  RUNNING
+                              <span class="dim">in&larr; alert.event alert.nps  out&rarr; skip.not_detractor=false</span>
+13-16  03  gate_handled       zread@already-handled         <span class="hi">exit</span> L4&rarr;<span class="warn">L6:zd</span>       <span class="ok">run&middot;out&middot;pass&middot;done</span>  RUNNING
+                              <span class="dim">in&larr; ticket alert.guest_email  out&rarr; handled.already=false handled.ticket_id
+                              pass = the idempotency gate: webhook + sweep overlap stays safe</span>
+17-19  04  classify           understand@complaint-category auto L4 in-proc      <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; alert.feedback       out&rarr; complaint.category complaint.map_hit</span>
+20-22  05  resolve_name       zread@guest-name              auto L4&rarr;<span class="warn">L6:zd</span>       <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; alert.guest_email    out&rarr; slots.name slots.suppress_close   fail=hold</span>
+23-25  06  claim_code         claim_code@imsorry-vault      auto L4&rarr;<span class="warn">L6:gcp</span>      <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; ticket alert.nps     out&rarr; slots.code slots.amount          fail=hold
+                              (P2+: atomic Firestore claim; vault empty &rarr; fail-hold, operator refills)</span>
+26-28  07  empathy_map        restate@category-empathy      auto L4 in-proc      <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; complaint.category complaint.map_hit alert.feedback
+                              out&rarr; empathy.text empathy.source</span>
+29-31  08  empathy_panel      vertex_panel@bounded-fallback auto L4&rarr;<span class="warn">L6:vertex</span>*  <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; empathy.source ...   out&rarr; empathy.final empathy.agree empathy.cost_usd
+                              * the ONLY non-$0 hop, and only on a map miss ($0 passthrough on hit)</span>
+32-34  09  compose            restate@zora-template         auto L4 in-proc      <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; slots.* empathy.final  out&rarr; reply.subject reply.body reply.draft_id</span>
+35-37  10  corpus_match       corpus_match@precedent        auto L4&rarr;L5 corpus   <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; alert.feedback complaint.category alert.store
+                              out&rarr; match.ticket_id match.body match.score      fail=continue</span>
+38-40  11  send               reply_send@followup-ticket    auto L4&rarr;<span class="warn">L6:zd</span>       <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; reply.draft_id reply.subject reply.body alert.guest_email ticket
+                              out&rarr; sent.ticket_id sent.status                  fail=hold
+                              sandbox gate=auto; PROD flips to gate:fire &mdash; see the armed row below</span>
+41-43  12  audit              reason@react-record           auto L4 in-proc      <span class="ok">run&middot;out&middot;done</span>       RUNNING
+                              <span class="dim">in&larr; sent.ticket_id slots.code empathy.* match.ticket_id
+                              out&rarr; audit.record run.cost_usd ($0.00 this run)</span>
+44     --  (run)              --                            --   L2&rarr;L5          <span class="hi">done</span> all units walked <span class="ok">DONE</span>
+</pre>
+<p>The same card in <strong>prod</strong> (unit <code>send</code> flipped to <code>gate: fire</code>) stops the trace at cycle 11 without dispatching:</p>
+<pre>
+38     11  send               reply_send@followup-ticket    <span class="bad">fire</span> (not dispatched) <span class="warn">gated</span>             <span class="warn">AWAIT_FIRE</span>
+                              <span class="dim">detail: "fire gate &mdash; DISARMED, nothing sent" &mdash; visible, armed by jc only</span>
+</pre>
+<p>And the <strong>operator lane</strong> renders in the same stream &mdash; verb events interleave by seq, e.g. after a fail-hold at claim_code (vault empty):</p>
+<pre>
+26     06  claim_code         claim_code@imsorry-vault      auto L4&rarr;<span class="warn">L6:gcp</span>      <span class="warn">fail-hold</span> "vault empty" <span class="warn">HELD</span>
+27     06  claim_code         (operator)                    --   OPERATOR&rarr;L2    <span class="hi">verb-rerun</span>          RUNNING
+</pre>
+
+<h3>5.5 Choices (the real forks)</h3>
+<div class="card">
+<ul>
+<li><strong>Derive in the renderer vs add fields to trace_ev &rarr; derive first.</strong> Cycle #, skill/slot/gate, in/out keys, hop, RUN code, and cost are all reconstructable from event + card + data plane. Deriving keeps trace_ev's emit minimal (it runs inside every cycle) and ships the tracelog with <em>zero executor change</em>. The only field that cannot be derived is elapsed-ms (ts is whole seconds) &mdash; when the timing question actually gets asked, add one <code>"ms"</code> field to the trace_ev JSON (additive; old events render with ms=?). Not in the First Move.</li>
+<li><strong>Live-tail vs post-run replay &rarr; both, replay first.</strong> <code>pirun_trace_json(since_seq, &amp;next_seq)</code> is already a tail cursor. The First Move ships replay (read seq 0&rarr;end, print); a <code>-f</code> follow flag is the same call in a poll loop &mdash; the caller's poll loop is the clock, same as the executor itself.</li>
+</ul>
+</div>
+
+<h2>6 &middot; First Move</h2>
+<div data-cm="5-shape" class="card">
+<p><strong><code>pirun_trace.c</code></strong> &mdash; a C99 view tool beside the executor: <code>src/sdk/nous/action/skill/pirun/pirun_trace.c</code>. Reads a real run's ledger and prints the firmware trace above. Builds on the P1 host that already runs; touches no executor code.</p>
+<ol>
+<li><code>pirun_trace &lt;card.pi&gt; &lt;store.ids&gt; &lt;run_id&gt; [-f]</code> &mdash; <code>pirun_load</code> the card (the join), <code>ids_open</code> the store, <code>pirun_trace_json</code> from seq 0.</li>
+<li>Per event: parse the flat JSON (the <code>json_pair</code> walker pattern in pirun.c 411&ndash;439 is the prior art), join unit&rarr;PiPlaybook for cycle/skill/slot/gate/in/out, map skill&rarr;hop tag, map ev&rarr;RUN code, enrich out-values and cost via <code>pirun_get</code>. Print one cycle block per the anatomy in 5.4.</li>
+<li>Define <code>const SkillEntry PIRUN_SKILLS[] = {{NULL,NULL}};</code> in the tool &mdash; required to link pirun.c's extern (find_skill), never called by a viewer.</li>
+<li>Build mirrors pirun_host.c's line: <code>gcc -std=c99 -O2 -I../../memory/skill/store pirun.c pirun_trace.c store.c index.c hash.c scope.c journal.c -o pirun_trace -lm</code>.</li>
+<li>Prove: run <code>pirun_host</code> on the mendo card, then <code>pirun_trace</code> against the same store + run_id &mdash; expect the 44-event trace, byte-stable across two runs (the determinism contract, now visible).</li>
+</ol>
+<p>Later slices (not now): the <code>-f</code> live tail; an HTML tracelog artifact per run (metal-live pattern); the <code>"ms"</code> field in trace_ev; the mesh-prime host serving the same trace over the wire.</p>
+</div>
+
+<h2>DoD</h2>
+<div data-cm="dod" class="card">
+<ul class="dod">
+<li>&#10003; A-D-D verified (design sourced from pirun.h's stated contract; no drift found between header doc and pirun.c behavior)</li>
+<li>&#10003; Code read, no guessing (pirun.c 548 lines, pirun.h 138, pirun_host.c 95, store.h 171, the .pi card &mdash; all read in full; every line number cited is real)</li>
+<li>&#10003; Corrections surfaced (19-event vocab incl. verb-*; ts = whole seconds; 44-event count; PIRUN_SKILLS link requirement)</li>
+<li>&#10003; Six-section spine (Need / Raw User Stories / Sourced Solution / Naming / Shape / First Move) + Choices only where a real fork exists</li>
+<li>&#10003; Complete layers+hops diagram, each layer named against a real file</li>
+<li>&#10003; Worked example: the actual 13-unit card traced cycle-by-cycle with hop + in/out + event chain, plus the prod fire-gate and operator-verb variants</li>
+<li>&#10003; First Move is the smallest real thing (one C file, zero executor change, proves against the existing P1 ledger)</li>
+<li>&#10003; Be template (bg #111111, raised #1A1A1A, accent #6FC3DF, 800px, no frameworks, pub date top-right)</li>
+</ul>
+</div>
+
+<footer>metal console &middot; Be &middot; v0 &middot; r632 &middot; 2026-07-15 &middot; Argus &mdash; pi_run firmware tracelog<br>Generated 2026-07-15</footer>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"4cc089d1-8778-440c-9bd2-f77145826486"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

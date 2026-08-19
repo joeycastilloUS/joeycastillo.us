@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NPS-Detractor Recovery — A/B Demonstration</title>
+<style>
+  :root{ --bg:#0c0e11;--surf:#14181d;--surf2:#0f1418;--accent:#6FC3DF;--ink:#eef3f6;--mut:#93a3ab;--line:#242f38;--a:#7CFFB2;--b:#f0c674; }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.6;font-size:16px;-webkit-font-smoothing:antialiased}
+  code{font-family:Consolas,ui-monospace,monospace;font-size:.85em;color:#9fe0f2;background:#0b1418;padding:1px 5px;border-radius:4px}
+  .nav{display:flex;justify-content:space-between;align-items:center;padding:14px 26px;border-bottom:1px solid var(--line)}
+  .nav .cpy{font-size:12.5px;font-weight:600;color:var(--mut);letter-spacing:.01em}
+  .nav .meta{font-size:12px;color:var(--mut)}
+  .wrap{max-width:900px;margin:0 auto;padding:0 22px 90px}
+
+  .hero{text-align:center;padding:52px 10px 30px}
+  .kick{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);border:1px solid var(--line);border-radius:20px;padding:5px 14px;margin-bottom:20px}
+  h1{font-size:38px;line-height:1.12;margin:0 0 14px;font-weight:800;letter-spacing:-.01em}
+  h1 .g{color:var(--accent)}
+  .tag{font-size:17px;color:#cdd9df;max-width:660px;margin:0 auto;line-height:1.5}
+  .tag b{color:#fff}
+
+  h2{font-size:14px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin:44px 0 14px;font-weight:800}
+  .purpose{font-size:16.5px;color:#e7eef2;background:var(--surf);border-left:3px solid var(--accent);border-radius:10px;padding:16px 20px;line-height:1.55}
+  .purpose b{color:#fff}
+
+  .lanes{display:grid;grid-template-columns:1fr;gap:16px;margin:6px 0}
+  @media(min-width:720px){.lanes{grid-template-columns:1fr 1fr}}
+  .lane{border:1px solid var(--line);border-radius:14px;background:var(--surf);padding:20px 20px 18px;position:relative;overflow:hidden}
+  .lane.b{border-top:3px solid var(--b)} .lane.a{border-top:3px solid var(--a)}
+  .lane .ord{position:absolute;top:14px;right:16px;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--mut)}
+  .lane .lbl{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+  .lane.b .lbl{color:var(--b)} .lane.a .lbl{color:var(--a)}
+  .lane h3{font-size:21px;margin:6px 0 4px;font-weight:800}
+  .lane .who{font-size:13.5px;color:var(--mut);margin-bottom:14px}
+  .lane ul{margin:0;padding-left:18px} .lane li{margin:7px 0;font-size:14px;color:#d3dde2}
+  .lane li b{color:#fff}
+  .vs{display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--mut);font-size:13px;letter-spacing:.1em}
+
+  .test{border:1px solid var(--line);border-radius:14px;background:var(--surf2);padding:20px 22px}
+  .flow{font-family:Consolas,ui-monospace,monospace;font-size:13px;color:#9fe0f2;background:#0a1216;border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin:2px 0 16px;line-height:1.7;overflow-x:auto;white-space:nowrap}
+  table{width:100%;border-collapse:collapse;font-size:14px} th,td{border-bottom:1px solid var(--line);padding:10px 10px;text-align:left;vertical-align:top} th{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  td.dim{font-weight:700;color:#fff;white-space:nowrap} td.q{color:var(--mut)} .tbd{color:var(--mut);font-style:italic}
+
+  .agenda{counter-reset:step;margin:6px 0}
+  .step{display:flex;gap:16px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;background:var(--surf);padding:15px 18px;margin:10px 0}
+  .step .num{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;background:#0a1620;border:1px solid var(--line);color:var(--accent)}
+  .step.b .num{color:var(--b);border-color:#4a3d17} .step.a .num{color:var(--a);border-color:#1f5f47}
+  .step .t{font-size:16px;font-weight:700;color:#fff} .step .d{font-size:13.5px;color:var(--mut);margin-top:2px}
+
+  .foot{color:#5f6f77;font-size:12.5px;margin-top:46px;border-top:1px solid var(--line);padding-top:16px;text-align:center;line-height:1.9}
+  .foot .btm{display:inline-block;margin-top:6px;color:var(--accent);font-size:13.5px;font-weight:700;letter-spacing:.01em}
+</style>
+</head>
+<body>
+<div class="nav"><div class="cpy">&copy; 2026 Joseph M. Castillo &middot; kASTIL Systems &middot; Purcius</div><div class="meta">A/B Demonstration &middot; 2026-07-27</div>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/8d22a79d-9fa9-44fb-bb0b-90bcd328fb42/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="kick">Demonstration &middot; Kick-off</div>
+    <h1>The same workflow, built two ways.</h1>
+    <div class="tag">Automated NPS-detractor recovery with a food-illness safety gate &mdash; built <b>two ways</b> on the <b>same account</b>, against the <b>same tickets</b>. One arm uses Zendesk's in-box AI; the other, Argus, is fully managed AI. Today we run both and show how each one gets it done.</div>
+  </div>
+
+  <h2>The intent, plainly</h2>
+<div class="lk-sec" data-cm="the-intent-plainly"><div class="purpose">
+    <b>A guest gives a low NPS score. Recover them</b> &mdash; a short, warm apology and a $10 code to make it right. <b>But if that guest is reporting they got sick, there is no code and no automated reply &mdash; the ticket goes straight to a human.</b> That safety line is absolute: the machine never answers a sick guest.
+  </div></div>
+<h2>The two lanes</h2>
+<div class="lk-sec" data-cm="the-two-lanes"><div class="lanes">
+    <div class="lane b">
+      <div class="ord">RUN FIRST</div>
+      <div class="lbl">Lane B</div>
+      <h3>Zendesk in-box AI</h3>
+      <div class="who">Copilot intelligent triage + the AI agent &mdash; the vendor path.</div>
+      <ul>
+        <li>The AI <b>classifies</b> the ticket and decides.</li>
+        <li>Reads the message, predicts intent + sentiment, drives the reply.</li>
+        <li>The AI + triggers are configured inside Zendesk.</li>
+        <li><b>Still needs external code</b> &mdash; coupon-code generation + District Operator email lookup. Zendesk can&rsquo;t compute a secret code or look up data it doesn&rsquo;t hold.</li>
+      </ul>
+    </div>
+    <div class="lane a">
+      <div class="ord">RUN SECOND</div>
+      <div class="lbl">Lane A</div>
+      <h3>Argus &mdash; Fully Managed AI</h3>
+      <div class="who">The same demands, met with fully managed AI.</div>
+      <ul>
+        <li><b>Two Gemini models</b> today &mdash; expandable to any available model as needed.</li>
+        <li>We <b>choose and route</b> the model for the job.</li>
+        <li><b>~$0.0003 per ticket.</b></li>
+      </ul>
+    </div>
+  </div></div>
+<h2>How we got it done</h2>
+<div class="lk-sec" data-cm="how-we-got-it-done"><div class="agenda">
+    <div class="step b"><div class="num">1</div><div><div class="t">Run Lane B &mdash; Zendesk's in-box AI</div><div class="d">Send the tickets. Watch the AI classify, decide, and act. See where it lands on the hard ones.</div></div></div>
+    <div class="step a"><div class="num">2</div><div><div class="t">Run Lane A &mdash; Argus</div><div class="d">Same tickets, run through Argus &mdash; fully managed AI. See where it lands on the same hard ones.</div></div></div>
+    <div class="step a"><div class="num">3</div><div><div class="t">How it&rsquo;s done</div><div class="d">Argus is fully managed AI &mdash; it runs two Gemini models today (and can add any available model as needed), at about $0.0003 per ticket.</div></div></div>
+  </div>
+
+  <div class="foot">
+    A/B demonstration on a real Zendesk sandbox &middot; same account, same tickets, same safety bar &middot; 2026-07-27<br>
+    <b class="btm">kASTIL Systems &middot; Purcius &mdash; Zero-Cost Intelligence, deterministic from the start.</b>
+  </div>
+
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"8d22a79d-9fa9-44fb-bb0b-90bcd328fb42"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

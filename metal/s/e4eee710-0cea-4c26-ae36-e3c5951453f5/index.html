@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design &mdash; DIA hit count (self-declared idempotency)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  ul, ol { margin: 8px 0 8px 22px; }
+  li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; }
+  pre code { background: none; padding: 0; color: #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 14px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; }
+  .bad { color: #e06c6c; font-weight: 600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~d &mdash; DIA hit count</span>
+  <span class="pub">Published 2026-07-19 02:28 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/e4eee710-0cea-4c26-ae36-e3c5951453f5/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Design &mdash; DIA hit count</h1>
+<p style="color:#999;">Per item, per DIA, a count of how many times that DIA has acted on it. The DIA reads its own count and decides. That's it.</p>
+
+<h2>1. Need</h2>
+<div class="lk-sec" data-cm="1-need"><div class="section">
+  <p>Many DIAs and automations will land on the <strong>same work item</strong> (one Zendesk ticket: NPS recovery, a classifier, CSAT, escalation&hellip;). Today mendo-nps decides "did I already do this?" by searching Zendesk for any prior "Follow&nbsp;Up" <code>requester:&lt;guest_email&gt;</code>. Two things wrong:</p>
+  <ul>
+    <li><span class="bad">Keyed on the guest, forever</span> &mdash; once a guest is ever recovered, every future alert for them is dropped. A returning guest's new complaint gets swallowed.</li>
+    <li><span class="bad">Blind to which DIA acted</span> &mdash; the gate can't tell its own prior work from another automation's, so idempotency can't be per-DIA.</li>
+  </ul>
+</div></div>
+<h2>2. Raw User Stories</h2>
+<div class="lk-sec" data-cm="2-raw-user-stories"><div class="section">
+  <ul>
+    <li>As a <strong>DIA</strong>, I want to know how many times <em>I</em> have hit <em>this item</em>, so I decide whether to act again.</li>
+    <li>As a <strong>DIA author</strong>, I want to decide for myself what a nonzero count means &mdash; skip (dedup) or act anyway.</li>
+    <li>As an <strong>operator</strong>, I want to see, on the item, which DIAs hit it and how often.</li>
+  </ul>
+</div></div>
+<h2>3. Sourced Solution</h2>
+<div class="lk-sec" data-cm="3-sourced-solution"><div class="section">
+  <p>It's mostly here already &mdash; finish it, don't invent.</p>
+  <table>
+    <tr><th>Source</th><th>What we use</th></tr>
+    <tr><td><code>nous</code> / <code>.si</code></td><td>The <code>.pi</code> <code>card:</code> name <em>is</em> the DIA-id. The <code>.si</code> already has <code>idem:</code> keys. <code>pi_run</code> already reads/writes the ticket via the jacket.</td></tr>
+    <tr><td>mendo-nps</td><td><code>gate_handled</code> (retire the guest search) and the <code>Ref: id-{ticket}</code> line shipped today.</td></tr>
+    <tr><td>Outside</td><td>An idempotency counter &mdash; the oldest trick there is.</td></tr>
+  </table>
+  <p><strong>Approach:</strong> On the item, keep a small count per DIA: <code>&lt;dia-id&gt; = &lt;hits&gt;</code>. <strong>The bump is the claim:</strong> a DIA bumps <em>before</em> acting, and the jacket's <code>count-bump</code> returns <code>created</code> (true only for the run that won the bump). A dedup DIA acts iff <code>created==true</code>; always-on DIAs ignore <code>created</code> and just let the count climb (audit). This closes the sweep race &mdash; runs launched 15s apart (an illness-panel triage runs longer than the cadence) can both read <code>hits==0</code>, but only one wins the bump. <code>pi_run</code> stays blind &mdash; DIA-id from the card, the count read/bumped on the item via the jacket.</p>
+</div></div>
+<h2>4. Naming</h2>
+<div class="lk-sec" data-cm="4-naming"><div class="section">
+  <table>
+    <tr><th>Thing</th><th>Name</th><th>Why</th></tr>
+    <tr><td>Whose count</td><td><code>dia-id</code></td><td>The <code>.pi</code> <code>card:</code> name. Already unique; nothing new invented.</td></tr>
+    <tr><td>The number</td><td><code>hits</code></td><td>How many times this DIA has acted on this item.</td></tr>
+    <tr><td>The mark on the item</td><td><code>dia:&lt;dia-id&gt;=&lt;hits&gt;</code></td><td>A tag/field on the Zendesk ticket. One per DIA that touched it.</td></tr>
+  </table>
+  <p><strong>Collision:</strong> "tag" is a literal Zendesk term &mdash; the count is <em>carried</em> as a tag; the idea is a hit count, not a "tag" scheme.</p>
+</div></div>
+<h2>5. Shape</h2>
+<div class="lk-sec" data-cm="5-shape"><div class="section">
+  <ul>
+    <li><strong>The count</strong> &mdash; on the item, one small value per DIA: <code>dia:mendo-nps-detractor-triage=1</code>.</li>
+    <li><strong>Read</strong> &mdash; the DIA reads its own count off the item it already has in hand (no extra search, no guest lookup, no index lag).</li>
+    <li><strong>Claim by bumping</strong> &mdash; a dedup DIA bumps <em>first</em>; the jacket returns <code>created</code> (true iff this run won). Act iff <code>created</code>. Always-on DIAs skip the check and bump as audit.</li>
+    <li><strong>Blind runtime</strong> &mdash; <code>pi_run</code> gets the DIA-id from the card; the jacket reads/bumps the count on the ticket (Zendesk update with <code>safe_update</code> &mdash; a 409 is a lost race &rarr; <code>created:false</code>).</li>
+  </ul>
+  <p><strong>Accepted trades (KISS, not gaps to fix):</strong></p>
+  <ul>
+    <li><strong>Same incident, two alert tickets</strong> (survey re-fire, or webhook + sweep both minting a ticket) &rarr; two recoveries. The count is per-item; cross-item is out of scope. The old guest-key masked this by over-blocking; we accept the rare double over dropping every returning guest.</li>
+    <li><strong>Bump lands, act then fails</strong> &rarr; count says 1 with nothing sent. <code>send</code> is <code>fail: hold</code>, so it surfaces to an operator, not a silent drop. Double-coupon is the worse failure; this is the right side.</li>
+    <li><strong>Always-on concurrent bumps</strong> may lose a count (last-write). It's audit, not a gate &mdash; acceptable.</li>
+    <li><strong>Claim-then-act is at-most-once</strong> &mdash; win the claim (<code>created:true</code>), then die before sending, and the count says handled with nothing sent. For a dedup follow-up that's the right failure (silent miss beats a double-coupon; <code>send</code> is <code>fail:hold</code> so it surfaces). A chosen trade, not a surprise.</li>
+  </ul>
+  <p><strong>Out of scope:</strong> cross-item counts, expiry/decay, retro-marking old tickets, the doculink/DIA viewer (separate line).</p>
+  <p style="color:#999;font-size:13px;"><em>Build-time verify (not a design fork): confirm Zendesk preserves <code>:</code>/<code>=</code> in tag text; if it normalizes them, spell the mark with underscores or use a ticket field &mdash; same op, different spelling.</em></p>
+</div></div>
+<h2>6. First Move</h2>
+<div class="lk-sec" data-cm="6-first-move"><div class="section">
+  <blockquote>Retire mendo-nps's guest search. The <code>gate</code> <strong>bumps</strong> <code>dia:mendo-nps-detractor-triage</code> on the source ticket and reads back <code>created</code>; the run acts iff <code>created==true</code>; then compose &rarr; send. If a returning guest with a <em>new</em> ticket now gets a recovery, the <em>same</em> ticket re-swept dedups, and two near-simultaneous sweeps of one fresh ticket send exactly once &mdash; done.</blockquote>
+  <p>Into the plan: a <code>hits</code> read/bump helper in <code>pi_run</code> (DIA-id from card); jacket <code>count-read</code> / <code>count-bump</code> ops; then it's the default idempotency for every DIA.</p>
+</div></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><div class="section">
+  <ul>
+    <li><span class="pass">&#10003;</span> Design committed (HTML artifact) &middot; hash in telemetry &middot; index updated &middot; pushed</li>
+    <li><span class="pass">&#10003;</span> Six spine sections present; KISS &mdash; no optional tools earned (it's a counter)</li>
+    <li><span class="pass">&#10003;</span> Sourced (nous card-id + .si idem + mendo Ref) before inventing; names literal</li>
+    <li><span class="pass">&#10003;</span> No prior work damaged &mdash; extends <code>idem:</code>/<code>Ref:</code>, retires only the guest search</li>
+  </ul>
+</div>
+
+</div></div>
+<footer>v0 &middot; r730 &middot; 2026-07-19 &middot; Be &middot; Argus &mdash; DIA hit count</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"e4eee710-0cea-4c26-ae36-e3c5951453f5"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

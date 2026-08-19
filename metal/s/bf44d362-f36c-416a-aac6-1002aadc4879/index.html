@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~i — Argus/Purcius Security: Full Audit + Red-Team</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; --crit:#ff5c5c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  .nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  .nav .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  .nav .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:860px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:26px; margin:.2em 0 .1em; }
+  h2 { font-size:20px; color:var(--accent); margin-top:2em; border-bottom:1px solid #262626; padding-bottom:5px; }
+  h3 { font-size:15px; margin:1.3em 0 .3em; color:#cfcfcf; }
+  .sub { color:var(--mut); margin-top:0; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  pre { background:#000; border:1px solid #242424; border-radius:6px; padding:12px; overflow:auto; font-size:12px; color:#cfe8ef; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:12.5px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid #242424; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  ul,ol { margin:.4em 0; padding-left:20px; } li { margin:.25em 0; }
+  .foot { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #242424; padding-top:12px; }
+  .big { font-size:15px; }
+  .lead { border-left:3px solid var(--accent); padding-left:12px; }
+  .sev { display:inline-block; font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:20px; letter-spacing:.05em; }
+  .s-crit { background:#3a0d0d; color:#ff8b8b; border:1px solid #6b1a1a; }
+  .s-high { background:#3a220d; color:#f0b46a; border:1px solid #6b3f1a; }
+  .s-med  { background:#33330d; color:#e0e07a; border:1px solid #5b5b1a; }
+  .s-low  { background:#13303a; color:#8fd3e6; border:1px solid #1a4b5b; }
+  .s-info { background:#1a1a1a; color:#8a8a8a; border:1px solid #333; }
+  .fid { color:var(--accent); font-weight:700; }
+  .today { color:var(--crit); font-weight:700; }
+  .tag { display:inline-block; font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid #333; color:var(--mut); margin-left:4px; }
+</style>
+</head>
+<body>
+<div class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-31 09:57 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/bf44d362-f36c-416a-aac6-1002aadc4879/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+<h1>~i — Argus/Purcius Security: Full Audit, Test Map &amp; Red-Team</h1>
+<p class="sub">Paired inspection &mdash; driver Opus + <b>three</b> independent Fable5 navigator passes (audit / red-team / test-inventory), reconciled, no contradictions &middot; project: <b>argus</b> + kastil-systems/nous &middot; r952 &middot; 2026-07-31</p>
+
+<div class="card lead big">
+<b>Verdict in three lines.</b> (1) The <b>pure-C crypto core is sound</b> &mdash; Ed25519 rejects non-canonical S, constant-time compares, fail-closed RNG, correct MAC-before-sig order. <b>Every real weakness is in the C# jacket, the browser gate, or the deployment plane.</b> (2) A handful are <b class="today">exploitable today with no dormant door</b>: the guessable daily data-key on <b>prod writes</b> (R0), unaudited crew self-escalation (R3), the directly-reachable Cloud Run URL (N1), and CORS <code>*.pages.dev</code>+credentialed cookies (N4). (3) Meta-critical: <b>Argus CI runs zero tests</b> &mdash; ~235 real security asserts exist but none gate a deploy, so the whole test suite is currently theater.
+</div>
+
+<h2>1. Schematic &mdash; trust-boundary &amp; attack-surface map</h2>
+<div class="lk-sec" data-cm="1-schematic-trust-boundary-attack"><p class="sub">Planes top-to-bottom = attacker &rarr; browser TCB &rarr; edge &rarr; bridge &rarr; state/data &rarr; crypto core. Findings are pinned where they live; <span style="color:#ff5c5c;font-weight:700;">red = exploitable today</span>, <span style="color:#f0b46a;">amber = one-misconfig / latent</span>, <span style="color:#7CD992;">green = clean</span>. Fat red arrows are the paths that need no dormant door.</p>
+<div style="overflow-x:auto;">
+<svg viewBox="0 0 860 660" width="100%" style="min-width:640px;font-family:Helvetica,Arial,sans-serif;">
+  <defs>
+    <marker id="rd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ff5c5c"/></marker>
+    <marker id="gy" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5a5a5a"/></marker>
+  </defs>
+  <style>
+    .pl{fill:#151515;stroke:#2a2a2a;} .plh{fill:#6FC3DF;font-size:11px;font-weight:700;letter-spacing:.05em;}
+    .bx{fill:#0c0c0c;stroke:#333;rx:5;} .bt{fill:#cfcfcf;font-size:11px;} .bs{fill:#8a8a8a;font-size:9.5px;}
+    .crit{stroke:#ff5c5c;} .high{stroke:#f0b46a;} .med{stroke:#e0e07a;} .okb{stroke:#7CD992;}
+    .fid{font-size:9px;font-weight:700;} .fc{fill:#ff8b8b;} .fh{fill:#f0b46a;} .fm{fill:#e0e07a;} .fo{fill:#7CD992;}
+    .flow{stroke:#ff5c5c;stroke-width:2.5;fill:none;} .flowl{fill:#ff8b8b;font-size:9px;font-weight:700;}
+  </style>
+
+  <!-- Plane A: attackers -->
+  <rect class="pl" x="8" y="8" width="844" height="42" rx="6"/>
+  <text class="plh" x="16" y="23">ATTACKER MODELS</text>
+  <g class="bs" text-anchor="middle" fill="#b9b9b9">
+    <rect class="bx" x="130" y="28" width="108" height="17"/><text x="184" y="40">M1 external</text>
+    <rect class="bx" x="244" y="28" width="118" height="17"/><text x="303" y="40">M2 phished crew</text>
+    <rect class="bx" x="368" y="28" width="110" height="17"/><text x="423" y="40">M3 insider/shares</text>
+    <rect class="bx" x="484" y="28" width="116" height="17"/><text x="542" y="40">M4 *.pages.dev</text>
+    <rect class="bx" x="606" y="28" width="108" height="17"/><text x="660" y="40">M5 phone malware</text>
+    <rect class="bx" x="720" y="28" width="120" height="17"/><text x="780" y="40">M6 supply-chain</text>
+  </g>
+
+  <!-- Plane B: browser TCB -->
+  <rect class="pl" x="8" y="60" width="844" height="86" rx="6"/>
+  <text class="plh" x="16" y="76">BROWSER / CLIENT TCB &mdash; argus.com.ai/app</text>
+  <rect class="bx okb" x="130" y="84" width="150" height="52"/><text class="bt" x="140" y="102">device Ed25519 key</text><text class="bs" x="140" y="116">non-extractable</text><text class="bs" x="140" y="128">(IndexedDB)</text>
+  <rect class="bx med" x="292" y="84" width="150" height="52"/><text class="bt" x="302" y="102">warrant.wasm</text><text class="bs" x="302" y="116">Shamir combine</text><text class="fid fm" x="302" y="128">N7 no SRI</text>
+  <rect class="bx crit" x="454" y="84" width="176" height="52"/><text class="bt" x="464" y="102">zrawPass() data key</text><text class="bs" x="464" y="116">"yyyymmdd~go"</text><text class="fid fc" x="464" y="128">R0 guessable</text>
+  <rect class="bx high" x="642" y="84" width="196" height="52"/><text class="bt" x="652" y="102">operator-password gate</text><text class="bs" x="652" y="116">lifts on bridge error</text><text class="fid fh" x="652" y="128">R1 fail-open</text>
+
+  <!-- Plane C: edge -->
+  <rect class="pl" x="8" y="156" width="844" height="52" rx="6"/>
+  <text class="plh" x="16" y="172">CLOUDFLARE EDGE &mdash; _worker.js</text>
+  <rect class="bx med" x="292" y="180" width="320" height="22"/><text class="bt" x="302" y="195">blind full-header proxy → run.app</text><text class="fid fm" x="512" y="195">N5</text>
+
+  <!-- Plane D: bridge -->
+  <rect class="pl" x="8" y="218" width="844" height="150" rx="6"/>
+  <text class="plh" x="16" y="234">CLOUD RUN &mdash; meraki-bridge (identity in the wrong house: 10/35 routes)</text>
+  <rect class="bx high" x="130" y="242" width="150" height="44"/><text class="bt" x="140" y="260">BRIDGE_TOKEN mw</text><text class="fid fh" x="140" y="276">R2 empty=open</text>
+  <rect class="bx high" x="292" y="242" width="150" height="44"/><text class="bt" x="302" y="260">OIDC callback</text><text class="fid fh" x="302" y="276">R4 unverified id_token</text>
+  <rect class="bx high" x="454" y="242" width="176" height="44"/><text class="bt" x="464" y="260">Overlord key door</text><text class="fid fh" x="464" y="276">R5 crew-bypass</text>
+  <rect class="bx okb" x="642" y="242" width="196" height="44"/><text class="bt" x="652" y="260">/ops OpsSession</text><text class="fid fo" x="652" y="276">fail-closed ✓</text>
+  <rect class="bx crit" x="130" y="298" width="290" height="44"/><text class="bt" x="140" y="316">POST /settings — rewrites crew</text><text class="fid fc" x="140" y="332">R3 self-escalate + ZERO audit</text>
+  <rect class="bx crit" x="432" y="298" width="220" height="44"/><text class="bt" x="442" y="316">CORS *.pages.dev</text><text class="fid fc" x="442" y="332">N4 +AllowCredentials</text>
+  <rect class="bx high" x="664" y="298" width="174" height="44"/><text class="bt" x="674" y="316">challenge burn table</text><text class="fid fh" x="674" y="332">N2 per-instance replay</text>
+
+  <!-- Plane E: state + data -->
+  <rect class="pl" x="8" y="378" width="844" height="70" rx="6"/>
+  <text class="plh" x="16" y="394">STATE + DATA PLANE</text>
+  <rect class="bx high" x="130" y="402" width="230" height="38"/><text class="bt" x="140" y="420">Firestore crew / sessions</text><text class="fid fh" x="140" y="434">no revocation · doc never re-read</text>
+  <rect class="bx crit" x="372" y="402" width="466" height="38"/><text class="bt" x="382" y="420">Data bridges: zendesk / gcp / raw / onedine / ZREC — incl. WRITE endpoints</text><text class="fid fc" x="382" y="434">R0 daily-key on promo-claim / config-apply / vertex-correction</text>
+
+  <!-- Plane F: crypto core -->
+  <rect class="pl okb" x="8" y="458" width="844" height="46" rx="6" style="stroke:#7CD992;stroke-opacity:.6;"/>
+  <text class="plh" x="16" y="474" style="fill:#7CD992;">PURE-C CRYPTO CORE — identity skill · genesis · crypt KATs</text>
+  <text class="fo" x="16" y="493" style="font-size:11px;font-weight:700;">AUDITED CLEAN ✓ &nbsp;canonical-S (no malleability) · constant-time · fail-closed RNG · MAC-before-sig · RFC 8032/6979 KATs pinned</text>
+
+  <!-- exploitable-today flows -->
+  <path class="flow" d="M542 46 C 542 120, 545 200, 545 298" marker-end="url(#rd)"/>
+  <text class="flowl" x="548" y="200">N4 cookie ride</text>
+  <path class="flow" d="M660 46 C 700 150, 720 300, 640 402" marker-end="url(#rd)"/>
+  <text class="flowl" x="705" y="200" transform="rotate(0)">N1 direct run.app</text>
+  <path class="flow" d="M184 46 C 120 220, 90 360, 372 415" marker-end="url(#rd)"/>
+  <text class="flowl" x="60" y="300">R0 daily-key write</text>
+  <path class="flow" d="M303 46 C 300 160, 280 260, 275 298" marker-end="url(#rd)"/>
+  <text class="flowl" x="220" y="150">R3 crew edit</text>
+</svg>
+</div></div>
+<h2>1b. Component map &mdash; the security surface + trust anchor</h2>
+<div class="lk-sec" data-cm="1b-component-map-the-security"><table>
+<tr><th>Component</th><th>Location</th><th>Trust anchor</th></tr>
+<tr><td>Machine-caller gate (middleware)</td><td><code>bridge/Program.cs:80-96</code></td><td><code>BRIDGE_TOKEN</code> (constant-time) <b>OR</b> a valid <code>argus_session</code></td></tr>
+<tr><td>Member session token</td><td><code>Auth.SessionSign/Verify:27-48</code></td><td>HMAC-SHA256(<code>AUTH_SESSION_KEY</code>) over <code>sid|idKey|email</code> &mdash; <b>stateless, no exp, Firestore doc never re-read</b></td></tr>
+<tr><td>OIDC login/callback (Google)</td><td><code>Program.cs:200-266</code></td><td>server-to-server TLS code exchange; id_token <b>decoded, not verified</b> (<code>Auth.cs:51-62</code>). <span class="warn">Currently 503 &mdash; no GOOGLE_CLIENT_ID</span></td></tr>
+<tr><td>Crew allow-list (login&ne;access)</td><td><code>Auth.EmailAllowed:79-111</code>, read <code>:252</code></td><td>Firestore <code>settings/argus</code> <code>argus_crew_v1</code> (exact email or <code>@domain</code>) &mdash; locked to <code>jcastillo@mendocinofarms.com</code></td></tr>
+<tr><td>Overlord key door</td><td><code>Program.cs:283-400</code> + <code>KeyAuth.cs</code></td><td>Ed25519 device sig + operator warrant, verified in the pure-C sidecar; mints session as <code>OVERLORD_EMAIL</code>, <b>crew-bypassed</b></td></tr>
+<tr><td>Pure-C identity skill</td><td>nous <code>security/skill/identity</code></td><td>HMAC(<code>PURCIUS_ID_KEY</code>) challenge/session MAC; <code>ed25519_verify</code> device+warrant. <span class="ok">Audited clean.</span></td></tr>
+<tr><td>Data-plane key</td><td><code>web/app/index.html:4698</code></td><td><b class="bad"><code>UTC yyyymmdd + "~go"</code> &mdash; guessable, no secret</b></td></tr>
+<tr><td>Edge proxy</td><td><code>web/_worker.js</code></td><td>hardcoded run.app URL; blind full-header forward incl. Set-Cookie; makes <code>/auth/*</code> first-party</td></tr>
+<tr><td>Browser device identity</td><td><code>index.html:9120-9236</code></td><td>non-extractable Ed25519 (IndexedDB); warrant in <code>localStorage</code></td></tr>
+</table></div>
+<h2>2. Findings &mdash; severity-ranked (R = prior lockdown inspection, N = new this audit)</h2>
+<div class="lk-sec" data-cm="2-findings-severity-ranked-r"><h3><span class="sev s-crit">CRITICAL</span> &mdash; exploitable now or one misconfig away</h3>
+
+<div class="card"><span class="fid">R0 — Guessable daily Bearer on production WRITE endpoints.</span> <span class="today">works today</span><br>
+<code>zrawPass()="yyyymmdd~go"</code> (<code>index.html:4698</code>) is the <code>Authorization: Bearer</code> for 5 services incl. writes: <code>/zendesk/promo-claim</code> <code>:7391</code>, <code>/promo-release</code> <code>:7401</code>, <code>/zendesk/config-apply</code> <code>:8069</code>, <code>/cc-apply</code> <code>:8083</code>, <code>/vertex/correction</code> <code>:3464</code>. Scheme is in committed comments (<code>:3115,:5547</code>). <b>Exploit:</b> compute today's string, POST prod Zendesk mutations with zero login. <b>Fix:</b> retire the daily key &mdash; prime-signed Ed25519 wire auth (the <i>purcius-bridge-auth</i> plan, already written), writes first.</div>
+
+<div class="card"><span class="fid">R3 — Any crew session can rewrite the crew via <code>POST /settings</code>, and it is UNAUDITED.</span> <span class="today">works with 1 session</span><br>
+A member session is an alternative credential on every gated route (<code>Program.cs:88-90</code>); <code>POST /settings</code> (<code>:690-703</code>) is proxied (<code>_worker.js:11</code>) with <b>no extra authorization and no AUDIT line</b>. <b>Exploit:</b> one allowed login adds <code>@attacker.com</code> to <code>argus_crew_v1</code> / removes the operator &mdash; invisibly. Blue-team's #1 blind spot. <b>Fix:</b> restrict crew-mutating settings to a <code>key:</code> (warrant) session + emit an AUDIT line on every settings write.</div>
+
+<div class="card"><span class="fid">N1 — Cloud Run is directly reachable, bypassing the edge.</span> <span class="today">works today</span><br>
+<code>_worker.js:10</code> hardcodes the public <code>meraki-bridge-…-uw.a.run.app</code>. CORS constrains only <i>browsers</i>. <b>Exploit:</b> a non-browser client hits run.app directly with the daily key (R0) or the empty-token path (R2), bypassing any Cloudflare edge/WAF. <b>Fix:</b> Cloud Run ingress = internal + IAP/edge-only, or an edge-injected shared secret the run.app URL requires.</div>
+
+<div class="card"><span class="fid">N4 / CORS — <code>*.pages.dev</code> + <code>AllowCredentials</code> + <code>SameSite=None</code> = credentialed cross-origin.</span> <span class="today">works while victim logged in</span> <span class="tag">driver-verified</span><br>
+CORS predicate allows <b>any</b> <code>*.pages.dev</code> host (plus argus.com.ai / joeycastillo.us / the-it-center.com) with <code>.AllowCredentials()</code> (<code>Program.cs:22-28</code>); the cookie is <code>SameSite=None</code> (<code>:264,398</code>). <b>Exploit:</b> stand up a free <code>attacker.pages.dev</code>; a logged-in victim who visits it triggers credentialed fetches to the bridge riding their cookie &mdash; read, write, even <code>POST /settings</code>. <b>Fix:</b> drop <code>.pages.dev</code> from the allow-list (pin the exact preview hosts you use), add a CSRF double-submit token on all POST, move to <code>SameSite=Lax</code> with a same-origin session front.</div>
+
+<div class="card"><span class="fid">R2 — Empty <code>BRIDGE_TOKEN</code> disables auth for the whole data plane.</span> <span class="warn">works if misdeployed</span><br>
+<code>Program.cs:83</code>: <code>|| string.IsNullOrEmpty(bridgeToken) → next()</code>. A missing/unset secret opens every <code>/meraki/*</code> incl. writes, silently &mdash; no "gate disabled" alert. <b>Fix:</b> unset <code>BRIDGE_TOKEN</code> AND unset <code>AUTH_SESSION_KEY</code> &rArr; 503 all gated routes (fail closed), CRITICAL-log at boot.</div>
+
+<div class="card"><span class="fid">CI-GAP — Argus CI runs zero tests.</span> <span class="today">meta-critical</span><br>
+<code>deploy-argus.yml</code> is <b>deploy-only</b> &mdash; it runs no web suites and no <code>bridge-tests</code>. ~235 real security asserts exist but execute only on dev boxes / inside the C Docker build. Every "fail-closed" claim below is an <b>untested comment</b> until a test job gates the deploy. <b>Fix:</b> add a CI <code>test</code> job (node web suites + <code>dotnet run --project bridge-tests</code>) that blocks deploy red.</div>
+
+<h3><span class="sev s-high">HIGH</span></h3>
+<table>
+<tr><th>ID</th><th>Finding</th><th>Where</th><th>Fix direction</th></tr>
+<tr><td class="fid">N2</td><td><b>Cross-instance challenge replay + monotonic-clock TTL.</b> Burn table is per-instance in-memory (<code>ConcurrentDictionary</code>); challenge TTL uses <code>GetTickCount64</code>/<code>CLOCK_MONOTONIC</code> = per-machine uptime. Mint on instance A, verify on instance B → TTL compares to B's uptime + B's burn table is empty → intercepted signed login replays past 60s.</td><td><code>Program.cs:295,363-366</code>; <code>crypt.c:45-74</code></td><td>Wall-clock (UTC ms) TTL; shared burn store (Firestore/Redis) keyed by challenge MAC</td></tr>
+<tr><td class="fid">Session</td><td><b>HMAC-only, no exp in payload, no revocation, crew never re-checked.</b> Firestore <code>sessions</code> doc written but never read; a stolen/valid cookie works the full 12h; a removed crew member rides ≤12h; only <code>AUTH_SESSION_KEY</code> rotation evicts (kills all).</td><td><code>Auth.cs:35-48</code>; <code>Program.cs:264,268-275,398</code></td><td>Add <code>exp</code> to the signed payload; per-request revocation check (read sessions doc) + crew re-read; short session + refresh</td></tr>
+<tr><td class="fid">R5</td><td><b>Overlord key door bypasses the crew + identity mismatch.</b> <code>/auth/key/verify</code> never calls <code>EmailAllowed</code>; mints as <code>OVERLORD_EMAIL</code> (default <code>overlord@joeycastillo.us</code>) &mdash; not the sole crew identity. Any device the root ever warranted is a crew-exempt door.</td><td><code>Program.cs:351-400</code></td><td>Decide: crew-gate the key door, OR explicitly label it a super-door (audited, crew-independent by design) + anchor rotation on retire</td></tr>
+<tr><td class="fid">R4</td><td><b>Thin OIDC trust (latent behind the 503).</b> id_token is base64-decoded, <b>not verified</b>: no JWKS/RS256, no <code>aud</code>, no <code>email_verified</code>, and the nonce is minted into the state cookie but <b>never compared</b> to the id_token nonce.</td><td><code>Auth.cs:51-62</code>; <code>Program.cs:207,222-224,246-252</code></td><td>Add <code>aud</code>+<code>iss</code>+<code>exp</code>+<code>email_verified</code>+nonce-equality now (cheap); JWKS RS256 next. Do this <i>before</i> wiring GOOGLE_CLIENT_ID.</td></tr>
+<tr><td class="fid">R1</td><td><b>Operator-password gate fails open.</b> Any non-401 <code>loadNetworks()</code> failure sets <code>bridgeDown=true</code> and lifts the gate with the password <b>unverified</b> (the corpus/GCP tabs, gated by <code>zrawPass</code> not PW, then run live).</td><td><code>index.html:9094-9107</code></td><td>Don't lift the gate on bridge-unreachable; render a locked shell</td></tr>
+<tr><td class="fid">N3</td><td><b>Burn-before-verify.</b> The challenge is added to the burn table <i>before</i> the sidecar verify — a failed/raced attempt still consumes it (minor DoS; confirms burn isn't tied to success).</td><td><code>Program.cs:366</code> vs <code>:373</code></td><td>Burn only on <code>ID_OK</code>, or accept the tradeoff explicitly</td></tr>
+</table>
+
+<h3><span class="sev s-med">MEDIUM</span></h3>
+<table>
+<tr><th>ID</th><th>Finding</th><th>Where</th></tr>
+<tr><td class="fid">N5</td><td>Worker is a <b>blind full-header proxy</b> (forwards all req/resp headers incl. <code>Set-Cookie</code>, no allowlist, no <code>X-Forwarded-*</code> stripping)</td><td><code>_worker.js:19-23</code></td></tr>
+<tr><td class="fid">N6</td><td>OAuth redirect base derives from client-controlled <code>Host</code>/<code>X-Forwarded-Proto</code> when <code>AUTH_REDIRECT_BASE</code> unset (bounded by Google's registered-URI check, but fragile)</td><td><code>Program.cs:196-197</code></td></tr>
+<tr><td class="fid">N7</td><td>No SRI on <code>qr.js</code> / no hash-pin on <code>warrant.wasm</code> &mdash; the console page is inside the key-ceremony TCB (it handles Shamir shares) but its integrity isn't proven beyond the deploy</td><td><code>index.html:9155</code>, <code>qr.js</code></td></tr>
+<tr><td class="fid">SEC-hyg</td><td><b>Orphaned <code>SLACK_CLIENT_ID/SECRET</code> still in the live bridge env</b> though the Slack provider was deleted &mdash; dead creds (not exploitable, hygiene)</td><td>meraki-bridge env <span class="tag">driver-verified</span></td></tr>
+<tr><td class="fid">N8</td><td>Slack sign-in button + copy still in the console UI though the provider is gone → a live 404 door that reads as a broken lockdown</td><td><code>index.html:~569</code></td></tr>
+</table>
+
+<h3><span class="sev s-low">LOW / INFO</span></h3>
+<ul>
+<li><span class="fid">N10</span> QR/webcam warrant scan trusts the scanned bytes &mdash; a hostile QR just plants a warrant that fails server verify (UX/phishing only).</li>
+<li><span class="fid">N11</span> <code>?harness=1</code> hides the gate UI (bridge still 401s real calls) &mdash; confirm it can't reach any daily-key route.</li>
+<li><span class="fid">N12</span> Timing: <code>FixedTimeEquals</code>/<code>TokenEquals</code>/<code>ct_neq32</code> all constant-time; <code>EmailAllowed</code> uses <code>==</code> but email isn't secret. No actionable oracle.</li>
+<li><span class="sev s-info">CLEAN</span> <b>Crypto core</b>: <code>ed25519_verify</code> rejects non-canonical S (RFC 8032 5.1.7, no malleability); RNG fail-closed + zeroized; <code>secure_zero</code> non-elidable; identity checks MAC before touching attacker sig bytes. No defects &mdash; steer fixes away from the C.</li>
+</ul></div>
+<h2>3. Design challenges (architectural, not line-level)</h2>
+<div class="lk-sec" data-cm="3-design-challenges-architectural-not"><ol>
+<li><b>Identity lives in the wrong house.</b> 10/35 <code>meraki-bridge</code> routes are identity/ops; every auth change redeploys the Meraki data routes over a known CI fork. Extract to <code>argus-identity</code> &mdash; <i>after</i> logins are green (see the 2026-07-25 inspect).</li>
+<li><b>Two trust models bolted together.</b> A titanium Ed25519+warrant front door beside a <code>yyyymmdd~go</code> screen door on the loading dock. The weakest door defines the posture.</li>
+<li><b>No revocation anywhere.</b> Stateless HMAC sessions; Firestore session/member docs are write-only decoration. Crew changes and de-provisioning don't take effect for ≤12h; the only "log everyone out" is key rotation.</li>
+<li><b>Fail-open defaults contradict the stated "fail-closed everywhere."</b> R1 (client) + R2 (server) open on absence/failure; the key door and Ops routes correctly fail closed &mdash; the pattern exists, it just isn't applied to the two oldest gates.</li>
+<li><b><code>OVERLORD_EMAIL</code> vs mendo identity mismatch.</b> The key door asserts <code>overlord@joeycastillo.us</code>; the intended crew is <code>jcastillo@mendocinofarms.com</code>. Decide what the key door <i>is</i>.</li>
+<li><b>Thin OIDC trust as a permanent state.</b> "v2 hardening" is the live path. Safe only because the exchange is server-side today; anything that fronts/caches token exchange makes R4 exploitable.</li>
+<li><b>Cross-repo / edge-plane trust.</b> Bridge directly reachable (N1); blind proxy (N5); Host-derived redirect (N6); key-ceremony page without SRI/signed-deploy proof (N7). The air-gap story is only as strong as the integrity of the page that asserts it.</li>
+<li><b>Multi-instance statelessness the core assumes isn't guaranteed by the host.</b> The pure-C skill is stateless + monotonic-clock; Cloud Run's multi-instance, per-uptime reality breaks both the TTL and the per-instance burn table (N2). Correct in isolation, violated by the substrate.</li>
+</ol></div>
+<h2>4. Test inventory &mdash; what we HAVE vs what we NEED</h2>
+<div class="lk-sec" data-cm="4-test-inventory-what-we"><div class="card"><b>Have (~235 asserts touching identity/auth/crypto) &mdash; but Argus CI runs none of them.</b></div>
+<table>
+<tr><th>Suite</th><th>Coverage</th><th>Runs in CI?</th></tr>
+<tr><td><code>argus/bridge-tests</code> (~150)</td><td>Gate (lab-match, allow-list, TokenEquals ct), Auth (SessionSign/Verify tamper/wrong-key/null, EmailAllowed exact/domain/fail-closed, PreserveCrew, ParseProviders, DecodeJwtPayload <i>decode-only</i>), KeyWire framing + sidecar integration, SourceDispatch traversal</td><td class="bad">NO (dev-box only)</td></tr>
+<tr><td><code>nous identity/test_identity.c</code> (~35)</td><td>Full warrant ceremony: challenge mint/verify, expiry, tampered nonce/MAC/expiry, wrong root, replay-for-other-device, session mint/check, RNG-fail-closed</td><td class="warn">only via downstream Docker build; <b>not in nous <code>make test</code></b></td></tr>
+<tr><td><code>nous genesis/tests</code> (~50)</td><td>mint/recover/resplit, 2-share reveals nothing, tampered share, anchor verify; substrate KATs (SHA/HMAC/HKDF/X25519/AES-GCM tamper/Ed25519/Shamir); WASM==CLI warrant + share zeroization; cli e2e</td><td class="ok">yes (preflight)</td></tr>
+<tr><td><code>nous crypt KATs</code></td><td>RFC 8032 §7.1 v1-3 bit-for-bit, RFC 6979 A.2.5, CTR_DRBG CAVP, selftest power-up</td><td class="ok">yes (security.yml)</td></tr>
+<tr><td><code>argus/web/test</code> (13 suites)</td><td>UI gate lock-step w/ Gate.cs, <b>publish-manifest parity</b>, no-control-bytes, runbooks</td><td class="bad">NO (deploy-only workflow)</td></tr>
+</table>
+<div class="card"><b>Need &mdash; prioritized (the HTTP auth surface has ZERO executable tests today).</b></div>
+<table>
+<tr><th>Pri</th><th>Test</th><th>Kind</th></tr>
+<tr><td class="bad">P0</td><td><b>Argus CI test gate</b> &mdash; run web suites + bridge-tests on push, block deploy red (turns 235 asserts from "exist" to "enforced")</td><td>integration</td></tr>
+<tr><td class="bad">P0</td><td><b>Wire <code>test_identity.c</code> into nous <code>make test</code></b> (canonical key-door suite currently runs only downstream)</td><td>unit</td></tr>
+<tr><td class="bad">P0</td><td><b>Forged-daily-key must-reject corpus</b> (wrong-day/truncated/empty/yesterday/random) &mdash; plan written, unbuilt</td><td>adversarial</td></tr>
+<tr><td class="bad">P0</td><td><b><code>BRIDGE_TOKEN</code> fail-open</b> + <b><code>/ops</code> OpsSession fail-closed</b> (unset→503, daily-key→401, wrong-token→401, valid session→OK, tampered cookie→401)</td><td>unit+adv</td></tr>
+<tr><td class="bad">P0</td><td><b>Session expiry + revocation</b> (expired→reject, revoked-sid→reject, forged-shape→reject) &mdash; these tests <i>force</i> the code fix</td><td>adversarial</td></tr>
+<tr><td class="warn">P1</td><td>OIDC: JWKS/RS256, <code>alg=none</code> reject, <code>aud</code>/<code>iss</code>/<code>exp</code>/<code>email_verified</code>, <b>nonce equality</b>, state/CSRF single-use, crew allow/deny at callback</td><td>unit+integration</td></tr>
+<tr><td class="warn">P2</td><td>Key-door e2e over HTTP (challenge→sign→verify→<code>key:</code> session→<code>/ops/doors warrant:true</code>); service-layer single-use/replay; sidecar env fail-closed</td><td>e2e+adv</td></tr>
+<tr><td class="warn">P3</td><td>Genesis: secure_zero canary, wrong-mint/duplicate-x/corrupt-share reject, anchor must-reject corpus, go-warrant/go-mint script parity</td><td>unit+adv</td></tr>
+<tr><td class="warn">P4</td><td>QR/web: device-pub QR encodes exactly the pubkey (snapshot), scan state-machine, BarcodeDetector fallback, camera-teardown leak assert</td><td>unit+integration</td></tr>
+<tr><td class="warn">P5</td><td><b>Merged-manifest CAMERA-only CI assert</b> in <code>genesis-apk.yml</code> (aapt permissions == {CAMERA}); JNI==CLI warrant parity; <b>SRI/hash-pin</b> qr.js/ZXing in publish-manifest test; signed-commit gate; deployed-surface auth smoke (no-token→401)</td><td>CI+supply-chain</td></tr>
+</table></div>
+<h2>5. Red-team plan (authorized defensive exercise &mdash; plan only)</h2>
+<div class="lk-sec" data-cm="5-red-team-plan-authorized"><h3>Attacker models</h3>
+<p><b>M1</b> external unauth (all logic is shipped client-side) &middot; <b>M2</b> phished/malicious crew member (1 valid session) &middot; <b>M3</b> insider holding ≥threshold Shamir shares &middot; <b>M4</b> on-path / hostile <code>*.pages.dev</code> origin &middot; <b>M5</b> malware on the operator's key phone &middot; <b>M6</b> supply-chain (dep / preview / edge).</p>
+
+<h3>Attack tree schematic</h3>
+<div style="overflow-x:auto;">
+<svg viewBox="0 0 860 440" width="100%" style="min-width:640px;font-family:Helvetica,Arial,sans-serif;">
+  <style>
+    .rt{fill:#0c0c0c;stroke:#6FC3DF;stroke-width:1.5;rx:6;} .rtt{fill:#6FC3DF;font-size:12px;font-weight:700;}
+    .lk{stroke:#3a3a3a;fill:none;} .bx2{fill:#0c0c0c;rx:5;stroke-width:1.4;}
+    .l1{fill:#e8e8e8;font-size:11px;font-weight:600;} .l2{fill:#8a8a8a;font-size:9.5px;}
+    .tdy{fill:#ff5c5c;stroke:#ff5c5c;} .lat{fill:#f0b46a;stroke:#f0b46a;}
+    .flg{font-size:8.5px;font-weight:700;} .ftdy{fill:#0c0c0c;}
+  </style>
+  <!-- root -->
+  <rect class="rt" x="270" y="8" width="320" height="34"/>
+  <text class="rtt" x="430" y="30" text-anchor="middle">ROOT: authed access · write prod · forge warrant</text>
+  <!-- spine -->
+  <path class="lk" d="M430 42 L430 54 M40 54 L820 54" />
+  <!-- 9 branches, 2 columns -->
+  <!-- col1 -->
+  <g>
+    <path class="lk" d="M215 54 L215 70"/>
+    <rect class="bx2" x="30" y="70" width="370" height="40" style="stroke:#ff5c5c;"/>
+    <rect x="30" y="70" width="46" height="40" rx="5" class="tdy"/><text class="flg ftdy" x="53" y="86" text-anchor="middle">TODAY</text>
+    <text class="l1" x="86" y="86">B1 data-plane bypass</text><text class="l2" x="86" y="101">R0 daily key → prod reads + WRITES</text>
+    <path class="lk" d="M215 110 L215 122"/>
+    <rect class="bx2" x="30" y="122" width="370" height="40" style="stroke:#ff5c5c;"/>
+    <rect x="30" y="122" width="46" height="40" rx="5" class="tdy"/><text class="flg ftdy" x="53" y="138" text-anchor="middle">TODAY</text>
+    <text class="l1" x="86" y="138">B4 crew self-escalation</text><text class="l2" x="86" y="153">R3 POST /settings · unaudited</text>
+    <path class="lk" d="M215 162 L215 174"/>
+    <rect class="bx2" x="30" y="174" width="370" height="40" style="stroke:#ff5c5c;"/>
+    <rect x="30" y="174" width="46" height="40" rx="5" class="tdy"/><text class="flg ftdy" x="53" y="190" text-anchor="middle">TODAY</text>
+    <text class="l1" x="86" y="190">B8 CORS cross-origin</text><text class="l2" x="86" y="205">N4 *.pages.dev + cookie ride</text>
+    <path class="lk" d="M215 214 L215 226"/>
+    <rect class="bx2" x="30" y="226" width="370" height="40" style="stroke:#ff5c5c;"/>
+    <rect x="30" y="226" width="46" height="40" rx="5" class="tdy"/><text class="flg ftdy" x="53" y="242" text-anchor="middle">TODAY</text>
+    <text class="l1" x="86" y="242">B2 UI gate fail-open</text><text class="l2" x="86" y="257">R1 corpus read, no valid cred</text>
+    <path class="lk" d="M215 266 L215 278"/>
+    <rect class="bx2" x="30" y="278" width="370" height="40" style="stroke:#ff5c5c;"/>
+    <rect x="30" y="278" width="46" height="40" rx="5" class="tdy"/><text class="flg ftdy" x="53" y="294" text-anchor="middle">TODAY</text>
+    <text class="l1" x="86" y="294">B7 no session revocation</text><text class="l2" x="86" y="309">stale crew cookie rides ≤12h</text>
+  </g>
+  <!-- col2 -->
+  <g>
+    <path class="lk" d="M645 54 L645 70"/>
+    <rect class="bx2" x="460" y="70" width="370" height="40" style="stroke:#f0b46a;"/>
+    <rect x="460" y="70" width="46" height="40" rx="5" class="lat"/><text class="flg ftdy" x="483" y="86" text-anchor="middle">MISCFG</text>
+    <text class="l1" x="516" y="86">B3 machine-gate fail-open</text><text class="l2" x="516" y="101">R2 empty BRIDGE_TOKEN = open</text>
+    <path class="lk" d="M645 110 L645 122"/>
+    <rect class="bx2" x="460" y="122" width="370" height="40" style="stroke:#ff5c5c;"/>
+    <rect x="460" y="122" width="46" height="40" rx="5" class="tdy"/><text class="flg ftdy" x="483" y="138" text-anchor="middle">TODAY</text>
+    <text class="l1" x="516" y="138">B(N1) direct run.app</text><text class="l2" x="516" y="153">bypass the Cloudflare edge/WAF</text>
+    <path class="lk" d="M645 162 L645 174"/>
+    <rect class="bx2" x="460" y="174" width="370" height="40" style="stroke:#f0b46a;"/>
+    <rect x="460" y="174" width="46" height="40" rx="5" class="lat"/><text class="flg ftdy" x="483" y="190" text-anchor="middle">SCALE</text>
+    <text class="l1" x="516" y="190">B(N2) challenge replay</text><text class="l2" x="516" y="205">per-instance burn + uptime TTL</text>
+    <path class="lk" d="M645 214 L645 226"/>
+    <rect class="bx2" x="460" y="226" width="370" height="40" style="stroke:#f0b46a;"/>
+    <rect x="460" y="226" width="46" height="40" rx="5" class="lat"/><text class="flg ftdy" x="483" y="242" text-anchor="middle">LATENT</text>
+    <text class="l1" x="516" y="242">B5 OIDC id_token abuse</text><text class="l2" x="516" y="257">R4 (blocked by Google 503)</text>
+    <path class="lk" d="M645 266 L645 278"/>
+    <rect class="bx2" x="460" y="278" width="370" height="40" style="stroke:#f0b46a;"/>
+    <rect x="460" y="278" width="46" height="40" rx="5" class="lat"/><text class="flg ftdy" x="483" y="294" text-anchor="middle">SHARES</text>
+    <text class="l1" x="516" y="294">B6 Overlord via Shamir</text><text class="l2" x="516" y="309">R5 self-warrant → crew-exempt</text>
+    <path class="lk" d="M645 318 L645 330"/>
+    <rect class="bx2" x="460" y="330" width="370" height="40" style="stroke:#f0b46a;"/>
+    <rect x="460" y="330" width="46" height="40" rx="5" class="lat"/><text class="flg ftdy" x="483" y="346" text-anchor="middle">XSS</text>
+    <text class="l1" x="516" y="346">B9 ride non-extractable key</text><text class="l2" x="516" y="361">script on origin → mint in-page</text>
+  </g>
+  <text x="30" y="400" style="fill:#8a8a8a;font-size:10px;">Legend: <tspan fill="#ff5c5c" font-weight="700">TODAY</tspan> = works against current code, no dormant door · <tspan fill="#f0b46a" font-weight="700">amber</tspan> = needs a precondition (misconfig / scale-out / shares / wired-Google / injection).</text>
+</svg>
+</div>
+<h3>Top 10 attacks, ranked (likelihood &times; impact)</h3>
+<table>
+<tr><th>#</th><th>Attack</th><th>Weakness</th><th>Works today?</th></tr>
+<tr><td>1</td><td>Daily-key data-plane <b>WRITE</b> (prod Zendesk mutation)</td><td>R0</td><td class="today">YES</td></tr>
+<tr><td>2</td><td>Daily-key full corpus <b>READ</b> (search/replay/ledger)</td><td>R0</td><td class="today">YES</td></tr>
+<tr><td>3</td><td>Crew self-escalation via <code>POST /settings</code> (unaudited)</td><td>R3</td><td class="today">YES w/ 1 session</td></tr>
+<tr><td>4</td><td>CORS credentialed cross-origin from <code>attacker.pages.dev</code></td><td>N4</td><td class="today">YES while victim logged in</td></tr>
+<tr><td>5</td><td>Direct run.app hit, bypass Cloudflare edge</td><td>N1</td><td class="today">YES</td></tr>
+<tr><td>6</td><td>UI fail-open → corpus read w/ no valid credential</td><td>R1</td><td class="today">YES</td></tr>
+<tr><td>7</td><td>Stale crew cookie / no revocation (12h after removal)</td><td>Session</td><td class="today">YES</td></tr>
+<tr><td>8</td><td><code>BRIDGE_TOKEN</code> empty ⇒ open bridge</td><td>R2</td><td class="warn">YES if misconfigured</td></tr>
+<tr><td>9</td><td>Multi-instance challenge replay (&lt;60s across instances)</td><td>N2</td><td class="warn">YES under scale-out</td></tr>
+<tr><td>10</td><td>Overlord door via Shamir threshold (self-warrant attacker device)</td><td>R5</td><td class="warn">YES if creds set + shares obtained</td></tr>
+</table>
+<p><b>Latent:</b> OIDC <code>aud</code>/<code>email_verified</code>/nonce (R4) &mdash; blocked today only by the Google 503; opens the moment creds are wired without the fix.</p>
+<h3>Phased engagement (rules of engagement)</h3>
+<p><b>Sandbox only:</b> throwaway GCP project + throwaway Firestore <code>argus</code> DB + a non-prod meraki-bridge revision; env-scoped test creds; <b>zero prod writes</b> (the code already carries an <code>env=sandbox</code> Zendesk lane); a purpose-minted throwaway Shamir set (never a real share); disarm + rotate any test <code>AUTH_SESSION_KEY</code> after. <b>Vantage (Rule 14):</b> the home box can't reach GCE high ports and the nous wire is TLS-not-HTTP &mdash; run in-plane probes from an in-VPC peer.</p>
+<ol>
+<li><b>Recon</b> (home): diff shipped <code>index.html</code> for endpoints/bases/<code>zrawPass</code>; hit <code>/version</code>, <code>/auth/key/status</code>, <code>/ops/doors</code> (posture booleans).</li>
+<li><b>Data-plane</b> (→ sandbox Zendesk env for writes): exercise R0; confirm no per-request audit.</li>
+<li><b>Login-plane</b> (→ in-VPC for cookie behavior): R1 in a browser; R2 on an empty-token sandbox revision; stage R4 against a sandbox Google client only.</li>
+<li><b>Crypto/warrant</b> (isolated): warrant.wasm self-warrant path (L6.2); R5 crew-exemption on a sandbox bridge; two-instance replay (N2).</li>
+<li><b>Session</b> (in-VPC): delete the Firestore session doc → cookie still verifies; remove crew email → cookie still works; R3 write via a sandbox crew cookie.</li>
+<li><b>Persistence</b>: self-added crew domain + 12h no-revoke = foothold surviving password rotation.</li>
+<li><b>Exfil</b> (sandbox data): quantify blast radius via R0 + the R1-opened shell, then purge + rotate.</li>
+</ol>
+<h3>Blue-team &mdash; audit coverage vs blind spots</h3>
+<p><b>Logs today</b> (<code>CloudLog.Critical AUDIT …</code>): auth-login, key-login OK/DENIED, ops-doors read, name/vlan/poe/remediate/template writes. <b>Blind spots (ranked):</b> (1) <code>POST /settings</code> has <b>zero</b> audit &mdash; the exact R3 route; (2) no "gate disabled" alert on empty <code>BRIDGE_TOKEN</code>; (3) R1 fail-open is client-side only; (4) daily-key R0 usage invisible from Argus's side; (5) session-verify failures, <code>/auth/me</code>, OpsSession reads unlogged; (6) no source-IP/origin/UA on AUDIT lines &mdash; a forged-but-allowed email or CORS-ridden request reads as clean.</p></div>
+<h2>6. Recommended updates &mdash; prioritized fix roadmap</h2>
+<div class="lk-sec" data-cm="6-recommended-updates-prioritized-fix"><table>
+<tr><th>#</th><th>Fix</th><th>Kills</th><th>Effort</th></tr>
+<tr><td>1</td><td><b>Retire the daily key</b> → prime-signed Ed25519 wire auth (purcius-bridge-auth plan), <b>writes first</b>, telemetry-gated cutover</td><td>R0, #1/#2</td><td>M-L</td></tr>
+<tr><td>2</td><td><b>Audit + admin-gate <code>POST /settings</code></b> (require <code>key:</code> session for crew edits + AUDIT line) — cheapest highest-value</td><td>R3, blind spot #1</td><td>S</td></tr>
+<tr><td>3</td><td><b>Lock CORS</b> (drop <code>.pages.dev</code>, pin exact hosts) + CSRF token + <code>SameSite=Lax</code></td><td>N4</td><td>S</td></tr>
+<tr><td>4</td><td><b>Fail closed</b>: unset <code>BRIDGE_TOKEN</code>+key ⇒ 503; UI gate doesn't lift on bridge-unreachable</td><td>R1, R2</td><td>S</td></tr>
+<tr><td>5</td><td><b>Cloud Run ingress internal/edge-only</b> (or edge-injected shared secret)</td><td>N1</td><td>S-M</td></tr>
+<tr><td>6</td><td><b>Session</b>: add <code>exp</code> to the signed payload + revocation check (read sessions doc) + per-request crew re-read</td><td>Session, #7</td><td>M</td></tr>
+<tr><td>7</td><td><b>Wall-clock TTL + shared burn store</b> for the key-login challenge</td><td>N2, #9</td><td>M</td></tr>
+<tr><td>8</td><td><b>OIDC hardening</b> (<code>aud</code>+<code>iss</code>+<code>exp</code>+<code>email_verified</code>+nonce now; JWKS next) — <b>before</b> wiring GOOGLE_CLIENT_ID</td><td>R4</td><td>S-M</td></tr>
+<tr><td>9</td><td><b>Decide the Overlord door</b>: crew-gate it, or label it a super-door + audit + anchor-rotate policy</td><td>R5</td><td>S (decision)</td></tr>
+<tr><td>10</td><td><b>CI test gate</b> (run all suites on push) + wire <code>test_identity</code> into nous + forged-daily-key corpus + merged-manifest CAMERA-only assert + SRI + signed-commit gate</td><td>CI-GAP, whole P0-P5</td><td>M</td></tr>
+<tr><td>11</td><td><b>Extract identity → <code>argus-identity</code></b> (after logins green)</td><td>Design #1</td><td>L</td></tr>
+<tr><td>12</td><td><b>Cleanup</b>: remove orphaned SLACK creds from env, kill the Slack UI button, review <code>harness=1</code></td><td>hygiene</td><td>S</td></tr>
+</table></div>
+<h2>7. Suggested next moves</h2>
+<div class="lk-sec" data-cm="7-suggested-next-moves"><p>This audit is the <code>~i</code>. The natural follow-on is a <b><code>~d</code> + <code>~p</code>/<code>~e</code></b> to size a <b>"security hardening" board</b> from the roadmap above, sequenced: <b>rows 2-4 first</b> (small, kill the exploitable-today CORS/settings/fail-open trio), then <b>10</b> (the CI gate, so fixes stay fixed), then <b>1</b> (the data-plane, the biggest structural win), then <b>6-8</b>, then <b>11</b>. Each row becomes a <code>~b~t</code> loop with the missing tests written <i>with</i> the fix (P0 tests force several of the code changes). Note the operator gate still stands: <b>logins must work first</b> (Google OAuth client + a valid warrant) before the identity-extract (11) or the OIDC hardening (8) can be verified end-to-end.</p></div>
+<h2 class="ok">Definition of Done &mdash; this artifact</h2>
+<div class="lk-sec" data-cm="definition-of-done-this-artifact"><ul>
+<li>&#10003; Paired (Rule 1): driver Opus + <b>three</b> independent Fable5 navigator passes (audit / red-team / test-inventory), reconciled; no contradictions; driver-verified the standout CORS + replay + orphaned-creds findings against source</li>
+<li>&#10003; Every finding cited to file:line; R0-R5 re-verified against current code (lines shifted, cited fresh); 12 new findings (N1-N12)</li>
+<li>&#10003; Crypto core reviewed to primitive level &mdash; clean; remediation steered at the C# jacket / browser / deploy plane</li>
+<li>&#10003; Deliverables all present: audit + giant have/need test list + design challenges + red-team attack plan + prioritized updates</li>
+<li>&#10003; Rendered to <code>be/plans/</code>, house style, published datetime</li>
+<li>&#9723; Latchkey published; committed + pushed</li>
+<li>&#8213; Production verification: N/A &mdash; audit artifact; the hardening build it recommends carries the Rule-10 gate (external no-token→401 smoke, forged-key reject proven from a third-party vantage)</li>
+</ul>
+
+<div class="foot">
+Be &middot; ~i paired security audit &middot; argus + nous &middot; v0 &middot; r952 &middot; 2026-07-31 09:57 PDT<br>
+Driver: Opus 4.8 &middot; Navigators: Fable5 &times;3 (audit / red-team / test-inventory) &middot; One signal in, full chain reaction out.
+</div>
+
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"bf44d362-f36c-416a-aac6-1002aadc4879"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design &mdash; Purcius Auto-Sync IDS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111111; color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.65; }
+  nav { position: sticky; top: 0; background: #000; border-bottom: 2px solid #6FC3DF; padding: 12px 24px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+  nav .brand { color: #6FC3DF; font-weight: 700; font-size: 18px; }
+  nav .title { color: #999; font-size: 14px; }
+  nav .pub { margin-left: auto; color: #555; font-size: 12px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { color: #6FC3DF; font-size: 28px; margin-bottom: 8px; }
+  h2 { color: #6FC3DF; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { color: #6FC3DF; font-size: 16px; margin: 20px 0 8px; }
+  .section { background: #1A1A1A; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .laws { background: #10171a; border: 1px solid #23424b; }
+  .laws li { margin: 8px 0; } .laws strong { color: #6FC3DF; }
+  .optional h2 { border-bottom-style: dashed; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6FC3DF; border: 1px solid #333; border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+  ul, ol { margin: 8px 0 8px 22px; } li { margin: 6px 0; }
+  p { margin: 8px 0; }
+  code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #6FC3DF; }
+  pre { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #222; margin: 12px 0; }
+  pre code { background: none; padding: 0; color: #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #333; font-size: 14px; vertical-align: top; }
+  th { color: #6FC3DF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  blockquote { border-left: 3px solid #6FC3DF; padding: 4px 16px; margin: 12px 0; color: #bbb; font-style: italic; }
+  .pass { color: #22c55e; font-weight: 600; } .warn { color: #f59e0b; font-weight: 600; } .bad { color: #e06c6c; font-weight: 600; }
+  footer { text-align: center; color: #555; font-size: 12px; margin-top: 48px; padding: 24px; border-top: 1px solid #222; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Be</span>
+  <span class="title">~d &mdash; Purcius Auto-Sync IDS</span>
+  <span class="pub">Published 2026-07-19 12:24 PDT</span>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/d7e94987-e55f-4a0e-a018-ab5b389ac9ad/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+
+<h1>Design &mdash; Purcius Auto-Sync IDS</h1>
+<p style="color:#999;">The paradigm promises the mesh stays in real-time sync and IDS records replicate. It isn't built. This makes it real &mdash; and holds to five laws: <strong>forward-only, no racing, no waste, no dup, and it resumes itself through a power cut.</strong> The Register (DIA claim/dedup/count) is its first record type. <span class="warn">Opus authored; two Fable5 adversarial passes folded in. v3: HRW ownership + a signed roster-record fence (skew is alarmed, not silent), and a deterministic draft_id so effectively-once holds through a mid-send cut &mdash; the two claims the model stakes its name on, now bolted down.</span></p>
+
+<h2>The Five Laws</h2>
+<div class="lk-sec" data-cm="the-five-laws"><div class="section laws">
+  <ul>
+    <li><strong>1 &middot; Forward only.</strong> Append-only, monotonic. The record never rewinds, never rewrites. "Change" is a new record + a read-time projection (event-sourcing). Time only moves forward.</li>
+    <li><strong>2 &middot; No racing.</strong> Not "race then resolve" &mdash; <em>no race exists.</em> Each item has one owner by <strong>rendezvous hashing</strong> (<code>owner(item)=argmax&#8202;fnv1a(node&#8741;item)</code>); only its owner writes its claim. And it's <strong>fenced:</strong> the roster is a signed, epoch-stamped replicated record, every write carries <code>(epoch, claimer)</code>, and a peer that receives a claim from a non-owner-under-its-roster <strong>alarms the divergence</strong>. Ownership <em>plus the fence</em> is "no race exists"; ownership alone is only "no race is visible."</li>
+    <li><strong>3 &middot; No waste.</strong> An item is processed by its owner <em>once</em> &mdash; not by every node then de-duped. Work routes to the owner; the others never touch it.</li>
+    <li><strong>4 &middot; No dup, dedup-protected.</strong> The claim is a forward-only append keyed on (dia, item); the store's native exact-triple dedup makes re-apply a no-op; the irreversible act is guarded by a durable intent (Law 5).</li>
+    <li><strong>5 &middot; Resume through a power cut.</strong> Even when the board caps buy a few milliseconds, at some point power is gone mid-act. To the system, <strong>power loss is time pausing;</strong> on power return, time unpauses and it <strong>keeps going from exactly where it stopped</strong> &mdash; a write-ahead intent + a resume pass drive every incomplete act to completion, forward-only, no dup, no human. It always unfucks itself.</li>
+  </ul>
+</div></div>
+<h2>1. Need</h2>
+<div class="lk-sec" data-cm="1-need"><div class="section">
+  <p>Two truths collided. <code>paradigm.md §5</code>: <em>"the mesh remains in real-time sync across the globe… syncing effortlessly once a connection is restored."</em> <code>conventions.md:1511</code>: <em>"IDS records replicate too."</em> A deep inspect of every <code>nous</code> copy found <span class="bad">no implementation</span>: <code>store.h</code> has zero node/peer/sync awareness, <code>mesh.c</code> only routes blobs, <code>enact_server</code> runs cards but never applies a remote write, and the only <code>replicate</code> in the tree copies a file to a bucket. Primes hold islanded <code>/var/nous/*.ids</code>.</p>
+  <p>So every multi-node behavior that needs shared truth has no floor: the DIA claim/dedup, cross-operator <code>.pi</code> collaboration, distributed audit, Tier-0 metering. mendo's double-send didn't reveal a mendo bug &mdash; it revealed <strong>the paradigm's foundation is a promise, not a substrate.</strong> Close it once, at the bottom, to the five laws.</p>
+</div></div>
+<h2>2. Raw User Stories</h2>
+<div class="lk-sec" data-cm="2-raw-user-stories"><div class="section">
+  <ul>
+    <li>As a <strong>node</strong>, I want a committed replicated-class write to land on every reachable node, so all nodes hold one record.</li>
+    <li>As a <strong>node</strong>, I want to own an item's claims alone, so no other node races me for it.</li>
+    <li>As a <strong>node</strong>, I want a power cut mid-act to resume to completion on reboot, so nothing is lost and nothing is sent twice.</li>
+    <li>As a <strong>node</strong>, I want to cross-check a peer's record (seal + cap) before I trust it.</li>
+    <li>As an <strong>operator</strong>, I want the record identical on every node ("same same") and self-healing, with no manual re-arm.</li>
+  </ul>
+</div></div>
+<h2>3. Sourced Solution</h2>
+<div class="lk-sec" data-cm="3-sourced-solution"><div class="section">
+  <p>Most primitives exist; the honest inventory (verified against source) is what the five laws are built from.</p>
+  <table>
+    <tr><th>Source</th><th>What we use &mdash; verified</th><th>Reuse / build</th></tr>
+    <tr><td><code>a-d-d</code></td><td>Continuous-Sync doctrine (intent). <strong>Trust</strong> pattern (seal+cap = cross-node verify). Latchkey (cap IS the key).</td><td>reuse</td></tr>
+    <tr><td><code>nous</code> store</td><td><strong><code>ids_insert</code> dedups exact triples</strong> (store.c:594; indexes at <code>ids_open</code>) &mdash; idempotent apply (Law 4). Seal-gated writes.</td><td>reuse as-is</td></tr>
+    <tr><td><code>nous</code> journal</td><td>Proves the WAL <em>pattern</em>. But it's crash-recovery only: <span class="bad">truncates to zero on close/recover, <code>seq</code> resets, stores hashes not strings, and never fsyncs</span>. Not the replication log; not yet durable.</td><td>reuse pattern; build</td></tr>
+    <tr><td><code>nous</code> mesh/wire</td><td>Single-hop broadcast, cap-gated frames, seal+cap, and the <strong>single-threaded enact loop</strong> &mdash; the per-owner serializer that makes Law 2 free (one owner, one thread, no lock).</td><td>reuse as-is</td></tr>
+    <tr><td><code>nous</code> <code>fnv1a</code></td><td>Already in the dhash. Ownership is <strong>rendezvous/HRW</strong> hashing over it (<code>argmax fnv1a(node&#8741;item)</code>) &mdash; deterministic, and only a departed node's items remap (modulo <code>%N</code> would remap ~everything).</td><td>reuse fn; ~5 new lines (HRW)</td></tr>
+    <tr><td>Outside</td><td><strong>Grow-only CRDT</strong> (append-only converges, no consensus). <strong>Durable-execution / write-ahead-intent + idempotent resume</strong> (Temporal, Stripe idempotency keys, Kafka effectively-once) &mdash; the escape from two-generals for an irreversible act. <strong>Anti-entropy</strong> (Dynamo). Deterministic ownership <em>instead of</em> both Bitcoin's proof-of-work race and a leader election.</td><td>model</td></tr>
+  </table>
+  <p><strong>Approach.</strong> Replicate a grow-only <em>record class</em> to every node (converges via native dedup, no consensus). <em>Write</em> each item's claim from its one deterministic <strong>owner</strong> (Law 2 &mdash; no race, no waste). Guard the one irreversible act with a <strong>write-ahead intent</strong> in the durable sync-log, and a boot-time <strong>resume pass</strong> that reconciles any intent-without-completion against the sink (Law 5). No majority grants, no quorum, no leader &mdash; ownership + durability replace all three.</p>
+</div></div>
+<h2>Missing C Skills &mdash; stated plainly, we roll our own</h2>
+<div class="lk-sec" data-cm="missing-c-skills-stated-plainly"><div class="section">
+  <p>No working around. These are nous skills we <strong>do not have</strong>; the design builds them in the skill convention, pure C99.</p>
+  <table>
+    <tr><th>Missing skill</th><th>What it does</th><th>Why it's missing</th></tr>
+    <tr><td><code>memory/skill/synclog</code> &mdash; <strong>the sync-log</strong></td><td>Durable, per-origin, monotonic, append-only, string-carrying, <strong>fsync'd</strong> log. Holds both replicated records <em>and</em> write-ahead intents (Law 5). Never truncated (compaction is v2).</td><td>The WAL truncates, resets <code>seq</code>, stores hashes not strings, never fsyncs.</td></tr>
+    <tr><td><code>comms/skill/sync</code> &mdash; <strong>the replication skill</strong></td><td>Broadcast a committed record to neighbors; apply-on-receive (verify &rarr; <code>ids_insert(strings)</code>, idempotent); anti-entropy per-origin high-water on reconnect / beyond one hop.</td><td><code>mesh</code> only routes blobs; nothing ships a record node&rarr;node.</td></tr>
+    <tr><td><code>action/skill/resume</code> &mdash; <strong>the resume pass</strong></td><td>On boot, replay the sync-log: every intent with no completion &rarr; reconcile against the sink (query "did it land?" or idempotent re-do) &rarr; complete it. Forward-only, automatic. The "unfuck."</td><td>Doesn't exist. pi_run has no crash-resume; a killed run is simply lost today.</td></tr>
+    <tr><td><code>memory/skill/journal</code> &mdash; <strong>fsync gap</strong></td><td>Durability before broadcast/ack &mdash; the precondition for Law 5.</td><td>fsync macro defined (journal.c:19), <strong>never called</strong>. One-line-class fix.</td></tr>
+  </table>
+  <p><strong>Not needed</strong> (Law 2 removes it): a quorum/consensus skill. Deterministic ownership is a routing rule (<code>fnv1a % N</code>), not a distributed-agreement subsystem. Owner-routing is a few lines in the relay/sweep, not a skill.</p>
+</div></div>
+<h2>4. Naming</h2>
+<div class="lk-sec" data-cm="4-naming"><div class="section">
+  <table>
+    <tr><th>Thing</th><th>Literal name</th><th>Why</th></tr>
+    <tr><td>The synced store</td><td><code>auto-sync IDS</code></td><td>An IDS that replicates itself.</td></tr>
+    <tr><td>Durable log (records + intents)</td><td><strong>sync-log</strong></td><td>Per-origin, fsync'd, never truncated. Distinct from the crash-recovery WAL.</td></tr>
+    <tr><td>The one node that writes an item's claims</td><td><strong>owner</strong> (<code>fnv1a(item)%N</code>)</td><td>Deterministic; no race, no election.</td></tr>
+    <tr><td>"I'm about to do the irreversible act"</td><td><strong>intent</strong> (fsync'd before the act)</td><td>The write-ahead record the resume pass reconciles.</td></tr>
+    <tr><td>Reconnect / beyond-one-hop repair</td><td><strong>anti-entropy</strong></td><td>Term of art (Dynamo).</td></tr>
+    <tr><td>The order-sensitive record type</td><td>the <strong>Register</strong></td><td>Govts <em>register</em> acts (root <em>gerere</em>, "carry back into record"). First consumer.</td></tr>
+  </table>
+  <p><strong>Pattern name is yours.</strong> Mechanism: <strong>Concord</strong> (L. "with one heart" &mdash; agreement, kin to <em>record</em>), or literal <strong>auto-sync IDS</strong>. Collision: "register" = CPU register (you build silicon) &rarr; fallback <strong>Roll</strong>.</p>
+</div></div>
+<h2>5. Shape</h2>
+<div class="lk-sec" data-cm="5-shape"><div class="section">
+  <h3>The record-class split (Law 1)</h3>
+  <ul>
+    <li><strong>Replicated class</strong> &mdash; its only write API is append; no delete exposed. Append-only <em>by construction</em> &rarr; grow-only CRDT &rarr; converges with no consensus. Countable records (hit counts) carry a unique event-id subject (a grow-only set can't count identical triples).</li>
+    <li><strong>Local run ledger</strong> &mdash; <code>pl_set</code>/<code>trace_ev</code>, mutable, local, <strong>never replicated.</strong> pi_run unchanged.</li>
+    <li><strong>Intents and dones are replicated-class append events</strong> (not a mutable state machine): <code>intent</code> and <code>done</code> are two immutable records; "pending" is the read-time projection <code>intent &and; &not;done</code>. That is event-sourcing &mdash; squarely Law 1. Replicating them (not just local) gives a dead owner's successor full information to reconcile. Projection rules, all convergent + order-tolerant: pending = intent-without-done; <em>any</em> done = complete (first-done-wins if two dones carry different sink-refs &mdash; a legal outcome when resume produces a second); anti-entropy may deliver done-before-intent, and the projection tolerates it.</li>
+  </ul>
+  <h3>Plane 1 &mdash; convergence (Laws 1, 4)</h3>
+  <ul>
+    <li>Append to sync-log (fsync) &rarr; broadcast the sealed <strong>envelope</strong> (the three strings + origin + sync-seq). Durable before the wire.</li>
+    <li>Apply on receive: verify seal+cap &rarr; <code>ids_insert(strings)</code>. Idempotent; any order converges. Anti-entropy (per-origin high-water on the sync-log) repairs single-hop gaps + reconnects. Real-time is one-hop; beyond one hop is anti-entropy cadence &mdash; stated, not oversold.</li>
+  </ul>
+  <h3>Plane 2 &mdash; the claim: ownership + a fence, not a race (Laws 2, 3)</h3>
+  <ul>
+    <li><code>owner(item) = argmax over roster of fnv1a(node &#8741; item)</code> (rendezvous/HRW). <strong>Only the owner writes the claim.</strong> Work routes to the owner (relay/sweep dispatches by owner, or each node processes only what it owns) &mdash; once, no waste. The owner's single-threaded enact loop serializes its own claims for free (no lock).</li>
+    <li><strong>The fence (this is what makes it truly race-free, not just usually).</strong> The roster is a <strong>replicated, epoch-stamped, operator-signed record</strong> in the sync-log &mdash; so config skew is a sync gap anti-entropy heals, not two divergent files. Every envelope carries <code>(epoch, claimer-id)</code>; apply-on-receive checks <code>owner(item, my_roster@epoch) == claimer</code>. Mismatch &rarr; the append still lands (forward-only) but raises a <strong>divergence alert</strong> &mdash; v1's reject-if-not-mine reborn as <em>detect</em>-if-not-mine. A silent skew-race becomes an alarmed one; the claim never has to guess.</li>
+    <li><strong>Epoch change (prime joins/leaves):</strong> drain pending intents &rarr; bump the epoch (operator ceremony, signed) &rarr; HRW remaps only the departed node's items. Resume re-checks "do I still own this under the <em>current</em> epoch"; if not, it never blind-sends &mdash; it completes only via query-confirm (Plane 3).</li>
+    <li><strong>Owner down = the item holds</strong> until the operator removes the prime + bumps the epoch (runbook), at which point the new owner reconciles the dead owner's intents against the sink (Plane 3) &mdash; "holds until operator acts," never "unknowable forever." Consistency over availability, deliberately.</li>
+  </ul>
+  <h3>Plane 3 &mdash; the irreversible act survives a power cut (Law 5)</h3>
+  <ul>
+    <li><strong>Deterministic key first.</strong> <code>draft_id = f(dia, item, epoch)</code> &mdash; recomputable by <em>any</em> node on <em>any</em> reboot. There is never a "the key was minted at send time and lost in the cut" window; the intent carries it too: <code>(dia, intent, item, draft_id)</code>.</li>
+    <li><strong>Write-ahead intent.</strong> Append the intent to the sync-log and <strong>fsync</strong>. Only then send (using that draft_id). Then append <code>(dia, done, item, draft_id, sink-ref)</code> and fsync. The act waits on <em>local fsync only</em> &mdash; never on replication acks (that would rebuild a quorum through the back door).</li>
+    <li><strong>Power loss = time paused; resume = time unpaused.</strong> On boot the resume pass (running <em>before</em> the enact loop accepts new work, same single thread) scans for <code>intent</code> with no <code>done</code> and reconciles against the sink by the deterministic draft_id: after a <strong>settle-delay</strong> (&ge; the original request's timeout budget, so a request the dead process launched has resolved), ask the sink "did this land?" &rarr; if yes, write <code>done</code> (no re-send); if no, send, then <code>done</code>. Resume is itself crash-safe: same key, same query, so a cut mid-resume just repeats, converging.</li>
+    <li><strong>Honest ceiling &mdash; two-generals is relocated, not escaped.</strong> Exactly-once <em>delivery</em> in one round is impossible; exactly-once <em>effect</em> is achievable, and this is the standard durable-execution result &mdash; but it rests entirely on the sink's guarantee. The requirement is <strong>consistently queryable OR idempotent on our key</strong> (not merely "a query exists": Zendesk <em>Search</em> is eventually-consistent and would miss in the mid-send window &mdash; U5 must verify a <em>consistent</em> read path, e.g. a direct <code>external_id</code>/draft_id lookup, or an idempotency key the vendor enforces). A sink that is neither leaves a <strong>residual duplicate window</strong>; that lane is declared at-least-once-with-reconcile, not effectively-once. We prove the property per lane, we don't claim it generically.</li>
+  </ul>
+  <p><strong>Out of scope:</strong> a general/SQL DB; mutable/LWW replicated records; log compaction (v2); Byzantine tolerance beyond seal-verify; live roster reshuffling (pinned, epoch-bumped by operator).</p>
+</div></div>
+<h2>6. First Move</h2>
+<div class="lk-sec" data-cm="6-first-move"><div class="section">
+  <blockquote>Two primes, one fact. Build the minimal <strong>sync-log</strong> (append + fsync, per-origin seq, string-carrying) <em>and its boot replay pass</em> (sync-log &rarr; <code>ids_insert</code>); hook a replicated-class commit to append + broadcast the envelope; apply-on-receive (verify &rarr; <code>ids_insert(strings)</code>). Prove: a replicated write on HK is queryable on Vegas within a round-trip &mdash; and after restart the boot replay restores it, not loses it.</blockquote>
+  <p>Into the plan: (2) anti-entropy from the sync-log; (3) HRW ownership + the roster-record fence so each item has one <em>verified</em> writer; (4) write-ahead-intent (deterministic draft_id) + resume pass, resume running <em>before</em> the enact loop on the same thread. <strong>Proof of Law 5 is a real power cut, not <code>kill -9</code></strong> (kill -9 leaves the kernel to flush the page cache, so it passes even with fsync unwired) &mdash; the ~t plan cuts a VM (or uses <code>dm-flakey</code>) between <code>intent</code> and <code>done</code> and watches reboot finish the act exactly once. (5) port the Register on + delete the vendor already-handled search.</p>
+</div>
+
+<div class="optional"></div>
+<h2>Choices + Consequences <span class="tag">earned</span></h2>
+<div class="lk-sec" data-cm="choices-consequences-earned"><div class="section">
+  <table>
+    <tr><th>Fork</th><th>Options</th><th>Pick + reason</th></tr>
+    <tr><td>The replication log</td><td>(a) reuse the WAL &mdash; truncates + resets &rarr; silent divergence<br>(b) a new durable sync-log</td><td><strong>(b).</strong> A replication + intent log must never truncate.</td></tr>
+    <tr><td>Claim safety (Law 2)</td><td>(a) majority-of-roster grants &mdash; a race, then a quorum resolves it (a consensus subsystem)<br>(b) HRW owner <strong>+ signed roster-record fence</strong> &mdash; no race exists, and skew is <em>alarmed</em> not silent</td><td><strong>(b).</strong> Remove the race, not resolve it &mdash; but only with the fence (bare ownership hides skew, it doesn't prevent it). One owner, one thread, no quorum, no leader, no waste.</td></tr>
+    <tr><td>Irreversible act across a cut (Law 5)</td><td>(a) at-most-once + operator re-arms orphans<br>(b) write-ahead intent + resume-reconcile = effectively-once, automatic</td><td><strong>(b).</strong> The machine unfucks itself; a human never re-arms a send. Requires a queryable/idempotent sink &mdash; ours is.</td></tr>
+  </table>
+</div>
+</div>
+
+<div class="optional"></div>
+<h2>Escape Routes <span class="tag">earned</span></h2>
+<div class="lk-sec" data-cm="escape-routes-earned"><div class="section">
+  <table>
+    <tr><th>Load-bearing choice</th><th>Reversal</th></tr>
+    <tr><td>New sync-log (records + intents)</td><td>State-based snapshots can be added later; both paths end at <code>ids_insert</code>. Low cost.</td></tr>
+    <tr><td><span class="warn">&#9888;</span> Replicated class is append-only (no delete API)</td><td>The one hard-to-reverse law &mdash; enforceable <em>because</em> scoped to a new class (the store keeps mutating for local run state). "Change" = new record + read-time projection. Decide before data exists.</td></tr>
+    <tr><td>Deterministic ownership</td><td>If a hot item overloads its owner, ownership is a pure function &mdash; swap the hash or add a qualifier without touching the store. Majority-grants remains a documented fallback if ownership ever can't hold.</td></tr>
+    <tr><td>Effectively-once needs a queryable/idempotent sink</td><td>Per-lane: a sink that is neither degrades to at-most-once, declared on that lane. Reversible by adding an idempotency key at the jacket.</td></tr>
+  </table>
+</div>
+</div>
+
+<div class="optional"></div>
+<h2>Pure Metal Test <span class="tag">earned</span></h2>
+<div class="lk-sec" data-cm="pure-metal-test-earned"><div class="section">
+  <table>
+    <tr><th>Dependency</th><th>Role</th><th>Load-bearing?</th></tr>
+    <tr><td>IDS store (dedup, indexes)</td><td>Local truth + idempotent apply</td><td>Yes &mdash; ours, C99, verified.</td></tr>
+    <tr><td>mesh + wire + cap + seal + single-threaded enact + fnv1a</td><td>Broadcast, transport, verify, serialize, ownership</td><td>Yes &mdash; ours, C99.</td></tr>
+    <tr><td>New build</td><td>synclog (durable/fsync/strings/intents), sync (broadcast/apply/anti-entropy), resume pass, journal fsync</td><td>The real bill &mdash; a subsystem; no framework, no external consensus lib (deterministic ownership means none is needed).</td></tr>
+  </table>
+  <p><strong>Verdict:</strong> <span class="pass">&#10003; Passes.</span> Pure C99, ours end to end. Ownership + durable-intent replaced the two heaviest pieces (consensus + the two-generals compromise) with a hash and a fsync.</p>
+</div>
+</div></div>
+<h2>Named Unknowns</h2>
+<div class="lk-sec" data-cm="named-unknowns"><div class="section">
+  <ul>
+    <li><span class="pass">U1 resolved</span> &mdash; nothing fsyncs today; fsync is in the synclog build, not an unknown.</li>
+    <li><span class="pass">U2 mostly resolved</span> &mdash; roster is a signed replicated record; epoch change is drain-then-bump (operator ceremony); HRW limits remap to the departed node's items; detect-if-not-mine alarms skew. Remaining: the drain-then-bump runbook detail + how long "owner down = holds" is allowed before the ceremony fires.</li>
+    <li><span class="warn">U3</span> &mdash; which key seals a record for cross-node authorship trust.</li>
+    <li><span class="warn">U4</span> &mdash; log growth/compaction of a never-truncated grow-only sync-log (v2, before real volume).</li>
+    <li><span class="warn">U5</span> &mdash; verify the <em>consistency</em> of the sink's read path per lane, not just its existence: Zendesk <em>Search</em> is eventually-consistent (would miss in the mid-send window); a direct <code>external_id</code>/draft_id lookup is the consistent path to confirm. A sink with neither a consistent read nor a server-enforced idempotency key leaves a residual window &mdash; that lane is declared at-least-once-with-reconcile.</li>
+    <li><span class="warn">U6</span> &mdash; dedup identity is fnv1a-64: accidental collision merges distinct facts. Note + accept v1.</li>
+  </ul>
+</div></div>
+<h2>What It Obsoletes</h2>
+<div class="lk-sec" data-cm="what-it-obsoletes"><div class="section">
+  <ul>
+    <li>The vendor "already-handled" search, the C# <code>SentDrafts</code> dict, the Zendesk-tag idea &mdash; all routed <em>around</em> a synced store that will now exist.</li>
+    <li>Majority grants / any quorum consensus &mdash; deterministic ownership means there's no race to vote on.</li>
+    <li>"At-most-once + a human re-arms it" &mdash; replaced by automatic resume-to-completion.</li>
+    <li>It <strong>delivers</strong> the paradigm's Continuous-Sync clause and Offline-Autonomy clause at once: forward-only, self-healing through a power cut, at Tier-0.</li>
+  </ul>
+</div></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><div class="section">
+  <ul>
+    <li><span class="pass">&#10003;</span> Design committed (HTML) &middot; hash in telemetry &middot; index updated &middot; pushed</li>
+    <li><span class="pass">&#10003;</span> Six spine sections + all three tools + the Five Laws</li>
+    <li><span class="pass">&#10003;</span> Sourced against verified code; Fable adversarial pass folded in; v2 tightened to forward-only / no-race / no-waste / no-dup / resume-through-power-loss</li>
+    <li><span class="pass">&#10003;</span> The two-generals ceiling met with effectively-once (durable intent + queryable sink + resume), the sink dependency named</li>
+    <li><span class="pass">&#10003;</span> Missing C skills stated plainly (synclog, sync, resume + journal fsync); quorum explicitly not needed</li>
+  </ul>
+</div>
+
+</div></div>
+<footer>v0 &middot; r735 &middot; 2026-07-19 &middot; Be &middot; Purcius &mdash; Auto-Sync IDS (forward-only, self-healing, one record)</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"d7e94987-e55f-4a0e-a018-ab5b389ac9ad"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

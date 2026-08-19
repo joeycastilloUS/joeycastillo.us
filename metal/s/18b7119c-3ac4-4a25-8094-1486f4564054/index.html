@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design · clarify — the intent-driven control stick (a skill)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#111;color:#e0e0e0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;line-height:1.6}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:11px 20px;display:flex;align-items:center;gap:12px;z-index:10}
+  nav .b{color:#6FC3DF;font-weight:700;font-size:17px}
+  nav .pub{margin-left:auto;color:#888;font-size:11px}
+  main{max-width:820px;margin:0 auto;padding:28px 20px 80px}
+  h1{color:#fff;font-size:24px;line-height:1.25;margin-bottom:4px}
+  .sub{color:#9fe0f2;font-size:14px;margin-bottom:6px}
+  .kv{color:#888;font-size:12px}
+  h2{color:#6FC3DF;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:32px 0 12px;border-bottom:1px solid #222;padding-bottom:6px}
+  h3{color:#fff;font-size:16px;margin:18px 0 6px}
+  p{margin:10px 0;color:#cfcfcf}
+  ul,ol{margin:10px 0 10px 22px}li{margin:6px 0;color:#cfcfcf}
+  code{background:#0a0a0a;border:1px solid #2a2a2a;border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2}
+  pre{background:#0a0a0a;border:1px solid #2a2a2a;border-left:3px solid #6FC3DF;border-radius:6px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#cfe6df;white-space:pre;margin:12px 0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #222;vertical-align:top}
+  th{color:#6FC3DF;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em}
+  td code{white-space:nowrap}
+  .inv{background:#0d160f;border:1px solid #2a5a38;border-radius:8px;padding:13px 16px;margin:12px 0}
+  .inv b{color:#7CFFB2}
+  .stick{background:#101a22;border:1px solid #245;border-radius:8px;padding:13px 16px;margin:12px 0;color:#cfe6df}
+  .stick b{color:#9fe0f2}
+  .foot{color:#666;font-size:12px;text-align:center;border-top:1px solid #222;margin-top:40px;padding-top:16px;font-family:Consolas,monospace}
+  .good{color:#7CFFB2}.warn{color:#f0c674}
+</style>
+</head>
+<body>
+<nav><span class="b">Be</span><span class="kv">design · skill</span><span class="pub">Published 2026-07-20 · PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/18b7119c-3ac4-4a25-8094-1486f4564054/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1><code>clarify</code> — the intent-driven control stick</h1>
+<div class="sub">A reusable skill: turn a person's free text into bounded, intent-sourced choices. Ask, don't guess.</div>
+<div class="kv">~d · paired: Opus + Fable · the answer to "how do I hand my manager a control stick with scoped capabilities"</div>
+
+<div class="stick">
+  <b>The idea in one line.</b> The <b>control stick is the intent</b> — the tunable surface of a <code>.pi</code>, filtered to an allowlist. <code>clarify</code> is how a person <b>moves that stick</b>: every question and every option it offers is derived from the intent, so the stick physically cannot push anywhere you haven't allowed. The manager feels like they're chatting freely; they're moving a stick whose range of motion <i>is</i> your intent. Hand it a different <code>.pi</code> + allowlist and the controls re-shape themselves — one skill, every operator's stick.
+</div>
+
+<h2>What it is</h2>
+<p>The <b>ask-don't-guess front door</b>. Given the allowlist manifest + the person's message, <code>clarify</code> emits <b>exactly one of</b>: a bounded <b>proposal</b> (a specific, in-bounds change) or a bounded <b>question</b> (whose options come entirely from the manifest). It <b>never guesses a material change</b>, and <b>never offers an out-of-scope option</b>. It is <b>read-only</b> — it proposes and asks; deterministic code still does the acting (the interpret/act split holds).</p>
+
+<h2>The rule — ask vs propose</h2>
+<p><b>Propose iff exactly one op matches, complete and in-bounds. Otherwise ask ONE question that closes the single blocking gap.</b> The proposal <i>is</i> the confirmation (the approve gate lives downstream), so <code>clarify</code> never nags "are you sure?" when only one in-bounds reading exists. Questions exist only when the manifest can't deterministically finish the <code>{op, value}</code>.</p>
+<table>
+  <tr><th>State</th><th>Emit</th></tr>
+  <tr><td>0 candidate ops</td><td><b>question · out-of-scope</b>: "I can't change that here." + the menu of allowed ops (the whole vocabulary)</td></tr>
+  <tr><td>&gt;1 candidate ops</td><td><b>question · disambiguate</b>: options = the candidate ops (each carrying its payload) + "none of these"</td></tr>
+  <tr><td>1 op, missing param</td><td><b>question · missing-param</b>: options per field type (below)</td></tr>
+  <tr><td>1 op, out of bounds</td><td><b>question · out-of-bounds</b>: quote the bound, offer the nearest bound + free entry in range. <span class="warn">Never silently clamp</span> (a clamped proposal biases approval)</td></tr>
+  <tr><td>1 op, complete, in-bounds</td><td class="good"><b>proposal</b>. Never ask — the proposal is the confirmation</td></tr>
+</table>
+<p>One question per turn, aimed at the single blocking gap.</p>
+
+<h2>Options carry payloads</h2>
+<p>Every option embeds its finished <code>{op, value}</code>. Picking an option is a <b>deterministic close</b> — no second model call, nothing to re-interpret, nothing to drift. Only free-entry answers (a typed number, an email, wording) loop back, and those hit the <b>deterministic validator</b>, not the model. Biggest correctness <i>and</i> cost win.</p>
+
+<h2>Per-type option rules</h2>
+<ul>
+  <li><b>enum</b> → options = the manifest <code>values</code> verbatim (labels humanized; payload byte-exact). Never add, never omit.</li>
+  <li><b>number</b> → 3 presets from the bounds (min · current/mid · max) + free entry with the range in the prompt ("or any amount 5–25"). Out-of-bounds input → the nearest bound offered explicitly.</li>
+  <li><b>email-list</b> → free entry, format-validated, <code>max_items</code> enforced; the question shows the current list + slots left ("2 of 5 used").</li>
+  <li><b>text</b> (wording) → not enumerable: ask for the wording, show <code>maxlen</code> + a char count, then the <b>proposal echoes the exact text</b> for approval. Opaque value, never interpreted.</li>
+</ul>
+
+<h2>Why it's <code>.pi</code>-driven — and safe</h2>
+<ul>
+  <li><b>Manifest at runtime.</b> The allowlist is an <b>input</b>, not baked in. Add <code>set-coupon-expiry</code> to the manifest and <code>clarify</code> asks about expiry on the next turn — <b>zero code change</b>. Point it at any DIA's manifest and the dialogue adapts. This is what makes it a genuine, reusable skill.</li>
+  <li><b>Least-privilege input.</b> <code>clarify</code> receives the manifest + <b>only the current values of manifest-listed fields</b> — <b>never the full <code>.pi</code></b>. It cannot offer what it cannot see.</li>
+  <li><b>Free text is a value, never a command.</b> Wording rides as an opaque, length-capped string — never parsed, never merged into the prompt as instruction, never allowed to name an op. That's the anti-smuggling seam.</li>
+  <li><b>Enforced twice.</b> The skill derives options from the manifest; the deterministic validator proves them again before apply. A jailbroken skill degrades UX, never safety.</li>
+</ul>
+<div class="inv"><b>The one invariant.</b> Everything <code>clarify</code> shows or proposes is constructible from the manifest — op in the allowlist, value inside that op's declared type and bounds; free text rides as an opaque, length-capped value that is never interpreted. Not in the manifest → cannot be offered, mentioned, or proposed.</div>
+
+<h2>Allow / Ignore — in the grammar</h2>
+<p>Both live in the <b><code>.pi</code> grammar</b> — statements indented under their demand line, parsed into the clause. Not a runtime store, not a second surface: <b>declared intent</b> — versioned, sealed, biRT-verified. And they are two <i>different</i> things:</p>
+<pre>D2: watch Zendesk for new NPS-detractor alerts.
+    ignore: email-from = qa-test@mendocinofarms.com   until=2026-08-15
+    ignore: store = 05                                until=2026-08-01
+
+D9: offer a &quot;We're Sorry&quot; recovery coupon.
+    allow:  amount = 10, 20, 30, 50 $</pre>
+<ul>
+  <li><b><code>allow:</code> — the permitted value set</b> a demand may use. <b>Permanent intent, no expiry.</b> Fail-closed: a value outside the set is drift &rarr; refuse and log, never silently clamp.</li>
+  <li><b><code>ignore:</code> — a skip condition at intake</b> (email-from, store, ticket). <b>Mandatory <code>until=</code></b> — applier defaults +30 days, caps at 90. Expired entries are inert; the engine reads them as absent. Ignores die on their own.</li>
+</ul>
+<div class="stick"><b>This closes the loop.</b> The <code>allow:</code> statement is <i>where <code>clarify</code>'s bounded options come from</i>. The intent declares its own permitted values; the skill reads them and offers exactly those. The <code>.pi</code> doesn't just drive what the DIA does — <b>it drives what the manager can be asked.</b></div>
+
+<h3>Where the check sits — and why illness can't be ignored</h3>
+<p>The ignore check runs in the <b>intake gate</b> (beside the handled-tag dedup), <b>before any model cost</b>. A match writes <code>ignored.by=D2.ignore.email-from</code> to the ledger and the run exits. There is <b>no ignore hook downstream of the illness check</b> — so an intake ignore filters non-guests (spam, a QA test sender); it can never suppress a detected illness. The escalate unit's existing fail-closed read (empty verdict = escalate) is untouched.</p>
+<div class="inv"><b>The safety floor — enforced three times, zero prompts.</b><br>
+<b>1 · Manifest:</b> the illness/escalate demands expose <b>no ignore keys</b> — <code>clarify</code> can't propose what isn't listed, and the applier rejects unknown <code>(demand, key)</code> pairs.<br>
+<b>2 · biRT:</b> <code>dia_verify</code> gains check&nbsp;6 — every allow/ignore statement's <code>(D#, key)</code> must exist in the manifest. A hand-edited <code>.pi</code> with <code>ignore:</code> on the escalate demand <b>refuses to run</b> — same fail-closed class as the word-seal.<br>
+<b>3 · Engine ordering:</b> ignores are only evaluated by intake-gate units. There is no hook downstream to attach one to.</div>
+
+<h3>Four ops, same shape</h3>
+<ul>
+  <li><code>ignore-add {demand, key, value, until}</code></li>
+  <li><code>ignore-remove {demand, key, value}</code></li>
+  <li><code>allow-set {demand, key, values}</code></li>
+  <li><code>list-overrides {}</code> — read-only: current statements with expiry dates and hit counts.</li>
+</ul>
+<p>All ride the same propose&rarr;approve&rarr;apply chain. The manifest enumerates exactly which <code>(demand, key)</code> pairs exist, with type, bounds, and a max-entries cap.</p>
+
+<h3>The worst failure, and the guard</h3>
+<p>An over-broad ignore silently swallowing real detractors past its reason's lifetime — a substring matching every gmail sender, or store 05's &quot;renovation&quot; ignore living forever. Two-part guard, both applier mechanism: <b>exact-match typed values only</b> (manifest types: email, store-enum, ticket-id — <b>no wildcards, no substrings</b>, entry-count cap per key) plus <b>mandatory expiry</b>. Visibility completes it: every ignored run writes to the ledger, and <code>list-overrides</code> shows expiry dates and hit counts.</p>
+<p class="kv">Note: per-ticket ignore is largely redundant — the handled-tag dedup already lets a manager kill one ticket by tagging it in Zendesk. The value/pattern statements (email-from, store, amount) are the real feature. Audit needs nothing new: who/what/when/why is the approved proposal in the applier's git commit; runtime hits are ledger + telemetry.</p>
+
+<h2>Where it lives + the contract</h2>
+<p><code>src/sdk/nous/comms/skill/clarify/</code> — <code>skill.json</code> (contract) + <code>clarify.md</code> (the read-only <code>claude -p</code> prompt with few-shot examples for all five decision states). It is the front half of the interpret step; the C99 applier/validator is untouched.</p>
+<pre>IN  { "manifest": "&lt;ops-manifest.json&gt;",
+      "current":  { "coupon_amount": 10, "coupon_audience": "detractors", ... },   // manifest fields ONLY
+      "message":  "&lt;person's free text&gt;",
+      "history":  [ ...recent turns... ] }
+
+OUT (exactly one)
+  { "kind":"proposal", "op":"set-coupon-amount", "value":25,
+    "echo":"Set coupon amount to $25 (current: $10)." }
+
+  { "kind":"question", "reason":"disambiguate|missing-param|out-of-bounds|out-of-scope",
+    "text":"Coupon max is $25. Which amount?",
+    "options":[ { "label":"$25 (max)", "op":"set-coupon-amount", "value":25 }, ... ],
+    "free_entry":{ "type":"number", "min":5, "max":25 } }</pre>
+
+<h2>Demo-minimum — four turns</h2>
+<ol>
+  <li>"bump the coupon to 20" → straight <b>proposal</b>, no nag. <span class="kv">(the premise-setter — it understands)</span></li>
+  <li>"make it more generous" → one <b>question</b>: $15 / $20 / $25 (max) / other 5–25 → pick → proposal.</li>
+  <li>"give them $50" → "Max is $25 — use $25, or another (5–25)?" <span class="kv">(the safety beat)</span></li>
+  <li>"turn off the survey" → "That's not tunable here. I can adjust: coupon amount, audience, empathy wording, escalation recipients." <span class="kv">(the allowlist beat)</span></li>
+  <li>"ignore store 5 until Friday" → proposal adds the <code>ignore:</code> line under the recovery demand. Then "ignore the illness alerts" → <b>refused</b> — guarded demand, can't be overridden. <span class="kv">(the safety-floor money shot)</span></li>
+</ol>
+<p><b>Most likely to look dumb on stage:</b> asking on turn 1. A fully-specified command that draws a question kills "it understands" in ten seconds. Mitigation is in the rule (propose-iff-complete; the proposal is the confirmation) and in <code>clarify.md</code>'s few-shot — the fully-specified case gets the most examples.</p>
+
+<h2>Definition of done</h2>
+<ul>
+  <li class="good">✓ One skill, manifest-driven; adding an op needs zero code change</li>
+  <li class="good">✓ Read-only — asks/proposes, never edits or deploys</li>
+  <li class="good">✓ Ask-vs-propose rule prevents both guessing and over-asking; options carry payloads</li>
+  <li class="good">✓ The invariant holds: nothing offered outside the allowlist; free text never interpreted; enforced twice</li>
+  <li class="warn">◻ Not built — this is the ~d. First build: <code>clarify.md</code> few-shot for the 5 states + the manifest reader, against <code>mendo-triage-ops.json</code></li>
+</ul>
+
+<div class="foot">v0 · 2026-07-20 · clarify skill · Opus 4.8 design + Fable 5</div>
+</main>
+</body>
+</html>

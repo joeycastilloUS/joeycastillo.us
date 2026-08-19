@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex, nofollow">
+<title>~i — Meraki in Argus · argus</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#111; color:#E0E0E0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.6; }
+nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF; padding:12px 24px; display:flex; justify-content:space-between; align-items:baseline; }
+.brand { color:#6FC3DF; font-weight:700; font-size:20px; letter-spacing:3px; } .brand-sub { color:#666; font-size:12px; letter-spacing:1px; margin-left:12px; }
+.pub { color:#666; font-size:12px; }
+.container { max-width:900px; margin:0 auto; padding:32px 24px; }
+h1 { color:#6FC3DF; font-size:25px; margin-bottom:8px; } h2 { color:#6FC3DF; font-size:18px; margin:30px 0 12px; text-transform:uppercase; letter-spacing:1px; }
+h3 { color:#9fdcef; font-size:15px; margin:16px 0 6px; }
+.status { display:inline-block; background:#06251a; color:#7CFFB2; border:1px solid #7CFFB2; border-radius:6px; padding:2px 12px; font-size:13px; font-weight:700; }
+section { background:#1A1A1A; border-radius:8px; padding:16px 20px; margin-bottom:16px; }
+code { background:#0d0d0d; border:1px solid #262626; border-radius:4px; padding:1px 6px; font-family:Consolas,monospace; font-size:12.5px; color:#6FC3DF; }
+table { width:100%; border-collapse:collapse; margin:8px 0; font-size:12.5px; }
+th,td { text-align:left; padding:5px 8px; border-bottom:1px solid #262626; vertical-align:top; } th { color:#6FC3DF; font-size:11px; text-transform:uppercase; }
+.no { color:#ff8b8b; font-weight:700; } .yes { color:#7CFFB2; font-weight:700; } .warn { color:#ffce85; font-weight:700; }
+.mono { font-family:Consolas,monospace; font-size:12px; color:#cfe9f2; white-space:pre; overflow-x:auto; display:block; background:#0d0d0d; border:1px solid #242424; border-radius:6px; padding:10px 12px; }
+.tag { display:inline-block; font-size:10.5px; font-weight:700; border-radius:4px; padding:1px 6px; letter-spacing:.5px; }
+.tag.r { background:#0b2a33; color:#6FC3DF; border:1px solid #245; } .tag.w { background:#33210b; color:#ffce85; border:1px solid #543; }
+footer { color:#666; font-size:12px; padding:24px; text-align:center; border-top:1px solid #222; margin-top:48px; }
+.dod { font-size:12.5px; } .dod div { padding:2px 0; }
+ul { margin:6px 0 6px 22px; } li { margin:3px 0; }
+</style>
+</head>
+<body>
+<nav><span><span class="brand">Be</span><span class="brand-sub">argus</span></span><span class="pub">Published 2026-08-04 21:13 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/58e7625d-e0d7-40f4-b6a6-36105ae15722/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="container">
+<h1>~i — Meraki in Argus: the original source, mapped</h1>
+<p><span class="status">INSPECTED</span> &nbsp; <span style="color:#999;">Read-only pass over the Cisco Meraki integration inside <code>C:\argus</code>. Paired (Rule 1): Opus driver + Fable navigator, independent passes reconciled. Meraki is <b>source #1</b> — the core Argus was born as, now one of several sources behind the same gated bridge + shell.</span></p>
+
+<h2>What it is</h2>
+<section data-cm="what-it-is">
+<p>Argus is a <b>read-only, multi-source operations console</b>. The Meraki integration is a security-gated C# .NET&nbsp;8 Cloud Run service (<code>meraki-bridge</code>) that wraps the <b>Meraki Dashboard API v1</b> over raw HTTPS — no SDK — and serves a vanilla-JS console. It does two jobs: (1) a broad <b>read surface</b> over networks, switch ports, Wi-Fi, clients, and the config-change/API-request audit logs; (2) a <b>read-only Firewall Security Audit</b> engine (30+ checks, scored A–F) plus a small set of <b>allowlist-gated config-write</b> actions (VLAN, PoE, port/device naming, template bind/unbind) that can only touch lab/test-named or operator-allowlisted networks. The org-wide API key lives only server-side; the browser never holds it. Meraki also served as the template for the whole multi-source architecture — one Cloud Run service per vendor, each holding exactly one secret.</p>
+</section>
+
+<h2>Structure</h2>
+<section data-cm="structure">
+<span class="mono">C:\argus
+  bridge/                  C# .NET 8 jacket over the Meraki Dashboard API (foreign-API only; language law)
+    Meraki.cs              MerakiClient — thin read-only HTTPS client + the 3 narrow write verbs (POST/PUT)
+    MerakiSource.cs        Meraki as ISource plugin #1 (the API-Browser /catalog + /read seam)
+    Program.cs             113 KB — all /meraki/* routes, the audit engine, auth, settings, write gates
+    Gate.cs                write-gate primitives (allowlist, lab-keyword match, VLAN/serial validators)
+    Auth.cs / KeyAuth.cs   OIDC (Google/Slack) sessions + Purcius Overlord key-login (PI1)
+    ISource.cs             the frontend source seam (CatalogEntry / ReadAsync)
+  web/
+    index.html             public landing (tools list)
+    app/index.html         the gated console (vanilla JS; BRIDGE const -> argus.net.ai edge)
+    app/checks-content.json human-readable guidance per audit check (FW-01, EXP-02, ...)</span>
+<p style="color:#999;font-size:13px;margin-top:8px"><b>Language boundary is clean:</b> C# exists only as the foreign-API jacket (Meraki REST). Everything Argus owns downstream is C99/nous/vanilla, per canon.</p>
+</section>
+
+<h2>The /meraki/* route surface (20 routes)</h2>
+<section data-cm="the-meraki-route-surface-20">
+<h3>Read-only <span class="tag r">READ</span></h3>
+<table>
+<tr><th>Route</th><th>What it answers</th></tr>
+<tr><td><code>GET /meraki/networks</code></td><td>list org networks (id + name + template binding)</td></tr>
+<tr><td><code>GET /meraki/templates</code></td><td>list org config templates</td></tr>
+<tr><td><code>GET /meraki/map</code></td><td>devices + client IPs for a network</td></tr>
+<tr><td><code>GET /meraki/portmap</code></td><td>full port→client map: config name, live status, VLAN, client, PoE draw</td></tr>
+<tr><td><code>GET /meraki/verify</code></td><td>current switchport VLANs + device names ("check my work")</td></tr>
+<tr><td><code>GET /meraki/wireless</code></td><td>all Wi-Fi for one network, grouped by SSID, wired clients excluded</td></tr>
+<tr><td><code>GET /meraki/ssid</code></td><td>Wi-Fi clients on a given SSID, org-wide or network-scoped</td></tr>
+<tr><td><code>GET /meraki/events</code></td><td>wireless connectivity events for a client (flap history)</td></tr>
+<tr><td><code>GET /meraki/changes</code></td><td>org configurationChanges log — who changed what, when</td></tr>
+<tr><td><code>GET /meraki/apirequests</code></td><td>org apiRequests log — the API-vs-UI oracle (31-day Meraki cap)</td></tr>
+<tr><td><code>GET /meraki/audit</code></td><td>Firewall Security Audit — scored findings (org / template / network scope)</td></tr>
+<tr><td><code>GET /meraki/audit/checks</code></td><td>audit methodology as data: check registry + weights + grade rubric</td></tr>
+</table>
+<h3>Config-write <span class="tag w">GATED WRITE</span> — all pass <code>RequireWritable(network, featureKey)</code></h3>
+<table>
+<tr><th>Route</th><th>Write</th><th>Gate key</th></tr>
+<tr><td><code>POST /meraki/name</code></td><td>set a client's name</td><td><code>one-click-naming</code></td></tr>
+<tr><td><code>POST /meraki/device-name</code></td><td>set a device's name (resolves net server-side, no org-wide rename)</td><td><code>one-click-naming</code></td></tr>
+<tr><td><code>POST /meraki/remediate/plan</code></td><td>read-only step generator (SW-NV1 / SW-UNUSED / SW-TRUNK)</td><td>remediable</td></tr>
+<tr><td><code>POST /meraki/remediate/apply</code></td><td>execute one approved step, capture-before</td><td>remediable</td></tr>
+<tr><td><code>POST /meraki/remediate/rollback</code></td><td>restore the exact captured prior value (non-weakening)</td><td>remediable</td></tr>
+<tr><td><code>POST /meraki/port-vlan</code></td><td>set one port's native VLAN xor allowed-VLANs</td><td><code>set-vlan</code></td></tr>
+<tr><td><code>POST /meraki/port-poe</code></td><td>enable/disable PoE on one port</td><td><code>set-poe</code></td></tr>
+<tr><td><code>POST /meraki/template</code></td><td>bind/unbind a network to a config template (atomic rebind)</td><td><code>set-template</code></td></tr>
+</table>
+<p style="color:#999;font-size:13px"><code>/settings</code> (GET/POST) and <code>/healthz</code>, <code>/version</code>, <code>/auth/*</code> round out the service. <code>/settings</code> writes the tool's own config (allowlists, keywords, crew), never Meraki config.</p>
+</section>
+
+<h2>The write gate — how production stays un-writable</h2>
+<section data-cm="the-write-gate-how-production">
+<p>Every config write is server-side gated. The browser flag is UX only; <b>the Firestore settings doc, re-read on every call, is the authority.</b></p>
+<span class="mono">RequireWritable(network, featureKey):
+    IsAllowedForFeatureAsync(network, featureKey)   // feature's own list if set, else global argus_remediable_v1
+      || IsLabNetworkAsync(network)                 // network name contains a Lab/Test keyword as a WHOLE word
+    ? proceed : 403 not-writable</span>
+<ul>
+<li><b>Per-feature allowlist</b> — <code>argus_featurelists_v1[featureKey]</code> if non-empty, else the global <code>argus_remediable_v1</code>. (<code>Gate.cs</code>)</li>
+<li><b>Lab-keyword floor</b> — <code>argus_labkw_v1</code> (default <code>["TEST","LAB"]</code>), whole-word regex so "Flabbergast" ≠ "LAB".</li>
+<li><b>Capture-before-write</b> — every write reads the prior value, PUTs, reads-after, and returns <code>{before, after}</code> for undo.</li>
+<li><b>Non-weakening rollback</b> — refuses to restore an empty/invalid prior value rather than fall back to a more-permissive default (VLAN→1, allowed→"all").</li>
+<li><b>Atomic template rebind</b> — if bind fails after unbind, it re-binds to <code>before</code> so a network is never silently left UNBOUND; if that also fails it 502s with an explicit "fix in dashboard" message.</li>
+<li><b>Every write is audited</b> to Cloud Logging (<code>AUDIT &lt;op&gt;: network=… before=…</code>).</li>
+<li><b>Fail-closed</b> — if Firestore is unreachable, the settings read returns null → every gate denies.</li>
+</ul>
+</section>
+
+<h2>The Firewall Security Audit engine <span style="color:#666;font-size:13px">(Program.cs ~990–1490 · navigator-sourced)</span></h2>
+<section data-cm="the-firewall-security-audit-engine">
+<p>Read-only, scored, three scopes: <code>?org=</code> (admins/MFA/login), <code>?template=</code> (appliance config for every bound network), <code>?network=</code> (site + overrides). 30+ checks as <b>data</b> (exposed at <code>/meraki/audit/checks</code>), across: Firewall (FW-01..03), Exposure (EXP-01..05), Threat Protection (THR-01..03), Wireless (WIFI-01/02/05/07), Switching (SW-NV1/TRUNK/UNUSED/PORTSEC/DHCP/STP/STORM), Anomalies (ANOM-01/02), Ops (OPS-01..03/VPN-01), Org (ORG-01/02/04), Overrides (OVR-*).</p>
+<p style="color:#999;font-size:13px">Scoring: each category starts at 100, subtracts weighted penalties (critical −25, high −12, medium −5, low −2); headline = weight-averaged (Firewall/Exposure/Org ×3, Threat/Wireless ×2, Switching/Ops ×1.5, Anomalies/Overrides ×1); grade A≥90…F&lt;60. Unlicensed/N-A endpoints are <b>skipped, never penalized</b>. Nice touch: WIFI-01 severity scales with isolation (isolated guest = medium, WEP = high, bridged-to-LAN = critical). Only <b>SW-NV1/SW-UNUSED/SW-TRUNK</b> have a remediate executor today — the rest are audit-only.</p>
+</section>
+
+<h2>Web surface</h2>
+<section data-cm="web-surface">
+<p><code>web/app/index.html</code> is the gated console. <code>const BRIDGE</code> (line 717) = same-origin on <code>argus.com.ai</code>/<code>argus.net.ai</code>, else <code>https://argus.net.ai</code> — the edge that fronts the <code>meraki-bridge</code> origin. Meraki-facing views: <b>Switch Port View</b> (portmap), <b>Wi-Fi</b> (wireless/ssid), <b>Audit</b> (findings grid + <code>checks-content.json</code> guidance), <b>Konductor</b> (template rollout), plus inline remediation UI (plan → apply → rollback), the port VLAN/PoE editors, one-click naming, and the multi-source <b>API Browser</b> (Meraki catalog entries: organizations, networks, config-templates, network, devices, clients, switch-ports, wireless-ssids). The unbind-forensics work (<code>/meraki/changes</code> + <code>/meraki/apirequests</code>) shipped here — see <code>be/builds/2026-07-15-1358-inspect-006-unbind-forensics.html</code>.</p>
+</section>
+
+<h2>State / health</h2>
+<section data-cm="state-health">
+<ul>
+<li><b>Live URL:</b> <code>https://meraki-bridge-d5vc4tye3a-uw.a.run.app</code> (GCP <code>acmedev-platform-hq</code>), fronted by the <code>argus.net.ai</code> edge. <span style="color:#999">Not probed from this box — Rule 14 vantage; <code>/healthz</code> + <code>/version</code> are the liveness surfaces.</span></li>
+<li><b>Secrets:</b> <code>MERAKI_API_KEY</code>, <code>MERAKI_ORG_ID</code>, <code>BRIDGE_TOKEN</code> via <code>--set-secrets</code> — never in source.</li>
+<li><b>Auth:</b> OIDC (Google/Slack) 12h sessions + Purcius Overlord key-login; crew allowlist (<code>argus_crew_v1</code>) re-read server-side; <code>PreserveCrew</code> guards against a settings save wiping sign-in.</li>
+</ul>
+</section>
+
+<h2>Patterns found</h2>
+<section data-cm="patterns-found">
+<ul>
+<li><b>Read-only-provable surface</b> — every read path builds the Meraki URL in-process; the API Browser is a curated catalog, never free-form passthrough.</li>
+<li><b>Trust / Hollow-Edge posture</b> — the secret lives in one client; the edge composes, holds no key.</li>
+<li><b>Gate-as-one-helper</b> — a single <code>RequireWritable(network, featureKey)</code> means no write path can drift from the "Production = net in (feature.list ?? global)" rule.</li>
+<li><b>Capture-before + non-weakening undo</b> — the write discipline mirrors the airbyte/zendesk gated-write lanes: reversible, audited, posture never silently relaxed.</li>
+<li><b>Checks-as-data</b> — the audit registry is declarative (<code>/audit/checks</code> + <code>checks-content.json</code>), so coverage is inspectable without reading C#.</li>
+</ul>
+</section>
+
+<h2>Open questions / risks</h2>
+<section data-cm="open-questions-risks">
+<ul>
+<li><b class="warn">Deploy fork (highest).</b> ARCHITECTURE.md §2–3: the canonical CI source is <code>acmedevUS/meraki-bridge</code>; <code>C:\argus\bridge/</code> is a consolidated working copy. Nothing automates reconciliation — drift means dev changes don't deploy or prod code isn't reflected here. <b>Reconcile before touching the deploy pipeline.</b> Last-reconciled date unknown.</li>
+<li><b>Write allowlist population unknown.</b> Gates are correct, but whether <code>argus_remediable_v1</code> / feature lists are empty or populated, and whether Firestore is currently healthy, was not verified in this read-only pass. If empty + no LAB/TEST names → all writes 403 (safe default).</li>
+<li><b>Audit-only checks with no executor.</b> Only SW-NV1/UNUSED/TRUNK remediate; EXP/FW/THR findings report but can't be actioned in-app (by design today — worth confirming it's intended, not half-built).</li>
+<li><b>"ZTPL" note</b> (board: "avoids the meraki TEMPLATES global → ZTPL") — resolved as a <i>frontend JS-global rename</i> to avoid a name collision on the Templates tab, <b>not</b> a Meraki-bridge concern. No action.</li>
+<li><b>Org-scale reads.</b> <code>/meraki/ssid</code> org-wide iterates every network; large orgs could be slow / near the 30s client timeout. No pagination guard observed.</li>
+</ul>
+</section>
+
+<h2>Paired reconcile <span style="color:#666;font-size:13px">(Rule 1 — navigator owns the verdict)</span></h2>
+<section data-cm="paired-reconcile-rule-1-navigator">
+<p>Driver (Opus) and navigator (Fable, via an independent Explore pass) agreed on the route inventory, the write-gating mechanism, and the audit engine. Two splits surfaced, both benign and folded in above:</p>
+<ul>
+<li><b>BRIDGE target.</b> Navigator read <code>argus.net.ai</code>; ARCHITECTURE.md names <code>meraki-bridge-…run.app</code>. Reconciled: <code>argus.net.ai</code> is the edge fronting the Cloud Run origin — a naming layer, not a discrepancy.</li>
+<li><b>Audit internals.</b> Driver confirmed the routes exist but did not read the 500-line scoring block; navigator did. The audit section is marked navigator-sourced for honesty.</li>
+</ul>
+<p>No unresolved disagreement.</p>
+</section>
+
+<h2>DoD</h2>
+<section data-cm="dod" class="dod">
+<div>✓ A-D-D verified (read ARCHITECTURE.md first; inspection matches §1–3 Meraki topology + language boundary)</div>
+<div>✓ Read-only — no source edits; artifact is the only output</div>
+<div>✓ Paired (Rule 1) — Opus driver + Fable navigator, independent passes reconciled, splits surfaced</div>
+<div>✓ Cites file:line (Program.cs routes, Meraki.cs, MerakiSource.cs, Gate.cs, web/app/index.html:717)</div>
+<div>✓ Sections present — What It Is, Structure, Route Surface, Gate, Audit, Web, State, Patterns, Open Questions</div>
+<div>✓ Pub date top-right; HTML template (dark #111, tron #6FC3DF, 900px)</div>
+<div>✓ Honest unknowns named (deploy fork, allowlist population, live health not probed — Rule 14 vantage)</div>
+<div>⧗ External production verification — n/a for a read-only inspect artifact; publishes as a Latchkey cap-URL (HTTP 200) on ship</div>
+</section>
+
+</div>
+<footer>Be · v0 · r724 · 2026-08-04 · argus · ~i Meraki-in-Argus · Opus+Fable paired</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"58e7625d-e0d7-40f4-b6a6-36105ae15722"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8"><title>Ticket Browser — pick an arm, see its tickets</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}
+body{background:#111;color:#e2e6e8;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:11px 22px;display:flex;align-items:center;gap:14px;z-index:9}
+nav .b{color:#6FC3DF;font-weight:700;font-size:15px}
+nav .t{color:#8ea1ab;font-size:13px;flex:1}
+nav .p{color:#6b7c85;font-size:11px}
+.w{max-width:800px;margin:0 auto;padding:26px 22px 60px}
+h1{font-size:25px;margin:12px 0 6px;color:#fff;line-height:1.25}
+h2{font-size:16px;color:#6FC3DF;margin:30px 0 8px;border-bottom:1px solid #223038;padding-bottom:5px}
+.sub{color:#8ea1ab;font-size:13.5px;margin-bottom:22px}
+.card{background:#1A1A1A;border:1px solid #223038;border-radius:9px;padding:15px 17px;margin:14px 0}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:10px 0}
+th{text-align:left;color:#6FC3DF;font-weight:700;padding:7px 9px;border-bottom:1px solid #223038}
+td{padding:7px 9px;border-bottom:1px solid #1c2830;color:#c8d4da;vertical-align:top}
+code{background:#0d0d0d;color:#9fe0f2;padding:1px 6px;border-radius:4px;font-size:12.5px}
+.ok{color:#7ee0a6;font-weight:700}.no{color:#f0997d;font-weight:700}
+.dim{color:#7d8f99;font-size:12.5px}
+ul{margin:8px 0 8px 20px;padding:0}li{margin:5px 0}
+.big{font-size:15px;color:#fff}
+footer{color:#6b7c85;font-size:12px;border-top:1px solid #223038;margin-top:34px;padding-top:12px}
+</style></head><body>
+<nav><span class="b">Be</span><span class="t">~go &middot; Argus ticket browser</span><span class="p">Published 2026-07-24 11:40 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/ba180554-43ec-43b7-8eb0-2e91817b1e29/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>Ticket Browser &mdash; pick an arm, hit the button, see its tickets</h1>
+<p class="sub">Argus Test Bench &middot; read-only across Arm A / Arm B / production &middot; paired Opus (driver) + Fable (navigator)</p>
+
+<h2>What shipped</h2>
+<div class="lk-sec" data-cm="what-shipped"><p>A ticket browser in the Argus Test Bench. Choose an arm, press <b>Load tickets</b>, and the pane lists that
+environment's tickets &mdash; id, created time, status, subject, via-channel, tags &mdash; with paging and a live
+count. Two lanes: <b>newest first</b> (Zendesk search, hard-capped at 1000 results and labelled as such) and
+<b>everything, by ticket id</b> (uncapped walk). Every call is a GET through the bridge's declared read catalog;
+nothing in this feature can write.</p></div>
+<h2>Live proof</h2>
+<div class="lk-sec" data-cm="live-proof"><table>
+<tr><th>Arm</th><th>Brand id</th><th>Tickets</th><th>Evidence</th></tr>
+<tr><td>A &middot; Guest Relations Test</td><td><code>50598728766228</code></td><td class="ok">11</td><td>#755, 743, 741, 739, 737, 735</td></tr>
+<tr><td>B &middot; Guest Relations Test v2</td><td><code>51641701238548</code></td><td class="ok">1</td><td>#744</td></tr>
+<tr><td>prod &middot; Mendocino Farms LIVE</td><td class="dim">no arm split</td><td class="ok">61,522</td><td>active; 435,641 in the search index</td></tr>
+</table>
+<p class="dim">Zero cross-brand leakage in either direction, verified against the deployed bridge.
+Console live at <code>argus.com.ai/app/</code> &mdash; HTTP 200, stamp <code>r889 &middot; 6a40007</code>.</p></div>
+<h2>Three truth bugs found and fixed</h2>
+<div class="lk-sec" data-cm="three-truth-bugs-found-and"><div class="card">
+<p class="big">1 &mdash; Mixed denominators</p>
+<p>The header printed &ldquo;N of 61,522&rdquo; while paging <i>search</i> results, which report 435,641.
+Zendesk archives closed tickets after ~120 days: they leave <code>tickets.json</code> but stay in the search
+index. Two different universes under one number. Each lane now carries its own denominator and names which
+universe it counted.</p>
+</div>
+
+<div class="card">
+<p class="big">2 &mdash; Arm A and Arm B returned identical lists <span class="no">(operator-caught)</span></p>
+<p>Selecting sandbox A vs sandbox B showed Arm A's tickets both times. Not a UI bug &mdash; a false premise.
+Both env slots resolve to the <b>same Zendesk account</b> (<code>mendocinofarms1781637851</code>, confirmed via
+<code>/version</code> slots). The arms are two <b>brands</b> inside it, so filtering by environment filters by
+nothing. The split now runs on <code>brand_id</code>, the only axis that separates them.</p>
+<p class="dim">The signal was in the pre-ship verification &mdash; both arms returned <code>count 673</code> and the
+same top ticket <code>#755</code> &mdash; and it shipped anyway. Recorded rather than smoothed over.</p>
+</div>
+
+<div class="card">
+<p class="big">3 &mdash; Arm B would have rendered empty</p>
+<p>The by-id lane decided &ldquo;end of list&rdquo; from the <i>brand-filtered</i> batch length. Arm B holds 1
+ticket in ~194, so page 1 filters to zero and the walk stopped immediately &mdash; showing an <b>empty</b> arm
+rather than a short one, the exact failure the brand fix existed to end. Paging now uses the pre-filter count.</p>
+</div></div>
+<h2>Navigator verdict &mdash; PASS-WITH-NOTES</h2>
+<div class="lk-sec" data-cm="navigator-verdict-pass-with-notes"><p>Fable reviewed the diff serially (Rule 1: driver writes, navigator reviews) and verified the fixes in the
+working tree rather than trusting the commit messages. Confirmed: no cross-arm leak path; brand ids sit well
+under 2<sup>53</sup> so the string coercion is exact; all four lane/denominator combinations are honest; every
+attacker-influenced field is escaped; <code>/read</code> cannot write in any environment. Both non-blocking
+findings were applied before this report:</p>
+<ul>
+<li><b>Busy-guard gap</b> &mdash; <code>zTktLoad</code> reset state and awaited the count unguarded, so a
+double-click fired a duplicate request. Guard now spans the await.</li>
+<li><b>Param hardening</b> &mdash; <code>{brand}</code>/<code>{page}</code> are digits-only. URL-encoding already
+blocked traversal, but inside a search-query template a <code>%20</code> is a term separator. Verified live:
+<code>brand=...%20status:open</code> &rarr; 400.</li>
+<li><b>esc() contract</b> &mdash; documented that it escapes <code>&amp; &lt; &gt;</code> but not quotes, so a future
+attribute interpolation of a guest-authored subject can't become an injection.</li>
+</ul></div>
+<h2>Definition of Done</h2>
+<div class="lk-sec" data-cm="definition-of-done"><ul>
+<li>&#10003; Work complete &mdash; browser live in the Test Bench, three arms selectable</li>
+<li>&#10003; Reviewed &mdash; Fable navigator, PASS-WITH-NOTES, all notes applied</li>
+<li>&#10003; Tested &mdash; live per-arm verification against the deployed bridge; JS syntax-checked each round</li>
+<li>&#10003; <b>Production-verified</b> &mdash; <code>argus.com.ai/app/</code> HTTP 200, stamp <code>r889</code>, all
+feature markers present at the edge</li>
+<li>&#10003; Data round-trip &mdash; brand-scoped reads return the correct disjoint ticket sets (A=11, B=1)</li>
+<li>&#10003; Committed + pushed &mdash; argus <code>bc92d0e, 501499b, 59216fa, b339bfa</code>; bridge
+<code>eed6a67, 2d54dd3, fff9556</code></li>
+<li>&#10003; Board updated &mdash; item marked Done with the three bugs recorded</li>
+<li>&#9888; Collision noted &mdash; a concurrent session in <code>C:\argus</code> swept this work into its own
+commits <code>7f7c79b</code> and <code>6a40007</code>. Nothing lost; attribution recorded here and in the commit
+messages rather than left to look like clean history.</li>
+</ul></div>
+<footer>Generated 2026-07-24 11:40 &middot; v0 &middot; r889 &middot; Argus &mdash; Mendo NPS A/B, Lane A<br>
+Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved</footer>
+</div>
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"ba180554-43ec-43b7-8eb0-2e91817b1e29"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

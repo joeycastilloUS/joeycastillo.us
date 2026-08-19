@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~d — Genesis app: Warrant a Console (QR, air-gapped)</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  .nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  .nav .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  .nav .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:800px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:26px; margin:.2em 0 .1em; }
+  h2 { font-size:19px; color:var(--accent); margin-top:1.9em; border-bottom:1px solid #262626; padding-bottom:5px; }
+  h3 { font-size:15px; margin:1.3em 0 .3em; color:#cfcfcf; }
+  .sub { color:var(--mut); margin-top:0; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:13px; }
+  pre { background:#000; border:1px solid #242424; border-radius:6px; padding:12px; overflow:auto; font-size:12.5px; color:#cfe8ef; }
+  ol,ul { margin:.4em 0; padding-left:20px; } li { margin:.3em 0; }
+  .foot { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #242424; padding-top:12px; }
+  .big { font-size:15px; }
+  .lead { border-left:3px solid var(--accent); padding-left:12px; }
+  .warnrail { border-left:3px solid var(--warn); padding-left:12px; }
+  .ok-rail { border-left:3px solid var(--ok); padding-left:12px; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13px; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid #242424; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-25 12:52 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/baa894ff-06b4-412e-b154-9c7c170166bb/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+<h1>~d — Genesis app: Warrant a Console</h1>
+<p class="sub">Tap-not-type warranting for the operator, air-gap preserved &middot; paired (Opus + Fable5, reconciled across this session) &middot; argus login &times; kastil-systems/nous purcius-genesis &middot; r930</p>
+
+<div class="card lead big">
+<b>One line:</b> make the <b>Genesis Android app</b> warrant a console device so the operator logs in by <b>scanning a QR and scanning a QR back</b> &mdash; no CLI, no share files, no 128-hex typing &mdash; <b>without the app ever touching the network</b> (its core security property). Today the app <b>cannot warrant at all</b>: its native surface exposes mint/recover/resplit/selftest, not <code>warrant</code>. This design adds that op and the two-QR hand-off.
+</div>
+
+<div class="card ok-rail">
+<b>Operator decisions (locked):</b> login target = <b>desktop console</b> &middot; device-pub in = <b>scan a QR</b> &middot; warrant out = QR back to the desktop webcam. Air-gap is non-negotiable.
+</div>
+
+<h2>Need</h2>
+<div class="lk-sec" data-cm="need"><p>The operator has the Genesis APK but is stuck at the Argus key-login: his share files are the wrong format (hex text vs the 65-byte binary genesis-cli writes), and there's no easy way to produce the <b>warrant signature</b> (<code>ed25519(root, devicePub||"console")</code>) his browser needs. He asked for the phone to do it &mdash; tap, not type. The blocker is concrete: <b>the app has no warrant function</b>, and its <b>no-network manifest</b> forbids the obvious "phone posts the warrant to the server" shortcut.</p></div>
+<h2>The constraint that shapes everything: air-gap</h2>
+<div class="lk-sec" data-cm="the-constraint-that-shapes-everything"><div class="card warnrail">
+purcius-genesis declares <b>no network permission</b> &mdash; "this app cannot phone home" (README + manifest). So a server-mediated pairing (phone &rarr; bridge &rarr; desktop) is <b>forbidden by design</b>. The warrant must leave the phone through a <b>local, offline channel: the screen</b>. Camera-in and QR-out are local operations &mdash; they keep the air-gap intact. This is the whole reason the flow is two QRs, not one tap.
+</div></div>
+<h2>Sourced solution (reuse first)</h2>
+<div class="lk-sec" data-cm="sourced-solution-reuse-first"><table>
+<tr><th>Reuse</th><th>Where</th></tr>
+<tr><td>The crypto is one recover + one sign</td><td><code>genesis_recover(t, shares, sk[64])</code> + <code>genesis_sign(sk, msg, len, sig[64])</code> &mdash; <code>core/genesis_core.h</code>. Warrant msg = <code>device_pub(32)||"console"(7)</code> = 39B (<code>security/skill/identity/identity.h</code>).</td></tr>
+<tr><td>Desktop reference behavior</td><td><code>go-warrant.bat</code> already does exactly this on Windows (recover from 3 shares in memory &rarr; sign &rarr; wipe &rarr; 128-hex to clipboard). The JNI mirrors it.</td></tr>
+<tr><td>JNI pattern to copy</td><td><code>genesis_jni.c</code> mint/recover (hexdec helper, jobjectArray, secure_zero) &mdash; add a sibling <code>warrant</code>.</td></tr>
+<tr><td>The browser already shows the device-pub + accepts a pasted warrant</td><td>argus <code>web/app/index.html</code> <code>#keypub</code> / <code>#warrantsave</code> &mdash; add a QR render + a webcam-scan-to-fill.</td></tr>
+</table></div>
+<h2>The flow (what "easy" looks like)</h2>
+<div class="lk-sec" data-cm="the-flow-what-easy-looks"><ol>
+<li>Desktop Argus login shows the device-pub <b>as a QR</b> (+ the existing hex).</li>
+<li>Phone Genesis app &rarr; <b>"Warrant a Console"</b> &rarr; <b>scan</b> the device-pub QR (camera, local).</li>
+<li>App recovers the root from the operator's shares <b>in memory</b>, signs <code>devicePub||"console"</code>, <b>wipes</b> the root, renders the <b>128-hex warrant as a QR</b> (+ Copy).</li>
+<li>Desktop login &rarr; <b>"Scan warrant"</b> &rarr; <b>webcam reads</b> the phone's QR &rarr; auto-fills + submits &rarr; logged in. Warrant caches (one-time).</li>
+</ol></div>
+<h2>Shape &mdash; verified slices (each shippable)</h2>
+<div class="lk-sec" data-cm="shape-verified-slices-each-shippable"><div class="card">
+<b>Slice 1 &mdash; the capability (dependency-free, do first).</b> Add <code>warrant(devpubHex, sharesHex[])</code> to <code>genesis_jni.c</code> + <code>GenesisNative.kt</code>, and a minimal <b>paste-based</b> "Warrant a Console" screen in <code>MainActivity.kt</code>. This makes the app <i>able</i> to warrant &mdash; pure C + Kotlin, no new deps, mirrors <code>go-warrant</code>. New APK, on-device selftest gate.
+</div>
+<div class="card">
+<b>Slice 2 &mdash; QR in.</b> Argus web login renders the device-pub as a QR (tiny pure-JS generator, no external &mdash; CSP-safe). App gains camera + a QR <b>decoder</b> (dependency decision: ZXing-Android-Embedded vs CameraX+MLKit vs a vendored pure-C decoder to stay dep-light). CAMERA permission only &mdash; still no INTERNET.</div>
+<div class="card">
+<b>Slice 3 &mdash; QR out + desktop scan.</b> App renders the warrant as a QR. Argus web login adds a "Scan warrant" webcam reader (getUserMedia + a JS QR decoder) that fills <code>#warrantsave</code> and submits. Fallback to Copy/paste throughout.</div></div>
+<h2>First move</h2>
+<div class="lk-sec" data-cm="first-move"><div class="card ok-rail big">
+<b>Slice 1, in a FRESH clone of kastil-systems/nous</b> (the checkout on the dev box is diverged/dirty from another session &mdash; do not build there). Add the <code>warrant</code> JNI + Kotlin binding + paste screen; commit; trigger <code>genesis-apk.yml</code>. <b>Verification is the operator's phone</b> with the new APK: warrant a real device-pub, paste into the console, land the session. Then Slices 2&ndash;3 layer the QR ease on top.
+</div></div>
+<h2>Risks / notes</h2>
+<div class="lk-sec" data-cm="risks-notes"><ul>
+<li><b>Crypto correctness</b> &mdash; the JNI must mirror <code>genesis_cli warrant</code> exactly: recover in memory, sign the 39-byte message, <code>secure_zero</code> the root before return. Serial-paired build review mandatory.</li>
+<li><b>QR-decode dependency</b> (Slice 2/3) is the one place this app breaks its zero-dep / pure-C ethos &mdash; flag for an explicit call before adding a library.</li>
+<li><b>Repo hazard</b> &mdash; <code>C:\nous</code> is diverged with another session's uncommitted <code>security/mesh_*</code> deletions; build the app in a fresh clone to avoid a collision.</li>
+<li><b>Interim to log in TODAY</b> (no app change): fix the share format (genesis-cli writes 65-byte binary <code>share-NN.share</code>, not hex <code>.txt</code>) and run desktop <code>go-warrant.bat &lt;device-pub&gt;</code> &rarr; paste. The app flow is the durable easy path; this is the shortcut.</li>
+</ul></div>
+<h2 class="ok">Definition of Done — this artifact</h2>
+<div class="lk-sec" data-cm="definition-of-done-this-artifact"><ul>
+<li>&#10003; Paired across the session (Opus driver + Fable5 navigator on the Genesis/identity diagnosis); air-gap constraint surfaced and reshaped the design</li>
+<li>&#10003; Operator's decisions (desktop / QR-in) locked in</li>
+<li>&#10003; Sourced from existing core (recover+sign), desktop go-warrant, JNI mint/recover pattern &mdash; cited</li>
+<li>&#10003; Sliced so the dependency-free capability ships first; the QR-dep decision is isolated</li>
+<li>&#10003; Rendered, house style, published datetime</li>
+<li>&#9723; Latchkey published; committed + pushed</li>
+<li>&#8213; Production verification: N/A for a design; the build carries it on the operator's phone (warrant a real device &rarr; console session lands)</li>
+</ul>
+
+<div class="foot">
+Be &middot; ~d paired design &middot; argus &times; nous/purcius-genesis &middot; v0 &middot; r930 &middot; 2026-07-25 12:52 PDT<br>
+Driver: Opus 4.8 &middot; Navigator: Fable5 &middot; One signal in, full chain reaction out.
+</div>
+
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"baa894ff-06b4-412e-b154-9c7c170166bb"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — Multi-Language Decode (mendo #532 false positive)</title>
+<style>
+  body { background:#111111; color:#ddd; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+         margin:0; line-height:1.55; }
+  .nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF;
+         display:flex; justify-content:space-between; align-items:center; padding:10px 24px; }
+  .nav .brand { color:#6FC3DF; font-weight:bold; font-size:18px; }
+  .nav .pub { color:#777; font-size:12px; }
+  main { max-width:800px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { color:#6FC3DF; font-size:24px; }
+  h2 { color:#6FC3DF; font-size:18px; margin-top:32px; border-bottom:1px solid #2a2a2a; padding-bottom:6px; }
+  .card { background:#1A1A1A; border-radius:6px; padding:14px 18px; margin:14px 0; }
+  code, pre { font-family:Consolas,monospace; font-size:13px; }
+  pre { background:#0c0c0c; border:1px solid #2a2a2a; border-radius:4px; padding:12px; overflow-x:auto; color:#bbb; }
+  .good { color:#7fd47f; } .bad { color:#e07070; } .muted { color:#888; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  td, th { border:1px solid #2a2a2a; padding:6px 10px; text-align:left; vertical-align:top; }
+  th { color:#6FC3DF; background:#161616; }
+  footer { color:#666; font-size:12px; text-align:center; padding:20px; border-top:1px solid #2a2a2a; }
+</style>
+</head>
+<body>
+<nav class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-16 · Argus / Purcius</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/8eda7d36-4dec-492e-a2fc-bd625d26bc1e/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>Multi-Language Decode — why #532 false-positived, and the fix jc already designed</h1>
+<p class="muted">Research note (Fable5, grounded — every claim carries file:line). Card: mendo-nps-detractor-triage,
+unit reduce_feedback. Failure: street-Spanish app complaint escalated as food-borne illness.</p>
+
+<h2>1 · Need</h2>
+<div data-cm="1-need" class="card">
+Guest #532 (Spanish): <i>"la app está bien fea, me da asco nomás de verla, me enferma lo mal hecha que está"</i>
+— the APP is ugly; zero food content. The 3-Gemini panel flagged illness (2/3 latched onto
+"enferma"/"asco"; one said "poorly made <b>food</b>"). The reduction is the cause, not the panel.
+</div>
+
+<h2>2 · What the decoder actually emitted (reproduced, real binary)</h2>
+<div data-cm="2-what-the-decoder-actually" class="card">
+Ran the ticket text through the built decoder (<code>src/sdk/nous/action/skill/understand/atoms.exe</code>,
+compiled from <code>understand.c</code> — the exact engine <code>reduce_atoms.h</code> calls):
+<pre>
+Spanish in  → 19 atoms, EVERY ONE  <span class="bad">entity/none</span>:
+  la app est bien fea me da asco nom s de verla me enferma lo mal hecha que est
+                                                                    (zero structure decoded)
+English equivalent in → 22 atoms WITH structure:
+  the/<span class="good">structure/specifier</span>  app/<span class="good">property</span>  is/<span class="good">structure/equivalence</span>  really ugly ...
+</pre>
+Three concrete losses on the Spanish path:
+<ul>
+<li><b>"app" was NOT dropped</b> — it is atom a2. What died is the <b>binding</b>: with
+"está" unrecognized, no equivalence structure marks <i>app</i> as the subject of <i>fea/enferma</i>.
+The panel got a flat 19-word bag where <i>asco/enferma/mal/hecha</i> dominate unanchored.</li>
+<li><b>Token mangling</b>: <code>is_word_char()</code> (understand.c:106-110) is ASCII-only, so UTF-8
+accents break tokens — "está"→"est" (×2), "nomás"→"nom"+"s". The copula is destroyed before lookup
+could ever match it.</li>
+<li><b>Zero reduction</b>: the closed vocabulary (understand.c:14-90, ~90 entries) is 100% English.
+No Spanish word matches, so nothing is classified as structure — Spanish text passes through
+UNREDUCED and UNLABELED, the exact opposite of the reducer's value proposition.</li>
+</ul>
+</div>
+
+<h2>3 · Findings — the code vs. what jc built and remembers</h2>
+<div data-cm="3-findings-the-code-vs" class="card">
+<table>
+<tr><th>Question</th><th>Truth, with evidence</th></tr>
+<tr><td>Language detector?</td><td><b>Designed yes, built only for C-vs-English, never ported.</b>
+The a-d-d doctrine is "detect → decode → apply … load the right dialect"
+(a-d-d nous/intelligence/skill/understand/CLAUDE.md §Implementation). Old nous BUILT
+<code>detect_language()</code> at C:\nous\intelligence\receive.c:3843 — but it detects by FILE EXTENSION
+(.c/.h → C datamap, everything else → English). No natural-language detector exists anywhere.
+The metal C99 port has none at all.</td></tr>
+<tr><td>understand() vs understand_atomize()</td><td><b>Same engine.</b> atomize (understand.c:206-230)
+calls understand() then keeps entity/action/property. Production reduce lane uses reduce_atoms.h (v2,
+full ordered stream) — pirun_run.c:253; the atomize block at pirun_run.c:493 is dead code (same guard,
+first block wins). Neither is more language-aware: both sit on the same English-only vocab + ASCII tokenizer.</td></tr>
+<tr><td>The datamap layer</td><td><b>Old nous had it; the metal port dropped it.</b>
+<code>understand_with(expression, out, Datamap*)</code> + datamap_store/load at
+C:\nous\intelligence\skill\understand\understand.h:147-187; datamaps built: C, English, PI. The a-d-d says
+"Every language that enters or exits the system needs one." No Spanish datamap was ever authored, and
+metal's understand.c hardcodes English instead of taking a datamap.</td></tr>
+<tr><td>The language skill</td><td><b>English skeleton only.</b> a-d-d nous/intelligence/skill/language/CLAUDE.md:
+English closed classes, English irregulars, -est/-ed/-ing morphology, Princeton WordNet 3.1. Built at
+C:\nous\intelligence\skill\language\language.c. Not ported to metal, no Spanish.</td></tr>
+<tr><td>The A-B bench</td><td><b>English-only corpus.</b> be/pi/mendo-illness-bench-corpus.tsv — 12 rows,
+all English. "Atoms ≥ raw" was proven inside the decoder's competence and generalized outside it.</td></tr>
+</table>
+</div>
+
+<h2>4 · Recommendation — (a) detect → dialect → decode, exactly what the a-d-d already says</h2>
+<div data-cm="4-recommendation-a-detect-dialect" class="card">
+<b>Do (a).</b> Not (b) raw-to-panel — that concedes the A-B and violates the card's atoms-in-never-prose law
+(jc order 2026-07-15) for every ticket to cover the non-English minority. Not (c) alone — widening one
+hardcoded table without detect rebuilds the same wall one language further out and still contradicts
+the datamap design. The proper fix per what jc actually designed:
+<ol>
+<li><b>UTF-8 tokenizer fix</b> — treat bytes ≥ 0x80 as word chars in <code>is_word_char()</code>.
+~5 lines. Kills "est"/"nom s" mangling for every language at once.</li>
+<li><b>Spanish closed-class table</b> — a second Vocab table mapping Spanish structure words to the SAME
+28 fns (la/el/las/los→specifier; es/está/son/están/era→equivalence; no/nunca/jamás→negation; de→possessive;
+en→locative; y→conjunction; o→disjunction; pero→contrast; porque→causal; que→relational; …). Finite,
+deterministic, ~150-200 entries — the closed classes are the cheap 90% of a dialect.</li>
+<li><b>Deterministic detector</b> — decode against each dialect's table; the dialect with the highest
+structure-hit-rate wins; below a floor → <code>lang=unknown</code>. The closed vocabulary IS the detector
+— no new machinery, $0, cannot hallucinate. Emit <code>reduced.lang</code> into the ledger.</li>
+<li><b>Fail-open guard</b> — <code>lang=unknown</code> ⇒ the reducer refuses to pretend: card sends the
+verbatim feedback to the panel for that ticket (flag-on-doubt already biases safe). Atoms must earn the
+payload; garble never ships as if it were a reduction.</li>
+<li><b>Bench before arm</b> — add Spanish rows to the corpus, including figurative-clean cases
+("me enferma lo mal hecha que está" = clean) and real Spanish illness cases, and re-run the A-B.</li>
+</ol>
+<b>Cost:</b> one table + ~40 lines of C + corpus rows; no LLM, no deps, no new skill. The pass-2
+property heuristic (understand.c:181-190) already generalizes: "la app está fea" marks <i>app</i> property
+exactly like "the app is ugly" once <i>está</i> is recognized as equivalence.
+<br><br>
+<b>Can atoms win cross-language?</b> Yes — the failure was never atomization-as-concept; it was an English
+lexicon flattening Spanish into an unlabeled bag. With the dialect table, #532 reduces to
+<code>app/property + está/structure/equivalence + fea/entity</code> — the subject binding the panel needed
+is exactly what the fix restores. Honest limit: atoms preserve structure, not idiom; a figurative "me enferma"
+still reaches Gemini as the word — but now anchored to <i>app</i>, which is what flipped 2 of 3 verdicts.
+Raw is the fallback for unknown languages only, not the plan.
+</div>
+
+<h2>5 · First move</h2>
+<div data-cm="5-first-move" class="card">
+<code>is_word_char()</code> UTF-8 fix + <code>g_vocab_es[]</code> in understand.c, detector in
+<code>reduce_atoms.h</code> (one serializer, bench and prod move together), Spanish bench rows,
+re-run pirun_bench. Prod stays disarmed until the A-B is green in both languages.
+</div>
+
+</main>
+<footer>metal console · Be · v0 · r644 · 2026-07-16 · Argus — multi-language decode</footer>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"8eda7d36-4dec-492e-a2fc-bd625d26bc1e"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

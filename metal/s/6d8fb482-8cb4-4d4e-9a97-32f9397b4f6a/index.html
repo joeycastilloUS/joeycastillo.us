@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test — Illness Panel Verbatim Feedback (PIRUN_DRY, live sandbox + live panel)</title>
+<style>
+  body { background:#111111; color:#ddd; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; margin:0; line-height:1.55; }
+  .nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF; display:flex; justify-content:space-between; align-items:center; padding:10px 24px; }
+  .nav .brand { color:#6FC3DF; font-weight:bold; font-size:18px; }
+  .nav .pub { color:#777; font-size:12px; }
+  main { max-width:800px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { color:#6FC3DF; font-size:24px; }
+  h2 { color:#6FC3DF; font-size:18px; margin-top:32px; border-bottom:1px solid #2a2a2a; padding-bottom:6px; }
+  .card { background:#1A1A1A; border-radius:6px; padding:14px 18px; margin:14px 0; }
+  code, pre { font-family:Consolas,monospace; font-size:13px; }
+  pre { background:#0c0c0c; border:1px solid #2a2a2a; border-radius:4px; padding:12px; overflow-x:auto; color:#bbb; }
+  .good { color:#7fd47f; } .bad { color:#e07070; } .muted { color:#888; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  td, th { border:1px solid #2a2a2a; padding:6px 10px; text-align:left; vertical-align:top; }
+  th { color:#6FC3DF; background:#161616; }
+  footer { color:#666; font-size:12px; text-align:center; padding:20px; border-top:1px solid #2a2a2a; }
+</style>
+</head>
+<body>
+<nav class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-15 20:22 PT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/6d8fb482-8cb4-4d4e-9a97-32f9397b4f6a/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>Test — Illness Panel Verbatim Feedback</h1>
+<p class="muted">PIRUN_DRY runs: full detection against the REAL sandbox Zendesk + the REAL 3-Gemini
+panel; sends disarmed by the switch. Fresh ledger per run.</p>
+
+<h2 id="matrix">Matrix — 5 runs, 5 expected outcomes, 5 hits</h2>
+<div class="card" data-cm="matrix">
+<table>
+<tr><th>Ticket</th><th>Feedback</th><th>Expected</th><th>Got</th></tr>
+<tr><td>#532</td><td>Street Spanish, figurative "me da asco / me enferma" about the APP
+(the false positive that triggered this change)</td>
+<td>SAFE, recovery composes</td>
+<td><span class="good">SAFE unanimous-3</span>; category=app; code claimed
+(IMSORRYLAUGHINGLONGHORN10, $10); Zora reply composed byte-verbatim, 683 bytes;
+send disarmed. <b>The false positive is dead.</b></td></tr>
+<tr><td>#512</td><td>"I got food poisoning after eating the chicken, was sick all night"</td>
+<td>ILLNESS, exit before recovery</td>
+<td><span class="bad">ILLNESS flagged-3-of-3</span> (each model's one-line evidence in
+illness.reason); illness.exit=true; NO recovery, NO code, escalation disarmed under DRY.</td></tr>
+<tr><td>#501</td><td>Clean English, guest already followed-up</td>
+<td>gate_handled exits</td>
+<td><span class="good">handled.already=true, run exits</span> — idempotency gate intact.</td></tr>
+<tr><td>#505</td><td>Clean English app complaint</td>
+<td>SAFE, recovery continues</td>
+<td><span class="good">SAFE unanimous-3</span>, category=app, recovery path entered.</td></tr>
+<tr><td>#506</td><td>Clean English pickup complaint</td>
+<td>SAFE, recovery continues</td>
+<td><span class="good">SAFE unanimous-3</span>, category=pickup, recovery path entered.</td></tr>
+</table>
+Zero missed illness. Zero false positives. Panel reads the verbatim text in whatever language it
+arrives — no client-side language handling needed, exactly the premise of the order.
+</div>
+
+<h2 id="regardless">De-atomize regardless — proven in the same runs</h2>
+<div class="card" data-cm="regardless">
+<pre>#532  reduced.atoms=24 atoms, 496 bytes -> ledger   (panel got verbatim)
+#512  reduced.atoms=12 atoms, 291 bytes -> ledger
+#505  reduced.atoms=13 atoms, 300 bytes -> ledger
+#506  reduced.atoms=18 atoms, 424 bytes -> ledger</pre>
+The reducer ran on every alert and its output landed in the ledger every time — the record and
+the raw material for the offline dialect work are intact.
+</div>
+
+<h2 id="cost">Cost on prose</h2>
+<div class="card" data-cm="cost">
+Panel cost per alert observed: $0.00042–$0.00059 — same order as the atoms lane. The ~2x token
+delta is real but the absolute number stays well under a tenth of a cent per detractor alert.
+</div>
+
+<h2 id="dod">DoD</h2>
+<div class="card" data-cm="dod">
+<pre>
+&#10003; A-D-D verified (runs executed the changed card; verify_card green on all 5)
+&#10003; External production verification (real sandbox Zendesk reads + real Vertex panel calls, not mocks)
+&#10003; Data round-trip proof (ledger values printed from the store after each run)
+&#10003; The failure that motivated the change (#532) re-run and fixed
+&#10003; The unforgivable case (#512 illness) re-run and still caught, still exits
+&#10003; Published as a Latchkey cap-URL (this page)
+</pre>
+</div>
+
+</main>
+<footer>metal console · Be · v0 · r645 · 2026-07-15 · Argus — illness panel verbatim feedback (test)</footer>
+
+<!-- LATCHKEY COMMENTS doc = cap token; owner+expires drive the Latchkey panel; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"6d8fb482-8cb4-4d4e-9a97-32f9397b4f6a",owner:"joeycastillo.us",expires:"2026-07-22T20:18:58-07:00"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+
+<!-- LATCHKEY CONFIDENTIAL -- proprietary marking; owner via METAL_CONF_OWNER -->
+<div id="lk-cf" style="max-width:800px;margin:22px auto 8px;padding:9px 16px;border-top:1px solid #2a2a2a;color:#6b7076;font:11px 'Helvetica Neue',Helvetica,Arial,sans-serif;text-align:center;line-height:1.55;">&copy; 2026 Joseph M. Castillo &middot; <b style="color:#8a9196;font-weight:600;">Proprietary &amp; Confidential</b> &middot; Furnished under NDA &middot; Purcius&trade; (U.S. trademark pending)</div>
+<!-- /LATCHKEY CONFIDENTIAL -->
+</body>
+</html>

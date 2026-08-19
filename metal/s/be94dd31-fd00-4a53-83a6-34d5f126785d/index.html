@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D16 — what "execute first" actually costs</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;position:sticky;top:0;z-index:9;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .t{color:#6a7a82;font-size:12.5px}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .w{max-width:800px;margin:0 auto;padding:8px 22px 70px}
+ h1{font-size:25px;margin:20px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:14px;color:#6FC3DF;margin:32px 0 10px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:7px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 18px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:15px 17px;margin:13px 0}
+ .bad{border-left:3px solid #ff9b93}.good{border-left:3px solid #7CFFB2}.warn{border-left:3px solid #f0c674}
+ code,pre{font-family:Consolas,monospace;color:#9fe0f2;background:#0d0d0d;border-radius:4px}
+ code{font-size:12.5px;padding:1px 6px}
+ pre{padding:12px 14px;overflow-x:auto;font-size:12.5px;line-height:1.55;border:1px solid #1e1e1e}
+ table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:8px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:8px 9px;color:#c5d0d6;vertical-align:top}
+ ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+ .foot{margin-top:34px;border-top:1px solid #222;padding-top:15px;color:#5f6f77;font-size:11.5px}
+ .kill{color:#ff9b93;font-weight:700}.ok{color:#7CFFB2;font-weight:700}.dim{color:#7d8f99}
+ .opt{background:#0f1a22;border:1px solid #23414f;border-radius:9px;padding:14px 17px;margin:12px 0}
+ .opt h3{margin:0 0 6px;color:#fff;font-size:15px}
+ .tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.06em;padding:1px 7px;border-radius:9px;margin-left:8px;vertical-align:middle}
+ .t-free{background:#12351f;color:#7CFFB2}.t-build{background:#33290f;color:#f0c674}.t-done{background:#12303f;color:#6FC3DF}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span class="t">doculink &middot; decision</span><span class="p">Published 2026-07-24 22:20 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/be94dd31-fd00-4a53-83a6-34d5f126785d/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>D16 &mdash; what "execute first" actually costs</h1>
+<p class="lede">You asked for D16 to execute first and to make sense when you discuss it, and whether the
+ordering is implied. <b>It is not.</b> There are three independent orderings in a Pure Intent card, and the
+demand number controls none of them.</p>
+
+<h2>The three orderings</h2>
+<div class="lk-sec" data-cm="the-three-orderings"><table>
+<tr><th>Ordering</th><th>Set by</th><th>Controls</th></tr>
+<tr><td>Demand block order</td><td><code>.pi</code></td><td>How it reads in the document. Presentation only.</td></tr>
+<tr><td><b>Unit order</b></td><td><b><code>.si</code></b></td><td><b>What actually executes, and in what sequence.</b></td></tr>
+<tr><td>The number <code>D16</code></td><td>&mdash;</td><td class="dim">Neither. It is a label.</td></tr>
+</table>
+<p>They are wired to nothing in common. Moving a demand up the <code>.pi</code> changes the document and
+nothing else; changing execution means editing the <code>.si</code>.</p></div>
+<h2>Where D16 executes today: second</h2>
+<div class="lk-sec" data-cm="where-d16-executes-today-second"><pre>mendo-nps-detractor-triage.si
+
+  index 0   - unit: scan_alert      why: D1          &larr; READS + parses the ticket
+  index 1   - unit: gate_handled    why: D2,<b>D16</b>      &larr; the lane test lives here
+  index 2   - unit: reduce_feedback why: D3
+  index 3   - unit: illness_check   why: D4,D5       &larr; the only model cost</pre>
+<p>So on every sweep, Argus <b>reads and parses the other arm's ticket</b> &mdash; guest email, feedback text,
+store &mdash; and only then asks whose lane it is.</p></div>
+<h2>The obvious fix is a trap</h2>
+<div class="lk-sec" data-cm="the-obvious-fix-is-a"><div class="card bad">
+<p>Both units declare <code>in: [ticket]</code> and neither consumes the other's output, so swapping them
+looks free. And it would <i>load and run</i> &mdash; biRT permits it, nothing refuses it. It is forbidden by
+<b>consequence</b>, not by the machine.</p>
+<p><b><code>scan_alert</code> is the filter.</b> The sweep hands over <i>every</i> ticket created in the window
+&mdash; that is deliberate (<code>mendo-nps-sweep.pi</code> D1: no filter, dedup is the filter) &mdash; and
+<code>scan_alert</code> aborts the non-alerts at index 0.</p>
+<p>Put <code>gate_handled</code> first and it <b>claims</b> &mdash; it merges <code>argus_nps_handled</code> onto
+<span class="kill">every own-lane ticket in the window</span>, alert or not, before anything establishes the ticket
+is even an NPS alert. That includes Argus's own recovery follow-ups, escalation artifacts, and any human or test
+ticket &mdash; the default brand is ~89% of everything Argus touches.</p>
+<p class="dim"><b>Corrected after review:</b> an earlier cut of this page said "every ticket in the account."
+That overstated it &mdash; the lane guard sits inside tag-claim <i>before</i> the merge, so even in the swapped
+order the other arm's tickets are still refused. The trap protects Lane A's own hygiene, not Lane B. The
+conclusion stands; the blast radius was wrong.</p>
+</div></div>
+<h2>What is already true</h2>
+<div class="lk-sec" data-cm="what-is-already-true"><div class="card good">
+<p><b>D16 already executes before any write, and before any model cost.</b> <b>The bridge is what enforces it
+&mdash; not the prime.</b> The guard derives the arm from <code>?env=</code> with no caller cooperation, so it
+holds regardless of which pi_run binary the prime is running. Verified live: <code>/version</code> reports
+<code>ZBR1k &hellip; D16 LANE GUARD</code>, and tag-claim, internal-alert and nps-cc all return
+<code>lane:"foreign"</code> and write nothing. <code>gate: exit</code> then ends the run, so the panel, escalation,
+code-claim and send units never execute on a foreign ticket.</p>
+<p><b>Lane B receives no writes today.</b> What still happens is a <i>read</i>: Argus fetches and parses Lane B's
+ticket content on each sweep. Harmless to the A/B result &mdash; it is the other arm's guest data being touched
+for no reason.</p>
+</div></div>
+<h2>Three separable pieces</h2>
+<div class="lk-sec" data-cm="three-separable-pieces"><div class="opt"><h3>1 &mdash; Reads sensibly when you discuss it <span class="tag t-free">free</span></h3>
+Move the demand block to the top of the <code>.pi</code>. The parser is order-blind &mdash; it stores clauses in
+file order and matches by string, never by number &mdash; so this ships against the binary running on the LA prime
+today with no rebuild, and the seal is untouched (the seal covers <code>words:</code> blocks only).
+<b>Zero code, zero risk, reversible.</b></div>
+
+<div class="opt"><h3>2 &mdash; Executes before any write <span class="tag t-done">already shipped</span></h3>
+Done and verified. Nothing further required.</div>
+
+<div class="opt"><h3>3 &mdash; Executes before the read <span class="tag t-build">needs a prime rebuild</span></h3>
+A new read-only lane unit at index 0, before <code>scan_alert</code>. That needs a new skill/slot binding in
+<code>pi_run</code> &mdash; compiled C on the LA prime. It is the one item here that cannot be done by editing
+cards. <b>Marginal gain, stated honestly:</b> exactly one thing &mdash; skipping the foreign ticket's content
+read. The write path is already sealed bridge-side and live. This buys privacy hygiene, not protection.</div></div>
+<h2>The number itself</h2>
+<div class="lk-sec" data-cm="the-number-itself"><p>If it presents first and executes first, <code>D16</code> is an <b>accession number</b> &mdash; like an RFC
+number: minted once, permanent, never a rank. In conversation it is "the lane rule," cited as
+<code>triage/D16</code> when the card matters.</p>
+<p>Making the token literally read <code>D1</code> is a different job: a renumber. The numbers are referenced
+~400+ times, including a working agreement written around "the 15 rules, D1&ndash;D15" &mdash; and the demands
+cite each other <i>inside their own prose</i>, so a renumber corrupts text within the card as well as outside it.
+Worth doing only as a decision about <b>identity</b>, not to tidy a document. That design is published separately.</p></div>
+<h2>The ask</h2>
+<div class="lk-sec" data-cm="the-ask"><table>
+<tr><th>Option</th><th>Cost</th><th>Gets you</th></tr>
+<tr><td><b>1 alone</b></td><td>minutes, no deploy</td><td>Reads right, discusses right. Writes already blocked.</td></tr>
+<tr><td><b>1 + 3</b></td><td>+ prime rebuild</td><td>Argus never even reads the other arm's tickets.</td></tr>
+<tr><td><b>1 + 3 + renumber</b></td><td>+ the full identity refactor</td><td>The token literally reads first.</td></tr>
+</table>
+<p class="dim">Recommendation: <b>1 now</b>, fold <b>3</b> into the next prime rebuild rather than triggering one
+for it &mdash; today's exposure is a read, and the write path is already closed.</p>
+
+<div class="foot">
+Paired: Opus (driver) + Fable (navigator). Navigator verification returned CONFIRMED on the three orderings, on D16 executing second, and on what is already true; PARTIAL on the swap trap &mdash; blast radius and &ldquo;cannot&rdquo; both corrected above, in place. Claims verified in source
+(<code>dia.c</code>, <code>pi_run.c</code>, <code>pirun.h</code>) and against the live bridge, not from recall.<br>
+Generated 2026-07-24 22:20 &middot; v0 &middot; Argus &mdash; Mendo NPS A/B, Lane A<br>
+Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved
+</div>
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"be94dd31-fd00-4a53-83a6-34d5f126785d"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

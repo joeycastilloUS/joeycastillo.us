@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auto-CC the DO/Store - three technical approaches (diagrams)</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#e2e6e8;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.55}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;display:flex;align-items:baseline;gap:14px;position:sticky;top:0;z-index:5}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .t{color:#8a949b;font-size:12.5px}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:860px;margin:0 auto;padding:10px 22px 72px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:34px}
+ h1{font-size:22px;margin:16px 0 4px;color:#fff}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 14px}
+ h2{font-size:12px;color:#6FC3DF;margin:28px 0 8px;letter-spacing:.08em;text-transform:uppercase}
+ p{font-size:14px;margin:6px 0}
+ a{color:#6FC3DF}
+ code{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;background:#0d0d0d;padding:1px 5px;border-radius:4px}
+ pre{background:#0d0d0d;border:1px solid #1e2a30;border-radius:8px;padding:12px 14px;font-family:Consolas,monospace;font-size:12.5px;color:#c8d4da;overflow-x:auto;line-height:1.5;white-space:pre-wrap}
+ table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13.5px}
+ td,th{border-bottom:1px solid #1e1e1e;padding:8px 7px;vertical-align:top;text-align:left}
+ th{color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+ td.k{color:#7d8894;white-space:nowrap;width:160px}
+ blockquote{margin:8px 0;padding:11px 16px;border-left:3px solid #6FC3DF;background:#161616;color:#dfe6ec;font-size:14px;border-radius:0 8px 8px 0}
+ .ok{color:#7CFFB2;font-weight:700}.warn{color:#f0c674;font-weight:700}.bad{color:#ff9b93;font-weight:700}
+ .pill{display:inline-block;border-radius:20px;padding:2px 11px;font-size:11.5px;font-weight:700;margin:0 2px}
+ .p-done{background:#0c1c22;border:1px solid #1f5f47;color:#7CFFB2}
+ .p-next{background:#0c1622;border:1px solid #2a5f7f;color:#6FC3DF}
+ .p-block{background:#221417;border:1px solid #5f2030;color:#ff9b93}
+ .p-hold{background:#1c1a12;border:1px solid #5f4f20;color:#f0c674}
+ .crit{background:#1a0f12;border:1px solid #5f2030;border-radius:10px;padding:12px 16px;margin:16px 0}
+ .crit b{color:#ff9b93}
+ .back{display:inline-block;margin:2px 0 10px;font-size:12.5px}
+ .foot{margin-top:26px;border-top:1px solid #222;padding-top:12px;color:#5f6f77;font-size:11px}
+ .dod{font-size:12px;color:#9fb3bd;margin:4px 0}
+ svg{max-width:100%;height:auto;display:block;margin:10px 0}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span class="t">DO/Store CC &middot; 3 approaches</span><span class="p">Published 2026-07-23 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/b1935424-be9e-4a5e-96b7-1f5d79729746/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+<h1>Auto-CC the District Operator / Store — three technical approaches</h1>
+<p class="sub">Zendesk NPS-detractor response CC · off-the-shelf options · diagrams + facts · sources inline · 2026-07-23</p>
+
+<h2>The requirement</h2>
+<div class="lk-sec" data-cm="the-requirement"><p>On every response to an NPS-detractor ticket, add two parties as CC: the District Operator (DO) who owns the store, and the store inbox. The store is written in the ticket body (e.g. "12-SM"). The correct DO for a store is not stored in Zendesk.</p></div>
+<h2>Facts that constrain the options</h2>
+<div class="lk-sec" data-cm="facts-that-constrain-the-options"><table>
+<tr><td class="k">No Add-CC trigger action</td><td>Zendesk trigger/automation actions include "Add follower" but no "Add CC." <a href="https://support.zendesk.com/hc/en-us/articles/4408828286234-Creating-business-rules-for-CCs-and-followers">Source</a>.</td></tr>
+<tr><td class="k">Follower = agents only</td><td>The follower action takes a static agent user. Non-agent emails submitted as followers are removed. <a href="https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/">Source</a>.</td></tr>
+<tr><td class="k">API accepts CC by email</td><td><code>PUT /api/v2/tickets/{id}</code> with <code>email_ccs:[{user_email, action:"put"}]</code>. If the email has no user, a user is created. <a href="https://developer.zendesk.com/documentation/ticketing/managing-tickets/creating-and-updating-tickets/">Source</a>.</td></tr>
+<tr><td class="k">Lookup fields, actions</td><td>Custom-object lookup relationship fields are usable in trigger conditions and notification actions, not in ticket-membership actions. <a href="https://www.eesel.ai/blog/zendesk-trigger-add-follower-by-custom-field">Source</a>.</td></tr>
+<tr><td class="k">email_ccs limits</td><td>Max 48 email CCs per ticket; a CC change in the same API update as an internal note is ignored; the field requires "CCs and followers" enabled in settings. <a href="https://developer.zendesk.com/documentation/ticketing/managing-tickets/creating-and-updating-tickets/">Source</a>.</td></tr>
+<tr><td class="k">Store→DO source</td><td>Not present in Zendesk (verified live: no ticket field, group membership, or object links a store to a DO). The mapping exists in Mendo operational systems.</td></tr>
+<tr><td class="k">Observed current behavior</td><td>In 25 recent NPS-detractor tickets, the DO was added as CC + follower by the inbound email's CC header (audit <code>via.channel = email</code>), not by a trigger or agent. <a href="https://argus.com.ai/app">Argus Escalations tab</a>.</td></tr>
+</table></div>
+<h2>Approach A — Organization field + webhook + trigger</h2>
+<div class="lk-sec" data-cm="approach-a-organization-field-webhook"><p>Store the CC email(s) on an organization custom field; one trigger calls a webhook that PUTs the ticket's <code>email_ccs</code>. Documented method: <a href="https://jasonariddell.medium.com/zendesk-automation-adding-cc-and-followers-the-scalable-way-1f4900f3a09e">Jason Riddell, "Adding CC and Followers — The Scalable Way."</a></p>
+<svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Approach A flow">
+  <defs><marker id="aA" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 z" fill="#6FC3DF"/></marker></defs>
+  <rect x="20" y="20" width="200" height="54" rx="8" fill="#0d0d0d" stroke="#1e2a30"/>
+  <text x="120" y="43" fill="#9fe0f2" font-family="Helvetica" font-size="12" text-anchor="middle">Ticket created</text>
+  <text x="120" y="61" fill="#7f97a6" font-family="Consolas,monospace" font-size="10" text-anchor="middle">org has auto_cc field</text>
+  <line x1="220" y1="47" x2="300" y2="47" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aA)"/>
+  <rect x="300" y="20" width="200" height="54" rx="8" fill="#161616" stroke="#6FC3DF"/>
+  <text x="400" y="43" fill="#6FC3DF" font-family="Helvetica" font-size="12" text-anchor="middle">Trigger fires</text>
+  <text x="400" y="61" fill="#7f97a6" font-family="Consolas,monospace" font-size="10" text-anchor="middle">condition: auto_cc present</text>
+  <line x1="500" y1="47" x2="580" y2="47" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aA)"/>
+  <rect x="580" y="20" width="220" height="54" rx="8" fill="#161616" stroke="#6FC3DF"/>
+  <text x="690" y="43" fill="#6FC3DF" font-family="Helvetica" font-size="12" text-anchor="middle">Webhook</text>
+  <text x="690" y="61" fill="#7f97a6" font-family="Consolas,monospace" font-size="9.5" text-anchor="middle">PUT tickets/{id} email_ccs</text>
+  <line x1="690" y1="74" x2="690" y2="120" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aA)"/>
+  <rect x="560" y="124" width="260" height="48" rx="8" fill="#0c1c22" stroke="#1f5f47"/>
+  <text x="690" y="146" fill="#7CFFB2" font-family="Helvetica" font-size="12" text-anchor="middle">DO + store on the ticket CC</text>
+  <text x="690" y="163" fill="#7f97a6" font-family="Consolas,monospace" font-size="9.5" text-anchor="middle">fans out on every public reply</text>
+  <rect x="20" y="124" width="500" height="150" rx="8" fill="#0c1013" stroke="#2a3a42"/>
+  <text x="40" y="146" fill="#9fb3bd" font-family="Helvetica" font-size="11.5" font-weight="700">Components</text>
+  <text x="40" y="168" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">map lives:   organization custom field (auto_cc)</text>
+  <text x="40" y="186" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">code lives:  the webhook JSON body (Liquid loop)</text>
+  <text x="40" y="204" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">cost:        no additional vendor</text>
+  <text x="40" y="222" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">keyed by:    organization (store is in the body,</text>
+  <text x="40" y="238" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">             so a store parse/map is additional)</text>
+  <text x="40" y="262" fill="#f0c674" font-family="Consolas,monospace" font-size="10.5">note: followers strip non-agent emails; 48-CC cap</text>
+</svg></div>
+<h2>Approach B — Custom object + lookup + webhook</h2>
+<div class="lk-sec" data-cm="approach-b-custom-object-lookup"><p>Model stores as a Zendesk custom object with a lookup field to the DO user; a webhook dereferences the lookup and PUTs <code>email_ccs</code>. <a href="https://support.zendesk.com/hc/en-us/articles/8415083900698-Creating-many-to-many-relationships-in-Zendesk-using-custom-objects">Zendesk custom objects docs</a>.</p>
+<svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Approach B flow">
+  <defs><marker id="aB" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 z" fill="#6FC3DF"/></marker></defs>
+  <rect x="20" y="20" width="190" height="54" rx="8" fill="#0d0d0d" stroke="#1e2a30"/>
+  <text x="115" y="43" fill="#9fe0f2" font-family="Helvetica" font-size="12" text-anchor="middle">Ticket carries</text>
+  <text x="115" y="61" fill="#7f97a6" font-family="Consolas,monospace" font-size="10" text-anchor="middle">Store lookup field</text>
+  <line x1="210" y1="47" x2="290" y2="47" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aB)"/>
+  <rect x="290" y="20" width="220" height="54" rx="8" fill="#161616" stroke="#6FC3DF"/>
+  <text x="400" y="40" fill="#6FC3DF" font-family="Helvetica" font-size="12" text-anchor="middle">Store custom object</text>
+  <text x="400" y="60" fill="#7f97a6" font-family="Consolas,monospace" font-size="9.5" text-anchor="middle">lookup -&gt; DO user record</text>
+  <line x1="510" y1="47" x2="590" y2="47" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aB)"/>
+  <rect x="590" y="20" width="210" height="54" rx="8" fill="#161616" stroke="#6FC3DF"/>
+  <text x="695" y="40" fill="#6FC3DF" font-family="Helvetica" font-size="12" text-anchor="middle">Webhook</text>
+  <text x="695" y="60" fill="#7f97a6" font-family="Consolas,monospace" font-size="9.5" text-anchor="middle">reads lookup, PUT email_ccs</text>
+  <line x1="695" y1="74" x2="695" y2="120" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aB)"/>
+  <rect x="565" y="124" width="255" height="48" rx="8" fill="#0c1c22" stroke="#1f5f47"/>
+  <text x="692" y="152" fill="#7CFFB2" font-family="Helvetica" font-size="12" text-anchor="middle">DO on the ticket CC</text>
+  <rect x="20" y="124" width="505" height="150" rx="8" fill="#0c1013" stroke="#2a3a42"/>
+  <text x="40" y="146" fill="#9fb3bd" font-family="Helvetica" font-size="11.5" font-weight="700">Components</text>
+  <text x="40" y="168" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">map lives:   Store custom-object records</text>
+  <text x="40" y="186" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">code lives:  the webhook (dereferences lookup)</text>
+  <text x="40" y="204" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">cost:        custom objects on Suite Growth+</text>
+  <text x="40" y="222" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">native no-code path: notification only (side email,</text>
+  <text x="40" y="238" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">             not a CC on the guest thread)</text>
+  <text x="40" y="262" fill="#f0c674" font-family="Consolas,monospace" font-size="10.5">note: lookup fields cannot set CC natively</text>
+</svg></div>
+<h2>Approach C — iPaaS (Zapier / Make) + spreadsheet</h2>
+<div class="lk-sec" data-cm="approach-c-ipaas-zapier-make"><p>A no-code automation platform reads the ticket, looks the store up in a spreadsheet, and PUTs <code>email_ccs</code> via a raw API-request step. <a href="https://zapier.com/apps/zendesk/integrations/code--google-sheets">Zapier Zendesk + Code + Sheets</a>.</p>
+<svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Approach C flow">
+  <defs><marker id="aC" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 z" fill="#6FC3DF"/></marker></defs>
+  <rect x="20" y="20" width="170" height="54" rx="8" fill="#0d0d0d" stroke="#1e2a30"/>
+  <text x="105" y="43" fill="#9fe0f2" font-family="Helvetica" font-size="12" text-anchor="middle">New ticket</text>
+  <text x="105" y="61" fill="#7f97a6" font-family="Consolas,monospace" font-size="9.5" text-anchor="middle">Zapier/Make trigger</text>
+  <line x1="190" y1="47" x2="260" y2="47" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aC)"/>
+  <rect x="260" y="20" width="180" height="54" rx="8" fill="#161616" stroke="#6FC3DF"/>
+  <text x="350" y="40" fill="#6FC3DF" font-family="Helvetica" font-size="12" text-anchor="middle">Sheet lookup</text>
+  <text x="350" y="60" fill="#7f97a6" font-family="Consolas,monospace" font-size="9.5" text-anchor="middle">store -&gt; DO email</text>
+  <line x1="440" y1="47" x2="510" y2="47" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aC)"/>
+  <rect x="510" y="20" width="150" height="54" rx="8" fill="#161616" stroke="#6FC3DF"/>
+  <text x="585" y="40" fill="#6FC3DF" font-family="Helvetica" font-size="12" text-anchor="middle">Format/Code</text>
+  <text x="585" y="60" fill="#7f97a6" font-family="Consolas,monospace" font-size="9.5" text-anchor="middle">build JSON</text>
+  <line x1="660" y1="47" x2="730" y2="47" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aC)"/>
+  <rect x="668" y="86" width="152" height="48" rx="8" fill="#161616" stroke="#6FC3DF"/>
+  <text x="744" y="108" fill="#6FC3DF" font-family="Helvetica" font-size="11" text-anchor="middle">API request</text>
+  <text x="744" y="124" fill="#7f97a6" font-family="Consolas,monospace" font-size="9" text-anchor="middle">PUT email_ccs</text>
+  <path d="M744,74 L744,86" stroke="#6FC3DF" stroke-width="1.5" marker-end="url(#aC)"/>
+  <rect x="20" y="124" width="620" height="150" rx="8" fill="#0c1013" stroke="#2a3a42"/>
+  <text x="40" y="146" fill="#9fb3bd" font-family="Helvetica" font-size="11.5" font-weight="700">Components</text>
+  <text x="40" y="168" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">map lives:   Google Sheet / Airtable (ops-editable)</text>
+  <text x="40" y="186" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">code lives:  the Zap steps + raw API-request body</text>
+  <text x="40" y="204" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">cost:        ~$20-30/mo Zapier or ~$9+/mo Make</text>
+  <text x="40" y="222" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">vendors:     +1 (the iPaaS platform)</text>
+  <text x="40" y="240" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">native Zendesk actions do not expose email_ccs;</text>
+  <text x="40" y="256" fill="#c8d4da" font-family="Consolas,monospace" font-size="10.5">a raw HTTP step is required</text>
+</svg></div>
+<h2>Common element across all three</h2>
+<div class="lk-sec" data-cm="common-element-across-all-three"><svg viewBox="0 0 820 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="common element">
+  <rect x="20" y="20" width="180" height="44" rx="8" fill="#0c1013" stroke="#2a3a42"/>
+  <text x="110" y="40" fill="#c8d4da" font-family="Helvetica" font-size="11" text-anchor="middle">A · org field</text>
+  <text x="110" y="56" fill="#7f97a6" font-family="Consolas,monospace" font-size="9" text-anchor="middle">+ webhook</text>
+  <rect x="20" y="72" width="180" height="44" rx="8" fill="#0c1013" stroke="#2a3a42"/>
+  <text x="110" y="92" fill="#c8d4da" font-family="Helvetica" font-size="11" text-anchor="middle">B · custom object</text>
+  <text x="110" y="108" fill="#7f97a6" font-family="Consolas,monospace" font-size="9" text-anchor="middle">+ webhook</text>
+  <rect x="20" y="124" width="180" height="20" rx="6" fill="#0c1013" stroke="#2a3a42"/>
+  <text x="110" y="138" fill="#c8d4da" font-family="Helvetica" font-size="10" text-anchor="middle">C · iPaaS + sheet</text>
+  <line x1="200" y1="42" x2="300" y2="66" stroke="#6FC3DF" stroke-width="1.3"/>
+  <line x1="200" y1="94" x2="300" y2="70" stroke="#6FC3DF" stroke-width="1.3"/>
+  <line x1="200" y1="134" x2="300" y2="74" stroke="#6FC3DF" stroke-width="1.3"/>
+  <rect x="300" y="46" width="230" height="48" rx="8" fill="#161616" stroke="#6FC3DF"/>
+  <text x="415" y="68" fill="#6FC3DF" font-family="Consolas,monospace" font-size="11" text-anchor="middle">PUT /tickets/{id}</text>
+  <text x="415" y="85" fill="#7f97a6" font-family="Consolas,monospace" font-size="9.5" text-anchor="middle">email_ccs by email</text>
+  <rect x="560" y="46" width="240" height="48" rx="8" fill="#0c1013" stroke="#2a3a42"/>
+  <text x="680" y="66" fill="#c8d4da" font-family="Helvetica" font-size="10.5" text-anchor="middle">All three route the CC through</text>
+  <text x="680" y="82" fill="#c8d4da" font-family="Helvetica" font-size="10.5" text-anchor="middle">the same API call.</text>
+  <line x1="530" y1="70" x2="560" y2="70" stroke="#6FC3DF" stroke-width="1.3"/>
+</svg>
+<table>
+<tr><td class="k">Shared</td><td>The CC is added via <code>PUT /tickets/{id}</code> <code>email_ccs</code> in all three; native trigger actions cannot add a CC.</td></tr>
+<tr><td class="k">Shared</td><td>The store&rarr;DO map is loaded into a datastore (org field / custom object / spreadsheet); it originates from Mendo operational data, not Zendesk.</td></tr>
+<tr><td class="k">Marketplace apps</td><td>The purpose-built app "Carbon Copier" (CC from a field) was removed from the marketplace after Zendesk deprecated its HTTP targets. <a href="https://www.aviwarner.com/carbon-copier/">Source</a>. SweetHawk's documentation for adding a CC directs to a webhook + trigger. <a href="https://support.sweethawk.com/hc/en-us/articles/360056870852">Source</a>.</td></tr>
+</table></div>
+<h2>Current state at Mendo (observed)</h2>
+<div class="lk-sec" data-cm="current-state-at-mendo-observed"><table>
+<tr><td class="k">Escalation today</td><td>In the 25 most recent NPS-detractor tickets sampled, the DO was added as CC + follower via the inbound email's CC header (audit <code>via.channel = email</code>). No trigger, automation, or agent added it.</td></tr>
+<tr><td class="k">Implication</td><td>A store&rarr;DO resolution is already occurring in the system that generates the NPS survey email. Scope of this sample: 25 tickets.</td></tr>
+</table>
+
+<div class="foot">Living doculink · comment on any section · v0 · 2026-07-23 · DO/Store CC — three technical approaches · sources inline</div>
+
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"b1935424-be9e-4a5e-96b7-1f5d79729746"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

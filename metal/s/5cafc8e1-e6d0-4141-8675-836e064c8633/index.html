@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagram — Status Bridge, full dyno</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  nav.bar { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  nav.bar .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  nav.bar .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:1140px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:24px; margin:.2em 0 .1em; }
+  .sub { color:var(--mut); margin-top:0; }
+  .frame { background:#0c0c0c; border:1px solid #242424; border-radius:10px; padding:8px; margin:16px 0; overflow-x:auto; }
+  svg { display:block; width:100%; height:auto; min-width:1000px; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:12px 15px; }
+  .card.law { grid-column:1 / -1; border-left:3px solid var(--warn); background:#191712; }
+  .card h3 { margin:.1em 0 .4em; font-size:14px; color:var(--accent); }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  .foot { color:var(--mut); font-size:12px; margin-top:34px; border-top:1px solid #242424; padding-top:12px; }
+  ul { margin:.3em 0; padding-left:18px; } li { margin:.2em 0; font-size:13.5px; }
+</style>
+</head>
+<body>
+<nav class="bar"><span class="brand">Be</span><span class="pub">Published 2026-07-18 11:40 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/5cafc8e1-e6d0-4141-8675-836e064c8633/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="wrap">
+
+<h1>Status Bridge &mdash; full dyno, data flow</h1>
+<p class="sub">Dynamic membership from signed DNS TXT &middot; closed output schema &middot; staleness lives in the app layer &middot; companion to <code>~d</code> v2</p>
+
+<div class="frame">
+<svg viewBox="0 0 1120 720" role="img" aria-label="Status bridge full-dyno data flow diagram">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#6FC3DF"/>
+    </marker>
+    <marker id="arD" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#E0B84C"/>
+    </marker>
+    <marker id="arG" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#7CD992"/>
+    </marker>
+  </defs>
+
+  <!-- zone headers -->
+  <text x="140" y="30" fill="#6FC3DF" font-size="14" font-weight="700" text-anchor="middle">THE MESH</text>
+  <text x="140" y="48" fill="#8a8a8a" font-size="11" text-anchor="middle">turn on / turn off</text>
+  <text x="400" y="30" fill="#6FC3DF" font-size="14" font-weight="700" text-anchor="middle">MEMBERSHIP = SIGNED DNS</text>
+  <text x="400" y="48" fill="#8a8a8a" font-size="11" text-anchor="middle">source of truth</text>
+  <text x="668" y="30" fill="#6FC3DF" font-size="14" font-weight="700" text-anchor="middle">THE STATUS BRIDGE</text>
+  <text x="668" y="48" fill="#8a8a8a" font-size="11" text-anchor="middle">in-VPC &middot; no public port</text>
+  <text x="985" y="30" fill="#6FC3DF" font-size="14" font-weight="700" text-anchor="middle">PUBLIC</text>
+  <text x="985" y="48" fill="#8a8a8a" font-size="11" text-anchor="middle">address-free</text>
+
+  <!-- MESH container -->
+  <rect x="30" y="62" width="220" height="330" rx="10" fill="none" stroke="#333" stroke-dasharray="5 4"/>
+  <g font-size="12.5" text-anchor="middle">
+    <rect x="46" y="80"  width="188" height="40" rx="7" fill="#1A1A1A" stroke="#2f5b66"/><text x="140" y="105" fill="#e8e8e8">relay-los-angeles</text>
+    <rect x="46" y="128" width="188" height="40" rx="7" fill="#1A1A1A" stroke="#2f5b66"/><text x="140" y="153" fill="#e8e8e8">relay-hong-kong</text>
+    <rect x="46" y="176" width="188" height="40" rx="7" fill="#1A1A1A" stroke="#2f4d3a"/><text x="140" y="201" fill="#e8e8e8">prime &middot; prime &middot; &hellip;</text>
+    <rect x="46" y="224" width="188" height="40" rx="7" fill="#1A1A1A" stroke="#444"/><text x="140" y="249" fill="#e8e8e8">bridge (self = up)</text>
+  </g>
+  <text x="140" y="292" fill="#7CD992" font-size="11" text-anchor="middle">announce signed TXT</text>
+  <text x="140" y="308" fill="#8a8a8a" font-size="10.5" text-anchor="middle">at boot + re-announce &lt; TTL 300</text>
+  <text x="140" y="340" fill="#E06C6C" font-size="11" text-anchor="middle">off &rarr; record expires (TTL)</text>
+  <text x="140" y="356" fill="#8a8a8a" font-size="10.5" text-anchor="middle">no recompile, ever</text>
+
+  <!-- MESH -> DNS announce arrow -->
+  <path d="M250,150 L296,150" fill="none" stroke="#7CD992" stroke-width="2" marker-end="url(#arG)"/>
+  <text x="273" y="142" fill="#7CD992" font-size="10" text-anchor="middle">announce</text>
+
+  <!-- DNS box -->
+  <rect x="300" y="80" width="200" height="230" rx="10" fill="#0f1416" stroke="#2f5b66"/>
+  <text x="400" y="106" fill="#6FC3DF" font-size="12.5" font-weight="600" text-anchor="middle">_relay.3-nous.net</text>
+  <text x="400" y="124" fill="#6FC3DF" font-size="12.5" font-weight="600" text-anchor="middle">_prime.3-nous.net</text>
+  <text x="400" y="146" fill="#8a8a8a" font-size="10.5" text-anchor="middle">zone 3-nous.net &middot; Cloudflare</text>
+  <line x1="320" y1="160" x2="480" y2="160" stroke="#242424"/>
+  <text x="400" y="182" fill="#e8e8e8" font-size="11" text-anchor="middle">record, per node:</text>
+  <text x="400" y="202" fill="#cfe8ef" font-size="11.5" text-anchor="middle" font-family="monospace">r=ip:port</text>
+  <text x="400" y="220" fill="#cfe8ef" font-size="11.5" text-anchor="middle" font-family="monospace">k=pubkey</text>
+  <text x="400" y="238" fill="#cfe8ef" font-size="11.5" text-anchor="middle" font-family="monospace">s=operator-sig</text>
+  <line x1="320" y1="252" x2="480" y2="252" stroke="#242424"/>
+  <text x="400" y="273" fill="#7CD992" font-size="10.5" text-anchor="middle">on = announced</text>
+  <text x="400" y="289" fill="#E06C6C" font-size="10.5" text-anchor="middle">off = TTL 300 expires</text>
+
+  <!-- DNS -> bridge discover -->
+  <path d="M500,150 L556,118" fill="none" stroke="#6FC3DF" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="527" y="128" fill="#6FC3DF" font-size="10" text-anchor="middle">read</text>
+
+  <!-- BRIDGE container -->
+  <rect x="548" y="62" width="238" height="580" rx="10" fill="none" stroke="#333" stroke-dasharray="5 4"/>
+  <g text-anchor="middle" font-size="12">
+    <rect x="566" y="96"  width="202" height="42" rx="7" fill="#12211f" stroke="#2f4d3a"/>
+      <text x="667" y="113" fill="#e8e8e8" font-weight="600">1 &middot; discover</text><text x="667" y="129" fill="#8a8a8a" font-size="10.5">dns_discover_relays()</text>
+    <rect x="566" y="152" width="202" height="42" rx="7" fill="#12211f" stroke="#2f4d3a"/>
+      <text x="667" y="169" fill="#e8e8e8" font-weight="600">2 &middot; verify</text><text x="667" y="185" fill="#8a8a8a" font-size="10.5">ed25519 &middot; drop unsigned</text>
+    <rect x="566" y="208" width="202" height="42" rx="7" fill="#1A1A1A" stroke="#2f5b66"/>
+      <text x="667" y="225" fill="#e8e8e8" font-weight="600">3 &middot; probe</text><text x="667" y="241" fill="#8a8a8a" font-size="10.5">GET /status (in-VPC)</text>
+    <rect x="566" y="264" width="202" height="46" rx="7" fill="#211d12" stroke="#E0B84C"/>
+      <text x="667" y="282" fill="#E0B84C" font-weight="700">4 &middot; project &rarr; CLOSED schema</text><text x="667" y="299" fill="#8a8a8a" font-size="10.5">field-by-field allowlist &mdash; THE LAW</text>
+    <rect x="566" y="324" width="202" height="46" rx="7" fill="#1A1A1A" stroke="#444"/>
+      <text x="667" y="342" fill="#e8e8e8" font-weight="600">5 &middot; stamp seen_cache</text><text x="667" y="359" fill="#8a8a8a" font-size="10.5">{pubkey_hash: first_seen,last_seen}</text>
+    <rect x="566" y="384" width="202" height="42" rx="7" fill="#1A1A1A" stroke="#444"/>
+      <text x="667" y="401" fill="#e8e8e8" font-weight="600">6 &middot; emit</text><text x="667" y="417" fill="#8a8a8a" font-size="10.5">mesh.json + index.html</text>
+    <rect x="566" y="440" width="202" height="42" rx="7" fill="#1A1A1A" stroke="#444"/>
+      <text x="667" y="457" fill="#e8e8e8" font-weight="600">7 &middot; push</text><text x="667" y="473" fill="#8a8a8a" font-size="10.5">cloudflare-bridge &middot; every 60s</text>
+  </g>
+  <!-- vertical step arrows -->
+  <g stroke="#6FC3DF" stroke-width="1.6" marker-end="url(#ar)">
+    <line x1="667" y1="138" x2="667" y2="150"/>
+    <line x1="667" y1="194" x2="667" y2="206"/>
+    <line x1="667" y1="250" x2="667" y2="262"/>
+    <line x1="667" y1="310" x2="667" y2="322"/>
+    <line x1="667" y1="370" x2="667" y2="382"/>
+    <line x1="667" y1="426" x2="667" y2="438"/>
+  </g>
+
+  <!-- probe back to mesh (dashed, in-VPC) -->
+  <path d="M566,229 C 430,229 300,360 254,300" fill="none" stroke="#E0B84C" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arD)"/>
+  <text x="360" y="330" fill="#E0B84C" font-size="10" text-anchor="middle">probe /status &middot; in-VPC (addr used here, never emitted)</text>
+
+  <!-- TRUST BOUNDARY -->
+  <line x1="806" y1="70" x2="806" y2="600" stroke="#E06C6C" stroke-width="1.4" stroke-dasharray="3 5"/>
+  <text x="806" y="622" fill="#E06C6C" font-size="10.5" text-anchor="middle">TRUST BOUNDARY &mdash; no addr / pubkey crosses</text>
+
+  <!-- push -> public -->
+  <path d="M786,461 C 815,461 815,150 832,132" fill="none" stroke="#6FC3DF" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- PUBLIC container -->
+  <rect x="835" y="62" width="255" height="580" rx="10" fill="none" stroke="#333" stroke-dasharray="5 4"/>
+  <rect x="852" y="96" width="222" height="44" rx="7" fill="#1A1A1A" stroke="#2f5b66"/>
+    <text x="963" y="114" fill="#e8e8e8" font-size="12.5" text-anchor="middle" font-weight="600">Cloudflare Pages</text>
+    <text x="963" y="131" fill="#8a8a8a" font-size="10.5" text-anchor="middle">project ai-metal-net</text>
+  <rect x="852" y="152" width="222" height="46" rx="7" fill="#0f1416" stroke="#6FC3DF"/>
+    <text x="963" y="170" fill="#6FC3DF" font-size="12.5" text-anchor="middle" font-weight="700">status.purcius.net</text>
+    <text x="963" y="188" fill="#cfe8ef" font-size="11" text-anchor="middle" font-family="monospace">/mesh.json</text>
+  <rect x="852" y="210" width="222" height="118" rx="7" fill="#1A1A1A" stroke="#444"/>
+    <text x="963" y="230" fill="#e8e8e8" font-size="11.5" text-anchor="middle" font-weight="600">emitted per node (facts)</text>
+    <text x="963" y="250" fill="#cfe8ef" font-size="11" text-anchor="middle" font-family="monospace">id = hash(pubkey)</text>
+    <text x="963" y="268" fill="#cfe8ef" font-size="11" text-anchor="middle" font-family="monospace">role &middot; region*</text>
+    <text x="963" y="286" fill="#cfe8ef" font-size="11" text-anchor="middle" font-family="monospace">last_seen &middot; last_probe</text>
+    <text x="963" y="304" fill="#cfe8ef" font-size="11" text-anchor="middle" font-family="monospace">reachable : bool</text>
+    <text x="963" y="322" fill="#7CD992" font-size="10" text-anchor="middle">no address &middot; no key &middot; no verdict</text>
+
+  <!-- pages -> status arrow -->
+  <line x1="963" y1="140" x2="963" y2="150" stroke="#6FC3DF" stroke-width="1.6" marker-end="url(#ar)"/>
+  <line x1="963" y1="198" x2="963" y2="208" stroke="#6FC3DF" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <!-- APP LAYER -->
+  <rect x="852" y="360" width="222" height="126" rx="8" fill="#0f1416" stroke="#6FC3DF" stroke-width="1.6"/>
+    <text x="963" y="382" fill="#6FC3DF" font-size="13" text-anchor="middle" font-weight="700">APP LAYER</text>
+    <text x="963" y="404" fill="#e8e8e8" font-size="11" text-anchor="middle">owns &ldquo;not seen&rdquo;</text>
+    <text x="963" y="424" fill="#8a8a8a" font-size="10.5" text-anchor="middle">reads last_seen + reachable,</text>
+    <text x="963" y="440" fill="#8a8a8a" font-size="10.5" text-anchor="middle">applies its OWN threshold &rarr;</text>
+    <text x="963" y="460" fill="#E0B84C" font-size="11" text-anchor="middle">up / down / stale = app&rsquo;s call</text>
+    <text x="963" y="478" fill="#8a8a8a" font-size="10" text-anchor="middle">the bridge never decides this</text>
+  <line x1="963" y1="328" x2="963" y2="358" stroke="#6FC3DF" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <!-- internal-only note under bridge -->
+  <text x="667" y="512" fill="#8a8a8a" font-size="10.5" text-anchor="middle">roster held one cycle, then dropped</text>
+  <text x="667" y="528" fill="#8a8a8a" font-size="10.5" text-anchor="middle">(discover &rarr; project &rarr; forget)</text>
+  <text x="667" y="552" fill="#E06C6C" font-size="10.5" text-anchor="middle">holds addr + pubkey to PROBE &amp; VERIFY only</text>
+</svg>
+</div>
+
+<div class="cards">
+  <div class="card law">
+    <h3>THE LAW (step 4) &mdash; why dynamic input is still leak-proof</h3>
+    Membership is <b>dynamic</b>; the output schema is <b>closed</b>. Discovered fields enter <b>named local variables</b>, never a forwardable blob. <code>addr</code> and <code>pubkey</code> are consumed <i>only</i> as a probe target and a verify key &mdash; <b>no output field is ever assigned from them.</b> A new attribute requires a <b>code change to the projection</b>, never a discovered field auto-appearing. String fields (<code>region</code>, <code>transport</code>) are validated against a word-allowlist before emit &mdash; a bad node can lie in a number but can&rsquo;t smuggle an address through one.
+  </div>
+  <div class="card">
+    <h3>Sense on / off (green + red path)</h3>
+    <ul>
+      <li><b>On:</b> node boots &rarr; announces signed TXT &rarr; within TTL+requery it&rsquo;s discovered, verified, probed &rarr; appears. No recompile.</li>
+      <li><b>Off:</b> node stops announcing &rarr; TTL 300 expires &rarr; drops from discovery &rarr; <code>recently_departed[]</code>, then gone.</li>
+      <li><b>never-seen</b> = absent &middot; <b>went-away</b> = present, <code>reachable:false</code> &middot; <b>departed</b> = in <code>recently_departed[]</code>.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Two upstream must-solves (yellow flags)</h3>
+    <ul>
+      <li><b>Relay re-announce.</b> Relays announce <code>_relay</code> at boot only, TTL 300 &rarr; a live relay would flap out. Add <code>dns_announce_self()</code> to <code>periodic_refresh()</code> first (Rule 11, flow up).</li>
+      <li><b>Probe protocol.</b> Confirm relays serve plain HTTP <code>/status</code> on <code>:8080</code> in-VPC (vs wire-TLS) &mdash; one peer <code>curl</code> (Rule 13).</li>
+    </ul>
+  </div>
+</div>
+
+<div class="foot">metal console &middot; Be &middot; v0 &middot; r707 &middot; 2026-07-18 &middot; 1819 pts &middot; Purcius &mdash; status bridge full-dyno (diagram, companion to ~d v2)</div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"5cafc8e1-e6d0-4141-8675-836e064c8633"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>

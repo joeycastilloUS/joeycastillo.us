@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~i — Why #735's Guest Got Nothing</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:800px;margin:0 auto;padding:8px 22px 60px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:36px}
+ h1{font-size:25px;margin:20px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:15px;color:#6FC3DF;margin:32px 0 9px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:6px}
+ h3{font-size:15px;color:#fff;margin:18px 0 6px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 6px}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 16px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:14px 16px;margin:12px 0}
+ .card.yes{border-left:3px solid #3aa06a}.card.no{border-left:3px solid #c9463f}
+ .card.warn{border-left:3px solid #c9a24b}.card.info{border-left:3px solid #3a6a90}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 6px;border-radius:4px}
+ pre{background:#0a0a0a;border:1px solid #262626;border-radius:7px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#c8d6dd;line-height:1.55}
+ table{width:100%;border-collapse:collapse;margin:11px 0;font-size:13.5px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:7px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:8px 9px;color:#c5d0d6}
+ td.k{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;white-space:nowrap}
+ ul{margin:7px 0;padding-left:20px}li{margin:5px 0}
+ .foot{margin-top:26px;border-top:1px solid #222;padding-top:13px;color:#5f6f77;font-size:11.5px}
+ .big{font-size:18px;color:#fff;font-weight:600;margin:0 0 6px}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">~i &middot; inspect</span>
+<span class="p">2026-07-21 11:30 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/c9910d29-275f-40d9-9d92-228746b8c3ce/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>Why #735's guest got nothing</h1>
+<p class="lede">The parser fix worked. The reply was composed and Zendesk fired a notification. It was
+never delivered, and the reason is one line of platform behaviour.</p>
+<p class="sub">Paired. Read-only &mdash; nothing changed. Scoped to <b>#735</b>, the shape production will
+actually see.</p>
+
+<h2>The cause</h2>
+<div class="card no">
+<p class="big">Zendesk never emails the author of the comment it is notifying about.</p>
+<p>On the recovery ticket the public comment's <code>author_id</code> was
+<b>the guest &mdash; who is also the requester</b>. The trigger fired, the Notification event is in the
+audit, the recipient list names the guest. Zendesk simply does not send someone mail about their own
+comment.</p>
+<p><b>It is platform behaviour, not a rule anyone wrote.</b> The trigger that fired &mdash;
+<i>"Support Happy - Initial Comment Email"</i> &mdash; has no &ldquo;current user is not requester&rdquo;
+condition. And the audit's <i>performer</i> was an admin, yet delivery was still suppressed. So the
+suppression keys on <b>who authored the comment</b>, not on who performed the update. Authenticating as an
+admin is not enough; the comment itself must be authored by someone other than the recipient.</p>
+</div>
+
+<h2>What #735 gets right, and it is the whole opportunity</h2>
+<div class="card yes">
+<p>Brendan's JotForm emails the alert <b>as the guest</b>:</p>
+<pre>FROM  joey.castillo@acmedev.com   ("Joey Castillo")
+TO    hello@guestrelationstest.zendesk.com  ("Guest Relations Test Brand")</pre>
+<p>So on #735 the <b>guest is already the requester</b>, on the right brand, in a thread they can reply
+to. There is no need to create a second ticket to reach them &mdash; and creating one is what broke it.
+<b>Post the recovery as a public, agent-authored comment on #735 and stop making a second ticket.</b></p>
+</div>
+
+<h2>The trap that would have burned us a second time</h2>
+<div class="card no">
+<p class="big">#735 has no group, and every notify trigger in this account is group-scoped.</p>
+<pre>ticket 735   group_id = None
+
+trigger "Guest Relations - Notify Requester ... When Public Comment Is Added"
+  ALL  update_type        is  Change
+  ALL  comment_is_public  is  true
+  ALL  group_id           is  50360136527764     &lt;-- cannot match a null group
+  ALL  custom_fields_...  is  false
+  ALL  current_tags  not_includes  hubspot_nps_survey</pre>
+<p>The group is null because the auto-assign trigger only matches the <i>production</i> Guest Relations
+address, not the sandbox <code>hello@guestrelationstest.zendesk.com</code>.</p>
+<p><b>So a correctly-authored public comment on #735 today would still send nothing</b> &mdash; and this
+time with no Notification event recorded at all, so it would look like nothing even tried. The fix must
+set the group in the same call.</p>
+</div>
+
+<h2>The exposure to fix in the same breath</h2>
+<div class="card warn">
+<p>The Guest Relations notify template quotes prior public comments into the outbound email. The alert
+comment on #735 is <b>public</b>. So the recovery mail would carry the raw alert back to the guest:</p>
+<pre>On ..., Joey Castillo Wrote:
+## Guest Experience Alert
+**NPS Score** 3 / 10
+**Guest Email** joey.castillo@acmedev.com ...</pre>
+<p>Their own data, with literal markdown asterisks, quoted beneath the apology. The same template also
+contains a malformed Liquid conditional that renders unpredictably. <b>Making the alert comment private
+is mandatory, not polish.</b></p>
+</div>
+
+<h2>The shape of the fix</h2>
+<pre>PUT /api/v2/tickets/735/comments/&lt;alert-comment-id&gt;/make_private.json
+
+PUT /api/v2/tickets/735.json
+{ "ticket": {
+    "comment": { "body": "&lt;recovery&gt;", "public": true, "author_id": &lt;agent&gt; },
+    "group_id": 50360136527764,
+    "additional_tags": ["argus_recovery_sent"]
+} }</pre>
+<table>
+<tr><th>Detail</th><th>Finding</th></tr>
+<tr><td>Author</td><td>Must not be the guest. An existing admin identity already used by the bridge works.</td></tr>
+<tr><td>From-address</td><td><code>hello@guestrelationstest.zendesk.com</code> &mdash; the ticket's recipient and the brand's default. Correct brand, no extra work. Its display <b>name is unset</b>; one send will confirm the chrome.</td></tr>
+<tr><td>Subject the guest sees</td><td><b>Not ours.</b> The trigger hard-codes its own subject line. The recovery's subject field is dead weight unless a dedicated trigger is added &mdash; that is an Ops decision, D9 owns it.</td></tr>
+<tr><td>Threading</td><td>Works. Replies come back to the GR address and reopen #735.</td></tr>
+<tr><td>Idempotency</td><td>Must live <b>on #735</b> and be checked before the write. <code>argus_nps_handled</code> marks the sweep, not the send &mdash; keep them distinct or a retry double-sends and double-spends a code.</td></tr>
+<tr><td>Bridge contract</td><td>The recovery lane posts <code>{guest_email, subject, body, draft_id}</code> with no ticket reference. It needs <code>alert_ticket_id</code> &mdash; the sibling internal-alert lane already carries one, so mirror it.</td></tr>
+</table>
+
+<h2>A demand now contradicts reality</h2>
+<div class="card warn">
+<p><b>D13</b> says the alert ticket's requester is a neutral NPS-system identity &mdash; for privacy, and
+to prevent notification loops. On the JotForm path <b>the requester IS the guest</b>, and that is
+precisely what makes replying on the alert ticket possible.</p>
+<p>The old assumption was "you cannot reply to a guest on the alert ticket." It is now inverted. <b>D13
+needs amending</b>, or someone will helpfully restore the neutral requester and silently break this whole
+path. The comment in <code>pi_run.c</code> describing the follow-up-ticket mechanism is now false too.</p>
+</div>
+
+<h2>Three things upstream in JotForm</h2>
+<ul>
+<li><b>The guest is copied on their own alert.</b> <code>original_recipients</code> lists the guest as
+well as the Zendesk address, so they receive the raw internal template from themselves. If they reply-all
+it has no Zendesk headers and <b>opens a brand-new ticket</b>. Notification recipients should be the
+Zendesk address only.</li>
+<li><b>JotForm spoofs the From as the guest.</b> That fails SPF/DKIM alignment for the guest's domain.
+<code>acmedev.com</code> passed here; a real guest on a domain publishing DMARC <code>p=reject</code> can
+be suspended or spam-binned &mdash; <b>Argus would never see the alert and the guest is never
+recovered.</b> Worth one test from a yahoo or gmail address before production.</li>
+<li><b>The subject carries mojibake</b> &mdash; <code>Guest Alert &acirc;&euro;&ldquo; Detractor</code>,
+a double-encoded en-dash &mdash; and the guest can see it in the portal.</li>
+</ul>
+
+<h2>Also worth knowing</h2>
+<ul>
+<li>The test recovery ticket landed on the <b>IT Request form</b> &mdash; the only reason any notify
+trigger matched at all. Even delivered, the guest would have received IT-Request chrome from the wrong
+brand.</li>
+<li>The escalation note is genuinely private &mdash; verified in source. The illness path does not leak.</li>
+<li>CSAT will not fire at this guest; that automation is bound to a different form.</li>
+<li>No suspended tickets, and the brand's addresses verify clean. Delivery infrastructure is not the
+problem.</li>
+</ul>
+
+<h2>Definition of Done</h2>
+<ul>
+<li>&#10003; Paired &mdash; navigator found the group-scoping trap the driver would have shipped past</li>
+<li>&#10003; Cause proven from the audit, not inferred from symptoms &mdash; notification fired, delivery suppressed by comment authorship</li>
+<li>&#10003; The two load-bearing claims re-verified by the driver against the live API</li>
+<li>&#10003; Read-only &mdash; nothing changed anywhere</li>
+<li>&#10003; A demand (D13) flagged as contradicted by the new intake shape</li>
+<li>&#10007; Not fixed. This is the <code>~i</code>.</li>
+</ul>
+
+<div class="foot">Generated 2026-07-21 11:30 &middot; v0 &middot; ~i &middot; live sandbox tickets 734/735/736,
+triggers 50360292729236 &amp; 50360318863892, <code>pi_run.c:648-654, 846-849</code></div>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+</body></html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zendesk NPS Automation — Native vs Custom: Platform Capability Assessment</title>
+<style>
+  :root{ --bg:#111;--surf:#1A1A1A;--surf2:#0c1013;--accent:#6FC3DF;--ink:#e6ebee;--mut:#93a3ab;--line:#243038;--ok:#7CFFB2;--warn:#f0c674;--bad:#f0997d; }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.58;font-size:15px}
+  code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0b1418;padding:1px 5px;border-radius:4px;word-break:break-word}
+  .nav{position:sticky;top:0;background:#000;border-bottom:2px solid var(--accent);display:flex;justify-content:space-between;padding:10px 20px;z-index:5}
+  .nav .brand{font-weight:700;color:var(--accent)} .nav .pub{font-size:12px;color:var(--mut)}
+  .wrap{max-width:860px;margin:0 auto;padding:24px 20px 70px}
+  h1{font-size:24px;margin:8px 0 4px} .sub{color:var(--mut);font-size:14px;margin-bottom:18px}
+  h2{font-size:18px;color:var(--accent);margin:30px 0 8px;border-bottom:1px solid var(--line);padding-bottom:5px}
+  h3{font-size:15px;margin:18px 0 6px;color:#dfeaef}
+  .lede{font-size:16px;color:#dfeaef;background:var(--surf);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:12px 0} th,td{border-bottom:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top} th{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .two{display:grid;grid-template-columns:1fr;gap:14px;margin:14px 0}
+  @media(min-width:760px){.two{grid-template-columns:1fr 1fr}}
+  .col{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--surf)}
+  .col.native{border-top:3px solid var(--ok)} .col.forced{border-top:3px solid var(--warn)}
+  .col h3{margin-top:0} .col ul{margin:6px 0 0;padding-left:18px} .col li{margin:6px 0;font-size:13.5px}
+  b.ok{color:var(--ok)} b.warn{color:var(--warn)} b.bad{color:var(--bad)}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
+  .kpi .k{flex:1;min-width:150px;background:var(--surf);border:1px solid var(--line);border-radius:9px;padding:12px 14px}
+  .kpi .n{font-size:26px;font-weight:700;color:var(--accent)} .kpi .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .note{font-size:12.5px;color:var(--mut)}
+  .foot{color:#5f6f77;font-size:12px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
+<div class="nav"><span class="brand">Be</span><span class="pub">Assessment · 2026-07-26</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/b64beaf7-2b6d-44d7-8736-ecdce5d65d2d/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+  <h1>Zendesk NPS-Detractor Automation — Native vs Custom</h1>
+  <div class="sub">A platform-capability assessment of the automated NPS-detractor recovery + illness-safety workflow: what Zendesk does out of the box, and where the platform forces custom code. Written from a line-by-line audit of the integration service against Zendesk's documented behavior. Objective; no vendor recommendation implied.</div>
+
+  <div class="lede">The workflow runs <b class="ok">largely on native Zendesk</b> — Intelligent Triage classification, triggers for tagging/routing/escalation, and templated email replies are all platform-native. The custom integration service exists for a <b class="warn">narrow, well-defined reason</b>: Zendesk trigger webhooks are <b>one-way</b>, so any value the business computes (a unique single-use coupon code) or looks up (the store's District Operator) must be written back into the ticket by an external call. That one-way-webhook limit — with two narrower gaps (Zendesk has no way to <em>compute</em> a secret-keyed value like a unique code, and custom AI topics have <em>no provisioning API</em>) — accounts for the <em>unavoidable</em> custom code. A few additional custom writes were conveniences of our own and are being moved back to native.</div>
+
+  <div class="kpi">
+    <div class="k"><div class="n">Native</div><div class="l">classification · routing · escalation · templated reply</div></div>
+    <div class="k"><div class="n">2</div><div class="l">genuinely-forced custom services (code + DO lookup write-back)</div></div>
+    <div class="k"><div class="n">1</div><div class="l">root limitation driving it (one-way webhooks)</div></div>
+  </div>
+
+  <h2>What Zendesk does natively (and we use as-is)</h2>
+<div class="lk-sec" data-cm="what-zendesk-does-natively-and"><table>
+    <tr><th>Capability</th><th>Native mechanism</th></tr>
+    <tr><td>Classify the ticket (topic, sentiment, language, <b>and confidence</b>)</td><td>Intelligent Triage — writes intent/sentiment/language <em>and</em> confidence as fields + tags (e.g. <code>intent_confidence__high</code>), usable directly in rules</td></tr>
+    <tr><td>Detect food-illness semantically</td><td>Intelligent Triage <b>custom topic</b> (Advanced AI add-on) — no code</td></tr>
+    <tr><td>Tag, route to a group, set priority, suppress on illness</td><td>Triggers — conditions + tag/group/priority actions</td></tr>
+    <tr><td>Only act on NPS mail / only on a clean detractor</td><td>Trigger conditions (recipient, body-token, tag algebra) — fail-closed by construction</td></tr>
+    <tr><td>Send the fixed recovery reply to the guest</td><td>Trigger <code>notification_user</code> action with a fixed template</td></tr>
+    <tr><td>Exactly-once / no double-fire</td><td>Trigger "marker-on-fire": a condition <code>not_includes &lt;marker&gt;</code> + an action that adds the marker</td></tr>
+    <tr><td>Full record of what happened</td><td>The native <b>ticket audit/event log</b> — every field/tag change plus each notification's subject, body and recipients; combined with the on-ticket field value, the exact content sent is reconstructable</td></tr>
+  </table>
+  <p class="note">Confidence-based gating (only auto-reply on high-confidence classifications) is <b>natively possible</b> today via the confidence tags above — it simply hasn't been enabled yet. That is our backlog item, not a platform gap.</p></div>
+<h2>Where Zendesk forces custom code — with the exact limitation</h2>
+<div class="lk-sec" data-cm="where-zendesk-forces-custom-code"><table>
+    <tr><th>What we had to build</th><th>The Zendesk limitation that forces it</th><th>Avoidable?</th></tr>
+    <tr><td>Write a <b>unique single-use coupon code</b> into the ticket field for the reply template</td><td><b>Trigger webhooks are one-way</b> — a trigger can call an external endpoint but <b>cannot consume its response</b> and place a returned value into a field. The code is computed per-ticket (HMAC), so no fixed/native value works.</td><td><b class="bad">No — structural</b></td></tr>
+    <tr><td>CC the <b>store's District Operator</b> (dynamic per store) on an illness escalation</td><td>Native CC/notify actions address only a <b>fixed, pre-chosen user</b>. A per-store mapping would need one hand-maintained trigger per store with every DO provisioned as a user — and here the store identity arrives in the email <b>body</b>, which trigger conditions can match but <b>cannot extract</b> into a lookup. So a native rule cannot resolve the recipient; a lookup service does.</td><td><b class="warn">Native but impractical</b></td></tr>
+    <tr><td>Provision / version the AI classification topics as config</td><td>Custom Intelligent-Triage topics have <b>no create/train API</b> — they are Admin-Center-only. They cannot be created, versioned, or promoted between environments programmatically.</td><td><b class="bad">No — platform gap</b> (manual step remains)</td></tr>
+    <tr><td>Leave a human-readable note of an automated action in the ticket comment stream</td><td><b>Triggers have no "add comment" action.</b> Automation can email or tag, but cannot post a comment. (The native audit log still records the action — see above.)</td><td><b class="warn">Partly</b> — the audit log is the native record; a comment needs code</td></tr>
+    <tr><td>Handle classification that lands <em>after</em> ticket creation without races</td><td>Intelligent Triage classifies <b>asynchronously, post-create</b>. Rules that assume classification-at-create miss it; this forces a fail-closed, marker-gated design.</td><td><b class="warn">Design cost</b> — solvable with native triggers, but adds complexity</td></tr>
+    <tr><td>Write multiple tags in one API update</td><td>A single-ticket API update <b>ignores <code>additional_tags</code></b>, forcing a read-modify-write of the whole tag set. (The dedicated Tags API can append safely, but splits into multiple update events; we needed one atomic event so downstream triggers evaluate exactly once.)</td><td><b class="warn">Minor</b> — only relevant because code writes tags at all</td></tr>
+  </table>
+
+  <p class="note"><b>Anticipating the sharpest rebuttal (ZIS):</b> Zendesk Integration Services can call an external API and write the result back into a ticket — but a ZIS flow is itself <b>custom-developed integration code</b>, and computing a secret-keyed value (the HMAC coupon) still requires an external compute endpoint. ZIS <em>relocates</em> the code into Zendesk's own integration layer; it does not eliminate the need for it. The forced-code conclusion stands.</p></div>
+<h2>What we coded that we did NOT have to (our choice — being moved to native)</h2>
+<div class="lk-sec" data-cm="what-we-coded-that-we"><p>In the spirit of a fair assessment: a handful of ticket-time writes in our service duplicate things Zendesk can do natively. These are on us, not the platform, and are being remediated:</p>
+  <ul>
+    <li><b>An internal comment recording the recovery</b> — duplicates the native audit log; a convenience, not a necessity.</li>
+    <li><b>An escalation tag + priority + email sent from the service</b> — replaceable by native trigger actions + a group notification. (The accompanying private <b>note</b> has no native equivalent — triggers can't comment — so it either drops, with the audit log as the record, or stays as the one justified code-write on this path.)</li>
+    <li><b>A code-written de-duplication tag</b> — the native marker-on-fire pattern (already used elsewhere in this same system) does it without code.</li>
+    <li><b>A redundant "CC sent" tag</b> — the native trigger already stamps its own marker.</li>
+  </ul></div>
+<h2>Net assessment</h2>
+<div class="lk-sec" data-cm="net-assessment"><p>The platform carries the workflow. Classification, routing, escalation, suppression, exactly-once, and the templated guest reply are all <b class="ok">native Zendesk</b>. The custom integration is small and almost entirely traceable to <b>one true structural limit</b> — one-way trigger webhooks — which means <b>any value the business must compute or look up has to be written back by an external service.</b> That is a real constraint, but a narrow one common to trigger-rule automation engines, not a wholesale capability failure. Two secondary platform gaps (no topic-provisioning API; no comment-from-trigger) require small manual or coded steps. The remaining custom code is our own convenience and is being folded back to native.</p>
+  <p class="note">Method: line-by-line audit of the integration service (every ticket-mutating call) cross-referenced to Zendesk's documented trigger/webhook/Intelligent-Triage behavior. Every "forced" item above names the specific mechanism that blocks the native path.</p>
+
+  <div class="foot">Platform capability assessment · NPS-detractor automation · 2026-07-26 · paired audit (independent code sweep + reconcile) · figures reflect the live sandbox configuration</div>
+
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"b64beaf7-2b6d-44d7-8736-ecdce5d65d2d"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

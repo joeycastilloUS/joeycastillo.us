@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~p~e — Argus AI Config pane (plan + estimate)</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#e2e6e8;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.5}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:900px;margin:0 auto;padding:8px 22px 60px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:34px}
+ h1{font-size:21px;margin:14px 0 3px;color:#fff}
+ .lede{color:#9fe0f2;font-size:14px;margin:0 0 4px}
+ .sub{color:#7f97a6;font-size:12.5px;margin:0 0 12px}
+ h2{font-size:12px;color:#6FC3DF;margin:24px 0 8px;letter-spacing:.07em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:6px}
+ table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.5px}
+ th{text-align:left;color:#6FC3DF;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #2a2a2a;padding:6px 8px}
+ td{border-bottom:1px solid #1e1e1e;padding:6px 8px;color:#c5d0d6;vertical-align:top}
+ td.ph{font-family:Consolas,monospace;color:#6FC3DF;font-weight:700;white-space:nowrap}
+ td.pt{text-align:right;font-family:Consolas,monospace;color:#fff;font-weight:700}
+ code{font-family:Consolas,monospace;font-size:11px;color:#9fe0f2;background:#0d0d0d;padding:1px 5px;border-radius:4px}
+ ul{margin:8px 0;padding-left:20px}li{margin:5px 0;font-size:13px}
+ .in{color:#7CFFB2}.out{color:#ff9b93}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:13px 15px;margin:12px 0}
+ .card.no{border-left:3px solid #c9463f}.card.info{border-left:3px solid #3a6a90}
+ .big{font-size:15px;color:#fff;font-weight:600;margin:0 0 5px}
+ .tot td{border-top:2px solid #2a2a2a;color:#fff;font-weight:700}
+ .foot{margin-top:22px;border-top:1px solid #222;padding-top:12px;color:#5f6f77;font-size:11px}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">plan + estimate &middot; ~p~e</span>
+<span class="p">2026-07-23 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/e7f4c6f6-2415-4dad-93fe-e762d1bb50c8/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>Argus AI Config pane &mdash; plan + estimate</h1>
+<p class="lede">Build the <code>zaiconfig</code> pane that enacts the Zendesk DIA from Argus. <b>23 points</b>, six
+shippable phases, read loop before any write.</p>
+<p class="sub">Paired &mdash; two independent ~p~e passes, reconciled. Two findings changed the plan: the
+<code>recipient_addresses</code> + <code>groups</code> Catalog reads <b>already exist</b> (first move is
+console-only, no bridge change), and <b>ConfigCatalog is a new reversibility class</b>, not a WriteCatalog
+extension (4 of 5 pushable knobs are creates; rollback-of-a-create &ne; restore-prior).</p>
+
+<h2>Intent</h2>
+<div class="lk-sec" data-cm="intent"><p style="font-size:13.5px">One Argus pane rendering every DIA D1&ndash;D6 knob as <b>Desired / Live / Lane</b> &mdash;
+push the API-pushable five through zendesk-bridge with capture+rollback, guide+verify the four Admin-Center-only
+AI knobs. jc never logs into Zendesk to configure, verify, arm, or disarm.</p></div>
+<h2>Scope</h2>
+<div class="lk-sec" data-cm="scope"><p style="font-size:13px"><b class="in">In:</b> <code>zaiconfig</code> tab in <code>web/app/index.html</code>;
+<code>ConfigCatalog.cs</code> + <code>GET /config/state</code> + <code>POST /config/apply</code> in zendesk-bridge;
+drift render; manual-lane deep links + verify; arm switch; the <code>.si</code> bind flips.
+&nbsp;<b class="out">Out:</b> browser-automation jacket for the 4 AI knobs (separate later ~d); prod arming beyond the
+double-gate; any non-mendo DIA generalization.</p></div>
+<h2>Approach</h2>
+<div class="lk-sec" data-cm="approach"><p style="font-size:13px"><b>Ship the read loop before any write exists</b> (the design&rsquo;s second-order risk:
+push without read = silent divergence). Console work is pattern-copy from the <code>zdfacts</code> pane (tab wiring
+touches ~5 registration points; <code>zfLoad</code>/<code>zdOne</code>/<code>zdAll</code> is the env-aware read
+template; <code>ZF_AB</code>, <code>ZD_DEEP</code>, the &ldquo;Admin Center&rdquo; honesty cell all reused). Bridge
+work is a new declared-config class beside WriteCatalog, pure builders unit-tested in the existing harness, endpoints
+reusing the triple write gate. <b>Trap:</b> the WOPR debug intercept matches mutating paths by name &mdash;
+<code>config/apply</code> must be added or writes bypass the hold panel.</p></div>
+<h2>Phases &mdash; board items</h2>
+<div class="lk-sec" data-cm="phases-board-items"><table>
+<tr><th>Phase</th><th>Deliverable</th><th>Done-gate</th><th class="pt">Pts</th></tr>
+<tr><td class="ph">P1<br>drift-pane</td><td><code>zaiconfig</code> tab, 7 unit rows, Desired (mirrors the <code>.pi config:</code>) vs Live (existing reads) vs Lane, client-side drift. <b>Zero writes, zero bridge deploy.</b></td><td>pane answers &ldquo;is the sandbox configured per the DIA?&rdquo; with red/green drift &mdash; no Zendesk login</td><td class="pt">3</td></tr>
+<tr><td class="ph">P2<br>config-state</td><td><code>ConfigCatalog.cs</code> desired constants + <code>GET /config/state</code> (live reads + server-side drift); pane switches to the endpoint. Desired lives in one place from here.</td><td><code>/config/state</code> returns 7 units whose drift matches P1</td><td class="pt">3</td></tr>
+<tr><td class="ph">P3<br>push-lane</td><td><code>POST /config/apply?unit=</code> for nps@ address, gate, illness trigger+group+tag, CC &mdash; create-if-absent + update, capture (&ldquo;absent&rdquo; is a legal prior), rollback=deactivate, idempotency, triple gate, WOPR wired, Apply buttons + response IDs inline.</td><td>each unit applied &rarr; drift green; rollback restores/deactivates; re-apply is a no-op</td><td class="pt">8</td></tr>
+<tr><td class="ph">P4<br>manual-lane</td><td>amber Admin Center chips + deep links to the exact AI-dashboard pages + <code>[Verify]</code> (re-read what&rsquo;s readable + sample the brand&rsquo;s latest AI-answered ticket); ack appended to <code>.sm.add</code>.</td><td>each of the 4 knobs greens only after a verify pass, never on click alone</td><td class="pt">5</td></tr>
+<tr><td class="ph">P5<br>arm</td><td>D6 switch = reversible <code>active</code> toggle on the gate trigger (the one unit that IS the WriteCatalog shape), prior captured, prod double-gated on jc, audit line per flip.</td><td>arm/disarm round-trip on sandbox; disarmed proven by trigger read, not UI state</td><td class="pt">2</td></tr>
+<tr><td class="ph">P6<br>drift-watch</td><td>re-check on pane open, red-never-silent drift; flip the <code>.si</code> pushable units <code>bind: manual &rarr; bridge</code>.</td><td>a manual Zendesk edit shows red next open; <code>.si</code> updated (re-sealed if needed)</td><td class="pt">2</td></tr>
+<tr class="tot"><td>Total</td><td>six phases, read-loop-first</td><td>&mdash;</td><td class="pt">23</td></tr>
+</table></div>
+<h2>Estimate &mdash; critical path &amp; risk</h2>
+<div class="lk-sec" data-cm="estimate-critical-path-risk"><p style="font-size:13px"><b>Critical path:</b> P1 &rarr; P2 &rarr; P3 &rarr; P5 (arm toggles a trigger P3 creates).
+<b>P4 runs parallel</b> after P2. <b>Assumptions:</b> 1pt &asymp; a focused half-day; sandbox creds seeded
+(<code>env=sandbox</code> isolation exists); the triple write gate + cloudbuild deploy reused untouched; no auth
+work. <b>Riskiest phase: P3</b> &mdash; if the create-rollback class needs its own board review, <b>8 &rarr; 13</b>.
+P4&rsquo;s verify-by-behavior sampling is second.</p></div>
+<h2>Unknowns (named &mdash; Rule 7)</h2>
+<div class="lk-sec" data-cm="unknowns-named-rule-7"><ul>
+<li><b>U-CREATE-ROLLBACK</b> &mdash; does the house permit DELETE in a rollback, or is rollback deactivate-only (orphaning created objects)? WriteCatalog forbids DELETE for its class; ConfigCatalog must decide.</li>
+<li><b>U-NPS-ADDRESS</b> &mdash; can <code>nps@</code> be fully created by API (native address), or does verification force it into the manual lane? Moves a D1 knob across lanes if so.</li>
+<li><b>U-VERIFY-SIGNAL</b> &mdash; what read actually proves &ldquo;agent published&rdquo; and &ldquo;tone = short/informal&rdquo;? <code>account/settings</code> may not expose AI state; the sampled-ticket heuristic is undefined.</li>
+<li><b>U-DESIRED-SOURCE</b> &mdash; the <code>.pi config:</code> values get duplicated into C# constants; nothing polices drift between the DIA file and ConfigCatalog. Accepted for v1.</li>
+<li><b>U-SEAL</b> &mdash; who re-seals when the <code>.si</code> bind lines flip in P6.</li>
+</ul></div>
+<h2>When to revisit (v2 signal)</h2>
+<div class="lk-sec" data-cm="when-to-revisit-v2-signal"><p style="font-size:13px">The first time jc asks to <b>set</b> (not verify) one of the 4 manual knobs from Argus, or
+drift on a manual knob recurs twice &rarr; the <b>browser-automation jacket ~d</b>. Second signal: a second
+brand/DIA wants this pane &rarr; generalize ConfigCatalog from mendo-hardcoded constants to catalog-per-DIA.</p></div>
+<h2>The single biggest 2&times;-maker</h2>
+<div class="lk-sec" data-cm="the-single-biggest-2-maker"><div class="card no"><p class="big">P4&rsquo;s verify loop depends on Zendesk-side state no code can create.</p>
+<p>&ldquo;Green only when a live read or an answered ticket proves the click&rdquo; requires the sandbox AI agent to be
+<b>actually live end-to-end</b> &mdash; AI agents-Advanced enabled, <code>nps@</code> receiving, agent published,
+replying. Those are the very manual knobs being verified: a circular dependency on operator clicks + Zendesk
+SKU/sandbox behavior, not on any repo. If the sandbox agent isn&rsquo;t answering mail, P4 can&rsquo;t close its
+gate and the schedule doubles. <b>De-risk:</b> do the prereq + respond manual clicks (with P1&rsquo;s drift pane
+watching) <b>during</b> P2/P3 development, not after.</p></div>
+
+<div class="foot">v0 &middot; 2026-07-23 &middot; ~p~e &middot; Opus + Fable, reconciled &middot; 23 pts &middot; board id AICFG.
+Rule 7: revision is the default &mdash; this is a v1 hypothesis.</div>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; All Rights Reserved</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"e7f4c6f6-2415-4dad-93fe-e762d1bb50c8"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body></html>

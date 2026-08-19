@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~d — Argus Ops: self-administration in the GCP module (paired)</title>
+<style>
+  :root { --bg:#111111; --surf:#1A1A1A; --accent:#6FC3DF; --ink:#e8e8e8; --mut:#8a8a8a; --ok:#7CD992; --bad:#E06C6C; --warn:#E0B84C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.55; }
+  .nav { position:sticky; top:0; z-index:10; background:#000; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center; padding:10px 20px; }
+  .nav .brand { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+  .nav .pub { color:var(--mut); font-size:12px; }
+  .wrap { max-width:800px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:26px; margin:.2em 0 .1em; }
+  h2 { font-size:19px; color:var(--accent); margin-top:1.9em; border-bottom:1px solid #262626; padding-bottom:5px; }
+  h3 { font-size:15px; margin:1.3em 0 .3em; color:#cfcfcf; }
+  .sub { color:var(--mut); margin-top:0; }
+  .card { background:var(--surf); border:1px solid #242424; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  code { background:#000; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:13px; }
+  pre { background:#000; border:1px solid #242424; border-radius:6px; padding:12px; overflow:auto; font-size:12.5px; color:#cfe8ef; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13px; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid #242424; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  ul { margin:.4em 0; padding-left:20px; } li { margin:.25em 0; }
+  .foot { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #242424; padding-top:12px; }
+  .big { font-size:15px; }
+  .risk { border-left:3px solid var(--bad); padding-left:12px; }
+  .warnrail { border-left:3px solid var(--warn); padding-left:12px; }
+  .lead { border-left:3px solid var(--accent); padding-left:12px; }
+  .gate { border-left:3px solid var(--ok); padding-left:12px; }
+</style>
+</head>
+<body>
+<div class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-24 19:04 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/1c66e6dd-719e-465d-909c-b38835dc02a9/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+<h1>~d — Argus Ops</h1>
+<p class="sub">Self-administration as a governed feature in the GCP module &middot; paired design (Opus driver + Fable5 navigator, two blind passes, reconciled) &middot; project: <b>argus</b> &middot; r914</p>
+
+<div class="card lead big">
+<b>One line:</b> take the Argus-admin acts the AI performed <i>by hand</i> this session &mdash; set the crew, redeploy a bridge, read service/deploy state &mdash; and make them a <b>first-class feature in the GCP module</b>, behind a gate <b>stronger than the normal console session</b> (the Overlord key = <b>Warrant Gate</b>), fully audited. Building this the wrong way would reopen the exact doors this session's lockdown just closed; the gate is therefore the design, not a footnote.
+</div>
+
+<div class="card gate">
+<b>Operator decisions (locked this turn):</b> scope = <b>full self-admin now</b> (view + crew-edit + redeploy + service-mgmt) &middot; gate = <b>Overlord key / door D</b> &middot; actor = <b>operator buttons AND an AI-callable path</b>. Built in verified slices; the AI path ships after the human path proves out.
+</div>
+
+<h2>1. Need</h2>
+<div class="lk-sec" data-cm="1-need"><p>This session the AI administered Argus <b>out-of-band</b>: hand-edited the crew doc (<code>settings/argus</code>, Firestore db <code>argus</code>) via gcloud, hand-fired a Cloud Build redeploy of meraki-bridge, hand-read Cloud Run env wiring and Secret Manager. It worked, but those acts have <b>no home in the product</b> &mdash; no gate Argus owns, no audit trail Argus keeps, no surface the operator can repeat without the AI holding his gcloud credentials. And the reason the hand-work happened was a <b>security lockdown</b> whose own inspection (R0&ndash;R5) proved the normal console session is too weak to carry these powers. The need: bring self-administration <b>inside</b> Argus &mdash; hard-gated, audited, in the GCP module &mdash; so "what the AI did by hand" becomes "what the operator (or a warranted AI) invokes, with a warrant," <b>without reopening one closed door</b>.</p></div>
+<h2>2. Raw user stories</h2>
+<div class="lk-sec" data-cm="2-raw-user-stories"><ul>
+<li>As the operator, I want to <b>see who can get in</b> (crew, live doors, token presence) in one pane, so "who has access right now?" is a glance, not a gcloud-read of Firestore.</li>
+<li>As the operator, I want to <b>see what's deployed</b> per bridge (live revision, image, deploy time, env/secret <i>names</i>), so "is the providers.json edit live?" is a glance, not <code>gcloud run services describe</code>.</li>
+<li>As the operator, I want to <b>edit the crew behind a harder gate than my normal session</b>, so one phished crew login can never invite an attacker (closes R3).</li>
+<li>As the operator, I want to <b>trigger a bridge redeploy</b> from the console with an explicit confirmation, so a config change lands without a terminal.</li>
+<li>As the operator, I want a <b>warranted AI</b> to be able to invoke the same governed actions, so the assistant can finish a lockdown end-to-end &mdash; under the same audit + gate, never a blank credential.</li>
+<li>As the operator, I want <b>every ops action logged</b> (actor / action / before&rarr;after / result) and <b>secret values never shown</b> (names + versions only), so the feature is auditable and can't become an exfiltration surface.</li>
+</ul></div>
+<h2>3. Sourced solution &mdash; mined from what exists</h2>
+<div class="lk-sec" data-cm="3-sourced-solution-mined-from"><table>
+<tr><th>Reuse</th><th>Where (verified)</th></tr>
+<tr><td>GCP-module pane pattern (load-on-click card list, no framework)</td><td><code>web/app/index.html</code> Cost pane :8269-8376, Watch pane :8378-8482 &rarr; add a third <b>Ops</b> pane</td></tr>
+<tr><td>Session already encodes which door minted it</td><td>OIDC signs <code>sid|idKey|email</code>, idKey <code>google:&lt;sub&gt;</code> (Program.cs:263); key door signs <code>key:&lt;pubhex&gt;</code> (:354,:363). Middleware verifies but <b>discards</b> the payload (<code>out _</code>, :90) &mdash; the hook is free.</td></tr>
+<tr><td>Feature-gate precedent (server-side re-read, fail-closed 403)</td><td><code>RequireWritable</code>/<code>IsAllowedForFeatureAsync</code> Program.cs:688-709</td></tr>
+<tr><td>Audit convention</td><td><code>CloudLog.Critical(..."AUDIT ...")</code> :253,:355 + Firestore side-writes :254-262</td></tr>
+<tr><td>Strongest credential in the system = Overlord key door</td><td>ed25519 device + operator warrant, 60s TTL, single-use challenge burn, crypto in pure-C sidecar Program.cs:283-366 (language law honored)</td></tr>
+<tr><td>Redeploy mechanism, checked in</td><td><code>bridge/cloudbuild.yaml</code> :30-33 &mdash; trigger via Cloud Build REST <code>builds.create</code> (foreign API &rarr; C# jacket in gcp-bridge, which already runs ADC in acmedev-platform-hq)</td></tr>
+<tr><td>First-party proxy (cookie stays first-party)</td><td><code>web/_worker.js:11</code> PROXY list &mdash; <code>/ops/*</code> joins it</td></tr>
+<tr><td>Admin-credential precedent</td><td><code>be/tools/invite.py</code> ARGUS_ADMIN_TOKEN + master secret &mdash; kept as escape-route gate</td></tr>
+</table>
+<p class="sub"><b>Constraints discovered:</b> gcp-bridge source is a <b>separate repo</b> (<code>acmedevUS/gcp-bridge</code>, not local) &mdash; must be reconciled before adding <code>/ops/*</code> there. Its service account needs <b>new, exact</b> IAM: <code>run.viewer</code>, <code>cloudbuild.builds.editor</code>, <code>secretmanager.viewer</code> (metadata only &mdash; <b>never</b> <code>secretAccessor</code>). gcp-bridge can't verify <code>argus_session</code> today (no session key) &rarr; mount <code>argus-session-secret</code> verify-only.</p></div>
+<h2>4. Name it true</h2>
+<div class="lk-sec" data-cm="4-name-it-true"><ul>
+<li><b>Feature: <code>Argus Ops</code></b> &mdash; the hands, governed. Tab label in the GCP module: <b>Ops</b>.</li>
+<li><b>Gate: the <code>Warrant Gate</code></b> (middleware <code>RequireWarrant</code>) &mdash; ops writes require a <i>warranted</i> (Overlord-key) session.</li>
+<li>meraki-bridge: <code>GET /ops/doors</code>, <code>POST /ops/crew</code> (the only crew write path).</li>
+<li>gcp-bridge: <code>GET /ops/services</code>, <code>GET /ops/builds</code>, <code>POST /ops/deploy</code>, <code>GET /ops/secrets</code> (metadata only).</li>
+<li>Audit: Firestore <code>ops_audit</code> + <code>AUDIT</code> log lines. Fleet as data: <code>fleet.json</code> (service &rarr; region &rarr; cloudbuild source), mirroring providers.json's routes-are-data pattern.</li>
+</ul></div>
+<h2>5. Shape &mdash; verified slices</h2>
+<div class="lk-sec" data-cm="5-shape-verified-slices"><div class="card">
+<b>Phase A &mdash; read-only Ops pane (zero new write surface).</b> Three cards beside Cost/Watch:
+<b>Doors &amp; Crew</b> (<code>GET /ops/doors</code>: crew from server truth not localStorage, providers loaded, <code>/auth/key/status</code>, token presence);
+<b>Services</b> (<code>GET /ops/services</code>: revision, image, deploy time, env/secret <i>names</i> &mdash; values structurally absent);
+<b>Builds</b> (<code>GET /ops/builds</code>: last 5 Cloud Build runs). Reads gated by any valid crew session via the worker &mdash; <b>never the daily key</b>.
+</div>
+<div class="card">
+<b>Phase B &mdash; two writes, individually warranted.</b>
+<b>Crew edit</b> (<code>POST /ops/crew</code> replaces <code>argus_crew_v1</code> only) &mdash; and <code>POST /settings</code> <b>loses</b> crew-write power (PreserveCrew flips from preserve to reject), which <b>closes R3</b>.
+<b>Deploy</b> (<code>POST /ops/deploy {service}</code>) &mdash; service must match a <code>fleet.json</code> entry; gcp-bridge submits the <b>checked-in</b> cloudbuild.yaml at pinned HEAD. No caller-supplied build config, ever (a deploy trigger is RCE by design; the only freedom is <i>which</i> fleet member). Both writes: Warrant Gate + typed confirmation + <code>ops_audit</code> + AUDIT line, before/after captured.
+</div>
+<div class="card">
+<b>Phase C &mdash; service mgmt + secret metadata</b> (<code>GET /ops/secrets</code> names/versions; env-name view). Read-only unless the operator later widens scope to env/secret rewiring (Open-Q1).
+</div>
+<div class="card warnrail">
+<b>Phase D &mdash; the AI-callable path (ships last).</b> Expose <code>/ops/*</code> to a <b>warranted AI</b> (e.g. via a doculink <code>~</code> comment or agent path). The novel/risky piece: how does a non-human present the ed25519 warrant? Needs its own warrant story (a scoped, revocable AI warrant minted by the operator, single-purpose, audited as actor=<code>ai:&lt;warrant-id&gt;</code>) &mdash; never the operator's own device key. Designed but <b>gated behind the human path proving out</b>.
+</div></div>
+<h2>6. The Warrant Gate &mdash; first-class</h2>
+<div class="lk-sec" data-cm="6-the-warrant-gate-first"><table>
+<tr><th>Gate option</th><th>Verdict</th></tr>
+<tr><td>Any crew session</td><td class="bad">No &mdash; reopens R3; R0/R1 show the normal plane fails open</td></tr>
+<tr><td>ARGUS_ADMIN_TOKEN header per action</td><td class="warn">Escape route only &mdash; a static bearer in browser memory is replayable/phishable</td></tr>
+<tr><td><b>Overlord key session (door D) + per-action confirm + audit</b></td><td class="ok"><b>Chosen</b> (operator-confirmed)</td></tr>
+<tr><td>Cloud IAP / Google re-auth</td><td class="bad">A fourth identity system; fights the Purcius identity direction</td></tr>
+</table>
+<p><b>The gate, concretely:</b></p>
+<ol>
+<li><code>/ops/*</code> <b>never accepts</b> <code>yyyymmdd~go</code>, BRIDGE_TOKEN, or an empty-token fallthrough. Dedicated middleware, fail-closed: unset config &rArr; 503, never open (kills the R2 pattern at birth for this surface).</li>
+<li><b>Reads:</b> valid <code>argus_session</code> (any door), verified server-side, payload parsed.</li>
+<li><b>Writes:</b> session idKey must begin <code>key:</code> &mdash; minted by the ed25519 device+warrant door with its single-use challenge burn. A Google-minted session gets 403 "warrant required," which the UI turns into the key-login prompt.</li>
+<li><b>R5 resolved by demotion:</b> door D stops being a general console credential and becomes <b>only</b> the ops credential &mdash; its crew-bypass property is now the <i>point</i> (the operator's key, above the crew), confined to <code>/ops/*</code>. Also bind <code>/auth/key/verify</code> to run <code>EmailAllowed</code> on <code>OVERLORD_EMAIL</code> so a stale env can't mint an unknown identity.</li>
+<li><b>Per-action ceremony:</b> typed confirmation client-side; server logs actor (email + idKey + device pubkey prefix), action, before/after, result to <code>ops_audit</code> + CloudLog <i>before</i> returning.</li>
+<li><b>Transport:</b> <code>/ops/*</code> on the worker PROXY list, split-routed (crew&rarr;meraki-bridge, GCP ops&rarr;gcp-bridge), cookie stays first-party; gcp-bridge gets <code>argus-session-secret</code> verify-only.</li>
+<li><b>Language boundary:</b> C# only where a foreign Google API is jacketed (Cloud Build/Run/Secret Manager REST, Firestore); gate crypto stays in the pure-C sidecar; frontend vanilla JS.</li>
+</ol></div>
+<h2>7. First move</h2>
+<div class="lk-sec" data-cm="7-first-move"><div class="card gate big">
+<b><code>GET /ops/doors</code> + the Doors &amp; Crew card.</b> One endpoint in <b>meraki-bridge</b> (the repo we hold), one worker PROXY entry, one card in the GCP module. It forces the load-bearing plumbing into existence &mdash; the dedicated ops middleware that <b>rejects the daily key</b> and <b>parses</b> the session payload (:90's discarded <code>out _</code> becomes real) &mdash; while shipping <b>zero write surface</b>.
+<b>Rule-10 verify:</b> from a non-dev machine, the endpoint 401s with no cookie, 401s with <code>Authorization: Bearer &lt;today&gt;~go</code>, and renders the true crew for a signed-in operator.
+</div></div>
+<h2>Choices / Escape routes / Pure Metal test</h2>
+<div class="lk-sec" data-cm="choices-escape-routes-pure-metal"><p><b>Choices:</b> endpoint homes split by ownership (crew ops in meraki-bridge, GCP ops in gcp-bridge) vs. a new <code>ops-bridge</code> service (rejected: third repo/IAM surface, no new isolation). Gate: warrant vs. admin-token vs. IAM (table above). Cookie transport: worker proxy (chosen) vs. CORS-credentialed cross-origin (rejected: widens cookie exposure).</p>
+<p><b>Escape routes:</b> if the identity sidecar isn't deployable in time &rarr; interim gate = ARGUS_ADMIN_TOKEN pasted per action, held in a JS closure (never localStorage), same audit, labeled interim. If gcp-bridge reconcile is heavy &rarr; Phase A ships Doors &amp; Crew only; Services/Builds render "reconcile pending." If door D is ever killed &rarr; gate falls back to ARGUS_ADMIN_TOKEN (weaker, still audited, still never the daily key).</p>
+<p><b>Pure Metal test:</b> every gate decision re-read server-side (no client flag is authority); no secret value crosses to the browser, structurally; fleet + routes are data; deploy runs only checked-in config; deterministic audit (actor, warrant, timestamp, before/after); C# confined to foreign-API jackets.</p></div>
+<h2>Open questions for the operator</h2>
+<div class="lk-sec" data-cm="open-questions-for-the-operator"><ol>
+<li><b>Ceiling of "do what you want":</b> this design = view state + crew-edit + redeploy + secret/env <i>metadata</i>. <b>Not</b> included: arbitrary gcloud, secret <b>values</b>, IAM edits, env-var rewiring. Widen to env/secret rewiring too? (Recommend: no, at least not in Phase A&ndash;C.)</li>
+<li><b>Door D:</b> the earlier lockdown answer was "keep D as break-glass." This design keeps it and <b>repurposes</b> it as the ops gate (ops-only, no longer a general console door). Confirm that's the intended role.</li>
+<li><b>Sequencing vs. the data-plane key (R0):</b> ops reads refuse the daily key regardless, but shipping ops while the data plane still honors <code>yyyymmdd~go</code> is an inconsistent house. Recommend the R0 fix lands with or before Phase B writes.</li>
+<li><b>Deploy fleet scope:</b> meraki-bridge only first, or all five services day one?</li>
+<li><b>The IAM grant + gcp-bridge changes are real privilege expansion</b> on a live service account &mdash; explicit go needed before Phase B/C touch gcp-bridge.</li>
+</ol></div>
+<h2 class="ok">Definition of Done &mdash; this artifact</h2>
+<div class="lk-sec" data-cm="definition-of-done-this-artifact"><ul>
+<li>&#10003; Paired (Rule 1): two blind passes (Opus + Fable5), reconciled; navigator owned the verdict; strong convergence, no unresolved split</li>
+<li>&#10003; Sourced from what exists first (GCP pane, session payload, feature-gate, key door, cloudbuild, worker) &mdash; cited to file:line</li>
+<li>&#10003; Security blast radius treated as the primary design axis (the Warrant Gate)</li>
+<li>&#10003; Operator's three decisions baked in (full scope / door-D gate / AI-callable)</li>
+<li>&#10003; Rendered to <code>be/designs/</code>, house style, published datetime</li>
+<li>&#9723; Latchkey published (cap-URL on publish); committed + pushed</li>
+<li>&#8213; Production verification: N/A for a design; the First Move build it defines carries the Rule-10 gate (401 on no-cookie / on daily-key, true crew when signed in)</li>
+</ul>
+
+<div class="foot">
+Be &middot; ~d paired design &middot; argus &middot; v0 &middot; r914 &middot; 2026-07-24 19:04 PDT<br>
+Driver: Opus 4.8 &middot; Navigator: Fable5 &middot; One signal in, full chain reaction out.
+</div>
+
+</div></div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"1c66e6dd-719e-465d-909c-b38835dc02a9"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

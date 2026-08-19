@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — Illness Panel Verbatim Feedback (send all to the LLMs, de-atomize regardless)</title>
+<style>
+  body { background:#111111; color:#ddd; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+         margin:0; line-height:1.55; }
+  .nav { position:sticky; top:0; background:#000; border-bottom:2px solid #6FC3DF;
+         display:flex; justify-content:space-between; align-items:center; padding:10px 24px; }
+  .nav .brand { color:#6FC3DF; font-weight:bold; font-size:18px; }
+  .nav .pub { color:#777; font-size:12px; }
+  main { max-width:800px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { color:#6FC3DF; font-size:24px; }
+  h2 { color:#6FC3DF; font-size:18px; margin-top:32px; border-bottom:1px solid #2a2a2a; padding-bottom:6px; }
+  .card { background:#1A1A1A; border-radius:6px; padding:14px 18px; margin:14px 0; }
+  code, pre { font-family:Consolas,monospace; font-size:13px; }
+  pre { background:#0c0c0c; border:1px solid #2a2a2a; border-radius:4px; padding:12px; overflow-x:auto; color:#bbb; }
+  .good { color:#7fd47f; } .bad { color:#e07070; } .muted { color:#888; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  td, th { border:1px solid #2a2a2a; padding:6px 10px; text-align:left; vertical-align:top; }
+  th { color:#6FC3DF; background:#161616; }
+  footer { color:#666; font-size:12px; text-align:center; padding:20px; border-top:1px solid #2a2a2a; }
+</style>
+</head>
+<body>
+<nav class="nav"><span class="brand">Be</span><span class="pub">Published 2026-07-15 20:07 PT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/7c469acf-627a-425a-b2bc-2a68483871b3/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>Illness Panel Verbatim Feedback — send all to the LLMs, de-atomize regardless</h1>
+<p class="muted">Design (jc-ordered, 2026-07-15 evening). Card: mendo-nps-detractor-triage, units
+reduce_feedback + illness_check. Supersedes the atoms-in-never-prose panel payload law
+(jc order 2026-07-15 morning) by the same authority: the operator.</p>
+
+<h2 id="need">1 · Need</h2>
+<div class="card" data-cm="need">
+Ticket #532 (street Spanish, app complaint) false-positived as food-borne illness because the
+English-only reducer flattened Spanish into an unlabeled word bag before the panel ever saw it
+(design/multilang-decode, cap 8eda7d36). The proper dialect-table fix is real but is a
+tomorrow/next-day build. jc's call on that design's thread: <b>Gemini detects language on the
+fly — so today, send the whole feedback to the LLMs and let the 3-model panel converge, while
+the deterministic atomizer keeps running regardless.</b> Coverage for every language TODAY;
+the dialect decode lands next, on its own bench.
+</div>
+
+<h2 id="stories">2 · Raw user story (verbatim, the order)</h2>
+<div class="card" data-cm="stories">
+<pre>jc: "I thought gemini can on the fly detect language. if that is the case. then today we
+     can send all to the llms and let them converge while we also de-atomize regardless..
+     at this pont we don't have spanish but we can do that tomorrow or next day literally.
+     fable5 ~d then drive the rest of ~go on this change."</pre>
+Parsed intent: (1) panel input = the verbatim guest feedback, any language — the models do the
+language detection natively; (2) convergence law unchanged — 3 Gemini, UNANIMOUS-SAFE;
+(3) the atomizer still runs on every alert and its output still lands in the ledger — the
+reduction is the record and the raw material for the offline dialect work; (4) Spanish dialect
+table + bench rows: the next build, not this one.
+</div>
+
+<h2 id="sourced">3 · Sourced solution (what already exists does the work)</h2>
+<div class="card" data-cm="sourced">
+<table>
+<tr><th>Piece</th><th>State</th></tr>
+<tr><td>gcp-bridge <code>/vertex/illness-panel</code> (Program.cs:2016)</td>
+<td><b>Already prose-ready.</b> The ONE fixed prompt says the INPUT comes "either as reduced
+key=value atom lines or as verbatim prose". No bridge change, no redeploy.</td></tr>
+<tr><td>pirun_bench Lane A</td>
+<td><b>Already sends raw prose</b> to the same lane — the plumbing is proven end-to-end.</td></tr>
+<tr><td>pirun_run.c illness_check (the active block)</td>
+<td>Sends <code>reduced.atoms</code>. <b>The change:</b> send <code>alert.feedback</code>
+(verbatim) as <code>input</code>; store + nps ride along unchanged.</td></tr>
+<tr><td>pirun_run.c reduce_feedback</td>
+<td><b>Unchanged code.</b> Still reduces every alert to atoms into the ledger
+(<code>reduced.atoms</code>, <code>reduced.count</code>) — "de-atomize regardless".
+It just stops being the panel payload.</td></tr>
+<tr><td>Card + .pi.skills</td>
+<td>illness_check <code>in:</code> becomes <code>[alert.feedback, alert.store, alert.nps]</code>;
+the signature line matches, so verify_card keeps its teeth.</td></tr>
+</table>
+Three files change, all ours, all data/C99. Zero new machinery.
+</div>
+
+<h2 id="naming">4 · Literal naming</h2>
+<div class="card" data-cm="naming">
+No new names. Panel input key = <code>alert.feedback</code> (already in the ledger from
+scan_alert). <code>reduced.atoms</code> / <code>reduced.count</code> keep their names and their
+unit. The design/change name is literal: <b>illness-panel-verbatim-feedback</b>.
+</div>
+
+<h2 id="shape">5 · Shape</h2>
+<div class="card" data-cm="shape">
+<pre>scan_alert -> gate_handled -> reduce_feedback (atoms -> ledger, REGARDLESS)
+                                -> illness_check (input = alert.feedback, verbatim, any language)
+                                     3 Gemini converge, UNANIMOUS-SAFE (unchanged)
+                                -> illness_escalate (branch/exit, unchanged) -> recovery (unchanged)</pre>
+Trade accepted by the order: prose costs more tokens than atoms (the A-B bench measured roughly
+2x) — still ~$0.001/alert territory, and only on the ONE inference unit. Determinism contract
+intact: the guest-facing path stays $0 deterministic; inference still only routes to humans.
+<br><br><b>Escape routes:</b> (a) if #532-class figurative text still flags on prose, the bridge
+prompt gains one any-language figurative-guard line (one Cloud Run deploy); (b) if English
+illness recall regresses in DRY runs, the payload flips back to atoms with a one-line revert —
+the atoms never left the ledger; (c) the dialect-table build (multilang-decode design) proceeds
+independently and can win the payload back through the A-B bench.
+</div>
+
+<h2 id="first">6 · First move</h2>
+<div class="card" data-cm="first">
+Edit <code>pirun_run.c</code> (illness_check input), <code>mendo-nps-detractor-triage.pi</code>
+(in: list + comments), <code>.pi.skills</code> (signature). Rebuild <code>pirun_run.exe</code>.
+PIRUN_DRY against #532 (Spanish app complaint — expect <span class="good">safe</span>),
+a seeded illness ticket (expect <span class="bad">ILLNESS -> exit</span>), a clean detractor
+(expect recovery compose). Ship report; Spanish corpus rows land with the dialect build.
+</div>
+
+<h2 id="dod">DoD</h2>
+<div class="card" data-cm="dod">
+<pre>
+&#10003; A-D-D verified (card + .pi.skills are the spec; change keeps them in lockstep, verify_card enforces)
+&#10003; Need sourced from the live failure (#532) + the operator order (thread on cap 8eda7d36)
+&#10003; Solution mined from what exists (bridge prompt, bench Lane A, ledger keys) — zero new machinery
+&#10003; Escape routes named (prompt guard / one-line revert / dialect bench)
+&#10003; Artifact published as a Latchkey cap-URL (this page)
+</pre>
+</div>
+
+</main>
+<footer>metal console · Be · v0 · r645 · 2026-07-15 · Argus — illness panel verbatim feedback</footer>
+
+<!-- LATCHKEY COMMENTS doc = cap token; owner+expires drive the Latchkey panel; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"7c469acf-627a-425a-b2bc-2a68483871b3",owner:"joeycastillo.us",expires:"2026-07-22T20:08:29-07:00"};</script>
+<script src="/artifact-comments.js?v=50d45a11"></script>
+
+<!-- LATCHKEY CONFIDENTIAL -- proprietary marking; owner via METAL_CONF_OWNER -->
+<div id="lk-cf" style="max-width:800px;margin:22px auto 8px;padding:9px 16px;border-top:1px solid #2a2a2a;color:#6b7076;font:11px 'Helvetica Neue',Helvetica,Arial,sans-serif;text-align:center;line-height:1.55;">&copy; 2026 Joseph M. Castillo &middot; <b style="color:#8a9196;font-weight:600;">Proprietary &amp; Confidential</b> &middot; Furnished under NDA &middot; Purcius&trade; (U.S. trademark pending)</div>
+<!-- /LATCHKEY CONFIDENTIAL -->
+</body>
+</html>

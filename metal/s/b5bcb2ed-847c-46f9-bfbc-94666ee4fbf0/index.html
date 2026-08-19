@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~d — Runbooks v2: Generate & Trace</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;position:sticky;top:0;z-index:9;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:800px;margin:0 auto;padding:8px 22px 70px}
+ .cpy{background:#0a0a0a;border-bottom:1px solid #1e1e1e;color:#6a5a3a;font-size:10px;letter-spacing:.09em;text-align:center;padding:7px 12px;text-transform:uppercase;font-weight:700}
+ .cpy.bot{border-bottom:none;border-top:1px solid #1e1e1e;margin-top:40px}
+ h1{font-size:25px;margin:20px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:15px;color:#6FC3DF;margin:36px 0 10px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:7px}
+ h3{font-size:15px;color:#fff;margin:22px 0 7px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 6px}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 18px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:15px 17px;margin:13px 0}
+ .card.yes{border-left:3px solid #3aa06a}.card.no{border-left:3px solid #c9463f}
+ .card.warn{border-left:3px solid #c9a24b}.card.info{border-left:3px solid #3a6a90}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 6px;border-radius:4px}
+ pre{background:#0a0a0a;border:1px solid #262626;border-radius:7px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#c8d6dd;line-height:1.55}
+ table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:8px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:9px;vertical-align:top;color:#c5d0d6}
+ td.k{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;white-space:nowrap}
+ ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+ .story{border-left:3px solid #3a6a90;background:#141a1e;border-radius:0 7px 7px 0;padding:10px 14px;margin:9px 0}
+ .story .id{font-family:Consolas,monospace;font-size:11px;color:#6FC3DF;font-weight:700}
+ .story .new{background:#0f2318;color:#7CFFB2;border:1px solid #2a5a38;font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:4px;margin-left:7px}
+ .story p{margin:3px 0 0;color:#d5dee3;font-size:14px}
+ .ph{display:inline-block;font-size:10px;font-weight:700;padding:2px 9px;border-radius:4px;letter-spacing:.05em;margin-right:8px}
+ .ph1{background:#0f2318;color:#7CFFB2;border:1px solid #2a5a38}
+ .ph2{background:#101c26;color:#9fc6dd;border:1px solid #2a4a5e}
+ .ph3{background:#1a140f;color:#f0c674;border:1px solid #4a3a20}
+ .foot{margin-top:30px;border-top:1px solid #222;padding-top:15px;color:#5f6f77;font-size:11.5px}
+ .big{font-size:18px;color:#fff;font-weight:600;margin:0 0 6px}
+ .mock{border:1px solid #2a3a42;border-radius:9px;background:#0e0e0e;padding:13px;margin:13px 0}
+ .row{border:1px solid #242424;background:#151515;border-radius:6px;padding:9px 11px;margin:6px 0;display:flex;align-items:center;gap:9px;font-size:12.5px}
+ .row .ck{color:#7CFFB2;font-family:Consolas,monospace}
+ .row .nm{color:#fff}
+ .row .mt{margin-left:auto;color:#6a7a82;font-size:11px;font-family:Consolas,monospace}
+ .btn{display:inline-block;background:#6FC3DF;color:#000;font-weight:700;font-size:12px;padding:7px 15px;border-radius:5px;margin-top:9px}
+ .btn.ghost{background:transparent;color:#6FC3DF;border:1px solid #2a4a5e}
+ .tagchip{font-family:Consolas,monospace;font-size:11px;background:#101c26;border:1px solid #2a4a5e;color:#9fc6dd;border-radius:4px;padding:2px 8px}
+</style></head><body>
+<div class="cpy">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">~d &middot; design &middot; v2</span>
+<span class="p">Published 2026-07-20 23:40 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/b5bcb2ed-847c-46f9-bfbc-94666ee4fbf0/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>Runbooks v2 &mdash; generate, and trace</h1>
+<p class="lede">Two new capabilities, one re-phasing, one naming verdict. v2 extends the 21:40 design;
+Phase 1 is unchanged and still buildable tonight.</p>
+<p class="sub">Paired serial per the working agreement &mdash; driver writes, navigator reviews with
+authority to block.</p>
+
+<h2>What changed</h2>
+<table>
+<tr><th>Change</th><th>Where it lands</th></tr>
+<tr><td>Horizontal top tabs (S8)</td><td>moved from Phase 3 &rarr; <b>Phase 2</b></td></tr>
+<tr><td><b>New:</b> generate a runbook from Zendesk templates</td><td>Phase 2 &mdash; S12</td></tr>
+<tr><td><b>New:</b> jump from a runbook to the tickets it touched</td><td>Phase 3 &mdash; S13 <span style="color:#6a7a82">(you said "phase 2&hellip; that is phase3" &mdash; taken as the correction; one word flips it)</span></td></tr>
+<tr><td>Name</td><td>verdict below &mdash; <b>runbook stands</b></td></tr>
+</table>
+
+<h2>The two new stories</h2>
+<div class="story"><span class="id">S12</span><span class="new">PHASE 2</span>
+<p>As the operator, I can select one or more of my Zendesk templates and generate a new runbook from
+them, so a procedure my team already follows by hand becomes one the system runs.</p></div>
+<div class="story"><span class="id">S13</span><span class="new">PHASE 3</span>
+<p>As the operator, I can jump from a runbook to the list of Zendesk tickets it touched, so I can see its
+real footprint instead of taking its word for it.</p></div>
+
+<h2>S13 first &mdash; because the answer is already in the file</h2>
+<div class="card yes">
+<p class="big">A runbook's tags are its fingerprint &mdash; but the trace is not free.</p>
+<p>You said "leverage our existing search capability, or something like that." The first half is real and
+better than expected &mdash; <b>every runbook already declares the marks it leaves</b>, so we never have
+to invent a way to identify its footprint:</p>
+<pre>mendo-nps-detractor-triage.si:38   set: gate.tag       = argus_nps_handled
+mendo-nps-detractor-triage.si:65   set: escalation.tag = argus_illness_escalation</pre>
+<p>D2 makes the gate tag the thing that stops a second run. The escalation tag is declared one level
+down, in the plan (<code>.si:65</code>, serving D6&ndash;D8) &mdash; <b>D7 itself never mentions a tag.</b>
+That earns an asterisk on the fingerprint idea: the gate tag is demand-level truth, the escalation tag is
+plan-level, and the plan can change without any demand changing.</p>
+<table>
+<tr><th>Question</th><th>Answer is a search for&hellip;</th></tr>
+<tr><td>Every alert it <b>claimed</b> &mdash; set at the gate, <i>before</i> the illness check, so it
+includes escalated and aborted runs, not just delivered recoveries</td><td class="k">gate.tag</td></tr>
+<tr><td>The escalated subset</td><td class="k">escalation.tag</td></tr>
+<tr><td>Everything it touched</td><td class="k">either tag</td></tr>
+</table>
+<p><b>The existing search cannot do it, and we should say so before anyone builds against the
+assumption.</b> The corpus search is a fixed contract &mdash; <code>/search /replay /similar /shape
+/spine</code> (<code>index.html:4674</code>) &mdash; and it accepts <code>q, limit, sort, dir, group</code>.
+There is no tag parameter. It is full-text over a <i>frozen</i> snapshot, so tags a runbook applies at
+runtime are not in it at any price. A footprint button wired to it would return empty forever.</p>
+<div class="card no" style="margin:12px 0">
+<p><b>The receipt is in the intent file.</b> D2 records that this exact approach was already tried here and
+pulled:</p>
+<pre>D2  &hellip; every later sweep reads that tag straight off the ticket (a direct
+    read, not the lagging search index) and bows out. &hellip; (Restored
+    2026-07-19 as a supportable tag claim &mdash; the old guest-search was
+    over-broad + eventually-consistent and was withdrawn.)</pre>
+<p>The team learned that on 2026-07-19 and the file remembered it. That is a better argument for putting
+truth in the intent file than the free-footprint version would have been.</p>
+</div>
+<p><b>So S13 costs one small read path</b>, and there are two honest ways to buy it: a bridge endpoint
+querying <i>live</i> Zendesk by tag (fast, but it inherits D2's eventual-consistency caveat &mdash; say
+so on screen), or staging tags into the next corpus rebuild and adding a tag facet to <code>/search</code>
+(consistent, but only as fresh as the last rebuild). Not free. Small, and worth it:</p>
+<div class="mock">
+ <div style="color:#8f9ea6;font-size:12px;margin-bottom:7px">Footprint</div>
+ <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+  <span class="tagchip">argus_nps_handled</span><span style="color:#6a7a82;font-size:11.5px">handled</span>
+  <span class="tagchip">argus_illness_escalation</span><span style="color:#6a7a82;font-size:11.5px">escalated</span>
+ </div>
+ <span class="btn ghost">See the tickets this runbook touched &rarr;</span>
+ <div style="color:#5f6f77;font-size:11px;margin-top:7px">Needs the new read path above &mdash; the
+ existing corpus search cannot answer this. Until that ships, this control does not appear at all.</div>
+</div>
+<p>Nobody designed a footprint feature &mdash; the runbook declared its own marks for a different
+reason, and the <i>identity</i> half fell out anyway. That is the real win. The retrieval half is ordinary
+work, and pretending otherwise is how a demo grows a button that goes nowhere.</p>
+</div>
+
+<h2>S12 &mdash; generate a runbook from templates</h2>
+<div class="card warn">
+<p>Harder, and worth being precise about what "template" means here, because the console already has a
+considered position on it.</p>
+<p><b>"Template" in Argus means a Zendesk macro.</b> The Off-Script &amp; Gaps tab replaced a passive
+macro list on purpose &mdash; the retro note is in the source (<code>:4187-4192</code>): a read-only
+inventory "earned nothing." What it does instead is find <b>where agents hand-wrote a reply instead of
+using a template</b>, cluster those into macro candidates, and hand you a drafted body. It is
+deliberately read-only: "Copy drafted macro only copies text; the operator creates it in Zendesk."</p>
+<p>That gives S12 two possible sources, and they are not equally good:</p>
+<table>
+<tr><th>Source</th><th>What you'd get</th><th>Verdict</th></tr>
+<tr><td>Existing Zendesk macros</td><td>A runbook whose words are a reply your team already sends</td><td><b>Yes</b> &mdash; this is what you asked for</td></tr>
+<tr><td>Off-Script macro <i>candidates</i></td><td>A runbook built from replies agents wrote because no macro existed</td><td><b>Better later</b> &mdash; it turns a gap into automation, but it is a second step</td></tr>
+</table>
+
+<h3>What a macro can and cannot become</h3>
+<p>This is the honest core of S12. A macro is <b>words plus an action</b>. A runbook is <b>demands plus
+words</b>. The words map cleanly. The demands do not exist in a macro at all.</p>
+<table>
+<tr><th>Runbook needs</th><th>From a macro?</th></tr>
+<tr><td><code>words</code> &mdash; what we say</td><td><b>Yes</b> &mdash; the macro body, near-verbatim</td></tr>
+<tr><td>Tags / priority / assignment</td><td><b>Yes</b> &mdash; macro actions map to <code>set:</code> values</td></tr>
+<tr><td><b>When it fires</b></td><td><b>No</b> &mdash; a macro is fired by a human choosing it</td></tr>
+<tr><td><b>What it must never do</b></td><td><b>No</b> &mdash; macros have no refusals</td></tr>
+<tr><td>Safety demands (the illness floor)</td><td><b>No</b> &mdash; and this is the whole point</td></tr>
+</table>
+<p><b>Design consequence:</b> generation produces a <b>draft runbook, deliberately incomplete</b>, with
+the words filled in and the demands blank and marked as required. It cannot produce a runnable runbook,
+and the screen must say that plainly rather than implying one more click ships it.</p>
+<div class="mock">
+ <div style="color:#8f9ea6;font-size:12px;margin-bottom:8px">New runbook from templates &mdash; step 1 of 2
+ <span style="color:#6a7a82;font-size:11px">(illustrative &mdash; the macro names and counts below are
+ placeholders, not real data)</span></div>
+ <div class="row"><span class="ck">[x]</span><span class="nm">We're Sorry &mdash; Service Recovery</span><span class="mt">macro &middot; used 412&times;</span></div>
+ <div class="row"><span class="ck">[x]</span><span class="nm">Refund Issued &mdash; Follow Up</span><span class="mt">macro &middot; used 188&times;</span></div>
+ <div class="row"><span class="ck">[ ]</span><span class="nm">Catering Inquiry &mdash; Route</span><span class="mt">macro &middot; used 96&times;</span></div>
+ <span class="btn">Draft a runbook from 2 templates</span>
+ <div style="color:#5f6f77;font-size:11px;margin-top:8px">This drafts the <b>words</b>. It cannot draft
+ the rules &mdash; when it fires, and what it must never do, are yours to state. The draft will not run
+ until they are.</div>
+</div>
+<p><b>Why this shape and not a wizard that "just makes it":</b> the demands are the part that keeps a
+guest who says they got sick from receiving an automated coupon. A generator that invents them would be
+inventing your safety floor. It gets to write the words; you state the rules.</p>
+
+<h2>Naming &mdash; settled</h2>
+<div class="card yes">
+<p class="big">Outside: <b>Runbook</b>. Inside: <b>playbook</b>, unchanged.</p>
+<p>Operator decision, 2026-07-20. The earlier draft argued this backwards and the correction is worth
+stating plainly, because the split is the point:</p>
+<table>
+<tr><th></th><th>Word</th><th>Why</th></tr>
+<tr><td><b>The operator's surface</b> &mdash; the tab, the docs, what a manager says out loud</td><td><b>Runbook</b></td><td>It is the word an operations team already owns. They are not managing an engine concept; they are managing the procedure their shop runs on.</td></tr>
+<tr><td><b>The runtime</b> &mdash; <code>pirun</code>, the C99, <code>PiPlaybook</code></td><td><b>playbook</b></td><td>Already correct and staying. <code>pirun.h:5</code>: "A <code>.pi</code> playbook is POLICY AS DATA." That is the engine describing what it holds, and no operator ever reads it.</td></tr>
+</table>
+<p><b>This is not a compromise, it is the right shape.</b> The internal word describes the artifact's
+nature &mdash; policy, as data, loaded and sealed. The external word describes its job &mdash; the book
+your shop runs by. They were never required to be the same word, and forcing them to be would have made
+one of the two lie.</p>
+<p><b>Consequence for the rename:</b> it touches documents and labels only. <b>Zero C99 changes.</b> The
+35 <code>playbook</code> occurrences in the pirun sources stay exactly as they are &mdash; which is also
+why this is safe during a freeze: nothing that executes is being modified.</p>
+<p class="sub" style="margin-top:10px">One collision still to resolve when the external rename fully
+lands: "runbook" already names a <b>human</b> deploy procedure in
+<code>be/plans/2026-07-10-1640-runbook-airbyte-philz-deploy-fire-fable5.html</code>. Two meanings, one
+word &mdash; worth a distinguishing prefix on one of them.</p>
+</div>
+<h2>Phases after this change</h2>
+<table>
+<tr><th>Phase</th><th>Stories</th><th>Note</th></tr>
+<tr><td><span class="ph ph1">1</span></td><td>S1&ndash;S5</td><td><b>Unchanged. Still 10 points, still buildable tonight.</b></td></tr>
+<tr><td><span class="ph ph2">2</span></td><td>S6, S7, <b>S8</b>, <b>S12</b></td><td>Staging, erase, top tabs, generate-from-templates</td></tr>
+<tr><td><span class="ph ph3">3</span></td><td>S9, S10, S11, <b>S13</b></td><td>Manager login, apply path, gated serve, footprint</td></tr>
+</table>
+<p><b>Phase 2 is now the heavy phase</b>, and the arithmetic should be honest: it was <b>3 points at
+23:05</b> (S6+S7). S8 brings <b>5</b> more, including its visual regression pass. S12 is <b>not yet
+estimated</b> &mdash; call it 5&ndash;7 for a picker, a generator and a draft view. So Phase 2 lands around
+<b>13&ndash;15</b>. Still the right order; no longer a small step.</p>
+
+<h2>Unknowns</h2>
+<ul>
+<li>Whether S12 should read live macros from Zendesk or the sealed corpus. Live is truer; the corpus is
+already wired and read-only. Not decided.</li>
+<li>Whether a generated draft is saved anywhere before its demands are written, or lives only on screen
+until complete. Leaning: on-screen only &mdash; an incomplete runbook in the library is a trap.</li>
+<li>The gate tag is claimed <i>before</i> the illness check, so nearly everything the runbook examines
+carries it &mdash; including runs that escalated or aborted. "Touched" is therefore the honest word;
+"handled" would not be. Whether you also want the delivered-recovery subset as its own view is open.</li>
+<li>Whether "touched" should include the follow-up tickets the recovery creates, not just the alert
+tickets it tagged.</li>
+</ul>
+
+<h2>When to revisit</h2>
+<p>S12 changes shape the moment a generated runbook is expected to run without a human writing demands
+&mdash; if that expectation ever appears, stop and re-read this section, because it is the safety floor
+being asked to generate itself. S13 changes the moment a runbook stops tagging what it touches; the
+footprint is free only while the tags are declared. The naming window closes the first time a customer
+uses the word in their own sentence.</p>
+
+<h2>Definition of Done</h2>
+<ul>
+<li>&#10003; Paired serial per the working agreement &mdash; navigator owns the verdict</li>
+<li>&#10003; Both new stories designed, not just listed</li>
+<li>&#10003; Mechanisms sourced to existing code where they exist &mdash; and the one that does
+<b>not</b> exist (S13's tag read path) named as new work rather than assumed free</li>
+<li>&#10003; S8 re-phased as instructed; the phase-2/3 ambiguity on S13 surfaced rather than silently picked</li>
+<li>&#10003; Naming answered with an argument, not a preference</li>
+<li>&#10003; Phase 2's growth from 3 to ~14 points surfaced before it is committed to</li>
+<li>&#10003; Unknowns + When To Revisit present (Rule 7)</li>
+<li>&#10003; No secret values in this document</li>
+<li>&#10007; Not built &mdash; Phase 1 remains the next build.</li>
+</ul>
+
+<div class="foot">
+Generated 2026-07-20 23:40 &middot; v0 &middot; ~d v2 &middot; extends the 21:40 design
+</div>
+</div>
+<div class="cpy bot">Copyright &copy; 2026 Joseph M. Castillo &middot; Confidential &middot; All Rights Reserved</div>
+</body></html>

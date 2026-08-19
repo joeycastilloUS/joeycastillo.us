@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~d — Runbooks in the Argus Zendesk App</title>
+<style>
+ *{box-sizing:border-box}
+ body{background:#111;color:#ddd;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.62}
+ nav{background:#000;border-bottom:2px solid #6FC3DF;padding:12px 22px;position:sticky;top:0;z-index:9;display:flex;align-items:baseline;gap:14px}
+ nav .b{color:#6FC3DF;font-weight:700;font-size:17px;letter-spacing:.04em}
+ nav .p{margin-left:auto;color:#6a7a82;font-size:11.5px}
+ .w{max-width:800px;margin:0 auto;padding:26px 22px 70px}
+ h1{font-size:25px;margin:14px 0 6px;color:#fff;line-height:1.28}
+ h2{font-size:15px;color:#6FC3DF;margin:36px 0 10px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #222;padding-bottom:7px}
+ h3{font-size:15px;color:#fff;margin:20px 0 7px}
+ .lede{color:#9fe0f2;font-size:15px;margin:0 0 6px}
+ .sub{color:#7f97a6;font-size:13px;margin:0 0 18px}
+ .card{background:#1A1A1A;border:1px solid #262626;border-radius:9px;padding:15px 17px;margin:13px 0}
+ .card.yes{border-left:3px solid #3aa06a}.card.no{border-left:3px solid #c9463f}
+ .card.warn{border-left:3px solid #c9a24b}.card.info{border-left:3px solid #3a6a90}
+ code{font-family:Consolas,monospace;font-size:12.5px;color:#9fe0f2;background:#0d0d0d;padding:1px 6px;border-radius:4px}
+ pre{background:#0a0a0a;border:1px solid #262626;border-radius:7px;padding:12px 14px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#c8d6dd;line-height:1.55}
+ table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+ th{text-align:left;color:#6FC3DF;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #2a2a2a;padding:8px 9px}
+ td{border-bottom:1px solid #1e1e1e;padding:9px;vertical-align:top;color:#c5d0d6}
+ td.k{font-family:Consolas,monospace;font-size:12px;color:#9fe0f2;white-space:nowrap}
+ ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+ blockquote{border-left:3px solid #3a4a52;margin:10px 0;padding:2px 0 2px 14px;color:#b9c6cd;font-style:italic}
+ .foot{margin-top:44px;border-top:1px solid #222;padding-top:15px;color:#5f6f77;font-size:11.5px}
+ /* ---- the mockup ---- */
+ .mock{border:1px solid #2a3a42;border-radius:10px;overflow:hidden;margin:16px 0;background:#0e0e0e}
+ .mk-nav{background:#000;border-bottom:1px solid #1e2a30;padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:12px}
+ .mk-nav .lg{color:#6FC3DF;font-weight:700;letter-spacing:.05em}
+ .mk-nav .ap{background:#101c26;border:1px solid #2a4a5e;color:#9fc6dd;border-radius:5px;padding:2px 9px;font-size:11px}
+ .mk-nav .who{margin-left:auto;color:#5f6f77;font-size:11px}
+ .mk-tabs{display:flex;gap:2px;background:#0a0a0a;border-bottom:1px solid #1e2a30;padding:0 8px;overflow-x:auto}
+ .mk-tabs span{padding:8px 11px;font-size:11.5px;color:#6a7a82;white-space:nowrap;border-bottom:2px solid transparent}
+ .mk-tabs span.on{color:#6FC3DF;border-bottom-color:#6FC3DF;font-weight:700}
+ .mk-body{padding:14px}
+ .rb{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;padding:2px 9px;border-radius:4px;background:#0f2318;color:#7CFFB2;border:1px solid #2a5a38;margin-bottom:11px}
+ .pb{border:1px solid #242424;border-left:3px solid #3a6a90;background:#151515;border-radius:7px;padding:11px 13px;margin:8px 0;cursor:default}
+ .pb.sel{border-left-color:#6FC3DF;background:#161d21}
+ .pb.ret{opacity:.5;border-left-color:#444}
+ .pb .t{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+ .pb .nm{color:#fff;font-size:14px;font-weight:600}
+ .pb .id{font-family:Consolas,monospace;font-size:11px;color:#6a7a82}
+ .pb .mt{color:#8f9ea6;font-size:11.5px;margin-top:3px}
+ .pill{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:4px;letter-spacing:.04em}
+ .p-sb{background:#1a140f;color:#f0c674;border:1px solid #4a3a20}
+ .p-pr{background:#0f2318;color:#7CFFB2;border:1px solid #2a5a38}
+ .p-sl{background:#101c26;color:#9fc6dd;border:1px solid #2a4a5e}
+ .p-rt{background:#1a1a1a;color:#777;border:1px solid #333}
+ .cnt{margin-left:auto;font-size:11px;color:#6a7a82;font-family:Consolas,monospace}
+ .crumb{font-size:11.5px;color:#6a7a82;margin-bottom:10px}
+ .crumb a{color:#6FC3DF;text-decoration:none}
+ .grp{margin:16px 0 6px;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:700}
+ .grp.o{color:#7CFFB2}.grp.i{color:#8fb6d6}.grp.l{color:#f0c674}
+ .grp span{color:#5f6f77;font-weight:400;letter-spacing:0;text-transform:none;margin-left:7px;font-size:11px}
+ .kn{border:1px solid #242424;background:#141414;border-radius:6px;padding:9px 11px;margin:6px 0}
+ .kn.o{border-left:3px solid #3aa06a}.kn.i{border-left:3px solid #3a6a90}.kn.l{border-left:3px solid #c9a24b}
+ .kn .h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+ .kn .ky{font-family:Consolas,monospace;font-size:11.5px;color:#9fe0f2}
+ .kn .dn{font-family:Consolas,monospace;font-size:10px;color:#5f6f77}
+ .kn .own{margin-left:auto;font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:4px}
+ .kn.o .own{background:#0f2318;color:#7CFFB2;border:1px solid #2a5a38}
+ .kn.i .own{background:#101c26;color:#8fb6d6;border:1px solid #2a4a5e}
+ .kn.l .own{background:#1a140f;color:#f0c674;border:1px solid #4a3a20}
+ .kn .ds{color:#98a6ad;font-size:11.5px;margin-bottom:6px}
+ .fake{width:100%;background:#0a0a0a;border:1px solid #333;border-radius:5px;padding:6px 9px;font-size:12px;color:#ddd;font-family:Consolas,monospace}
+ .fake.dis{opacity:.55}
+ .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+ .chip{font-family:Consolas,monospace;font-size:10.5px;border-radius:4px;padding:2px 7px;border:1px solid #2a4a5e;background:#101c26;color:#9fc6dd}
+ .chip.on{border-color:#2a5a38;background:#0f2318;color:#7CFFB2;font-weight:700}
+ .chip.gt{border-color:#4a3a20;background:#1a140f;color:#f0c674}
+ .note{color:#5f6f77;font-size:10.5px;margin-top:5px}
+ .stage{margin-top:15px;padding:11px 13px;border:1px solid #2a4a5e;border-radius:7px;background:#0d141a}
+ .stage .btn{display:inline-block;background:#6FC3DF;color:#000;font-weight:700;font-size:12px;padding:7px 15px;border-radius:5px}
+ .stage .ex{color:#8f9ea6;font-size:11.5px;margin-top:8px;line-height:1.55}
+ .cap{color:#5f6f77;font-size:11px;text-align:center;margin:6px 0 20px}
+</style></head><body>
+<nav><span class="b">Be</span><span style="color:#6a7a82;font-size:12.5px">~d &middot; design</span>
+<span class="p">Published 2026-07-20 21:40 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/674235a4-5ca2-4a9f-8ce2-daa3ad0da1c7/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<div class="w">
+
+<h1>Runbooks &mdash; a plural config surface in the Argus Zendesk app</h1>
+<p class="lede">Port <b>Manage the Triage</b> into the console as a library, not a page.</p>
+<p class="sub">Paired per Rule 1 &mdash; Opus driver, Fable navigator, concurrent then reconciled.
+Navigator owns the verdict; both divergences are surfaced below, none resolved silently.
+Target: <b>demo tomorrow</b>, operator logs in.</p>
+
+<h2>1 &middot; The need</h2>
+<p>The triage config exists and is real, but it lives in a dev tool that nobody logs into. It needs to be
+in Argus, where the work already happens. Three constraints shape everything:</p>
+<ul>
+<li><b>The demo is tomorrow and Joey logs in</b> &mdash; not the manager. Manager identity and Zendesk
+login are explicitly post-demo. That removes the hardest blocker from tomorrow's path and we should not
+spend a single hour on it.</li>
+<li><b>This is one of many.</b> The repo already holds three live cards plus a retired one. A
+single-purpose page would be rework inside a week.</li>
+<li><b>Nothing may lie.</b> The applier does not exist. The surface has to say so in words, not hide it.</li>
+</ul>
+
+<h2>2 &middot; Raw user stories</h2>
+<blockquote>
+As the operator, I open Argus, land in the Zendesk app, and see <b>every automated procedure I own</b> in
+one list &mdash; not just the triage one.<br><br>
+As the operator, I open one, see what it does in demands I can read, see which settings are mine, which
+are IT's, and which are locked &mdash; and see the options each one actually permits.<br><br>
+As the operator demoing this, I can point at the screen and say "and this is where the support manager
+will tune it" without anything on screen being a mockup.<br><br>
+As the operator, when I change a value I am told <b>exactly</b> what did and did not happen.
+</blockquote>
+
+<h2>3 &middot; Sourced solution &mdash; everything here already exists</h2>
+<p>Nothing in this design is invented. Every mechanism is lifted from something already running:</p>
+<table>
+<tr><th>Need</th><th>Existing source</th><th>Where</th></tr>
+<tr><td>Browse-then-drill in one tab</td><td><code>zprogram</code> &mdash; "browse when no ticket is open, replay when one is"</td><td class="k">index.html:5710</td></tr>
+<tr><td>Tab registration</td><td><code>templates</code> / <code>zdaudit</code> precedent</td><td class="k">:732 &middot; :5733</td></tr>
+<tr><td>Deep link + back button</td><td><code>navSnap</code> / <code>navHash</code> &rarr; <code>#zendesk/runbooks/&lt;card&gt;</code></td><td class="k">:752 &middot; :5797</td></tr>
+<tr><td>Honesty banner</td><td><code>realBadge()</code> &mdash; live / corpus / demo kinds</td><td class="k">:704</td></tr>
+<tr><td>Repo data in the browser</td><td>baked JSON assets, <code>cache:"no-store"</code></td><td class="k">:1622</td></tr>
+<tr><td>Ops / IT / Locked grouping</td><td>the config renderer shipped today</td><td class="k">bridge-postman</td></tr>
+<tr><td>Comment strip</td><td><code>cmBar()</code></td><td class="k">:706</td></tr>
+</table>
+<p>Consequence: <b>zero new backend, zero new deploy surface.</b> It ships as static Pages assets in the
+file that already ships.</p>
+
+<h2>4 &middot; Literal naming &mdash; where we disagree with you</h2>
+<div class="card no">
+<h3>&ldquo;Plan&rdquo; is already taken, by the file sitting next to it</h3>
+<p>You floated <b>plan</b> as the external word for a <code>.pi</code> and asked if we like it. We do not,
+and the reason is concrete rather than aesthetic &mdash; <b>the <code>.si</code> is already called the plan,
+in our own files:</b></p>
+<pre>mendo-nps-detractor-triage.pi:5   "The cortex = this .pi + its .si (the plan) + the .sm"
+mendo-nps-detractor-triage.si:2   "SKILL INTENT (the execution plan)"
+mendo-nps-detractor-triage.si:17  plan:          &larr; the literal parse token</pre>
+<p>Adopting it externally means you say &ldquo;plan&rdquo; meaning <code>.pi</code> while every file, every
+parser, and metal's own <code>~p</code> command say &ldquo;plan&rdquo; meaning <code>.si</code>. Also taken:
+<code>be/plans/</code>, and the console already uses Plan as a dry-run verb (<code>:3296</code>
+&ldquo;Plan clone (dry)&rdquo;). And &ldquo;Plans&rdquo; would sit in the tab rail directly beside
+&ldquo;Programs.&rdquo;</p>
+</div>
+<div class="card yes">
+<h3>The answer is two words, not one: <b>Runbook</b> outside, <b>playbook</b> inside</h3>
+<p>The operator's surface says <b>Runbook</b> &mdash; the word an operations team already owns. They are
+not managing an engine concept; they are managing the procedure their shop runs on.</p>
+<p>The runtime keeps <b>playbook</b>, and it was right all along:</p>
+<pre>src/sdk/nous/action/skill/pirun/pirun.h:5
+  "A .pi playbook is POLICY AS DATA: frontmatter + a protocol[] of structured units"</pre>
+<p>That is the engine describing what it <i>holds</i> &mdash; policy, as data, loaded and sealed. No
+operator ever reads it. <b>The two words were never required to match, and forcing them to would make one
+of them lie.</b> Internal names the artifact's nature; external names its job.</p>
+<p><b>&ldquo;Plan&rdquo; is rejected for both.</b> It already means the companion <code>.si</code> &mdash;
+in the <code>.pi</code>'s own header, in the <code>.si</code>'s own header, and as the literal
+<code>plan:</code> parse token.</p>
+<p><b>Consequence:</b> the external rename touches documents and labels only. <b>Zero C99 changes</b>
+&mdash; which is also why it is safe during a freeze: nothing that executes is modified.</p>
+</div>
+
+<h2>5 &middot; Shape &mdash; the UX</h2>
+<p>One tab. Library when nothing is selected, config when something is. Same shape as
+<code>zprogram</code>, so back/forward/deep-link work without new code.</p>
+
+<h3>5.1 &mdash; The library</h3>
+<div class="mock">
+ <div class="mk-nav"><span class="lg">ARGUS</span><span class="ap">&#128172; Zendesk &#9662;</span>
+ <span style="color:#5f6f77;font-size:11px">Support &middot; corpus + live &middot; read-only</span>
+ <span class="who">jc &middot; operator</span></div>
+ <div class="mk-tabs"><span>Focus</span><span>Find</span><span>Programs</span><span>Matches</span>
+ <span>Patterns</span><span>Shape</span><span>Tickets</span><span>Off-Script</span><span>Audit</span>
+ <span class="on">Runbooks</span><span>API</span></div>
+ <div class="mk-body">
+  <span class="rb">&#9679; REAL &mdash; REPO SNAPSHOT &middot; baked 2026-07-20 21:40</span>
+  <div style="color:#fff;font-size:15px;font-weight:600;margin-bottom:2px">Runbooks</div>
+  <div style="color:#8f9ea6;font-size:12px;margin-bottom:12px">Every automated procedure, as its intent
+  file declares it. Read from <code>be/pi</code> at deploy &mdash; nothing on this screen is hand-written.</div>
+
+  <div class="pb sel"><div class="t"><span class="nm">NPS Detractor Triage</span>
+   <span class="id">mendo-nps-detractor-triage</span><span class="pill p-sb">SANDBOX</span>
+   <span class="pill p-sl">SEALED</span><span class="cnt">15 demands</span></div>
+   <div class="mt">owner jc &middot; 6 yours &middot; 4 IT &middot; 3 locked &middot; <span style="color:#6FC3DF">open &rarr;</span></div></div>
+
+  <div class="pb"><div class="t"><span class="nm">NPS Sweep</span>
+   <span class="id">mendo-nps-sweep</span><span class="pill p-sb">SANDBOX</span>
+   <span class="pill p-sl">SEALED</span><span class="cnt">plumbing</span></div>
+   <div class="mt">owner jc &middot; finds the alerts and hands each one to the Triage &middot;
+   <span style="color:#5f6f77">config editor lands next</span></div></div>
+
+  <div class="pb"><div class="t"><span class="nm">Purcius Mesh Status</span>
+   <span class="id">purcius-mesh-status</span><span class="pill p-pr">PROD</span>
+   <span class="pill p-sl">SEALED</span></div>
+   <div class="mt">owner jc &middot; <span style="color:#5f6f77">config editor lands next</span></div></div>
+
+  <div class="pb ret"><div class="t"><span class="nm">App Survey Autoresponse</span>
+   <span class="id">mendo-app-survey-autoresponse</span><span class="pill p-rt">RETIRED</span></div>
+   <div class="mt">retired 2026-07-15 &middot; superseded by NPS Detractor Triage</div></div>
+ </div>
+</div>
+<p class="cap">Every row is real metadata parsed from a real file &mdash; <code>card:</code>,
+<code>owner:</code>, <code>env:</code>, seal presence. Plurality demonstrated with zero invented content.</p>
+
+<h3>5.2 &mdash; The detail</h3>
+<div class="mock">
+ <div class="mk-nav"><span class="lg">ARGUS</span><span class="ap">&#128172; Zendesk &#9662;</span>
+ <span class="who">jc &middot; operator</span></div>
+ <div class="mk-tabs"><span>Focus</span><span>Find</span><span>Programs</span><span>&hellip;</span>
+ <span class="on">Runbooks &middot; NPS Detractor Triage</span></div>
+ <div class="mk-body">
+  <div class="crumb"><a>&larr; Runbooks</a> &nbsp;/&nbsp; NPS Detractor Triage</div>
+  <span class="rb">&#9679; REAL &mdash; REPO SNAPSHOT &middot; baked 2026-07-20 21:40</span>
+  <div style="color:#fff;font-size:15px;font-weight:600">NPS Detractor Triage</div>
+  <div style="color:#8f9ea6;font-size:12px;margin-bottom:4px">Pure Intent &middot;
+  <code>mendo-nps-detractor-triage.pi</code> &middot; sealed &middot; env <b style="color:#f0c674">sandbox</b></div>
+
+  <div class="grp o">Yours to set <span>Help desk &middot; Ops owns these &middot; 6</span></div>
+  <div class="kn o"><div class="h"><span class="ky">escalation.recipients</span>
+   <span class="dn">D6 D7 D8 D15</span><span class="own">YOURS</span></div>
+   <div class="ds">Who receives a food-safety escalation</div>
+   <div class="fake">&lt;the escalation list &mdash; two addresses&gt;</div></div>
+  <div class="kn o"><div class="h"><span class="ky">escalation.priority</span>
+   <span class="dn">D6 D7 D8 D15</span><span class="own">YOURS</span></div>
+   <div class="ds">How urgently the escalation lands</div>
+   <div class="fake">high &nbsp;&#9662;<span style="color:#5f6f77"> &nbsp; low &middot; normal &middot; high &middot; urgent</span></div></div>
+  <div class="kn o"><div class="h"><span class="ky">words.zora-reply</span>
+   <span class="own">YOURS</span></div>
+   <div class="ds">The apology a guest reads</div>
+   <div class="fake" style="color:#98a6ad">Hi {name},<br><br>Thank you for participating in our survey.
+   I'm so sorry to hear {empathy}&hellip;</div></div>
+
+  <div class="grp i">IT <span>System machinery &middot; 4</span></div>
+  <div class="kn i"><div class="h"><span class="ky">panel.models</span><span class="dn">D4</span>
+   <span class="own">IT</span></div>
+   <div class="ds">Which AI models review each guest's words</div>
+   <div class="chips"><span class="chip on">vertex-gemini</span><span class="chip on">vertex-gemini-pro</span></div>
+   <div class="note">Allowed by the intent &mdash; 26 Vertex models (inside our boundary):</div>
+   <div class="chips"><span class="chip">vertex/gemini-2.5-pro</span><span class="chip">vertex/gemini-2.5-flash</span>
+   <span class="chip">vertex/claude-opus-4-8</span><span class="chip">vertex/claude-sonnet-5</span>
+   <span class="chip">+22 more</span></div>
+   <div class="note">Gated &mdash; BYOK; guest data leaves the Google boundary:</div>
+   <div class="chips"><span class="chip gt">byok/gpt-5.5</span><span class="chip gt">byok/grok-4.3</span>
+   <span class="chip gt">+6 more</span></div></div>
+  <div class="kn i"><div class="h"><span class="ky">gate.tag</span><span class="dn">D2</span>
+   <span class="own">IT</span></div>
+   <div class="ds">Marks a ticket as already handled</div>
+   <div class="fake dis">argus_nps_handled</div></div>
+
+  <div class="grp l">Locked <span>The safety floor &middot; 3</span></div>
+  <div class="kn l"><div class="h"><span class="ky">panel.fold</span><span class="dn">D4 D5</span>
+   <span class="own">LOCKED</span></div>
+   <div class="ds">How the two verdicts combine &mdash; both must say safe</div>
+   <div class="fake dis">unanimous-safe</div></div>
+
+  <div class="stage">
+   <span class="btn">Stage change &middot; sandbox</span>
+   <div class="ex"><b>Staged, not applied.</b> <code>pi_run</code> reads the sealed repo files &mdash; a
+   staged value takes effect only when the owner applies it and the card is resealed. <b>The apply step
+   does not exist yet</b>; staged values are saved and will carry into it when it lands.</div>
+  </div>
+ </div>
+</div>
+<p class="cap">The <code>allow:</code> sets render in the intent's <i>own</i> vocabulary &mdash; including
+the BYOK warning sentence, verbatim from the <code>.pi</code>. Nothing is an invented picker.</p>
+
+<h3>5.3 &mdash; Why the missing applier is a feature on stage</h3>
+<div class="card info">
+<p>Do not apologise for it in the demo. It <i>is</i> the safety property: biRT means <code>pi_run</code>
+&ldquo;refuses to load on drift&rdquo; (<code>.pi:8-9</code>). Config cannot silently change under a sealed
+card &mdash; stage, then the owner applies, then it reseals. That is the designed path. The screen says so
+in plain words, which is exactly what a support manager should be told before they are handed the stick.</p>
+</div>
+
+<h2>6 &middot; First move</h2>
+<table>
+<tr><th>#</th><th>Move</th><th>Touches</th></tr>
+<tr><td>1</td><td>Bake <code>be/pi/*.pi</code> + <code>.si</code> &rarr; <code>web/app/runbooks.json</code> (the parser exists &mdash; lift it from the current build script)</td><td class="k">new, ~40 lines</td></tr>
+<tr><td>2</td><td>Register the tab: <code>tabs</code> array + <code>tabHtml</code> entry</td><td class="k">:732 &middot; :5733</td></tr>
+<tr><td>3</td><td>Add the pane: <code>case "runbooks"</code> &rarr; <code>realBadge("snapshot") + pbPane() + cmBar()</code></td><td class="k">:5678-5720</td></tr>
+<tr><td>4</td><td>Library + detail render off <code>PB.sel</code>; deep link via <code>navSnap</code></td><td class="k">pane-local</td></tr>
+<tr><td>5</td><td>Stage writes to <code>localStorage</code>, labelled &ldquo;staged on this machine&rdquo;</td><td class="k">no server</td></tr>
+</table>
+<p>One file, one new asset, no backend. That is the whole demo build.</p>
+
+<h2>Where the pair diverged</h2>
+<div class="card warn">
+<p><b>Divergence 1 &mdash; where staged edits go.</b> The navigator's primary pick was the existing
+<code>/settings</code> round-trip (one key in <code>settingsKeys()</code>, syncs across machines free).
+The driver took the navigator's <i>own</i> caution as decisive: that Firestore doc is
+<b>server-side gate authority</b> (<code>Program.cs:673-682</code>). Writing runbook config into the
+document that decides who may do what &mdash; the night before a demo &mdash; is the wrong risk.
+<b>Resolved: localStorage for the demo</b>, its own document post-demo. Navigator concurred on review.</p>
+<p><b>Divergence 2 &mdash; the name.</b> Driver initially accepted &ldquo;plan&rdquo; as the operator's
+call. Navigator refused it with file:line evidence. The operator then settled it: <b>Runbook</b> on the outside, <b>playbook</b> in the runtime &mdash; the internal name was already correct.
+<b>Surfaced to the operator rather than resolved &mdash; the name is Joey's to pick.</b></p>
+</div>
+
+<h2>Unknowns</h2>
+<ul>
+<li>Whether <code>acmedevUS/zendesk-bridge</code> can serve a live runbook list &mdash; out of repo,
+unverified. Bake is chosen partly <i>because</i> it does not depend on the answer.</li>
+<li>How many runbooks this scales to before the flat library needs grouping. Four is fine; forty is not.</li>
+<li>Whether the manager should ever see IT and Locked rows at all, or only Ops. Deferred with the login.</li>
+</ul>
+
+<h2>When to revisit</h2>
+<p>The moment <b>any</b> of these fires: the applier lands (staging moves off localStorage); a second
+person needs to log in (the whole auth question reopens and this design does not answer it); a
+<code>.pi</code> is edited and the baked snapshot goes stale in front of someone &mdash; that is the signal
+the live endpoint is no longer optional.</p>
+
+<h2>Definition of Done</h2>
+<ul>
+<li>&#10003; Paired per Rule 1 &mdash; concurrent, reconciled, navigator owned the verdict</li>
+<li>&#10003; Both divergences surfaced, neither resolved silently</li>
+<li>&#10003; Architecture read first; every mechanism sourced to existing code with file:line</li>
+<li>&#10003; Naming checked against the codebase, not taste &mdash; collision proven, alternative sourced</li>
+<li>&#10003; UX mockup rendered, not described</li>
+<li>&#10003; Unknowns + When To Revisit present (Rule 7)</li>
+<li>&#10003; Honest-labelling requirement carried into the design, not bolted on</li>
+<li>&#10007; Not built &mdash; this is <code>~d</code>. Build is the next move.</li>
+</ul>
+
+<div class="foot">
+Generated 2026-07-20 21:40 &middot; v0 &middot; ~d &middot; design<br>
+Sources: <code>web/app/index.html</code>, <code>web/_worker.js</code>, <code>bridge/Program.cs</code>,
+<code>be/pi/dianoia/*.pi</code> + <code>.si</code>, <code>src/sdk/nous/action/skill/pirun/pirun.h</code>,
+<code>be/tools/bridge-postman.html</code>
+</div>
+</div></body></html>

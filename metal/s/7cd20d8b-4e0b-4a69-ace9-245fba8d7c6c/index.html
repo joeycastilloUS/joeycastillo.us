@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<title>~cr: argus-tacho r9 — crash recovery</title>
+<style>
+  :root { --bg:#111111; --sur:#1A1A1A; --acc:#6FC3DF; --txt:#e8e8e8; --mut:#9a9a9a;
+          --grn:#4ade80; --amb:#fbbf24; --red:#f87171; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+         font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; line-height:1.6; }
+  nav { position:sticky; top:0; background:#000; border-bottom:1px solid var(--acc);
+        padding:10px 20px; display:flex; justify-content:space-between; align-items:baseline; }
+  nav .brand { color:var(--acc); font-weight:bold; font-size:18px; }
+  nav .pub { color:var(--mut); font-size:12px; }
+  main { max-width:800px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { color:var(--acc); font-size:26px; margin:0 0 4px; }
+  .sub { color:var(--mut); margin:0 0 28px; }
+  h2 { color:var(--acc); font-size:17px; margin:34px 0 10px;
+       border-bottom:1px solid #2a2a2a; padding-bottom:6px; }
+  .card { background:var(--sur); border-radius:6px; padding:14px 18px; margin:14px 0; }
+  code { background:#000; padding:1px 5px; border-radius:3px; font-size:13px; color:var(--acc); }
+  pre { background:#000; padding:14px; border-radius:6px; overflow-x:auto; font-size:13px;
+        border-left:2px solid var(--acc); }
+  table { width:100%; border-collapse:collapse; margin:14px 0; font-size:14px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #2a2a2a; vertical-align:top; }
+  th { color:var(--acc); font-weight:600; }
+  .ok { color:var(--grn); } .no { color:var(--red); } .warn { color:var(--amb); }
+  .sec { display:block; }
+  ul { padding-left:20px; } li { margin:5px 0; }
+  footer { color:var(--mut); font-size:12px; margin-top:40px; border-top:1px solid #2a2a2a;
+           padding-top:14px; }
+</style>
+</head>
+<body>
+<nav><span class="brand">Be</span><span class="pub">Published 2026-07-18 15:00 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://ai-metal.net/s/7cd20d8b-4e0b-4a69-ace9-245fba8d7c6c/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>~cr — argus-tacho r9</h1>
+<p class="sub">Crash recovery: session 51d0506a, interrupted mid-edit. Recovered, finished, shipped.</p>
+
+<h2>What Crashed</h2>
+<div class="sec" data-cm="what-crashed">
+<div class="card">
+Session <code>51d0506a</code> was working the argus-tacho HUD. Last prompt
+<b>20:46:11Z</b> — <i>"fix it and repackage as r9 AND CAN'T YOU show me the dollar values
+behind the credits and make it more accurate?"</i> — then nothing. No commit, no package,
+no report. The session died with the edit half-applied in <code>C:\argus</code>.
+</div></div>
+<h2>Evidence Found</h2>
+<div class="sec" data-cm="evidence-found">
+<ul>
+  <li><b>Prompt log</b> (<code>be/prompts.jsonl</code>, Step 0) named the session, the folder,
+      and the exact ask. Highest-signal evidence — read before touching git.</li>
+  <li><b>One dirty file</b> in <code>C:\argus</code>: <code>be/tools/claude-usage.ps1</code>,
+      +37/-2 substantive lines, every addition tagged <code># r9:</code>.</li>
+  <li><b>No commit</b> on the repo since 13:07 — the work never landed.</li>
+  <li><b>Whole-file diff</b> (122/87) masking a 37-line change: the editor had flipped
+      the file to CRLF.</li>
+</ul></div>
+<h2>Command Identified</h2>
+<div class="sec" data-cm="command-identified">
+<p>Source code dirty, no report, no package → crashed during <b>work</b> (stage 1), before
+review. Mapped to <code>~f</code> — a fix to a shipped tool.</p></div>
+<h2>Break Point</h2>
+<div class="sec" data-cm="break-point">
+<table>
+  <tr><th>Stage</th><th>State at crash</th></tr>
+  <tr><td>1 work</td><td class="warn">partial — dollar figures computed, never printed</td></tr>
+  <tr><td>2 review</td><td class="no">never ran</td></tr>
+  <tr><td>3 package r9</td><td class="no">zip still r8 (Jul 4)</td></tr>
+  <tr><td>4–7 report / commit / push / deploy</td><td class="no">nothing</td></tr>
+</table></div>
+<h2>What The Draft Got Wrong</h2>
+<div class="sec" data-cm="what-the-draft-got-wrong">
+<p>Resuming was not "finish typing." Three defects were in the recovered code, all found by
+reading the <b>live payload</b> instead of trusting the draft's guessed field names:</p>
+<div class="card">
+<b>1. Computed but never displayed.</b> The draft derived every dollar figure and then left
+the r8 display block untouched. Nothing it computed ever reached the screen.
+</div>
+<div class="card">
+<b>2. Guessed the percent scale.</b> <code>ExactPct()</code> tried to infer whether
+<code>utilization</code> was 0–1 or 0–100 by comparing both readings against the integer
+percent, and shipped a dead branch (<code>if($u -lt 1){return $u} else {return $u}</code>).
+The live payload settles it: <code>five_hour.utilization=1.0</code> alongside
+<code>limits[session].percent=1</code> — same 0–100 scale. Replaced with a documented
+<code>Pct()</code>.
+</div>
+<div class="card">
+<b>3. Aimed at the wrong dollars.</b> The draft pulled per-window
+<code>used_dollars</code>/<code>limit_dollars</code> — <b>null on flat-rate plans</b>, so it
+would have rendered nothing on this account. The money the operator asked about is in
+<code>spend</code>: <code>{amount_minor:14027, exponent:2}</code> → <b>$140.27 of $140.00</b>.
+</div></div>
+<h2>The Bug Behind The Ask</h2>
+<div class="sec" data-cm="the-bug-behind-the-ask">
+<p>r8 rendered a bare <code>credits off</code> while the account sat <b>$0.27 over</b> a
+$140.00 cap with extra usage disabled — the overage and its reason were both invisible.</p>
+<pre>r8    credits off
+
+r9    credits  $140.27 of $140.00 (100%)  over by $0.27  [off: org_level_disabled_until]</pre></div>
+<h2>What Was Recovered</h2>
+<div class="sec" data-cm="what-was-recovered">
+<table>
+  <tr><th>Area</th><th>Change</th></tr>
+  <tr><td>reader</td><td><code>Money()</code> decodes <code>{amount_minor,currency,exponent}</code>
+      and rounds at the currency's own precision — raw float left
+      <code>spend_remaining</code> as <code>-0.27000000000001023</code> in the log.</td></tr>
+  <tr><td>reader</td><td>Credits line carries dollars, over-by, and the
+      <code>disabled_reason</code>. Dropped <code>"{pct}% off"</code> — it read as a discount.</td></tr>
+  <tr><td>reader</td><td><code>Pct()</code> replaces the guessing; log row gains
+      <code>session_pct</code>/<code>weekly_pct</code>/<code>fable_pct</code> + money fields.</td></tr>
+  <tr><td>HUD</td><td>Credits block renders dollars + over-by + reason, severity-coloured;
+      form +16px. Gauges prefer exact percents; sub-1% reads <code>&lt;0.1%</code>, not
+      <code>0%</code>.</td></tr>
+  <tr><td>packaging</td><td>New <code>be/tools/pack-tacho.py</code> — builds from repo sources,
+      CRLF at pack time, fixed timestamps, <code>--check</code> fails on drift.</td></tr>
+  <tr><td>hygiene</td><td>CRLF → LF restored; whole-file diff collapsed to a real 83/8.</td></tr>
+</table></div>
+<h2>Drift Caught On The Way</h2>
+<div class="sec" data-cm="drift-caught-on-the-way">
+<div class="card">
+r8 was packaged <b>by hand</b> — all four shipped files differed from their repo sources.
+Nobody could tell what was actually in the customer's zip. <code>pack-tacho.py --check</code>
+now makes that a failure instead of a surprise.
+</div>
+<div class="card warn">
+<b>Not fixed — flagged.</b> <code>be/tools/claude-usage.sh</code> (Mac/Linux) is still on the
+retired <code>anthropic-ratelimit-*</code> header side-channel; it never got the r8 endpoint
+migration. POSIX operators are reading a dead source. Out of scope for this recovery; it
+needs its own <code>~f</code>. Cross-Platform From Day One canon.
+</div></div>
+<h2>Chain Completed</h2>
+<div class="sec" data-cm="chain-completed">
+<table>
+  <tr><th>Step</th><th>Result</th></tr>
+  <tr><td>Verified live</td><td class="ok">HTTP 200, plan max / 20x — figures reconcile against raw payload</td></tr>
+  <tr><td>Data round-trip</td><td class="ok"><code>usage.jsonl</code> row carries
+      <code>spend_used=140.27 spend_limit=140 spend_remaining=-0.27</code></td></tr>
+  <tr><td>Standalone smoke</td><td class="ok">unzipped to a clean folder — both scripts parse
+      clean, reader exit 0, HUD reaches message loop with no paint errors</td></tr>
+  <tr><td>Packaged</td><td class="ok">r9 zip, <code>--check</code> clean, stamps bumped
+      (README / HUD / download link)</td></tr>
+  <tr><td>Committed</td><td class="ok"><code>a9a26c8</code> — rebased onto 8 remote commits
+      (zero file overlap), pushed</td></tr>
+  <tr><td>Deployed</td><td class="ok">CI <code>deploy-argus</code> 16s success</td></tr>
+  <tr><td>Production verified</td><td class="ok">3 cache-busted GETs → 11440 bytes,
+      sha <code>9b99f81d</code> = local, page links <code>?v=r9</code></td></tr>
+</table></div>
+<h2>DoD</h2>
+<div class="sec" data-cm="dod">
+<ul>
+  <li class="ok">✓ Work finished, not merely resumed (three draft defects corrected)</li>
+  <li class="ok">✓ Verified against the real account, not a mock</li>
+  <li class="ok">✓ Data round-trip proven on the write path (<code>usage.jsonl</code>)</li>
+  <li class="ok">✓ External production verification (cache-busted, sha-matched)</li>
+  <li class="ok">✓ LF endings restored (Project DoD P2)</li>
+  <li class="ok">✓ Committed atomically + pushed</li>
+  <li class="warn">! POSIX sibling drift flagged, not silently fixed</li>
+</ul></div>
+<footer>
+  Generated 2026-07-18 15:00 &middot; v0 &middot; r718 &middot; argus &middot; kASTIL Systems<br>
+  Copyright (c) 2026 Joseph M. Castillo. Confidential // Top Secret.
+</footer>
+</main>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"7cd20d8b-4e0b-4a69-ace9-245fba8d7c6c"};</script>
+<script src="/artifact-comments.js"></script>
+</body>
+</html>
