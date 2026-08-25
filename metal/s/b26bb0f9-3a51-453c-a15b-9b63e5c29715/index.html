@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meraki Bridge — Proper Provider (diagram)</title>
+<!--lk-og-->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="joeycastillo.us">
+<meta property="og:title" content="Meraki Bridge — Proper Provider (diagram)">
+<meta name="description" content="Why refresh clicks return nothing today, and the two-lane design that gives you a real live refresh while keeping ~100 boards from ever flooding the Meraki API.">
+<meta property="og:description" content="Why refresh clicks return nothing today, and the two-lane design that gives you a real live refresh while keeping ~100 boards from ever flooding the Meraki API.">
+<meta property="og:url" content="https://joeycastillo.us/metal/s/b26bb0f9-3a51-453c-a15b-9b63e5c29715/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Meraki Bridge — Proper Provider (diagram)">
+<meta name="twitter:description" content="Why refresh clicks return nothing today, and the two-lane design that gives you a real live refresh while keeping ~100 boards from ever flooding the Meraki API.">
+<!--/lk-og-->
+<style>
+  :root{--bg:#111;--surf:#1A1A1A;--surf2:#202020;--acc:#6FC3DF;--txt:#e8e8e8;--mut:#8a8a8a;
+        --bad:#ff7a7a;--good:#7ad19a;--warn:#e8c56a;--line:#333;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif}
+  .nav{position:sticky;top:0;z-index:5;background:#000;border-bottom:2px solid var(--acc);
+       display:flex;align-items:center;justify-content:space-between;padding:10px 18px}
+  .nav .brand{font-weight:700;letter-spacing:.5px}
+  .nav .brand b{color:var(--acc)}
+  .nav .pub{font-size:12px;color:var(--mut)}
+  .wrap{max-width:1120px;margin:0 auto;padding:26px 18px 60px}
+  h1{font-size:24px;margin:.2em 0 .1em}
+  h1 .sub{color:var(--acc)}
+  .lede{color:var(--mut);margin:0 0 22px;max-width:820px}
+  .panel{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:18px 18px 22px;margin:0 0 22px}
+  .panel > h2{margin:.1em 0 .2em;font-size:16px;display:flex;align-items:center;gap:10px}
+  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
+  .tag.now{background:rgba(255,122,122,.15);color:var(--bad);border:1px solid rgba(255,122,122,.4)}
+  .tag.fix{background:rgba(122,209,154,.14);color:var(--good);border:1px solid rgba(122,209,154,.4)}
+  .cap{color:var(--mut);font-size:13px;margin:.1em 0 16px}
+  /* flow diagram */
+  .flow{display:grid;grid-template-columns:170px 46px 1fr;align-items:center;gap:10px 4px}
+  .col-lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px;text-align:right}
+  .box{background:var(--surf2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px}
+  .box .t{font-weight:700}
+  .box .d{color:var(--mut);font-size:12px;margin-top:2px}
+  .box.acc{border-color:var(--acc)}
+  .box.bad{border-color:rgba(255,122,122,.55)}
+  .box.good{border-color:rgba(122,209,154,.55)}
+  .box.warn{border-color:rgba(232,197,106,.5)}
+  .arrow{color:var(--acc);text-align:center;font-size:20px;font-weight:700}
+  .arrow.sm{font-size:15px}
+  .stack{display:flex;flex-direction:column;gap:8px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .inst{background:#171717;border:1px dashed var(--line);border-radius:8px;padding:8px 10px}
+  .inst .h{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  .meraki{background:linear-gradient(180deg,#12303a,#0e2530);border:1px solid var(--acc);
+          border-radius:8px;padding:12px;text-align:center}
+  .meraki .t{font-weight:700;color:var(--acc)}
+  .meraki .d{color:var(--mut);font-size:12px;margin-top:2px}
+  .gate{background:#241f10;border:1px solid var(--warn);border-radius:8px;padding:10px 12px}
+  .gate .t{font-weight:700;color:var(--warn)}
+  ul.notes{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+  ul.notes li{background:#161616;border-left:3px solid var(--line);padding:8px 12px;border-radius:0 6px 6px 0;font-size:13px}
+  ul.notes li b{color:var(--txt)}
+  ul.notes.bad li{border-left-color:var(--bad)}
+  ul.notes.bad li .n{color:var(--bad);font-weight:700;margin-right:6px}
+  ul.notes.good li{border-left-color:var(--good)}
+  ul.notes.good li .n{color:var(--good);font-weight:700;margin-right:6px}
+  .lane{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;margin-left:6px}
+  .lane.shared{background:rgba(111,195,223,.15);color:var(--acc)}
+  .lane.live{background:rgba(122,209,154,.15);color:var(--good)}
+  .foot{color:var(--mut);font-size:12px;border-top:1px solid var(--line);margin-top:26px;padding-top:14px}
+  code{background:#000;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12px;color:var(--acc)}
+  @media(max-width:760px){.flow{grid-template-columns:1fr}.col-lbl{text-align:left}.arrow{display:none}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="nav">
+  <div class="brand"><b>Be</b> · argus — Meraki provider</div>
+  <div class="pub">Published 2026-08-25 00:55 PDT</div>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/b26bb0f9-3a51-453c-a15b-9b63e5c29715/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+  <h1>Meraki Bridge — <span class="sub">from single cache to proper provider</span></h1>
+  <p class="lede">Why refresh clicks return nothing today, and the two-lane design that gives you a real live
+  refresh while keeping ~100 boards from ever flooding the Meraki API.</p>
+
+  <!-- CURRENT -->
+  <div class="panel">
+    <h2><span class="tag now">Current</span> one funnel — a click gets the same cache as the background poll</h2>
+    <p class="cap">Manual refresh, board polling, and the warmer all share ONE cached read path. Within the 30s TTL
+    the warmer has already filled the cache — so your click returns byte-identical JSON. Two instances each keep
+    their own cache, so it also jumps around.</p>
+    <div class="flow">
+      <div class="col-lbl">clients</div><div></div>
+      <div class="stack">
+        <div class="box bad"><div class="t">Argus APP — you click refresh</div><div class="d">?_=Date.now() busts the <i>browser</i> cache only</div></div>
+        <div class="box"><div class="t">Board × ~100 tabs</div><div class="d">background poll every ~30s</div></div>
+      </div>
+
+      <div class="arrow">→</div><div></div>
+      <div class="box acc"><div class="t">edge /_worker → bridge</div><div class="d">load-balances across instances (no affinity)</div></div>
+
+      <div class="col-lbl">bridge<br>maxScale=2</div><div class="arrow">→</div>
+      <div class="row2">
+        <div class="inst"><div class="h">Instance #1</div>
+          <div class="box"><div class="t">GetAsync (one path)</div><div class="d">cache 30s · warmer :00/:30 · active-set</div></div></div>
+        <div class="inst"><div class="h">Instance #2</div>
+          <div class="box"><div class="t">GetAsync (one path)</div><div class="d">SEPARATE cache · SEPARATE warmer</div></div></div>
+      </div>
+
+      <div class="col-lbl">upstream</div><div class="arrow">→</div>
+      <div class="meraki"><div class="t">Meraki Dashboard API</div><div class="d">no rate gate · sequential per-switch build · reactive-429 only</div></div>
+    </div>
+    <ul class="notes bad">
+      <li><span class="n">①</span> <b>No force path.</b> A human click hits the same <code>GetAsync</code> as the poll → returns the ≤30s snapshot → <i>“nothing changed.”</i></li>
+      <li><span class="n">②</span> <b>Split-brain.</b> 2 instances, each its own cache + warmer → clicks bounce between snapshots → <i>“works sometimes.”</i></li>
+      <li><span class="n">③</span> <b>Staleness hidden.</b> Cache-buster makes it look live; the app shows <i>your</i> clock as “as of,” not the data’s real age.</li>
+      <li><span class="n">④</span> <b>No limiter.</b> Sequential fan-out + no token bucket → slow cold builds and latent 429 risk under load.</li>
+    </ul>
+  </div>
+
+  <!-- FIXED -->
+  <div class="panel">
+    <h2><span class="tag fix">Proper provider</span> two lanes, one governed pipe</h2>
+    <p class="cap">Shared reads stay cached (protect Meraki). Interactive clicks take a force lane that bypasses the
+    TTL but is itself floored per-network. One instance = one cache/warmer. Everything meters through a single
+    token bucket, so nothing floods the API.</p>
+    <div class="flow">
+      <div class="col-lbl">clients</div><div></div>
+      <div class="stack">
+        <div class="box"><div class="t">Board × ~100 tabs<span class="lane shared">shared</span></div><div class="d">cached read — unchanged, cheap</div></div>
+        <div class="box"><div class="t">warmer :00 / :30<span class="lane shared">shared</span></div><div class="d">keeps active set warm</div></div>
+        <div class="box good"><div class="t">Argus APP — manual click<span class="lane live">live</span></div><div class="d">sends <code>&amp;force=1</code></div></div>
+      </div>
+
+      <div class="arrow">→</div><div></div>
+      <div class="box acc"><div class="t">edge /_worker → bridge <b>(min = max = 1)</b></div><div class="d">one instance → one cache, one warmer, no split-brain</div></div>
+
+      <div class="col-lbl">read lanes</div><div class="arrow">→</div>
+      <div class="row2">
+        <div class="box"><div class="t">Cached lane</div><div class="d">GetAsync(cached) → serve fresh L1 instantly</div></div>
+        <div class="box good"><div class="t">Force lane</div><div class="d">bypass TTL · per-network floor (1 / 10s) · single-flight collapses bursts</div></div>
+      </div>
+
+      <div class="col-lbl">one cache</div><div class="arrow sm">↓</div>
+      <div class="box acc"><div class="t">Single L1 cache + single warmer</div><div class="d">one snapshot → asOf is stable and shared</div></div>
+
+      <div class="col-lbl">governor</div><div class="arrow">→</div>
+      <div class="gate"><div class="t">Token bucket + concurrency gate</div><div class="d">~5 req/s, burst 10 — warmer + interactive + audit all share it · builds run parallel (Task.WhenAll) UNDER the gate</div></div>
+
+      <div class="col-lbl">upstream</div><div class="arrow">→</div>
+      <div class="meraki"><div class="t">Meraki Dashboard API</div><div class="d">never exceeds org limit · sub-second builds</div></div>
+    </div>
+    <ul class="notes good">
+      <li><span class="n">P0</span> <b>Force read + per-network floor</b> — your click always fetches live; can’t be spammed into a flood. <span style="color:var(--mut)">MerakiCache.GetAsync(force) · handlers · manual buttons</span></li>
+      <li><span class="n">P0</span> <b>min = max = 1</b> — one cache/warmer/active-set; the intermittency disappears at zero code cost. <span style="color:var(--mut)">Cloud Run scaling</span></li>
+      <li><span class="n">P1</span> <b>Token bucket + concurrency gate</b> — structural “stay within Meraki limits,” not reactive-429. <span style="color:var(--mut)">Meraki.cs GetAsync</span></li>
+      <li><span class="n">P1</span> <b>Parallel build under the gate</b> — sub-second refresh, shorter lock holds. <span style="color:var(--mut)">BuildPortmap / BuildVerify</span></li>
+      <li><span class="n">P2</span> <b>Honest asOf</b> — both surfaces show real data age; the app stops stamping your local clock. <span style="color:var(--mut)">app + board</span></li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    argus · Meraki bridge provider diagram · investigation artifact (<code>~i</code>, paired: fable + opus reconciled) ·
+    v0 · 2026-08-25 · not yet built — P0 is the immediate fix
+  </div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"b26bb0f9-3a51-453c-a15b-9b63e5c29715"};</script>
+<script src="/metal/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>
