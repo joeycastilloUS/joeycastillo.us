@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Konductor Board — Group LAF Synthesis</title>
+<!--lk-og-->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="joeycastillo.us">
+<meta property="og:title" content="Konductor Board — Group LAF Synthesis">
+<meta name="description" content="Close 9:00 PM CDT Go-live Tue, Aug 25 as of 3:56:04 AM CDT · 1:56 AM PDT Above Registers 4 /12 BOH 0 /4 Patio AP 4 /12">
+<meta property="og:description" content="Close 9:00 PM CDT Go-live Tue, Aug 25 as of 3:56:04 AM CDT · 1:56 AM PDT Above Registers 4 /12 BOH 0 /4 Patio AP 4 /12">
+<meta property="og:url" content="https://joeycastillo.us/metal/s/f7174d8d-cdea-4074-98da-a3629273b39a/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Konductor Board — Group LAF Synthesis">
+<meta name="twitter:description" content="Close 9:00 PM CDT Go-live Tue, Aug 25 as of 3:56:04 AM CDT · 1:56 AM PDT Above Registers 4 /12 BOH 0 /4 Patio AP 4 /12">
+<!--/lk-og-->
+<style>
+  :root{
+    --bg:#0d0f11; --panel:#14171a; --panel2:#1a1e22; --line:#262c31;
+    --ink:#eef2f4; --mut:#8b969d; --dim:#6b757b;
+    --acc:#6FC3DF; --good:#4fd08a; --amber:#e8b45a; --red:#ff6b6b; --redbg:#2a0f0f; --redln:#5a2020;
+    --gold:#e8c56a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .page{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
+  .credit{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:18px}
+  .credit .t{font-weight:800;letter-spacing:.3px}
+  .credit .t b{color:var(--acc)}
+  .credit .s{font-size:12px;color:var(--mut)}
+  .synth{font-size:12px;color:var(--mut);margin:0 0 18px;max-width:900px}
+  .synth b{color:var(--ink)}
+  .synth .tag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--acc);border:1px solid #244;border-radius:20px;padding:1px 9px;margin:0 3px}
+
+  /* ---- the quad ---- */
+  .quad{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .qhead{display:grid;grid-template-columns:1fr auto auto;gap:18px;align-items:center;padding:16px 20px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#161a1e,#14171a)}
+  .qname{min-width:0}
+  .qnum{font-size:26px;font-weight:800;letter-spacing:.5px;line-height:1.05}
+  .qnum b{color:var(--acc)}
+  .qmeta{display:flex;gap:14px;align-items:center;margin-top:5px;color:var(--mut);font-size:12.5px}
+  .qmeta a{color:var(--acc);text-decoration:none}
+  /* dual clock — site leads, viewer is one quiet subordinate line (Fable + Opus). No wrap, ever. */
+  .clock{text-align:right;line-height:1.1}
+  .clock .big{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+  .clock .big .z{font-size:13px;font-weight:700;color:var(--mut);margin-left:4px}
+  .clock .sub{font-size:11.5px;color:var(--dim);margin-top:2px;font-variant-numeric:tabular-nums}
+  /* progress ring (Sonnet) + big status (Haiku) */
+  .prog{display:flex;align-items:center;gap:12px}
+  .ring{--p:100;width:58px;height:58px;border-radius:50%;background:conic-gradient(var(--good) calc(var(--p)*1%),#22282c 0);display:grid;place-items:center}
+  .ring::before{content:"";position:absolute;width:44px;height:44px;border-radius:50%;background:var(--panel)}
+  .ring b{position:relative;font-size:15px;font-weight:800;color:var(--good)}
+  .state{text-align:left}
+  .pill{display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;padding:3px 10px;border-radius:20px}
+  .pill.live{color:var(--good);background:rgba(79,208,138,.12);border:1px solid rgba(79,208,138,.4)}
+  .state .inst{font-size:11.5px;color:var(--mut);margin-top:6px;white-space:nowrap}
+  .state .inst b{color:var(--ink)}
+  .state .inst .z2{color:var(--dim)}
+
+  .sub2{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:9px 20px;border-bottom:1px solid var(--line);color:var(--mut);font-size:12px;background:var(--panel)}
+  .sub2 .k{color:var(--dim)}
+  .aps{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .ap{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--mut)}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot.up{background:var(--good)}.dot.down{background:var(--red)}.dot.warn{background:var(--amber)}
+  .ap b{color:var(--ink)}
+
+  /* issue banner — red, Meraki lastSeen leads (Opus color-as-meaning) */
+  .issue{display:flex;align-items:center;gap:10px;margin:12px 20px;padding:9px 12px;background:var(--redbg);border:1px solid var(--redln);border-radius:9px}
+  .issue .h{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--red)}
+  .issue .chip{font-size:12px;color:#ffc2c2;background:#361212;border:1px solid #5a2020;border-radius:6px;padding:2px 9px}
+  .issue .chip .seen{color:#e59a9a;font-size:10.5px}
+  .issue .chip .note{color:#9a6a6a;font-size:9px;margin-left:4px}
+
+  /* rollout chips + readiness */
+  .rollout{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 20px 12px}
+  .rk{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-right:2px}
+  .rchip{font-size:12px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:3px 10px}
+  .rchip b{color:var(--good)}
+  .ready{margin-left:auto;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;padding:4px 12px;border-radius:20px}
+  .ready.solid{color:var(--good);background:rgba(79,208,138,.12);border:1px solid rgba(79,208,138,.45)}
+  .live-n{font-size:12px;color:var(--mut);margin-left:10px}
+
+  /* device roster */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;padding:2px 20px 18px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:5px 6px;border-bottom:1px solid var(--line)}
+  td{padding:6px 6px;border-bottom:1px solid #1c2126;font-size:13px}
+  td.st{width:16px}
+  td.dev{font-weight:600}
+  td.port{color:var(--mut);font-variant-numeric:tabular-nums}
+  td.poe{text-align:right;color:var(--mut);font-size:12px}
+  .poe .on{color:var(--good)}.poe .bolt{color:var(--gold)}.poe .off{color:var(--dim)}
+  tr.down td{background:var(--redbg);border-bottom-color:var(--redln)}
+  tr.down td.st{box-shadow:inset 3px 0 0 var(--red)}
+  tr.down td.dev{color:#ffb3b3;font-weight:700}
+  tr.down .sub{display:block;font-size:9px;color:#c98a8a;font-weight:400}
+  @media(max-width:760px){.cols{grid-template-columns:1fr}.qhead{grid-template-columns:1fr}.clock,.state{text-align:left}}
+</style>
+</head>
+<body>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/f7174d8d-cdea-4074-98da-a3629273b39a/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+
+<div class="page">
+  <div class="credit">
+    <div class="t"><b>Group Project</b> — Konductor Board · Look &amp; Feel synthesis</div>
+    <div class="s">Fable · Opus · Sonnet · Haiku</div>
+  </div>
+  <p class="synth">Best of all four: <span class="tag">Fable</span> site-time leads, viewer time a quiet subordinate line (no wrap) ·
+    <span class="tag">Opus</span> color-as-meaning, glanceable density · <span class="tag">Sonnet</span> progress ring + calm grouping ·
+    <span class="tag">Haiku</span> huge status, ruthless signal. One quad, high fidelity.</p>
+
+  <div class="quad">
+    <!-- header: name · dual-clock · status+ring -->
+    <div class="qhead">
+      <div class="qname">
+        <div class="qnum"><b>093</b> &mdash; River North</div>
+        <div class="qmeta"><span>&#9742; (312) 625-3820</span><a href="#">&#9776; Playbook</a></div>
+      </div>
+      <div class="clock">
+        <div class="big">3:56 <span class="z">AM CDT</span></div>
+        <div class="sub">1:56 AM PDT · your time</div>
+      </div>
+      <div class="prog">
+        <div class="state">
+          <span class="pill live">underway</span>
+          <div class="inst">Install <b>Mon Aug 24 · 8:30 PM CDT</b> <span class="z2">· 6:30 PM PDT</span></div>
+        </div>
+        <div class="ring" style="--p:100"><b>100%</b></div>
+      </div>
+    </div>
+
+    <!-- sub line: close / go-live / as-of + AP health -->
+    <div class="sub2">
+      <span><span class="k">Close</span> 9:00 PM CDT</span>
+      <span><span class="k">Go-live</span> Tue, Aug 25</span>
+      <span><span class="k">as of</span> 3:56:04 AM CDT · 1:56 AM PDT</span>
+      <div class="aps">
+        <span class="ap"><span class="dot up"></span>Above Registers <b>4</b>/12</span>
+        <span class="ap"><span class="dot warn"></span>BOH <b>0</b>/4</span>
+        <span class="ap"><span class="dot up"></span>Patio AP <b>4</b>/12</span>
+      </div>
+    </div>
+
+    <!-- issue: Meraki lastSeen leads -->
+    <div class="issue">
+      <span class="h">1 issue</span>
+      <span class="chip">Bread Printer <span class="seen">last seen 08-24 17:41 CDT · 15:41 PDT</span><span class="note">noticed 01:45</span></span>
+    </div>
+
+    <!-- rollout + readiness -->
+    <div class="rollout">
+      <span class="rk">Rollout</span>
+      <span class="rchip">Inventory clean <b>16 pass</b></span>
+      <span class="rchip">Decomm clean <b>9 pass</b></span>
+      <span class="rchip">Install <b>submitted</b></span>
+      <span class="ready solid">Solid</span>
+      <span class="live-n">12/12 live</span>
+    </div>
+
+    <!-- roster -->
+    <div class="cols">
+      <table>
+        <thead><tr><th class="st"></th><th>Device</th><th>Port</th><th class="poe">PoE</th></tr></thead>
+        <tbody>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Bread Start</td><td class="port">POS-9</td><td class="poe"><span class="on">On</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Bread Finish</td><td class="port">POS-14</td><td class="poe"><span class="on">On</span> <span class="bolt">&#9889;</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Salad Start</td><td class="port">POS-11</td><td class="poe"><span class="on">On</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Salad Finish</td><td class="port">POS-16</td><td class="poe"><span class="on">On</span> <span class="bolt">&#9889;</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Expo</td><td class="port">POS-13</td><td class="poe"><span class="on">On</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Digital Expo</td><td class="port">POS-7</td><td class="poe"><span class="on">On</span></td></tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th class="st"></th><th>Device</th><th>Port</th><th class="poe">PoE</th></tr></thead>
+        <tbody>
+          <tr class="down"><td class="st"><span class="dot down"></span></td><td class="dev">Bread Printer<span class="sub">last seen 08-24 17:41 CDT · 15:41 PDT</span></td><td class="port">POS-15</td><td class="poe"><span class="off">&mdash;</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Salad Printer</td><td class="port">POS-12</td><td class="poe"><span class="on">On</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Expo Printer</td><td class="port">POS-17</td><td class="poe"><span class="on">On</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Terminal 1</td><td class="port">POS-3</td><td class="poe"><span class="on">On</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Terminal 2</td><td class="port">POS-5</td><td class="poe"><span class="on">On</span></td></tr>
+          <tr><td class="st"><span class="dot up"></span></td><td class="dev">Injest</td><td class="port">POS-23</td><td class="poe"><span class="on">On</span> <span class="bolt">&#9889;</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"f7174d8d-cdea-4074-98da-a3629273b39a"};</script>
+<script src="/metal/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>
