@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meraki Provider Upgrade — Contribution Report</title>
+<!--lk-og-->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="joeycastillo.us">
+<meta property="og:title" content="Meraki Provider Upgrade — Contribution Report">
+<meta name="description" content="One build, four model tiers, paired per Rule 1. The regression: refresh clicks returned cached data. The fix: a proper provider — an interactive force-lane, a rate governor, parallel…">
+<meta property="og:description" content="One build, four model tiers, paired per Rule 1. The regression: refresh clicks returned cached data. The fix: a proper provider — an interactive force-lane, a rate governor, parallel…">
+<meta property="og:url" content="https://joeycastillo.us/metal/s/44c6eedf-30ca-4246-a210-b58c24925c8f/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Meraki Provider Upgrade — Contribution Report">
+<meta name="twitter:description" content="One build, four model tiers, paired per Rule 1. The regression: refresh clicks returned cached data. The fix: a proper provider — an interactive force-lane, a rate governor, parallel…">
+<!--/lk-og-->
+<style>
+  :root{--bg:#111;--surf:#1A1A1A;--surf2:#202020;--acc:#6FC3DF;--txt:#e8e8e8;--mut:#8a8a8a;
+        --bad:#ff7a7a;--good:#7ad19a;--warn:#e8c56a;--line:#333;
+        --fable:#c79bf0;--opus:#6FC3DF;--sonnet:#7ad19a;--haiku:#e8c56a;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.55 "Helvetica Neue",Helvetica,Arial,sans-serif}
+  .nav{position:sticky;top:0;z-index:5;background:#000;border-bottom:2px solid var(--acc);
+       display:flex;align-items:center;justify-content:space-between;padding:10px 18px}
+  .nav .brand{font-weight:700}.nav .brand b{color:var(--acc)}
+  .nav .pub{font-size:12px;color:var(--mut)}
+  .wrap{max-width:860px;margin:0 auto;padding:26px 18px 60px}
+  h1{font-size:24px;margin:.1em 0}h1 .sub{color:var(--acc)}
+  .lede{color:var(--mut);margin:.3em 0 22px;max-width:760px}
+  h2{font-size:16px;margin:26px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  table{width:100%;border-collapse:collapse;margin:6px 0 4px;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .who{font-weight:700}
+  .m-fable{color:var(--fable)}.m-opus{color:var(--opus)}.m-sonnet{color:var(--sonnet)}.m-haiku{color:var(--haiku)}
+  .role{color:var(--mut);font-size:12px}
+  tfoot td{border-top:2px solid var(--line);font-weight:700}
+  .card{background:var(--surf);border:1px solid var(--line);border-radius:9px;padding:14px 16px;margin:10px 0}
+  .catch{border-left:3px solid var(--good)}
+  .catch .h{color:var(--good);font-weight:700;margin-bottom:4px}
+  .tiers{display:grid;gap:8px;margin:8px 0}
+  .tier{background:var(--surf2);border:1px solid var(--line);border-radius:7px;padding:9px 12px;font-size:13px}
+  .tier b{color:var(--acc)}
+  .chip{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;margin-left:6px}
+  .chip.p0{background:rgba(255,122,122,.16);color:var(--bad)}
+  .chip.p1{background:rgba(232,197,106,.16);color:var(--warn)}
+  .chip.p2{background:rgba(122,209,154,.16);color:var(--good)}
+  .ver li{margin:3px 0}
+  .ver .ok{color:var(--good)}
+  code{background:#000;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12px;color:var(--acc)}
+  .note{color:var(--mut);font-size:12px;margin-top:4px}
+  .foot{color:var(--mut);font-size:12px;border-top:1px solid var(--line);margin-top:28px;padding-top:14px}
+</style>
+</head>
+<body>
+<div class="nav">
+  <div class="brand"><b>Be</b> · argus — Contribution Report</div>
+  <div class="pub">Published 2026-08-25 01:30 PDT</div>
+  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/44c6eedf-30ca-4246-a210-b58c24925c8f/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+  <h1>Meraki Provider Upgrade — <span class="sub">who did what, time &amp; cost</span></h1>
+  <p class="lede">One build, four model tiers, paired per Rule 1. The regression: refresh clicks returned
+  cached data. The fix: a proper provider — an interactive force-lane, a rate governor, parallel builds.
+  Below is exactly how each model contributed, with wall-clock time and token cost.</p>
+
+  <h2>What shipped</h2>
+<div class="lk-sec" data-cm="what-shipped"><div class="tiers">
+    <div class="tier"><b>P0 — Force-read</b> <span class="chip p0">the fix you feel</span> — manual refresh sends
+      <code>?force=1</code>; the bridge bypasses the TTL (with a per-key 10s floor) so your click always fetches
+      live Meraki data. Auto/board polling stays cached. <code>min=max=1</code> kills the two-instance split-brain.</div>
+    <div class="tier"><b>P1 — Rate governor</b> <span class="chip p1">stay within limits</span> — token bucket
+      (~5 req/s, burst 10) + concurrency cap on every Meraki call; <code>BuildPortmap</code>/<code>BuildVerify</code>
+      parallelized under it (sub-second builds, deterministic output order).</div>
+    <div class="tier"><b>P2 — Honest asOf</b> <span class="chip p2">show real age</span> — the app stamps the
+      server's real <code>asOf</code> ("as of Ns ago") instead of your local clock.</div>
+  </div></div>
+<h2>Contribution — time &amp; cost</h2>
+<div class="lk-sec" data-cm="contribution-time-cost"><table>
+    <thead><tr><th>Model</th><th>Role</th><th>Key contribution</th><th class="num">Time</th><th class="num">Tokens</th><th class="num">Cost*</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="who m-sonnet">Sonnet 4.6</td>
+        <td class="role">Orchestrator</td>
+        <td>Read all 5 files; produced the deterministic line-level edit spec, deploy sequence, smoke tests &amp; risk notes. Corrected the estimated line numbers against reality and pre-caught 3 inline fixes.</td>
+        <td class="num">3m34s</td><td class="num">73,750</td><td class="num">~$0.44</td>
+      </tr>
+      <tr>
+        <td class="who m-fable">Fable 5</td>
+        <td class="role">Build driver</td>
+        <td>Applied all six edits across bridge + clients exactly to spec; made the right call keeping <code>wifiStamp</code>; materialized LINQ to protect JSON shape.</td>
+        <td class="num">2m51s</td><td class="num">92,613</td><td class="num">~$0.93</td>
+      </tr>
+      <tr>
+        <td class="who m-fable">Fable 5</td>
+        <td class="role">Navigator</td>
+        <td><b>Caught the ship-blocker</b> — <code>RefreshAsync</code>'s TTL re-check silently nulled the force. Verified throttle release-balance, token-bucket math, JSON shape, and copy fidelity.</td>
+        <td class="num">3m22s</td><td class="num">82,675</td><td class="num">~$0.83</td>
+      </tr>
+      <tr>
+        <td class="who m-haiku">Haiku 4.5</td>
+        <td class="role">Mechanical</td>
+        <td>Recompiled the bridge with the fix (0 errors / 0 warnings); grep-verified every edit landed and that <code>force=1</code> is isolated to manual paths only.</td>
+        <td class="num">25s</td><td class="num">37,435</td><td class="num">~$0.06</td>
+      </tr>
+      <tr>
+        <td class="who m-opus">Opus 4.8</td>
+        <td class="role">Check / reconcile / ship</td>
+        <td>Orchestrated the crew; owned the reconcile; wrote the force-fix (<code>freshSince</code>) that resolved the navigator's FAIL; committed, deployed (scaling + Cloud Build + web CI), production-verified.</td>
+        <td class="num">~7m†</td><td class="num">~55,000†</td><td class="num">~$1.10†</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr><td colspan="3">Total (5 roles across 4 model tiers)</td><td class="num">~17m‡</td><td class="num">~341k</td><td class="num">~$3.36</td></tr>
+    </tfoot>
+  </table>
+  <p class="note">* Cost is an <b>estimate</b> from token counts at approximate blended per-model rates — tokens are the hard
+  metric. † Opus figures are estimated (main-loop work isn't returned as a discrete subagent total). ‡ Agents ran
+  mostly sequentially (spec → build → review → verify); wall-clock is longer than the sum of the fast steps because
+  of the C# Cloud Build (~5 min) and CI deploys.</p>
+
+  <div class="card catch">
+    <div class="h">Why the pair earned its cost</div>
+    Fable (build) wrote clean code that <b>compiled with zero warnings</b> — and would have shipped the headline
+    feature silently dead. The force path called <code>RefreshAsync</code>, whose inner TTL re-check re-imposed the
+    exact freshness gate the force meant to bypass; with the warmer keeping the cache fresh, every "force" would have
+    returned cache. Fable (navigator) traced it and called <b>FAIL</b>. Opus wrote the <code>freshSince</code> fix,
+    Haiku confirmed the recompile. That's the reconcile doing its job: two brains caught what one would have shipped.
+  </div></div>
+<h2>Deploy &amp; verification</h2>
+  <ul class="ver">
+    <li><span class="ok">✓</span> Web (app + board <code>force=1</code> + asOf) — pushed <code>8cd1d54</code>, CI deployed, board build <code>r1243</code> live.</li>
+    <li><span class="ok">✓</span> Scaling — meraki-bridge <code>min=max=1</code> applied (revision 00083).</li>
+    <li id="v-bridge"><span class="ok">✓</span> Bridge (force-read + rate governor + parallel builds) — Cloud Build SUCCESS, revision <code>00084</code> serving, <code>min=max=1</code> preserved.</li>
+    <li id="v-smoke"><span class="ok">✓</span> P0 smoke (prod) — a <code>force=1</code> advanced <code>asOf</code> by +17.9s while a non-force read would've returned the cached snapshot (TTL 30s): force reaches live Meraki past the warm cache. The exact defect the navigator caught — now working.</li>
+  </ul>
+
+  <div class="foot">
+    argus · Meraki provider contribution report · paired build (Rule 1): Sonnet · Fable×2 · Haiku · Opus ·
+    v0 · 2026-08-25
+  </div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"44c6eedf-30ca-4246-a210-b58c24925c8f"};</script>
+<script src="/metal/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>
