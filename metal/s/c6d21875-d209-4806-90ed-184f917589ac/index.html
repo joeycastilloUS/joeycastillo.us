@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pulse REST API — Playground (proposal) · Argus</title>
+<!--lk-og-->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="joeycastillo.us">
+<meta property="og:title" content="Pulse REST API — Playground (proposal) · Argus">
+<meta name="description" content="A proposal for Norman. Click any endpoint, fill the params, hit Send — see the JSON we'd serve for the Pulse fleet.">
+<meta property="og:description" content="A proposal for Norman. Click any endpoint, fill the params, hit Send — see the JSON we'd serve for the Pulse fleet.">
+<meta property="og:url" content="https://joeycastillo.us/metal/s/c6d21875-d209-4806-90ed-184f917589ac/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Pulse REST API — Playground (proposal) · Argus">
+<meta name="twitter:description" content="A proposal for Norman. Click any endpoint, fill the params, hit Send — see the JSON we'd serve for the Pulse fleet.">
+<!--/lk-og-->
+<style>
+:root{--bg:#111;--panel:#1A1A1A;--acc:#6FC3DF;--line:#242424;--line2:#23343b;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:#e0e0e0;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;}
+a{color:var(--acc);text-decoration:none;} a:hover{text-decoration:underline;}
+.nav{position:sticky;top:0;z-index:5;background:#000;border-bottom:2px solid var(--acc);padding:10px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.nav b{color:var(--acc);font-size:16px;letter-spacing:.04em;}
+.nav .crumb{color:#8a93a0;font-size:12px;}
+.nav .pub{margin-left:auto;color:#6a7480;font-size:11px;}
+.wrap{max-width:1100px;margin:0 auto;padding:16px 18px 60px;}
+h1{color:var(--acc);font-size:22px;margin:14px 0 4px;}
+.sub{color:#8a93a0;font-size:13px;margin-bottom:10px;}
+.chip{font-size:11px;font-weight:700;padding:1px 8px;border-radius:20px;border:1px solid #333;white-space:nowrap;display:inline-block;margin:2px 2px 2px 0;}
+.chip.ok{background:#0d2a17;color:#7ce0a0;border-color:#1a5b34;}
+.chip.warn{background:#33330d;color:#e0e07a;border-color:#5b5b1a;}
+.chip.bad{background:#3a0d0d;color:#ff8b8b;border-color:#6b1a1a;}
+.chip.info{background:#16242b;color:#9fd3e8;border-color:#2c4a55;}
+.banner{background:#0c1b21;border:1px solid #2c4a55;border-radius:7px;padding:10px 14px;margin:10px 0 16px;font-size:12.5px;color:#bcd7e0;}
+.banner b{color:var(--acc);}
+.cols{display:grid;grid-template-columns:300px 1fr;gap:16px;}
+@media(max-width:820px){.cols{grid-template-columns:1fr;}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;}
+.grp{color:#6a7480;text-transform:uppercase;letter-spacing:.06em;font-size:10.5px;margin:12px 0 4px;}
+.grp:first-child{margin-top:0;}
+.ep{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:6px;padding:6px 8px;margin:2px 0;color:#cfe3ea;cursor:pointer;font-family:Consolas,monospace;font-size:12px;}
+.ep:hover{background:#16242b;border-color:#2c4a55;}
+.ep.on{background:#16242b;border-color:var(--acc);color:#fff;}
+.ep .m{color:#7ce0a0;font-weight:700;margin-right:6px;}
+.reqbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+.method{background:#0d2a17;color:#7ce0a0;border:1px solid #1a5b34;border-radius:5px;padding:3px 8px;font-weight:700;font-family:Consolas,monospace;font-size:12px;}
+.path{flex:1;min-width:220px;background:#0f171b;border:1px solid var(--line2);border-radius:5px;padding:6px 8px;font-family:Consolas,monospace;font-size:12.5px;color:#9fd3e8;overflow-x:auto;white-space:nowrap;}
+.send{background:var(--acc);color:#04222c;border:none;border-radius:5px;padding:6px 16px;font-weight:700;cursor:pointer;font-size:13px;}
+.send:hover{filter:brightness(1.1);}
+.params{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 8px;}
+.params label{font-size:11px;color:#8a93a0;display:flex;flex-direction:column;gap:2px;}
+.params input{background:#0f171b;border:1px solid var(--line2);border-radius:5px;padding:5px 7px;color:#cfe8f2;font-family:Consolas,monospace;font-size:12.5px;min-width:120px;}
+.epdesc{font-size:12px;color:#8a93a0;margin:2px 0 8px;}
+.wire{font-family:Consolas,monospace;font-size:11.5px;color:#6a7480;margin:6px 0 2px;}
+.wire b{color:#8fb6c2;}
+.status{font-family:Consolas,monospace;font-size:12px;margin:8px 0 4px;}
+.status .ok2{color:#7ce0a0;} .status .t{color:#6a7480;}
+pre{background:#0f171b;border:1px solid var(--line2);border-radius:6px;padding:12px;overflow:auto;max-height:52vh;font-family:Consolas,monospace;font-size:12px;color:#cfe8f2;margin:0;}
+.k{color:#9fd3e8;} .s{color:#c8e6a0;} .n{color:#e0c07a;} .nl{color:#ff8b8b;} .b{color:#c79bf0;}
+.try{margin:8px 0 2px;}
+.try button{background:#16242b;color:#9fd3e8;border:1px solid #2c4a55;border-radius:20px;padding:3px 10px;margin:2px 4px 2px 0;font-size:11.5px;cursor:pointer;}
+.try button:hover{border-color:var(--acc);color:#fff;}
+.foot{color:#6a7480;font-size:11px;border-top:1px solid var(--line);margin-top:28px;padding-top:10px;}
+h2{color:var(--acc);font-size:15px;border-bottom:1px solid var(--line2);padding-bottom:4px;margin:26px 0 8px;}
+</style>
+</head>
+<body>
+<div class="nav"><b>Be</b><span class="crumb">Pulse REST API · Argus · playground proposal</span><span class="pub">Published 2026-08-25 02:50 PT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/c6d21875-d209-4806-90ed-184f917589ac/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+<h1>Pulse REST API — Playground</h1>
+<div class="sub">A proposal for Norman. Click any endpoint, fill the params, hit Send — see the JSON we'd serve for the Pulse fleet.</div>
+<div>
+<span class="chip ok">read-only</span>
+<span class="chip info">C99 + RAW IDS backend</span>
+<span class="chip info">light speed in · REST out</span>
+<span class="chip warn">mock data (from your real numbers)</span>
+<span class="chip ok">mirrors Argus /read seam</span>
+</div>
+
+<div class="banner">
+<b>What this is.</b> The exact REST surface Argus would serve over your Pulse telemetry — modeled on how Argus already serves Meraki
+(<code>ISource</code> catalog → <code>/read</code>, read-only-provable). The data below is <b>canned from your 22-Aug status report</b>
+(the 46.4&nbsp;GFLOPS / 23.8&nbsp;W run, the Silicon&nbsp;Power SATA at 69&nbsp;°C vs the Kingston NVMe at 56&nbsp;°C, the stick that reports
+no temperature) plus a small illustrative fleet so "multi-site" is real. Production is <b>pure&nbsp;C99</b> serving derived views off a
+<b>RAW sealed IDS</b> — no schema invented, your record format stays deferred. You push (HTTPS today, the <b>mesh</b> at line speed later);
+we serve it up REST-style. Nothing here can write to a terminal.
+</div>
+
+<div class="try">
+<span style="color:#6a7480;font-size:11.5px;">Try:</span>
+<button data-try='fleet-health'>Fleet health rollup</button>
+<button data-try='terminal-drives|serial=PL-0001'>PL-0001 drives (the 69&deg;C SATA)</button>
+<button data-try='fleet-flags'>All fleet flags</button>
+<button data-try='run|runId=run-0001'>The 0.9.4 run + speed bars</button>
+<button data-try='terminal-sensors|serial=PL-0001|from=0|to=60'>Sensor series (heat-soak)</button>
+<button data-try='fleet-firmware'>Firmware inventory</button>
+</div>
+
+<div class="cols">
+  <div class="panel" id="epList"></div>
+  <div class="panel">
+    <div class="reqbar">
+      <span class="method">GET</span>
+      <span class="path" id="pathOut">/pulse/fleet/health</span>
+      <button class="send" id="sendBtn">Send</button>
+    </div>
+    <div class="params" id="paramBox"></div>
+    <div class="epdesc" id="epDesc"></div>
+    <div class="wire" id="wireOut"></div>
+    <div class="status" id="statusOut"></div>
+    <pre id="respOut">// select an endpoint and press Send</pre>
+  </div>
+</div>
+
+<h2>The endpoint catalog</h2>
+<div class="lk-sec" data-cm="the-endpoint-catalog"><div class="sub" style="margin-top:-2px">Every entry is a source-declared template; the caller only fills <code>{params}</code> (URL-encoded, ≤200 chars, no control chars, fails closed) — that is what makes it provably read-only. Each maps 1:1 to the Argus wire form <code>GET /read?source=pulse&amp;id=&lt;id&gt;&amp;&lt;param&gt;=&lt;value&gt;</code>.</div></div>
+<script>
+// ---------- CANNED FLEET (built from Norman's real numbers + a small illustrative fleet) ----------
+const SITES = [
+  {siteId:"bench-lab",     name:"Bench / Test Lab",        city:"—",              terminals:["PL-0001"]},
+  {siteId:"store-anaheim", name:"Store — Anaheim",         city:"Anaheim CA",     terminals:["PL-0002","PL-0003","PL-0004"]},
+  {siteId:"store-placentia",name:"Store — Placentia",      city:"Placentia CA",   terminals:["PL-0005","PL-0006"]},
+];
+
+// Each terminal keyed by Pulse-Link per-unit serial (the hardware id Norman already ships).
+const TERMS = {
+ "PL-0001":{serial:"PL-0001",siteId:"bench-lab",model:"POS N305 (i3-N305, 8 core)",linkFw:"1.0.0",vcd:"1.0.26",
+   lastRun:"run-0001",gflops:46.4,wattsAvg:23.8,wattsPeak:24.0,verdict:"PASS",throttle:"none",note:"Norman's real bench run (0.9.4)",
+   drives:[
+     {id:"nvme0",model:"Kingston NVMe",bus:"NVMe",tempC:56,wearOut:"2026-11",wearRange:"2026-10 .. 2027-01",wearFlag:"red",caveat:"all-day load-test duty cycle — NOT what a till sees",status:"ok"},
+     {id:"sata0",model:"Silicon Power 128GB",bus:"SATA",tempC:69,wearOut:"2027-06",wearRange:"2027-03 .. 2027-10",wearFlag:"amber",caveat:"runs far hotter than the NVMe under the same load",status:"hot"},
+     {id:"usb0", model:"USB stick",bus:"USB",tempC:null,wearOut:null,wearRange:null,wearFlag:null,caveat:"reports no temperature — recorded blank, never a fake number",status:"ok"}
+   ]},
+ "PL-0002":{serial:"PL-0002",siteId:"store-anaheim",model:"POS N305",linkFw:"1.0.0",vcd:"1.0.26",lastRun:"run-0002",gflops:45.9,wattsAvg:23.5,wattsPeak:23.9,verdict:"PASS",throttle:"none",
+   drives:[{id:"nvme0",model:"Kingston NVMe",bus:"NVMe",tempC:48,wearOut:"2029-02",wearRange:"2028-09 .. 2029-08",wearFlag:"green",caveat:"",status:"ok"}]},
+ "PL-0003":{serial:"PL-0003",siteId:"store-anaheim",model:"POS N305",linkFw:"1.0.0",vcd:"1.0.26",lastRun:"run-0003",gflops:41.2,wattsAvg:23.9,wattsPeak:24.1,verdict:"PASS",throttle:"sustained",note:"speed bars shorten through the run — case heat-soak throttling",
+   drives:[{id:"sata0",model:"Silicon Power 128GB",bus:"SATA",tempC:71,wearOut:"2027-01",wearRange:"2026-11 .. 2027-04",wearFlag:"red",caveat:"hottest drive in the fleet",status:"hot"}]},
+ "PL-0004":{serial:"PL-0004",siteId:"store-anaheim",model:"POS N305",linkFw:"1.0.0",vcd:"1.0.26",lastRun:"run-0004",gflops:46.0,wattsAvg:23.6,wattsPeak:24.0,verdict:"PASS",throttle:"none",
+   drives:[{id:"nvme0",model:"Kingston NVMe",bus:"NVMe",tempC:53,wearOut:"2027-09",wearRange:"2027-05 .. 2028-02",wearFlag:"amber",caveat:"",status:"ok"}]},
+ "PL-0005":{serial:"PL-0005",siteId:"store-placentia",model:"POS N305",linkFw:"1.0.0",vcd:"1.0.26",lastRun:"run-0005",gflops:46.3,wattsAvg:23.7,wattsPeak:24.0,verdict:"PASS",throttle:"none",
+   drives:[{id:"nvme0",model:"Kingston NVMe",bus:"NVMe",tempC:47,wearOut:"2029-05",wearRange:"2028-12 .. 2029-12",wearFlag:"green",caveat:"",status:"ok"}]},
+ "PL-0006":{serial:"PL-0006",siteId:"store-placentia",model:"POS N305",linkFw:"1.0.0",vcd:"1.0.26",lastRun:"run-0006",gflops:38.7,wattsAvg:22.9,wattsPeak:23.8,verdict:"FAIL",throttle:"sustained",note:"failed the run pass — GFLOPS fell below floor as it throttled",
+   drives:[{id:"nvme0",model:"Kingston NVMe",bus:"NVMe",tempC:62,wearOut:"2027-03",wearRange:"2027-01 .. 2027-07",wearFlag:"red",caveat:"",status:"warn"}]},
+};
+
+// Runs: per-test rows with a speed bar (relative to the run's best) — throttle is visible when bars shorten.
+function speedBars(best, arr){ return arr.map((g,i)=>({test:i+1, gflops:+g.toFixed(1), speedBarPct:Math.round(g/best*100)})); }
+const RUNS = {
+ "run-0001":{runId:"run-0001",serial:"PL-0001",program:"Pulse-POS-Load-Test 0.9.4",started:"2026-08-21T14:03:00",durationSec:600,rows:599,
+   cycle:"30s on / 30s off",workload:"fused-multiply-add matrix",verdict:"PASS",gflops:46.4,wattsAvg:23.8,wattsPeak:24.0,
+   tests:speedBars(46.4,[46.4,46.3,46.2,46.1,46.0,45.9,45.8,45.7,45.6,45.5])},   // bench: barely throttles
+ "run-0003":{runId:"run-0003",serial:"PL-0003",program:"Pulse-POS-Load-Test 0.9.4",started:"2026-08-24T12:10:00",durationSec:600,rows:599,
+   cycle:"30s on / 30s off",workload:"fused-multiply-add matrix",verdict:"PASS",gflops:44.8,wattsAvg:23.9,wattsPeak:24.1,
+   tests:speedBars(44.8,[44.8,44.4,43.7,43.0,42.3,41.6,41.0,40.6,40.3,40.1])},   // shortening bars = throttling
+ "run-0006":{runId:"run-0006",serial:"PL-0006",program:"Pulse-POS-Load-Test 0.9.4",started:"2026-08-24T18:22:00",durationSec:600,rows:599,
+   cycle:"30s on / 30s off",workload:"fused-multiply-add matrix",verdict:"FAIL",gflops:41.0,wattsAvg:22.9,wattsPeak:23.8,
+   tests:speedBars(41.0,[41.0,40.1,39.3,38.6,38.0,37.6,37.2,36.9,36.7,36.5])},
+};
+
+// Fleet flags — derived (what the operator needs to SEE before service).
+const FLAGS = [
+ {flag:"drive-temp",   severity:"critical", siteId:"store-anaheim",  serial:"PL-0003", device:"sata0", detail:"Silicon Power SATA at 71°C — hottest drive in the fleet"},
+ {flag:"run-fail",     severity:"critical", siteId:"store-placentia",serial:"PL-0006", device:"cpu",   detail:"last load-test verdict FAIL — throttled below GFLOPS floor"},
+ {flag:"throttle",     severity:"warn",     siteId:"store-anaheim",  serial:"PL-0003", device:"cpu",   detail:"sustained throttle — speed bars shorten through the run"},
+ {flag:"drive-temp",   severity:"warn",     siteId:"bench-lab",      serial:"PL-0001", device:"sata0", detail:"Silicon Power SATA at 69°C vs Kingston NVMe 56°C, same load"},
+ {flag:"wear-out",     severity:"warn",     siteId:"store-placentia",serial:"PL-0006", device:"nvme0", detail:"wear-out estimate March 2027"},
+ {flag:"wear-out",     severity:"info",     siteId:"bench-lab",      serial:"PL-0001", device:"nvme0", detail:"Kingston wear-out Nov 2026 (red) — honest arithmetic for an all-day load test, not a till duty cycle"},
+];
+
+// ---------- DERIVATIONS (what pure-C99 pulse-rest computes over the RAW IDS) ----------
+function fleetHealth(){
+  const sev={critical:0,warn:0,info:0};
+  FLAGS.forEach(f=>sev[f.severity]++);
+  const overall = sev.critical? "critical" : sev.warn? "warn" : "green";
+  return {operator:"one operator · not multi-tenant", overall, sites:SITES.length,
+    terminals:Object.keys(TERMS).length, flags:{critical:sev.critical,warn:sev.warn,info:sev.info},
+    generatedFrom:"RAW sealed IDS (derived · decoder view)"};
+}
+function listSites(){ return {count:SITES.length, sites:SITES.map(s=>{
+  const flags=FLAGS.filter(f=>f.siteId===s.siteId);
+  const overall=flags.some(f=>f.severity==="critical")?"critical":flags.some(f=>f.severity==="warn")?"warn":"green";
+  return {siteId:s.siteId,name:s.name,city:s.city,terminals:s.terminals.length,health:overall,flags:flags.length};
+})};}
+function getSite(id){ const s=SITES.find(x=>x.siteId===id); if(!s) return null;
+  return {...s, health:listSites().sites.find(x=>x.siteId===id).health}; }
+function siteTerminals(id){ const s=SITES.find(x=>x.siteId===id); if(!s) return null;
+  return {siteId:id, count:s.terminals.length, terminals:s.terminals.map(t=>termSummary(t))}; }
+function termSummary(serial){ const t=TERMS[serial]; if(!t) return null;
+  return {serial:t.serial, siteId:t.siteId, model:t.model, lastRun:t.lastRun, gflops:t.gflops,
+    wattsAvg:t.wattsAvg, wattsPeak:t.wattsPeak, verdict:t.verdict, throttle:t.throttle,
+    drives:t.drives.length, flags:FLAGS.filter(f=>f.serial===serial).length}; }
+function getTerminal(serial){ const t=TERMS[serial]; if(!t) return null;
+  return {serial:t.serial,siteId:t.siteId,model:t.model,identity:"Pulse-Link per-unit serial",
+    firmware:{"pulse-link":t.linkFw,"vcd2x20":t.vcd},
+    lastRun:{runId:t.lastRun,gflops:t.gflops,wattsAvg:t.wattsAvg,wattsPeak:t.wattsPeak,verdict:t.verdict,throttle:t.throttle},
+    devices:t.drives.length+2, flags:FLAGS.filter(f=>f.serial===serial), note:t.note||""}; }
+function getDevices(serial){ const t=TERMS[serial]; if(!t) return null;
+  return {serial, devices:[
+    {kind:"cpu-package",id:"pkg",label:t.model,verdict:t.lastRun&&RUNS[t.lastRun]?RUNS[t.lastRun].verdict:t.verdict,throttle:t.throttle},
+    ...t.drives.map(d=>({kind:"drive",id:d.id,label:d.model,bus:d.bus,tempC:d.tempC,status:d.status})),
+    {kind:"coprocessor",id:"esp32s3",label:"Pulse-Link flight recorder",mode:"decoded records only",note:"never raw peripheral traffic"}
+  ]};}
+function getDrives(serial){ const t=TERMS[serial]; if(!t) return null;
+  return {serial, count:t.drives.length, drives:t.drives.map(d=>({
+    id:d.id, model:d.model, bus:d.bus, tempC:d.tempC,
+    wearOut:d.wearOut, wearOutRange:d.wearRange, wearFlag:d.wearFlag, caveat:d.caveat, status:d.status}))};}
+function getRun(runId){ const r=RUNS[runId]; return r? r : null; }
+function getRunSeries(runId){ const r=RUNS[runId]; if(!r) return null;
+  return {runId, rows:r.rows, note:"full second-by-second file — use /sensors from/to to slice", sampleFirst5:genSeries(r.serial,0,5).series}; }
+// Second-by-second sensor series: 30s on / 30s off, drive heat-soaks 42 -> ~terminal peak.
+function genSeries(serial, from, to){
+  const t=TERMS[serial]; if(!t) return null;
+  const cores=8; const peakDrive = t.drives[0]? (t.drives.find(d=>d.tempC!=null)||t.drives[0]).tempC : 56;
+  const rows=[]; const N=599; const a=Math.max(0,from|0), b=Math.min(N-1,(to|0));
+  for(let s=a;s<=b;s++){
+    const on = (Math.floor(s/30)%2)===0;                 // 30 on / 30 off
+    const soak = 42 + (peakDrive-42)*(s/N);              // slow heat-soak baseline
+    const pw = on ? +(t.wattsAvg + (Math.sin(s/3)*0.4)).toFixed(1) : +(7.8 + Math.sin(s/5)*0.3).toFixed(1);
+    const coreBase = on ? 78 + 12*(s/N) : 52 + 6*(s/N);
+    const coreC = Array.from({length:cores},(_,c)=> Math.round(coreBase + (c%3) + (on?Math.sin((s+c)/2)*2:0)));
+    const drives = {}; t.drives.forEach(d=>{ drives[d.id] = d.tempC==null? null : Math.round(soak*(d.tempC/peakDrive)); });
+    rows.push({t:s, packageW:pw, coreC, drives});
+  }
+  return {serial, from:a, to:b, rowsReturned:rows.length, rowsTotal:N,
+    legend:"packageW=package power (W); coreC[]=per-core °C; drives{}=per-drive °C (null = no sensor)", series:rows};
+}
+function fleetFirmware(){
+  const inv={}; Object.values(TERMS).forEach(t=>{
+    const add=(comp,ver)=>{ inv[comp]=inv[comp]||{}; inv[comp][ver]=(inv[comp][ver]||0)+1; };
+    add("pulse-link-fw",t.linkFw); add("vcd2x20",t.vcd); add("load-test","0.9.4");
+  });
+  return {components:Object.entries(inv).map(([component,vers])=>({component,
+    versions:Object.entries(vers).map(([version,terminals])=>({version,terminals}))}))};
+}
+function fleetFlags(){ return {count:FLAGS.length, flags:FLAGS}; }
+
+// ---------- CATALOG (mirrors bridge/MerakiSource.cs CatalogEntry list) ----------
+const CATALOG = [
+ {grp:"Fleet", id:"fleet-health",  label:"Fleet health rollup",  path:"/pulse/fleet/health",             params:[], run:()=>fleetHealth()},
+ {grp:"Fleet", id:"fleet-flags",   label:"All health flags",     path:"/pulse/fleet/flags",              params:[], run:()=>fleetFlags()},
+ {grp:"Fleet", id:"fleet-firmware",label:"Firmware inventory",   path:"/pulse/fleet/firmware",           params:[], run:()=>fleetFirmware()},
+ {grp:"Sites", id:"sites",         label:"All sites",            path:"/pulse/sites",                    params:[], run:()=>listSites()},
+ {grp:"Sites", id:"site",          label:"One site",             path:"/pulse/sites/{siteId}",           params:["siteId"], run:a=>getSite(a.siteId)},
+ {grp:"Sites", id:"site-terminals",label:"Terminals at a site",  path:"/pulse/sites/{siteId}/terminals", params:["siteId"], run:a=>siteTerminals(a.siteId)},
+ {grp:"Terminals", id:"terminal",        label:"One terminal",           path:"/pulse/terminals/{serial}",              params:["serial"], run:a=>getTerminal(a.serial)},
+ {grp:"Terminals", id:"terminal-devices",label:"Devices on a terminal",  path:"/pulse/terminals/{serial}/devices",      params:["serial"], run:a=>getDevices(a.serial)},
+ {grp:"Terminals", id:"terminal-drives", label:"Drive health",           path:"/pulse/terminals/{serial}/drives",       params:["serial"], run:a=>getDrives(a.serial)},
+ {grp:"Terminals", id:"terminal-sensors",label:"Sensor series (per-sec)",path:"/pulse/terminals/{serial}/sensors?from={from}&to={to}", params:["serial","from","to"], run:a=>genSeries(a.serial,+a.from||0,+a.to||60)},
+ {grp:"Terminals", id:"terminal-runs",   label:"Runs on a terminal",     path:"/pulse/terminals/{serial}/runs",         params:["serial"], run:a=>{const rs=Object.values(RUNS).filter(r=>r.serial===a.serial).map(r=>({runId:r.runId,started:r.started,verdict:r.verdict,gflops:r.gflops})); return TERMS[a.serial]?{serial:a.serial,count:rs.length,runs:rs}:null;}},
+ {grp:"Runs", id:"run",       label:"One run (+ speed bars)", path:"/pulse/runs/{runId}",        params:["runId"], run:a=>getRun(a.runId)},
+ {grp:"Runs", id:"run-series",label:"Run series meta",        path:"/pulse/runs/{runId}/series", params:["runId"], run:a=>getRunSeries(a.runId)},
+];
+
+// ---------- read-only-provable dispatch (mirrors SourceDispatch.TryBuildPath) ----------
+function buildPath(entry, args){
+  let p = entry.path;
+  for(const k of entry.params){
+    const v = args[k];
+    if(v===undefined || v==="") return {err:"missing param: "+k};
+    if(String(v).length>200 || /[\x00-\x1f]/.test(String(v))) return {err:"invalid param: "+k};
+    p = p.replaceAll("{"+k+"}", encodeURIComponent(v));
+  }
+  if(p.includes("{")||p.includes("}")) return {err:"unfilled template"};
+  return {path:p};
+}
+
+// ---------- UI ----------
+const $=s=>document.querySelector(s);
+let current = CATALOG[0];
+function renderList(){
+  const el=$("#epList"); el.innerHTML="";
+  let g=null;
+  CATALOG.forEach(e=>{
+    if(e.grp!==g){ g=e.grp; const h=document.createElement("div"); h.className="grp"; h.textContent=g; el.appendChild(h); }
+    const b=document.createElement("button"); b.className="ep"+(e.id===current.id?" on":"");
+    b.innerHTML='<span class="m">GET</span>'+e.path.split("?")[0];
+    b.onclick=()=>{ current=e; renderReq(); renderList(); };
+    el.appendChild(b);
+  });
+}
+function renderReq(){
+  $("#epDesc").textContent = descFor(current.id);
+  const box=$("#paramBox"); box.innerHTML="";
+  current.params.forEach(p=>{
+    const l=document.createElement("label"); l.textContent=p;
+    const i=document.createElement("input"); i.id="p_"+p; i.value=defFor(current.id,p); i.placeholder=p;
+    i.oninput=updatePath; l.appendChild(i); box.appendChild(l);
+  });
+  updatePath();
+  $("#respOut").textContent="// press Send"; $("#statusOut").innerHTML="";
+}
+function curArgs(){ const a={}; current.params.forEach(p=>a[p]=($("#p_"+p)||{}).value); return a; }
+function updatePath(){
+  const r=buildPath(current,curArgs());
+  $("#pathOut").textContent = "/pulse".replace("/pulse","") + (r.path||current.path);
+  const wireP = current.params.map(p=>p+"="+encodeURIComponent(curArgs()[p]||"{"+p+"}")).join("&");
+  $("#wireOut").innerHTML = "Argus wire form &rarr; <b>GET /read?source=pulse&amp;id="+current.id+(wireP?"&amp;"+wireP:"")+"</b>";
+}
+function send(){
+  const r=buildPath(current,curArgs());
+  const resp=$("#respOut"), st=$("#statusOut");
+  if(r.err){ st.innerHTML='<span class="nl">HTTP 400</span> <span class="t">'+r.err+' (fails closed — source-declared template)</span>'; resp.textContent="{\n  \"error\": \""+r.err+"\"\n}"; resp.innerHTML=color(resp.textContent); return; }
+  const out = current.run(curArgs());
+  if(out===null){ st.innerHTML='<span class="nl">HTTP 404</span> <span class="t">not found in fleet</span>'; const j='{\n  "error": "not found"\n}'; resp.innerHTML=color(j); return; }
+  st.innerHTML='<span class="ok2">HTTP 200</span> <span class="t">application/json · derived from RAW IDS</span>';
+  resp.innerHTML=color(JSON.stringify(out,null,2));
+}
+function descFor(id){return ({
+ "fleet-health":"Top-of-fleet rollup: sites, terminals, flag counts, overall green/warn/critical.",
+ "fleet-flags":"Every health flag across the fleet — the 69°C SATA, throttle, wear-out, run FAIL — what to see before service.",
+ "fleet-firmware":"Driver/firmware versions across the whole fleet (Pulse-Link fw, VCD2x20, load-test).",
+ "sites":"All sites with a per-site health rollup.",
+ "site":"One site.",
+ "site-terminals":"Terminals at one site, each with a last-run summary.",
+ "terminal":"One terminal by Pulse-Link serial: last run, firmware, flags, device count.",
+ "terminal-devices":"Every device on a terminal: CPU package, drives, coprocessor.",
+ "terminal-drives":"Per-drive health: temp, wear-out estimate + honest range, status (null temp stays null).",
+ "terminal-sensors":"Second-by-second series (package power, per-core °C, per-drive °C). Slice with from/to.",
+ "terminal-runs":"Load-test runs recorded on this terminal.",
+ "run":"One run: per-test rows + speed bars (bars shorten when the case heat-soaks and the CPU throttles).",
+ "run-series":"Metadata for a run's full 599-row second-by-second file.",
+})[id]||"";}
+function defFor(id,p){return ({serial:"PL-0001",siteId:"bench-lab",runId:"run-0001",from:"0",to:"60"})[p]||"";}
+function color(j){ return j
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/("(?:[^"\\]|\\.)*")(\s*:)/g,'<span class="k">$1</span>$2')
+  .replace(/:\s*("(?:[^"\\]|\\.)*")/g,': <span class="s">$1</span>')
+  .replace(/:\s*(-?\d+\.?\d*)/g,': <span class="n">$1</span>')
+  .replace(/:\s*(true|false)/g,': <span class="b">$1</span>')
+  .replace(/:\s*(null)/g,': <span class="nl">$1</span>'); }
+
+document.querySelectorAll(".try button").forEach(b=>b.onclick=()=>{
+  const parts=b.dataset.try.split("|"); const id=parts[0];
+  current=CATALOG.find(e=>e.id===id)||current; renderReq(); renderList();
+  parts.slice(1).forEach(kv=>{const [k,v]=kv.split("=");const inp=$("#p_"+k);if(inp)inp.value=v;});
+  updatePath(); send();
+});
+$("#sendBtn").onclick=send;
+renderList(); renderReq(); send();
+</script>
+
+<div class="foot">Be · Argus · Pulse REST API playground · proposal · mock data from Pulse Suite Status Report Ver 1.6 (22 Aug 2026) · built with Norman Campbell · read-only · C99 + RAW IDS · Generated 2026-08-25 02:50</div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"c6d21875-d209-4806-90ed-184f917589ac"};</script>
+<script src="/metal/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>

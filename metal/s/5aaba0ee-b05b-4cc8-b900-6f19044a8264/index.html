@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>~d · Argus · Pulse REST API</title>
+<!--lk-og-->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="joeycastillo.us">
+<meta property="og:title" content="~d · Argus · Pulse REST API">
+<meta name="description" content="A read-only REST surface for Norman Campbell's Pulse Suite POS hardware-health telemetry — modeled exactly on how Argus already exposes Meraki. Mesh gives him a way to give us data at light…">
+<meta property="og:description" content="A read-only REST surface for Norman Campbell's Pulse Suite POS hardware-health telemetry — modeled exactly on how Argus already exposes Meraki. Mesh gives him a way to give us data at light…">
+<meta property="og:url" content="https://joeycastillo.us/metal/s/5aaba0ee-b05b-4cc8-b900-6f19044a8264/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="~d · Argus · Pulse REST API">
+<meta name="twitter:description" content="A read-only REST surface for Norman Campbell's Pulse Suite POS hardware-health telemetry — modeled exactly on how Argus already exposes Meraki. Mesh gives him a way to give us data at light…">
+<!--/lk-og-->
+<style>
+body{margin:0;background:#111111;color:#e0e0e0;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;}
+a{color:#6FC3DF;text-decoration:none;} a:hover{text-decoration:underline;}
+.nav{position:sticky;top:0;z-index:5;background:#000;border-bottom:2px solid #6FC3DF;padding:10px 18px;display:flex;align-items:center;gap:12px;}
+.nav b{color:#6FC3DF;font-size:16px;letter-spacing:.04em;}
+.nav .crumb{color:#8a93a0;font-size:12px;}
+.nav .pub{margin-left:auto;color:#6a7480;font-size:11px;}
+.wrap{max-width:800px;margin:0 auto;padding:20px 18px 60px;}
+h1{color:#6FC3DF;font-size:22px;margin:18px 0 4px;}
+h2{color:#6FC3DF;font-size:16px;margin:28px 0 8px;border-bottom:1px solid #23343b;padding-bottom:4px;}
+h3{color:#cdd6da;font-size:14px;margin:16px 0 6px;}
+.box{background:#1A1A1A;border:1px solid #242424;border-radius:7px;padding:12px 16px;margin:10px 0;}
+.muted{color:#8a93a0;} .dim{color:#6a7480;font-size:12px;}
+code{background:#0f171b;border:1px solid #23343b;border-radius:4px;padding:1px 5px;font-family:Consolas,monospace;font-size:12.5px;color:#9fd3e8;}
+pre{background:#0f171b;border:1px solid #23343b;border-radius:6px;padding:12px;overflow-x:auto;font-family:Consolas,monospace;font-size:12.5px;color:#cfe8f2;}
+ul{margin:6px 0 12px;padding-left:22px;} li{margin:4px 0;}
+.chip{font-size:11px;font-weight:700;padding:1px 8px;border-radius:20px;border:1px solid #333;white-space:nowrap;display:inline-block;}
+.chip.ok{background:#0d2a17;color:#7ce0a0;border-color:#1a5b34;}
+.chip.warn{background:#33330d;color:#e0e07a;border-color:#5b5b1a;}
+.chip.info{background:#16242b;color:#9fd3e8;border-color:#2c4a55;}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px;}
+th{color:#6a7480;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:5px 8px;border-bottom:1px solid #2c4a55;}
+td{padding:6px 8px;border-bottom:1px solid #1d262b;vertical-align:top;}
+.dod{background:#0c1b21;border:1px solid #2c4a55;border-radius:7px;padding:12px 16px;margin:24px 0;}
+.dod .i{margin:3px 0;font-size:13px;}
+.ok2{color:#7ce0a0;} .no{color:#ff8b8b;}
+.foot{color:#6a7480;font-size:11px;border-top:1px solid #242424;margin-top:32px;padding-top:10px;}
+</style>
+</head>
+<body>
+<div class="nav"><b>Be</b><span class="crumb">~d · Argus · Pulse REST API</span><span class="pub">Published 2026-08-25 02:50 PT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/5aaba0ee-b05b-4cc8-b900-6f19044a8264/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+
+<h1>Pulse REST API</h1>
+<p class="muted">A read-only REST surface for Norman Campbell's Pulse Suite POS hardware-health telemetry — modeled exactly on how Argus already exposes Meraki. Mesh gives him a way to give us data at light speed; we serve it up REST style. <span class="chip info">design only</span> <span class="chip ok">read-only-provable</span> <span class="chip ok">pure C99</span></p>
+
+<!-- ============================================================ -->
+<h2>1 · Need</h2>
+<div class="lk-sec" data-cm="1-need"><div class="box">
+<p>Norman's Pulse Suite (Status Report Ver 1.6, 22 Aug 2026) already measures everything that matters on a POS terminal's hardware: load-test GFLOPS, package power, per-core temps, per-drive temps and wear-out arithmetic, throttle behavior, firmware inventory. Today that lives in per-run CSVs and a status report on one bench. There is <b>no way for Argus — or anyone — to ask a fleet-wide question</b>: <i>which drives are running hot right now? which terminal crossed a wear-out threshold? which sites are still on Pulse-Link fw 1.0.0?</i></p>
+<p>Argus already solved this exact problem for Meraki: one read-only-provable source seam, a declared catalog, GET-only wire. Pulse needs the same seam — not a new idiom. The operator's directive is the whole spec: <b>"the mesh gives him a way to give us data at light speed, then we serve it up REST style"</b> — and <b>"c99 and raw ids as much as possible, light speed for the win."</b></p>
+<p class="dim">Non-need, stated to kill it early: this is NOT a control surface, NOT multi-tenant (one operator, implicit), and it NEVER touches the payment path — Pulse law is one-way observe-only, fail-independent, coprocessor carries decoded records only.</p>
+</div>
+
+<!-- ============================================================ --></div>
+<h2>2 · Raw user stories</h2>
+<div class="lk-sec" data-cm="2-raw-user-stories"><ul>
+<li>As Norman, I want to hit one URL and see fleet health — how many terminals are green / warn / critical — so I don't open 40 CSVs.</li>
+<li>As Norman, I want <code>terminals/{serial}</code> keyed by the <b>Pulse-Link per-unit serial</b> — the hardware id I already ship on every unit — so identity is the physical thing, not an invented database id.</li>
+<li>As an Argus dashboard, I want per-drive health with the honest numbers: 56°C Kingston NVMe, 69°C Silicon Power SATA, and a USB stick that reports <b>no</b> temp shown as <code>null</code>, never a fake number.</li>
+<li>As Norman, I want the wear-out estimate served <b>with its honest range and duty-cycle caveat</b> — "November 2026" is the all-day-load-test arithmetic, not what a till sees — so nobody panics off a worst-case number.</li>
+<li>As an Argus dashboard, I want the second-by-second series (the 599-row shape) for any run or time window, so I can draw the speed bars shortening as the case heats and the CPU throttles.</li>
+<li>As Argus ops, I want every health flag across the fleet in one call — drive-temp, wear-out crossing, sustained throttle — so the fleet-flags view is one GET, not N.</li>
+<li>As Argus ops, I want firmware inventory across the fleet (Pulse-Link fw, VCD2x20, OPOS drivers) to plan rollouts.</li>
+<li>As the Argus browser, I want Pulse to be <b>just another ISource</b> — same catalog, same <code>/read</code> wire, same fail-closed path builder — so zero new client code is written.</li>
+<li>As the operator, I want the read server in C99 over raw ids — no ORM, no framework, no managed runtime between Norman's data and the wire.</li>
+</ul>
+
+<!-- ============================================================ --></div>
+<h2>3 · Sourced solution — mirror the Meraki seam</h2>
+<div class="lk-sec" data-cm="3-sourced-solution-mirror-the"><div class="box">
+<h3>The idiom (ground truth from Argus's own code)</h3>
+<p>Argus exposes every source through ONE read-only-provable seam, <code>bridge/ISource.cs</code>:</p>
+<pre>interface ISource {
+  string Name;
+  IReadOnlyList&lt;CatalogEntry&gt; Catalog;
+  string? ScopeTokenEnv;
+  Task&lt;JsonElement&gt; ReadAsync(string path);
+}
+record CatalogEntry(string Id, string Label, string PathTemplate, string[] Params)</pre>
+<ul>
+<li><b>The SOURCE declares the path template.</b> The caller only fills <code>{param}</code> placeholders — it can never invent a path.</li>
+<li><b><code>SourceDispatch.TryBuildPath()</code></b> substitutes each <code>{param}</code> URL-encoded and <b>fails closed</b> on: missing param, value &gt;200 chars, control chars, or any leftover <code>{</code>/<code>}</code>. A stray <code>/</code> in a value becomes <code>%2F</code> — traversal is impossible by construction. This is what makes the browser <i>provably</i> read-only: no arbitrary-path passthrough exists.</li>
+<li><b>Wire:</b> <code>GET /catalog</code> lists entries; <code>GET /read?source=&lt;name&gt;&amp;id=&lt;entryId&gt;&amp;&lt;param&gt;=&lt;value&gt;</code> runs ONE entry and returns raw JSON.</li>
+<li><b>Per-source scope:</b> <code>ScopeTokenEnv</code> names the env var that authorizes THIS source; unlocking one source never unlocks another.</li>
+</ul>
+<p><code>bridge/MerakiSource.cs</code> instantiates this for Meraki with the org id <b>pre-substituted server-side</b> (never from the caller): organizations · networks · config-templates · network (show) <code>networks/{networkId}</code> · devices <code>networks/{networkId}/devices</code> · clients · switch-ports <code>devices/{serial}/switch/ports</code> · wireless-ssids. Meraki's hierarchy is <b>org → network → device → ports</b>.</p>
+</div>
+<div class="box">
+<h3>The transpose</h3>
+<table>
+<tr><th>Meraki</th><th>Pulse</th><th>Note</th></tr>
+<tr><td>org (pre-substituted server-side)</td><td>operator (implicit, exactly one)</td><td>NOT multi-tenant; no <code>{operatorId}</code> anywhere</td></tr>
+<tr><td>network</td><td>Site</td><td><code>sites/{siteId}</code></td></tr>
+<tr><td>device (serial)</td><td>Terminal (<b>Pulse-Link per-unit serial</b>)</td><td>identity = the hardware id Norman already ships</td></tr>
+<tr><td>ports</td><td>Devices (drives, CPU package, peripherals, coprocessor)</td><td>the leaf hardware of a terminal</td></tr>
+<tr><td>— (no Meraki analog)</td><td>Run (load-test run)</td><td>Pulse's unit of evidence; gets its own entries</td></tr>
+</table>
+<p>So: <b>operator (implicit) → Site → Terminal → Device → Run</b>, exposed as a <code>PulseSource</code> catalog identical in mechanism to Meraki's. <code>ScopeTokenEnv = ARGUS_PULSE_TOKEN</code> — unlocking Pulse never unlocks Meraki, and vice versa.</p>
+</div>
+<div class="box">
+<h3>The backend — pure C99 over a RAW sealed IDS (ARCHITECTURE.md §7, §12)</h3>
+<p>The REST server is <b><code>pulse-rest</code>, pure C99/nous</b> (operator: "c99 as much as possible, light speed"). It serves derived views over a <b>RAW sealed IDS</b> (§7): each pushed Pulse record is atomized <b>once</b> into <code>(site, terminal serial, device, metric, value, timestamp)</code> triples; every endpoint below is a <b>deterministic derivation</b> over that store. No schema is invented — Pulse's record format is deliberately undefined until Track C (§12), and the triple store doesn't need one.</p>
+<p>Ingest is a <b>separate binary</b>: <code>pulse-ingest</code> RECEIVES pushed batches (HTTPS now, nous <b>mesh</b> store-and-forward later — "light speed in, REST out") and is the ONLY writer. The read surface is GET-only, honoring the read-only invariant (§3, §12). <b>Zero C#</b> — Pulse is the first Argus source with no foreign API to jacket, so the Language Boundary law leaves it entirely C99.</p>
+<p class="dim">Sources read: <code>bridge/ISource.cs</code> · <code>bridge/MerakiSource.cs</code> · <code>ARCHITECTURE.md</code> §3 (read-only invariant), §7 (RAW sealed IDS), §12 (Pulse track: record format deferred to Track C, observe-only laws).</p>
+</div>
+
+<!-- ============================================================ --></div>
+<h2>4 · Name it true</h2>
+<div class="lk-sec" data-cm="4-name-it-true"><div class="box">
+<ul>
+<li><b><code>pulse-rest</code></b> — the C99 read server. It serves Pulse over REST. That's the name.</li>
+<li><b><code>pulse-ingest</code></b> — the C99 writer. It ingests Pulse pushes. Only writer.</li>
+<li><b><code>PulseSource</code></b> — the ISource registration. Sits next to <code>MerakiSource</code>, same seam.</li>
+<li>Endpoint ids are literal nouns for what they return: <code>fleet-health</code> returns fleet health. <code>terminal-drives</code> returns a terminal's drives. <code>run-series</code> returns a run's series. No themes, no cleverness — every id reads as the answer to "what do I get back?"</li>
+<li><code>{serial}</code> is named <code>serial</code> because it IS the Pulse-Link per-unit serial — a raw hardware id, not a surrogate key. Raw ids as much as possible.</li>
+</ul>
+</div>
+
+<!-- ============================================================ --></div>
+<h2>5 · Shape</h2>
+<div class="lk-sec" data-cm="5-shape"><h3>The catalog — 15 entries, all GET, all read-only-provable</h3>
+<table>
+<tr><th>Id</th><th>Label</th><th>Path template</th><th>Params</th></tr>
+<tr><td><code>catalog</code></td><td>List endpoints</td><td><span class="dim">the ISource <code>/catalog</code> itself</span></td><td>—</td></tr>
+<tr><td><code>fleet-health</code></td><td>Fleet rollup</td><td><code>fleet/health</code></td><td>—</td></tr>
+<tr><td><code>sites</code></td><td>All sites + per-site health rollup</td><td><code>sites</code></td><td>—</td></tr>
+<tr><td><code>site</code></td><td>One site</td><td><code>sites/{siteId}</code></td><td>siteId</td></tr>
+<tr><td><code>site-terminals</code></td><td>Terminals at a site</td><td><code>sites/{siteId}/terminals</code></td><td>siteId</td></tr>
+<tr><td><code>terminal</code></td><td>One terminal — last run summary, device count</td><td><code>terminals/{serial}</code></td><td>serial</td></tr>
+<tr><td><code>terminal-devices</code></td><td>Drives, CPU package, peripherals, coprocessor</td><td><code>terminals/{serial}/devices</code></td><td>serial</td></tr>
+<tr><td><code>terminal-drives</code></td><td>Per-drive health — temp, wear-out + honest range, status card</td><td><code>terminals/{serial}/drives</code></td><td>serial</td></tr>
+<tr><td><code>terminal-sensors</code></td><td>Second-by-second series (the 599-row shape)</td><td><code>terminals/{serial}/sensors?from={from}&amp;to={to}</code></td><td>serial, from, to</td></tr>
+<tr><td><code>terminal-runs</code></td><td>Load-test runs on this terminal</td><td><code>terminals/{serial}/runs</code></td><td>serial</td></tr>
+<tr><td><code>run</code></td><td>One run — per-test rows + speed bars, summary</td><td><code>runs/{runId}</code></td><td>runId</td></tr>
+<tr><td><code>run-series</code></td><td>The run's second-by-second CSV as JSON</td><td><code>runs/{runId}/series</code></td><td>runId</td></tr>
+<tr><td><code>fleet-flags</code></td><td>Every health flag across the fleet</td><td><code>fleet/flags</code></td><td>—</td></tr>
+<tr><td><code>fleet-firmware</code></td><td>Driver/firmware inventory across the fleet</td><td><code>fleet/firmware</code></td><td>—</td></tr>
+</table>
+<p class="dim">List endpoints accept Meraki-style query params: <code>perPage</code> for paging; <code>from</code>/<code>to</code> ISO-8601 timespans on series endpoints. Wire is the standard Argus pair: <code>GET /catalog</code> · <code>GET /read?source=pulse&amp;id=terminal-drives&amp;serial=PL-2600-0147</code>.</p>
+
+<div class="box">
+<h3>Read-only-provable rules (identical to Meraki, restated as law)</h3>
+<ul>
+<li>The source declares every path template above; callers only fill <code>{param}</code> slots. There is no raw-path endpoint.</li>
+<li><code>TryBuildPath()</code> URL-encodes every substitution and fails closed on missing param, value &gt;200 chars, control chars, or leftover <code>{</code>/<code>}</code>. A serial containing <code>/</code> becomes <code>%2F</code> — it matches no terminal, it traverses nothing.</li>
+<li>The operator is pre-substituted server-side (there is exactly one) — the caller can never name a tenant, same as Meraki's server-side org id.</li>
+<li><code>pulse-rest</code> compiles with no write handler. GET-only isn't policy, it's the binary.</li>
+<li><code>ScopeTokenEnv = ARGUS_PULSE_TOKEN</code> — per-source scope; Pulse access grants nothing else.</li>
+</ul>
+</div>
+
+<h3>Example — <code>terminals/PL-2600-0147</code> (Norman's real bench numbers)</h3>
+<pre>{
+  "serial": "PL-2600-0147",
+  "siteId": "bench-1",
+  "status": "green",
+  "deviceCount": 5,
+  "lastRun": {
+    "runId": "run-20260822-0917",
+    "tool": "Pulse-POS-Load-Test 0.9.4",
+    "workload": "fused-multiply-add matrix",
+    "result": "PASS",
+    "gflops": 46.4,
+    "wattsAvg": 23.8,
+    "wattsPeak": 24.0,
+    "throttle": "none",
+    "durationS": 600,
+    "seriesRows": 599
+  },
+  "firmware": { "pulseLink": "1.0.0", "vcd2x20": "1.0.26", "opos": "present" }
+}</pre>
+
+<h3>Example — <code>terminals/PL-2600-0147/drives</code></h3>
+<p class="dim">Three drives, three honest answers: hot NVMe, hotter SATA (flag), and a USB stick that reports no temp — recorded as <code>null</code>, never a fake number. Wear-out ships with its honest range and duty-cycle caveat: "November 2026" is all-day-load-test arithmetic, not what a till sees.</p>
+<pre>{
+  "serial": "PL-2600-0147",
+  "drives": [
+    {
+      "device": "kingston-nvme",
+      "model": "Kingston NVMe",
+      "tempC": 56,
+      "status": "warn",
+      "wearOut": {
+        "estimate": "2026-11",
+        "flag": "red",
+        "honestRange": ["2026-11", "2029+"],
+        "caveat": "estimate assumes all-day load-test duty cycle; a till's real duty cycle extends this substantially"
+      }
+    },
+    {
+      "device": "sp-sata-128",
+      "model": "Silicon Power 128 GB SATA",
+      "tempC": 69,
+      "status": "flag",
+      "flags": ["drive-temp"],
+      "wearOut": null
+    },
+    {
+      "device": "usb-stick-1",
+      "model": "USB stick",
+      "tempC": null,
+      "status": "green",
+      "note": "drive reports no temperature sensor; recorded as null, never synthesized"
+    }
+  ]
+}</pre>
+
+<h3>Example — <code>runs/run-20260822-0917/series</code> (the 599-row shape, truncated)</h3>
+<p class="dim">Package power, per-core temps, per-drive temps, one row per second. The Kingston heat-soaks 42°C → 56°C across the run; speed bars shorten where the CPU throttles as the case heats.</p>
+<pre>{
+  "runId": "run-20260822-0917",
+  "columns": ["t", "pkgW", "coreTempsC", "driveTempsC"],
+  "rowCount": 599,
+  "rows": [
+    { "t": 1,   "pkgW": 23.9, "coreTempsC": [61, 60, 62, 61], "driveTempsC": { "kingston-nvme": 42, "sp-sata-128": 55, "usb-stick-1": null } },
+    { "t": 300, "pkgW": 23.9, "coreTempsC": [74, 73, 75, 74], "driveTempsC": { "kingston-nvme": 51, "sp-sata-128": 64, "usb-stick-1": null } },
+    { "t": 599, "pkgW": 23.8, "coreTempsC": [78, 77, 79, 78], "driveTempsC": { "kingston-nvme": 56, "sp-sata-128": 69, "usb-stick-1": null } }
+  ]
+}</pre>
+<p class="dim">Workload note served with every run: fused-multiply-add matrix is the hottest honest load — 23.9 W sustained vs 16.4 W crypto vs 21.8 W Passmark — which is why Pulse's numbers are worth trusting.</p>
+
+<!-- ============================================================ --></div>
+<h2>6 · First Move</h2>
+<div class="lk-sec" data-cm="6-first-move"><div class="box">
+<p><b>Tonight:</b> a live playground demo Norman plays with — the Argus browser pointed at a <code>PulseSource</code> backed by a <b>canned dataset built from these exact bench numbers</b> (46.4 GFLOPS, 23.8/24.0 W, 599 rows, 56°C/69°C/null, the November-2026 wear-out with its honest range). He clicks through <code>fleet-health → sites → terminals/PL-2600-0147 → terminal-drives → run-series</code> and sees his own report served REST-style, flag chips and all. The catalog and JSON shapes above ARE the demo contract.</p>
+<p><b>Proposed production:</b> the C99 <b><code>pulse-rest</code></b> reference server serving the <b>same JSON</b> from the RAW sealed triple store, with <code>pulse-ingest</code> receiving his pushes (HTTPS first, mesh store-and-forward when the nous mesh lands). Same catalog, same bytes on the wire — the canned demo is the acceptance test the C99 server must pass.</p>
+</div>
+
+<!-- ============================================================ --></div>
+<h2>Choices + Consequences</h2>
+<div class="lk-sec" data-cm="choices-consequences"><table>
+<tr><th>Choice</th><th>Chose</th><th>Consequence</th></tr>
+<tr><td>REST over derived views vs raw-record passthrough</td><td><b>Derived views</b> over the triple store</td><td>We never commit to Norman's record format (deliberately undefined until Track C, §12) — the triples absorb any shape he pushes; endpoints stay stable while his format evolves. Cost: a derivation layer to keep deterministic. Passthrough would freeze his format into our API on day one — exactly wrong.</td></tr>
+<tr><td>HTTPS ingest now vs mesh from the start</td><td><b>HTTPS now, mesh later</b></td><td>Norman can push tonight with curl; the mesh ("light speed in") slots in behind <code>pulse-ingest</code> without touching the read surface. Cost: one transport migration later — contained entirely inside the one writer binary.</td></tr>
+<tr><td>Canned demo vs live C99 server now</td><td><b>Canned demo tonight</b>, C99 as the build</td><td>Norman reacts to real shapes with his real numbers tonight; the catalog gets corrected by use before a line of C99 hardens around it (Rule 7 — plans are wrong by default). Cost: the demo isn't production — and it says so on its face.</td></tr>
+</table></div>
+<h2>Escape Routes</h2>
+<div class="lk-sec" data-cm="escape-routes"><ul>
+<li><b>Catalog is wrong-grained</b> (Norman thinks in runs, not terminals — or vice versa): entries are additive; add/deprecate CatalogEntry rows without breaking the seam. The ISource wire never changes.</li>
+<li><b>Triple store too slow for series endpoints</b> (599 rows × fleet): add a per-run derived cache keyed by runId — still deterministic derivation, still one writer, read surface unchanged.</li>
+<li><b>Mesh slips</b>: HTTPS ingest is not a stopgap, it's a full transport — Pulse ships on it indefinitely with zero read-side change.</li>
+<li><b>Track C defines the record format differently than expected</b>: only the atomizer in <code>pulse-ingest</code> changes; triples and every endpoint derivation survive.</li>
+<li><b>Serial collision or reprovisioned hardware</b>: serial stays the key (raw ids law); a <code>supersededBy</code> field on the terminal view handles unit swaps without inventing surrogate ids.</li>
+</ul></div>
+<h2>Pure Metal Test</h2>
+<div class="box">
+<ul>
+<li><b>Load-bearing deps:</b> nous TripleStore (the RAW sealed IDS) and nous <code>understand()</code> for the atomize step — both ours, both C99, both deterministic. That's the point.</li>
+<li><b>Replaceable:</b> Cloud Run hosting is a convenience shell; <code>pulse-rest</code> is a static C99 binary that runs anywhere a socket opens — including bare metal under Purcius later.</li>
+<li><b>ZERO C#:</b> no foreign manufacturer API exists here — Norman pushes to us — so the Language Boundary law leaves nothing to jacket. First Argus source that is pure metal end to end: C99 in, triples at rest, C99 out, JSON on the wire.</li>
+<li><b>No frameworks, no ORM, no schema migration ever:</b> triples don't migrate.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="dod">
+<h3 style="margin-top:0;">Definition of Done — this artifact</h3>
+<div class="i"><span class="ok2">✓</span> A-D-D read first (ARCHITECTURE.md §3 read-only invariant, §7 RAW sealed IDS, §12 Pulse track) — design conforms, no spec drift</div>
+<div class="i"><span class="ok2">✓</span> Six-section spine complete (Need · Raw user stories · Sourced solution · Name it true · Shape · First Move) + earned tools (Choices+Consequences, Escape Routes, Pure Metal Test)</div>
+<div class="i"><span class="ok2">✓</span> Mirrors the Meraki ISource seam exactly — <code>bridge/ISource.cs</code>, <code>bridge/MerakiSource.cs</code> cited; hierarchy transposed org→network→device→ports ⇒ Site→Terminal→Device→Run</div>
+<div class="i"><span class="ok2">✓</span> Read-only-provable catalog: source-declared templates, URL-encoded param substitution, fails closed (missing/oversize/control-chars/leftover braces)</div>
+<div class="i"><span class="ok2">✓</span> Pure C99 backend over RAW sealed IDS; <code>pulse-ingest</code> sole writer; zero C#</div>
+<div class="i"><span class="ok2">✓</span> Pulse laws honored: observe-only, never instruments the payment path, fail-independent, single-operator (not multi-tenant), null means null</div>
+<div class="i"><span class="ok2">✓</span> Design only — no code built; publish/commit left to the parent run</div>
+</div>
+
+<div class="foot">Be · ~d · Generated 2026-08-25 02:50 · Argus Pulse REST API · design only — no code · fable-authored, opus fact-checked</div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"5aaba0ee-b05b-4cc8-b900-6f19044a8264"};</script>
+<script src="/metal/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>
