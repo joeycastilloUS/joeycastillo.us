@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quadrant reacts on cron-finish — design</title>
+<!--lk-og-->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="joeycastillo.us">
+<meta property="og:title" content="Quadrant reacts on cron-finish — design">
+<meta name="description" content="Event-driven, not a timer. The board holds still and only re-pulls a quadrant when the server signals a warm pass completed — one coordinated update per cron finish, every read a cache hit…">
+<meta property="og:description" content="Event-driven, not a timer. The board holds still and only re-pulls a quadrant when the server signals a warm pass completed — one coordinated update per cron finish, every read a cache hit…">
+<meta property="og:url" content="https://joeycastillo.us/metal/s/7935f854-5422-46eb-bb5b-3e869b36fe5d/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Quadrant reacts on cron-finish — design">
+<meta name="twitter:description" content="Event-driven, not a timer. The board holds still and only re-pulls a quadrant when the server signals a warm pass completed — one coordinated update per cron finish, every read a cache hit…">
+<!--/lk-og-->
+<style>
+  :root{--bg:#0d0f11;--panel:#14171a;--panel2:#1b1f23;--line:#262c31;--txt:#eef2f4;--mut:#8b969d;
+        --acc:#6FC3DF;--good:#7ad19a;--amber:#e8c56a;--red:#ff7a7a;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.55 "Helvetica Neue",Helvetica,Arial,sans-serif}
+  .nav{position:sticky;top:0;background:#000;border-bottom:2px solid var(--acc);display:flex;justify-content:space-between;align-items:center;padding:10px 18px}
+  .nav b{color:var(--acc)}.nav .pub{font-size:12px;color:var(--mut)}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 18px 60px}
+  h1{font-size:23px;margin:.1em 0}h1 .s{color:var(--acc)}
+  .lede{color:var(--mut);margin:.3em 0 20px;max-width:800px}
+  h2{font-size:15px;margin:24px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px;margin-right:8px}
+  .tag.ok{background:rgba(122,209,154,.14);color:var(--good);border:1px solid rgba(122,209,154,.4)}
+  .tag.new{background:rgba(111,195,223,.15);color:var(--acc);border:1px solid rgba(111,195,223,.4)}
+  .flow{display:flex;flex-direction:column;gap:10px}
+  .row{display:grid;grid-template-columns:150px 34px 1fr;align-items:center;gap:6px}
+  .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px;text-align:right}
+  .arw{color:var(--acc);text-align:center;font-size:20px;font-weight:700}
+  .arw.d{font-size:16px}
+  .box{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px 13px;font-size:13.5px}
+  .box .t{font-weight:700}.box .d{color:var(--mut);font-size:12px;margin-top:2px}
+  .box.acc{border-color:var(--acc)}.box.good{border-color:rgba(122,209,154,.5)}.box.amber{border-color:rgba(232,197,106,.5)}
+  .box.meraki{background:linear-gradient(180deg,#12303a,#0e2530);border-color:var(--acc);text-align:center}
+  .box.meraki .t{color:var(--acc)}
+  .crons{display:flex;gap:8px;flex-wrap:wrap}
+  .cron{background:#0e1a20;border:1px solid #244;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--acc);font-weight:700}
+  .quads{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .quad{background:#111;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:12.5px;position:relative}
+  .quad .n{font-weight:700;color:var(--acc)}.quad .a{color:var(--mut);font-size:11px;margin-top:3px}
+  .pulse{position:absolute;right:9px;top:9px;width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
+  ul.notes{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+  ul.notes li{background:#161616;border-left:3px solid var(--line);padding:8px 12px;border-radius:0 6px 6px 0;font-size:13px}
+  ul.notes li b{color:var(--txt)}
+  ul.notes.good li{border-left-color:var(--good)} ul.notes.amber li{border-left-color:var(--amber)}
+  code{background:#000;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12px;color:var(--acc)}
+  .foot{color:var(--mut);font-size:12px;border-top:1px solid var(--line);margin-top:26px;padding-top:14px}
+  @media(max-width:680px){.row{grid-template-columns:1fr}.lbl{text-align:left}.arw{display:none}.quads{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="nav"><div><b>Be</b> · argus — quadrant reacts on cron-finish</div><div class="pub">Design · 2026-08-25 17:33 PDT</div>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/7935f854-5422-46eb-bb5b-3e869b36fe5d/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+  <h1>Quadrant reacts when the cron pass <span class="s">finishes</span></h1>
+  <p class="lede">Event-driven, not a timer. The board holds still and only re-pulls a quadrant when the
+  server signals a warm pass completed — one coordinated update per cron finish, every read a cache hit.
+  This is the opposite of the "crazy" refresh we removed (blind per-quad timers racing the server).</p>
+
+  <h2><span class="tag ok">Already true</span> confirmed by ~i</h2>
+<div class="lk-sec" data-cm="already-true-confirmed-by-i"><ul class="notes good">
+    <li><b>Client auto-refresh is OFF</b> — <code>pollWarmStatus=0</code>, auto <code>tickClock=0</code>, <code>bgRefresh=0</code>. Only the clock display + manual ↻ remain. Same code for the bare board and the <code>?k=</code> share link.</li>
+    <li><b>4 GCP crons fire</b> on <code>:00 / :15 / :30 / :45</code> (<code>refresh-active?after=0/15/30/45</code>).</li>
+    <li><b>The server already stamps the signal</b> — the bridge bumps <code>warmEpoch</code> when a pass completes and exposes <code>/meraki/warm-status</code> <code>{epoch, lastPassMs, lastPassAt}</code>. Nothing to build server-side.</li>
+  </ul></div>
+<h2><span class="tag new">Proposed</span> the one client addition</h2>
+<div class="lk-sec" data-cm="proposed-the-one-client-addition"><div class="flow">
+    <div class="row"><div class="lbl">GCP cron</div><div></div>
+      <div class="crons"><span class="cron">:00</span><span class="cron">:15</span><span class="cron">:30</span><span class="cron">:45</span><span style="color:var(--mut);font-size:12px;align-self:center">→ POST /meraki/refresh-active</span></div></div>
+    <div class="row"><div class="lbl">bridge</div><div class="arw d">↓</div>
+      <div class="box acc"><div class="t">warm pass — reads the active sites</div><div class="d">on COMPLETE → <code>warmEpoch++</code> · publishes <code>/meraki/warm-status</code></div></div></div>
+    <div class="row"><div class="lbl">upstream</div><div class="arw">→</div>
+      <div class="box meraki"><div class="t">Meraki API</div><div class="d">≤1 read / network / pass · governed 5 req/s</div></div></div>
+    <div class="row"><div class="lbl">board (NEW)</div><div class="arw d">↓</div>
+      <div class="box good"><div class="t">poll <code>/meraki/warm-status</code> every ~5s</div><div class="d">tiny in-memory JSON · no Meraki · rides the share key</div></div></div>
+    <div class="row"><div class="lbl">decision</div><div class="arw d">↓</div>
+      <div class="box amber"><div class="t">epoch advanced since last seen?</div><div class="d"><b>no</b> → hold still (nothing happens) &nbsp;·&nbsp; <b>yes</b> → a pass just finished, fresh data is ready</div></div></div>
+    <div class="row"><div class="lbl">reaction</div><div class="arw d">↓</div>
+      <div class="box good"><div class="t">sweep the visible quads, staggered ~275ms</div><div class="d">every read a warm-cache HIT → zero extra Meraki · one coordinated update</div></div></div>
+    <div class="row"><div class="lbl">what you see</div><div></div>
+      <div class="quads">
+        <div class="quad"><span class="pulse"></span><div class="n">093 · River North</div><div class="a">as of 3:56:04 → <b style="color:var(--good)">3:56:19</b> · reacted</div></div>
+        <div class="quad"><span class="pulse"></span><div class="n">041 · Addison</div><div class="a">as of 3:56:03 → <b style="color:var(--good)">3:56:19</b> · reacted</div></div>
+        <div class="quad"><span class="pulse"></span><div class="n">025 · San Ramon</div><div class="a">as of 3:56:05 → <b style="color:var(--good)">3:56:19</b> · reacted</div></div>
+        <div class="quad"><span class="pulse"></span><div class="n">087 · The Market Place</div><div class="a">as of 3:56:02 → <b style="color:var(--good)">3:56:19</b> · reacted</div></div>
+      </div></div>
+  </div></div>
+<h2>Guardrails &amp; the one caveat</h2>
+  <ul class="notes amber">
+    <li><b>Only on advance.</b> No epoch change = the board does nothing. No blind timers, no racing — the exact failure mode we removed.</li>
+    <li><b>Manual ↻ untouched.</b> Still forces a live read anytime; login gate untouched; share link untouched.</li>
+    <li><b>Cadence = pass duration.</b> The epoch advances when a pass <i>finishes</i>. ~i measured <b>lastPassMs ≈ 41s with 8 active sites</b> (5 req/s governor). So quads react every ~15–40s depending on how many sites are active — not faster than the server can actually read. If you want a hard 15s reaction with many sites, that's a separate lever (raise the rate cap / shard the pass) — flag it and we decide.</li>
+    <li><b>Scope of the build:</b> ONE function on the board (poll warm-status + sweep-on-advance) + its boot hook. Server already done. ~15 lines. Opus checks.</li>
+  </ul>
+
+  <div class="foot">argus · design preview — awaiting operator GO before build · fable ~i + ~d · 2026-08-25</div>
+</div>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"7935f854-5422-46eb-bb5b-3e869b36fe5d"};</script>
+<script src="/metal/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>
