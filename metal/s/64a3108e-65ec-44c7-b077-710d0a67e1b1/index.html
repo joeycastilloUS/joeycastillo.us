@@ -92,8 +92,9 @@ ul{margin:10px 0;padding-left:21px}li{margin:7px 0;font-size:14px;color:#d3dade}
 <tbody>
 <tr><td class="k">Signal to POS AP</td><td>Moderate &mdash; usable, not strong</td></tr>
 <tr><td class="k">Signal to BOH AP</td><td><b>Poor</b> &mdash; strong enough to attract a roam attempt, too weak to hold it</td></tr>
-<tr><td class="k">Corroboration</td><td>Your BOH switch logged a <b>MAC flap</b> for this device between the two AP ports &mdash; the network briefly saw it behind both APs at once.</td></tr>
-<tr><td class="k">Not just this device</td><td><b>Another client at this store has done exactly the same thing every day since 24 August.</b> Other devices on the staff Wi-Fi churn as much or more. This is a location issue, not a timeclock issue.</td></tr>
+<tr><td class="k">Corroboration</td><td>Your BOH switch logged <b>MAC flaps</b> between the two AP ports &mdash; the network seeing this device behind both access points at once.</td></tr>
+<tr><td class="k">How long</td><td><b>Since 13 August &mdash; three weeks</b>, on 14 separate days. This is a long-standing condition at this spot, not something that started recently.</td></tr>
+<tr><td class="k">Not unique to it</td><td>Other devices on the staff Wi-Fi show as much join/leave churn or more. The location and the AP overlap are the common factor.</td></tr>
 </tbody></table>
 <p>Nothing else in the store is implicated: no access point reboots, no channel changes, no uplink flaps, and the MX is clean. All six Meraki devices at the store are online.</p>
 </div>
@@ -101,6 +102,8 @@ ul{margin:10px 0;padding-left:21px}li{margin:7px 0;font-size:14px;color:#d3dade}
 <div class="blue">
 <p><b>Worth knowing: these timeclocks are invisible to Meraki, and that is a setting you control.</b></p>
 <p>This iPad connects using an <b>iOS &ldquo;Private Wi-Fi Address&rdquo;</b> &mdash; a randomised MAC address rather than its real one. That is why Meraki shows no manufacturer and no operating system for it, and why its history only goes back to <b>1 September</b>: the address is new, so the device looks new.</p>
+<p><b>We watched it happen at this store.</b> Until 1 September the timeclock was on the network as MAC <span class="mono">3a:19:87:3b:80:03</span> holding <span class="mono">192.168.1.59</span> &mdash; 354 address renewals between 6 August and 01:44 on 1 September. At 02:55 that morning it came back as a brand-new MAC, <span class="mono">b6:41:19:a4:d8:fb</span>, and took the next address, <span class="mono">192.168.1.60</span>. The two never overlap; there is a 71-minute gap between the last lease of the old identity and the first of the new one.</p>
+<p>To Meraki those look like <b>two different devices</b>. One physical iPad, two client records, two IP addresses, and a history that appears to begin on 1 September when the device has in fact been there since at least 6 August. The roaming problem above is only visible as a three-week pattern because we joined those two records back together by hand.</p>
 <p>This is not one store. <b>Nine of your ten timeclocks</b> across the estate do the same thing. The practical consequences: you cannot identify these devices in Meraki, MAC-based allowlisting and per-device policy will not hold, and their connection history resets whenever the address rotates.</p>
 <p>The fix is a single MDM setting &mdash; disable Private Wi-Fi Address for the corporate SSID on managed iPads. <b>Valencia (store 65) is already configured this way</b> and shows the desired end state, so this is a change you have proven once already.</p>
 </div></div>
@@ -116,7 +119,7 @@ ul{margin:10px 0;padding-left:21px}li{margin:7px 0;font-size:14px;color:#d3dade}
 <div class="card">
 <ul>
 <li><b>Leave the timeclock alone.</b> It is working. No visit, no swap, no reboot needed.</li>
-<li><b>Look at coverage between POS AP and BOH AP</b> at this store. A second device has been flapping between them daily for ten days, so fixing it helps more than the timeclock. Options range from adjusting transmit power and roaming thresholds to physically relocating an AP.</li>
+<li><b>Look at coverage between POS AP and BOH AP</b> at this store. The flapping has been going on for three weeks and other staff devices show the same churn, so this is the fix with the widest benefit. Options range from adjusting transmit power and roaming thresholds to physically relocating an AP.</li>
 <li><b>Turn off Private Wi-Fi Address on the managed iPads</b> for the corporate SSID. This restores your ability to identify and govern them in Meraki, fleet-wide.</li>
 <li><b>If you want the definitive per-failure breakdown</b>, we can add Meraki&rsquo;s failed-connections report to Argus so this chart is explained automatically next time rather than investigated by hand.</li>
 </ul>
