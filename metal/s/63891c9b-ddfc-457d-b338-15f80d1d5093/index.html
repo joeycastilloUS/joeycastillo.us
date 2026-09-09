@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rollout FAIL → Slack (atomic-funk) — ~i</title>
+<!--lk-og-->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="joeycastillo.us">
+<meta property="og:title" content="Rollout FAIL → Slack (atomic-funk) — ~i">
+<meta name="description" content="Operator marks FAIL in Inventory / Decommission review → photo + failure notes land in atomic-funk automatically. Hook: server-side, in the bridge.">
+<meta property="og:description" content="Operator marks FAIL in Inventory / Decommission review → photo + failure notes land in atomic-funk automatically. Hook: server-side, in the bridge.">
+<meta property="og:url" content="https://joeycastillo.us/metal/s/63891c9b-ddfc-457d-b338-15f80d1d5093/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Rollout FAIL → Slack (atomic-funk) — ~i">
+<meta name="twitter:description" content="Operator marks FAIL in Inventory / Decommission review → photo + failure notes land in atomic-funk automatically. Hook: server-side, in the bridge.">
+<!--/lk-og-->
+<style>
+  :root{--bg:#111111;--card:#1A1A1A;--accent:#6FC3DF;--txt:#DDD;--muted:#888;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.5;}
+  nav{position:sticky;top:0;background:#000;border-bottom:2px solid var(--accent);padding:10px 20px;display:flex;justify-content:space-between;align-items:center;z-index:10;}
+  nav .brand{color:var(--accent);font-weight:bold;}
+  nav .pub{color:var(--muted);font-size:12px;}
+  main{max-width:800px;margin:0 auto;padding:24px 20px 60px;}
+  h1{font-size:26px;margin:18px 0 4px;color:#fff;}
+  h2{font-size:17px;color:var(--accent);margin:34px 0 10px;border-bottom:1px solid #2a2a2a;padding-bottom:6px;}
+  .intent{color:var(--muted);margin:0 0 8px;}
+  .card{background:var(--card);border:1px solid #2a2a2a;border-radius:8px;padding:16px;margin:14px 0;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{color:var(--accent);text-align:left;padding:6px 8px;border-bottom:1px solid #333;font-weight:600;}
+  td{padding:6px 8px;border-bottom:1px solid #222;vertical-align:top;}
+  code{background:#000;color:#9fd8ec;padding:1px 5px;border-radius:3px;font-size:12px;font-family:Consolas,monospace;}
+  pre{background:#000;border:1px solid #2a2a2a;border-radius:6px;padding:12px;overflow-x:auto;font-size:12px;color:#9fd8ec;font-family:Consolas,monospace;}
+  ol.steps{padding-left:22px;}
+  ol.steps li{margin:10px 0;}
+  .rec{color:#7CE38B;font-weight:600;}
+  .gap{color:#F6C744;font-weight:600;}
+  .dod{background:var(--card);border-left:3px solid var(--accent);padding:14px 16px;margin:24px 0;font-size:13px;}
+  .dod div{margin:3px 0;}
+  .ok{color:#7CE38B;}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:40px;border-top:1px solid #222;padding-top:14px;}
+  .mermaid{background:var(--card);border-radius:8px;padding:12px;margin:14px 0;}
+</style>
+</head>
+<body>
+<nav><span class="brand">Be · ~i inspect</span><span class="pub">Published 2026-09-08 PT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/63891c9b-ddfc-457d-b338-15f80d1d5093/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</nav>
+<main>
+
+<h1>Rollout FAIL → Slack (atomic-funk)</h1>
+<p class="intent">Operator marks FAIL in Inventory / Decommission review → photo + failure notes land in atomic-funk automatically. Hook: server-side, in the bridge.</p>
+
+<h2>Flow</h2>
+<div class="lk-sec" data-cm="flow"><div class="mermaid">
+flowchart TD
+  A["Operator clicks FAIL"] --> B["Reason editor"]
+  B --> C["krReviewSet 10918"]
+  C --> D["POST /atb/review-set"]
+  D --> E["ReviewSet Program.cs:643"]
+  E --> F["SetAsync → atb_review"]
+  F --> G{"fail + inv/dec + new?"}
+  G -- yes --> H["Photo URL + notes"]
+  H --> I["POST /notify"]
+  I --> J["Regulator + BlockKit"]
+  J --> K["atomic-funk C0BUEL6E51R"]
+  G -- "re-save / pass" --> L["No post"]
+  style G fill:#1A1A1A,stroke:#7CE38B,stroke-width:3px,color:#7CE38B
+  style K fill:#1A1A1A,stroke:#6FC3DF,stroke-width:2px,color:#6FC3DF
+</div>
+<p class="intent"><span class="rec">★ Recommended hook</span> = green node: server-side in airtable-bridge <code>ReviewSet</code>, after the Firestore write succeeds.</p></div>
+<h2>Findings</h2>
+<div class="lk-sec" data-cm="findings"><div class="card">
+<table>
+<tr><th>What</th><th>Where (verified 2026-09-08)</th><th>Note</th></tr>
+<tr><td>FAIL write (client)</td><td><code>web/app/index.html:10918</code> krReviewSet; reason save <code>:11015→:11022</code></td><td>FAIL never written without a reason. Inv <code>tblAyGdWUUWI6n7oE</code>, Dec <code>tbl0vaMoERlzgKqnj</code> (<code>:10038</code>).</td></tr>
+<tr><td>FAIL write (server)</td><td><code>airtable-bridge/Program.cs:643-699</code> ReviewSet → <code>AtbReview.cs:35</code> SetAsync</td><td>Firestore <code>atb_review/{recordId|field}</code>. Already does read-before-write (<code>:39</code>) — free dedup signal.</td></tr>
+<tr><td>Photo</td><td>att id rides the review body (<code>index.html:10940</code> inv, <code>:10930</code> dec); record cached at <code>Program.cs:669</code></td><td>Airtable URL (<code>url</code> / <code>thumbnails.large.url</code>) is in the cached record. Expires ~2h (<code>AtbPhotos.cs:12</code>) — fine: Slack fetches + caches at post time. GCS mirror is gated data-URL only, not Slack-fetchable.</td></tr>
+<tr><td>Notes available</td><td>SetAsync args + cached record</td><td>site (<code>fields["Site"]</code>), table name, field/slot, verdict, fail reason (≤500), who (email), server timestamp, ocrState, ⚑ flag.</td></tr>
+<tr><td>/notify target</td><td><code>slack-bridge/Program.cs:25-63</code></td><td>Gate <code>X-Argus-Internal</code> = <code>ARGUS_INTERNAL_TOKEN</code> (secret <code>slack-internal-token-test</code>). Channel: body or <code>SLACK_NOTIFY_CHANNEL</code>. Regulator scans all outbound.</td></tr>
+<tr><td class="gap">Image gap</td><td><code>slack-bridge/BlockKit.cs:27</code></td><td><span class="gap">/notify has no image block</span> — header + fields + link only. Extend it (below): ~6 lines.</td></tr>
+</table>
+</div></div>
+<h2>Why server-side (not frontend, not Firestore trigger)</h2>
+<div class="lk-sec" data-cm="why-server-side-not-frontend"><div class="card">
+Frontend: missable (tab close), secret can't live in the browser. Firestore trigger: new infra, new deploy surface, no-Firebase house rule. Server-side: fires for every caller, one place, secret stays in Cloud Run, dedup is one read we already make. Done.
+</div></div>
+<h2>Instructions</h2>
+<div class="lk-sec" data-cm="instructions"><ol class="steps">
+<li><b>Extend /notify with an image.</b> <code>slack-bridge/BlockKit.cs</code>:
+<pre>// NotifyRequest — add:
+[JsonPropertyName("imageUrl")] public string? ImageUrl { get; set; }
+
+// Build(), after the fields sections:
+if (!string.IsNullOrWhiteSpace(r.ImageUrl))
+    blocks.Add(new { type = "image", image_url = r.ImageUrl,
+                     alt_text = "evidence photo" });
+
+// FlattenForScan — add r.ImageUrl to parts (Regulator sees everything).</pre>
+Deploy slack-bridge.</li>
+<li><b>Give airtable-bridge the door.</b> Cloud Run env <code>SLACK_BRIDGE_URL=https://slack-bridge-d5vc4tye3a-uw.a.run.app</code> + <code>--set-secrets ARGUS_INTERNAL_TOKEN=slack-internal-token-test:latest</code>. Names only, never values.</li>
+<li><b>Hook SetAsync.</b> <code>AtbReview.cs:39</code> already snapshots the doc — return <code>prevVerdict</code> too. In <code>Program.cs</code> ReviewSet, after the <code>:691</code> SetAsync succeeds: if <code>verdict=="fail"</code> AND <code>tableId</code> ∈ {<code>tblAyGdWUUWI6n7oE</code>, <code>tbl0vaMoERlzgKqnj</code>} AND <code>prevVerdict!="fail"</code> → build payload, fire-and-forget POST (Task.Run + log; never block or fail the review response on Slack).</li>
+<li><b>Payload.</b> Photo URL: walk <code>recSnap</code> attachment fields for the body's <code>att</code> id → <code>thumbnails.large.url</code> else <code>url</code>. Post:
+<pre>{ "event": "rollout.fail",
+  "title": "FAIL — {Site} · {Inventory|Decommission}",
+  "fields": ["*Slot:* {field}", "*Reason:* {note}",
+             "*By:* {by}", "*When:* {at}"],
+  "imageUrl": "{airtable attachment url}",
+  "link": "{console url}" }</pre>
+No channel field — bridge default is atomic-funk. Prod stays out until consent.</li>
+<li><b>Dedup.</b> The <code>prevVerdict!="fail"</code> guard is it: first FAIL posts, reason re-save is silent, fail→pass→fail posts again (that's a new failure — correct).</li>
+<li><b>Test.</b> One real FAIL in Inventory → photo + reason render in atomic-funk. Re-save the reason → no second post. Repeat once in Decommission.</li>
+</ol></div>
+<h2>First move</h2>
+<div class="lk-sec" data-cm="first-move"><div class="card">
+Ship step 1, then curl <code>/notify</code> with a real Airtable photo URL + <code>imageUrl</code> → see the photo in atomic-funk. Proves the render before any bridge wiring.
+</div>
+
+<div class="dod">
+<b>DoD</b>
+<div class="ok">✓ A-D-D verified (slack-bridge CONTRACT.md + ARCHITECTURE.md §14 — notify-only, test env, matches)</div>
+<div class="ok">✓ Code inspected at file:line, all paths re-verified today (2026-09-08)</div>
+<div class="ok">✓ Trigger compared (server / frontend / Firestore) — server-side recommended with reasons</div>
+<div class="ok">✓ /notify image gap named + exact extension stated</div>
+<div class="ok">✓ Scope held: Inventory + Decommission, atomic-funk C0BUEL6E51R only</div>
+<div class="ok">✓ Dedup + no-block-on-Slack rules stated</div>
+</div></div>
+<footer>Be · ~i · Generated 2026-09-08 · v0 · Fable-only inspect · Opus publishes</footer>
+</main>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+mermaid.initialize({ startOnLoad: true, theme: "dark", themeVariables: {
+  primaryColor: "#1A1A1A", primaryTextColor: "#DDD", primaryBorderColor: "#6FC3DF",
+  lineColor: "#6FC3DF", fontFamily: "Helvetica Neue, Helvetica, Arial, sans-serif" }});
+</script>
+
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"63891c9b-ddfc-457d-b338-15f80d1d5093"};</script>
+<script src="/metal/artifact-comments.js?v=50d45a11"></script>
+</body>
+</html>
