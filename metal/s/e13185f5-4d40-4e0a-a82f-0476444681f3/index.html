@@ -1,0 +1,135 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta name="referrer" content="no-referrer"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Design — Board Liveness: Green / Amber / Red</title>
+<!--lk-og-->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="joeycastillo.us">
+<meta property="og:title" content="Design — Board Liveness: Green / Amber / Red">
+<meta name="description" content="~d · argus · Konductor Rollout Board · fixes the regression from cf4a828 (2026-09-03)">
+<meta property="og:description" content="~d · argus · Konductor Rollout Board · fixes the regression from cf4a828 (2026-09-03)">
+<meta property="og:url" content="https://joeycastillo.us/metal/s/e13185f5-4d40-4e0a-a82f-0476444681f3/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Design — Board Liveness: Green / Amber / Red">
+<meta name="twitter:description" content="~d · argus · Konductor Rollout Board · fixes the regression from cf4a828 (2026-09-03)">
+<!--/lk-og-->
+<style>
+*{box-sizing:border-box}body{background:#111;color:#e0e0e0;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+.nav{position:sticky;top:0;background:#000;border-bottom:2px solid #6FC3DF;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;z-index:10}
+.nav b{color:#6FC3DF;font-size:18px}.nav .pub{color:#8a93a0;font-size:12px}
+.wrap{max-width:800px;margin:0 auto;padding:28px 20px 60px}
+h1{color:#6FC3DF;font-size:27px;margin:0 0 6px}
+h2{color:#6FC3DF;font-size:19px;margin:32px 0 10px;border-bottom:1px solid #242424;padding-bottom:6px}
+h3{color:#cdd6da;font-size:15px;margin:18px 0 6px}
+.card{background:#1A1A1A;border:1px solid #242424;border-radius:8px;padding:16px 18px;margin:14px 0}
+code{background:#0d0d0d;padding:1px 5px;border-radius:3px;color:#7ce0a0;font-size:12.5px}
+pre{background:#0d0d0d;border:1px solid #242424;border-radius:8px;padding:13px 15px;overflow-x:auto;font-size:12.5px;color:#cdd6da}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+th{text-align:left;color:#6FC3DF;border-bottom:1px solid #2c4a55;padding:7px 8px}
+td{border-bottom:1px solid #1e1e1e;padding:7px 8px;vertical-align:top}
+.bad{color:#ff8b8b}.ok{color:#7ce0a0}.mut{color:#8a93a0}.amb{color:#d6b84a}
+ul{margin:8px 0 8px 18px;padding:0}li{margin:5px 0}
+.foot{margin-top:40px;border-top:1px solid #242424;padding-top:14px;color:#8a93a0;font-size:12px}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.up{background:#39d98a}.sleep{background:#d6b84a}.down{background:#ff7a7a}.plan{background:#f5c36f}
+</style></head><body>
+<div class="nav"><b>Be</b><span class="pub">Published 2026-09-17 00:40 PDT</span>  <button class="lk-share-btn" onclick="(function(b){navigator.clipboard.writeText('https://joeycastillo.us/metal/s/e13185f5-4d40-4e0a-a82f-0476444681f3/').then(function(){var t=b.textContent;b.textContent='\u2713 Copied';setTimeout(function(){b.textContent=t;},1500);});})(this)" style="margin-left:12px;background:#6FC3DF;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer;flex:0 0 auto;">Share</button>
+</div>
+<div class="wrap">
+<h1>Board Liveness — Green / Amber / Red</h1>
+<p class="mut">~d &middot; argus &middot; Konductor Rollout Board &middot; fixes the regression from <code>cf4a828</code> (2026-09-03)</p>
+
+<h2>1. The need</h2>
+<div class="lk-sec" data-cm="1-the-need"><div class="card"><p>Operator: <em>&ldquo;why is this not updating.. these sites are done being upgraded switch wise&rdquo;</em> &mdash; the board says a store is dead when it is merely closed.</p>
+<p>Technical: since <code>cf4a828</code>, <code>st='live'</code> at <code>:1147</code> requires Meraki client <code>Online</code>, which is a <b>&le;2-minute traffic flag</b>. A present-but-quiet Konductor device (measured <code>lastSeen</code> 34&ndash;44 min at a closed store) falls to <code>notlive</code>, so <code>unacc</code> climbs, <code>solid</code> goes false, and the quad reads <b>1/12 live &middot; NOT SOLID</b>.</p></div></div>
+<h2>2. Raw user stories</h2>
+<div class="lk-sec" data-cm="2-raw-user-stories"><ul>
+<li>At 1am, across the room, I can tell a <b>closed</b> store from a <b>broken</b> store without reading a word.</li>
+<li>A device someone unplugged, or that hung, still turns red &mdash; inside an hour or two, not never.</li>
+<li>A device that has never checked in is never green; the board says <i>gap</i>, not <i>guess</i>.</li>
+<li>The number in the corner means &ldquo;devices accounted for&rdquo;, and Solid means &ldquo;nothing is wrong&rdquo;.</li>
+</ul></div>
+<h2>3. Sourced solution</h2>
+<div class="lk-sec" data-cm="3-sourced-solution"><p>Every signal below already exists in the board&rsquo;s own <code>seen[ip]</code> record, built in <code>note()</code> at <code>:1114-1123</code>. No bridge work.</p>
+<table><tr><th>Signal</th><th>Where</th><th>Use</th><th>Why</th></tr>
+<tr><td><code>s.online</code></td><td>:1116</td><td>primary green</td><td>traffic &le;2 min &mdash; the only &ldquo;talking now&rdquo; proof</td></tr>
+<tr><td><code>s.ls</code></td><td>:1119</td><td><b>the discriminator</b></td><td>a present-idle device refreshes it; a dropped device never does</td></tr>
+<tr><td><code>s.portConn</code></td><td>:1122</td><td>veto, not proof</td><td>link-up alone painted the dropped Expo green &mdash; that was <code>cf4a828</code>&rsquo;s whole point</td></tr>
+<tr><td><code>poeActive</code></td><td>:1126</td><td>not used</td><td>a hung-but-powered printer still draws PoE</td></tr>
+<tr><td><code>poeDraw</code></td><td>:1126</td><td>not used</td><td>cumulative Wh, not live draw &mdash; the file already says so at <code>:1294</code></td></tr>
+<tr><td><code>clientCount</code></td><td>bridge, unread</td><td>v2 candidate</td><td>no measurement of how fast it ages out</td></tr>
+<tr><td><code>/konducter</code> rows</td><td>:1305-1320</td><td>stays a badge</td><td>see R6</td></tr>
+</table>
+<p>One new board-local field: <code>s.wired</code>, set in <code>note()</code> when the sighting came from a switch port. Needed because <code>s.poe</code> is only kept for online-or-connected devices (<code>:1121</code>), so today a device on a <i>down</i> port carries no wired evidence at all.</p></div>
+<h2>4. Literal naming</h2>
+<div class="lk-sec" data-cm="4-literal-naming"><table><tr><th>status</th><th>dot</th><th>what it means on the wall</th></tr>
+<tr><td><code>live</code></td><td><span class="dot up"></span>green</td><td>talking right now</td></tr>
+<tr><td><code>idle</code> <b>(new)</b></td><td><span class="dot sleep"></span>amber</td><td>plugged in, heard from within 90 min, quiet &mdash; normal for a closed store</td></tr>
+<tr><td><code>planned</code></td><td><span class="dot plan"></span></td><td>accepted not-installed (unchanged)</td></tr>
+<tr><td><code>notlive</code></td><td><span class="dot down"></span>red</td><td>silent past 90 min, or its port went down</td></tr>
+<tr><td><code>missing</code></td><td><span class="dot down"></span>red</td><td>no client record at all &mdash; a real gap</td></tr>
+</table>
+<p>Amber reuses the board&rsquo;s own precedent: <code>netcls</code> at <code>:1292</code> already says an asleep Toast device is <i>&ldquo;NORMAL, so NEVER red&rdquo;</i>, and <code>.dot.sleep</code> already exists at <code>:289</code>. A closed store shows a wall of amber; it flips green when the store opens. <b>Amber never claims &ldquo;confirmed&rdquo;</b> &mdash; which is exactly what <code>cf4a828</code> was protecting.</p></div>
+<h2>5. The shape</h2>
+<div class="lk-sec" data-cm="5-the-shape"><h3>Constant</h3>
+<pre>var IDLE_MAX_MIN=90;   // quiet-but-present. Measured 2026-09-17 (12 sites, 5h after close):
+                       // live Konductor devices lastSeen 15-60 min (99 of 119 records), ZERO past 60;
+                       // stale ex-Toast squatters 199-292 min; Meraki flips Offline at 8 min.</pre>
+<h3><code>note()</code> &mdash; one added write after <code>:1122</code></h3>
+<pre>if(poe)s.wired=true;   // sighting came from a switch port</pre>
+<h3>The predicate &mdash; replaces <code>:1147-1150</code></h3>
+<pre>var ageMin=(s&amp;&amp;s.ls)?(Date.now()-Date.parse(s.ls))/60000:NaN;   // NaN never satisfies &lt;=
+var idle=!!(s&amp;&amp;!s.online&amp;&amp;ageMin&lt;=IDLE_MAX_MIN&amp;&amp;(!s.wired||s.portConn));
+if(s&amp;&amp;s.online){st='live';live++;}
+else if(idle){st='idle';live++;}        // accounted-for; amber says "quiet", never green
+else if(isA){st='planned';planned++;}
+else if(s){st='notlive';unacc++;}       // silent past IDLE_MAX_MIN, or wired with the port down
+else{st='missing';unacc++;}</pre>
+<h3><code>netcls</code> at <code>:1293</code></h3>
+<pre>if(dv.status==='live')return 'up';if(dv.status==='idle')return 'sleep';
+if(dv.status==='planned')return 'plan';return 'down';</pre>
+<p><code>devRow</code> (<code>:1327</code>) also gains <code>dv.status==='idle'||</code> on its <code>seen</code> condition, so amber rows print <b>&ldquo;last seen HH:MM&rdquo;</b> &mdash; that number is how the operator tunes the constant with evidence instead of guessing.</p>
+<h3>What the counters mean now</h3>
+<p><code>solid</code> (<code>:1243</code>) stays <code>unacc===0</code> and means <b>nothing is red</b>. Idle is not red.<br>
+<code>live/expected</code> (<code>:1382</code>) and <code>pct</code> (<code>:1205</code>) now count <b>green + amber = accounted for</b>. This is required, not cosmetic: <code>pct</code> feeds <code>pctcls</code> at <code>:1348</code>, so any counter excluding idle turns every closed store&rsquo;s quad red every night.</p></div>
+<h2>Replay on tonight&rsquo;s real data</h2>
+<div class="lk-sec" data-cm="replay-on-tonight-s-real"><table><tr><th>Site</th><th>Today</th><th>Under this design</th></tr>
+<tr><td>028 Rice Village</td><td class="bad">1/12 &middot; NOT SOLID</td><td><b>10/12</b> &middot; 1 <span class="ok">green</span>, 9 <span class="amb">amber</span>, 2 <span class="bad">red</span> &middot; pct 83 &rarr; <code>mid</code></td></tr>
+<tr><td>063 Highland Park</td><td class="bad">2/12 &middot; NOT SOLID</td><td><b>10/12</b> &middot; 2 <span class="ok">green</span>, 8 <span class="amb">amber</span>, 2 <span class="bad">red</span></td></tr>
+</table></div>
+<h2>Hard requirements</h2>
+<div class="lk-sec" data-cm="hard-requirements"><table><tr><th>#</th><th>Requirement</th><th>How it is met</th></tr>
+<tr><td>R1</td><td>028 must not read 0/12 or NOT SOLID</td><td>Reads <b>10/12</b>, pct 83 &rarr; <code>mid</code>. It <b>still reads NOT SOLID</b>, and that is not designed around: two devices have no Meraki record at all. The old rule would also have shown 10/12 NOT SOLID.</td></tr>
+<tr><td>R2</td><td>A genuinely dropped device must still go red</td><td>At &ldquo;~an hour&rdquo; (<code>cf4a828</code>&rsquo;s own words) it is <b>amber, not green</b> &mdash; the board is not claiming it. At 90 min it turns red and stays red. If the cable is pulled, <code>s.wired &amp;&amp; !s.portConn</code> makes it red inside Meraki&rsquo;s 8-min flip regardless of age.</td></tr>
+<tr><td>R3</td><td>No client record must never be green</td><td><code>s</code> undefined &rarr; <code>ageMin</code> NaN &rarr; <code>idle</code> false &rarr; <code>missing</code>, red, <code>unacc++</code>.</td></tr>
+<tr><td>R4</td><td>Readable across a room</td><td>Green / amber / red dots, existing CSS at <code>:289</code>, 16px in <code>.q.max</code>.</td></tr>
+<tr><td>R5</td><td>One file, no bridge, no schema</td><td>Met. <code>web/board/index.html</code> only; <code>s.wired</code> is board-local.</td></tr>
+<tr><td>R6</td><td>Does <code>/konducter</code> feed liveness?</td><td><b>No &mdash; badge only.</b> Tonight <code>ageSec</code> 6756 is 7.5&times; <code>KON_STALE_SEC</code> (900). A 2-hour-old portal aggregate cannot outrank Meraki&rsquo;s own <code>lastSeen</code>. Revisit when konducter-warm holds its 5-min cadence, and then only as a <b>veto</b> (Konducter Offline + fresh &rarr; cap at amber), never as a green source.</td></tr>
+</table></div>
+<h2>What this does NOT fix</h2>
+<div class="lk-sec" data-cm="what-this-does-not-fix"><ul>
+<li><b>Four devices with no Meraki client record</b> (028: Bread Printer .70, Salad Printer .71; 063: HerdServe .55, Digital Expo Printer .90). Separate gap &mdash; unmapped ports, powered off nightly, or wrong IPs in <code>MAP</code>. The board correctly shows red.</li>
+<li><b>konducter-warm is 1h53m behind its 5-minute design.</b> The K badge is dimmed and nobody is alerted.</li>
+<li><code>clientCount</code> remains unread.</li>
+</ul></div>
+<h2>The one thing most likely to make this wrong in a week</h2>
+<div class="lk-sec" data-cm="the-one-thing-most-likely"><div class="card"><p><code>IDLE_MAX_MIN=90</code> is measured on one night. It is validated on the <b>present</b> side &mdash; 99 of 119 fleet records sit at 15&ndash;60 min and <b>zero</b> exceed 60, so 90 carries 30 minutes of headroom. It is <b>not</b> validated on the <b>dropped</b> side: there is no genuinely-dropped Konductor device in tonight&rsquo;s data to test against. The mechanism is confirmed &mdash; Meraki queries clients with <code>timespan=86400</code> and legacy records were observed ageing to 292 min rather than vanishing &mdash; but the threshold itself is untested against a real drop.</p>
+<p>A device class with a longer quiet gap (a printer with no keepalive, a long DHCP lease) will flip red at 3am and look like a drop. The &ldquo;last seen&rdquo; line on amber rows exists so that gets tuned with evidence.</p>
+<p>Second-order: <code>Date.now()</code> minus a cached portmap&rsquo;s <code>lastSeen</code> includes cache age, which only pushes toward red &mdash; conservative, but a stale bridge read will look like a site going quiet.</p></div></div>
+<h2>6. First move</h2>
+<div class="lk-sec" data-cm="6-first-move"><p>One file, five edits, in order: constant after <code>:1304</code> &middot; <code>s.wired</code> after <code>:1122</code> &middot; predicate <code>:1147-1150</code> &middot; <code>netcls</code> <code>:1293</code> &middot; <code>devRow</code> <code>:1327</code>. Leave <code>:1179</code> alone &mdash; it is the Toast block, not Konductor liveness.</p></div>
+<h2>DoD</h2>
+<ul>
+<li class="ok">&#10003; Root cause established to the commit and line (<code>cf4a828</code>, <code>:1147</code>)</li>
+<li class="ok">&#10003; Paired &mdash; Fable drove the design, Opus verified every code claim</li>
+<li class="ok">&#10003; Threshold measured against 119 real records across 12 sites, not guessed</li>
+<li class="ok">&#10003; Replayed against tonight&rsquo;s live data: 1/12 &rarr; 10/12</li>
+<li class="ok">&#10003; The unvalidated side of the threshold is stated, not hidden</li>
+<li class="mut">&#9675; Build / test / ship &mdash; awaiting operator go</li>
+</ul>
+<div class="foot">Generated 2026-09-17 00:40 &middot; v0 &middot; argus &middot; ~d board-liveness-three-state</div>
+</div>
+<!-- LATCHKEY COMMENTS doc = this artifact's cap token; ~fu attends via the gcp-bridge -->
+<script>window.ARTIFACT={doc:"e13185f5-4d40-4e0a-a82f-0476444681f3"};</script>
+<script src="/metal/artifact-comments.js?v=50d45a11"></script>
+</body></html>
