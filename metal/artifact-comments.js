@@ -102,7 +102,7 @@
   }
   function relt(ms){ var s=Math.round((Date.now()-ms)/1000); if(s<2)return "just now"; if(s<60)return s+"s ago"; return Math.round(s/60)+"m ago"; }
   function reltIso(iso){ if(!iso) return ""; var t=Date.parse(String(iso).replace(" ","T")); if(isNaN(t)) return iso; var s=Math.round((Date.now()-t)/1000); if(s<0)s=0; if(s<45)return "just now"; if(s<90)return "1 min ago"; if(s<3600)return Math.round(s/60)+" min ago"; if(s<5400)return "1 hr ago"; if(s<86400)return Math.round(s/3600)+" hr ago"; if(s<172800)return "yesterday"; if(s<2592000)return Math.round(s/86400)+" days ago"; try{ return new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }catch(_){ return iso; } }
-  function tick(){ var e=el("ac-live"); if(e&&lastPoll) e.innerHTML="<span class='ac-dot'></span> live &middot; "+relt(lastPoll)+(totalNew?" &middot; <b style='color:#7CFFB2'>"+totalNew+" new</b>":""); }
+  function tick(){ var e=el("ac-live"); if(e&&lastPoll) e.innerHTML="comments loaded"+(totalNew?" &middot; <b style='color:#7CFFB2'>"+totalNew+" new</b>":""); }
   function load(){ fetch(GB+"/comments?doc="+DOC+"&_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){ seenTs=(d&&d.seenByMetal)||seenTs; lastPoll=Date.now(); render((d&&d.comments)||[]); }).catch(function(){}); }
   function markRead(o){ lsSet(readKey(o), nowIso()); render(allComments); }
   // Post is RESILIENT: the backend (Cloud Run) can cold-start and 500 the first
@@ -140,5 +140,5 @@
   });
 
   try{ var la=lsGet("cm_author"); if(la) objs.forEach(function(n){ var ai=el("aca-"+n.getAttribute("data-cm")); if(ai) ai.value=la; }); }catch(_){}
-  load(); setInterval(load, 15000); setInterval(tick, 1000);
+  load();
 })();

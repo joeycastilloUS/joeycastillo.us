@@ -90,7 +90,7 @@
     tick();
   }
   function relt(ms){ var s=Math.round((Date.now()-ms)/1000); if(s<2)return "just now"; if(s<60)return s+"s ago"; return Math.round(s/60)+"m ago"; }
-  function tick(){ var e=el("ac-live"); if(e&&lastPoll) e.innerHTML="<span class='ac-dot'></span> live &middot; "+relt(lastPoll)+(totalNew?" &middot; <b style='color:#7CFFB2'>"+totalNew+" new</b>":""); }
+  function tick(){ var e=el("ac-live"); if(e&&lastPoll) e.innerHTML="comments loaded"+(totalNew?" &middot; <b style='color:#7CFFB2'>"+totalNew+" new</b>":""); }
   function load(){ fetch(GB+"/comments?doc="+DOC+"&_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){ seenTs=(d&&d.seenByMetal)||seenTs; lastPoll=Date.now(); render((d&&d.comments)||[]); }).catch(function(){}); }
   function markRead(o){ lsSet(readKey(o), nowIso()); render(allComments); }
   function post(o){
@@ -110,5 +110,5 @@
   });
 
   try{ var la=lsGet("cm_author"); if(la) objs.forEach(function(n){ var ai=el("aca-"+n.getAttribute("data-cm")); if(ai) ai.value=la; }); }catch(_){}
-  load(); setInterval(load, 15000); setInterval(tick, 1000);
+  load();
 })();
