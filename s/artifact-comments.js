@@ -8,7 +8,7 @@
    metal reads via /comments/recent and stamps seen. Self-contained: injects its own CSS. */
 (function(){
   var CFG = window.ARTIFACT || {};
-  var GB  = CFG.bridge || "https://gcp-bridge-692654781984.us-west1.run.app";
+  var GB  = CFG.bridge || "https://ai-doculink.net/api";
   var DOC = CFG.doc; if(!DOC){ return; }
 
   function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
